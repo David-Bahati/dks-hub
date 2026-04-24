@@ -13,7 +13,12 @@ import {
   X,
   Coins,
   ShieldCheck,
-  UserCircle
+  UserCircle,
+  Users,
+  Settings,
+  Tags,
+  FileText,
+  UserPlus
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -30,10 +35,15 @@ import { UserRole } from "@/lib/types";
 
 const NAV_ITEMS = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, roles: ["ADMIN"] },
-  { label: "Inventaire", href: "/inventory", icon: Package, roles: ["ADMIN", "SELLER"] },
+  { label: "Produit", href: "/inventory", icon: Package, roles: ["ADMIN", "SELLER"] },
   { label: "Caisse", href: "/pos", icon: ShoppingCart, roles: ["ADMIN", "CASHIER"] },
-  { label: "Ventes", href: "/sales", icon: History, roles: ["ADMIN"] },
-  { label: "Accueil Boutique", href: "/", icon: Store, roles: ["ANY"] },
+  { label: "Commande", href: "/dashboard/orders", icon: FileText, roles: ["ADMIN"] },
+  { label: "Catégorie", href: "/dashboard/categories", icon: Tags, roles: ["ADMIN"] },
+  { label: "Client", href: "/dashboard/customers", icon: Users, roles: ["ADMIN"] },
+  { label: "Utilisateurs", href: "/dashboard/users", icon: UserPlus, roles: ["ADMIN"] },
+  { label: "Rapport", href: "/sales", icon: History, roles: ["ADMIN"] },
+  { label: "Paramètres", href: "/dashboard/settings", icon: Settings, roles: ["ADMIN"] },
+  { label: "Boutique", href: "/", icon: Store, roles: ["ANY"] },
 ];
 
 export function Navbar() {
@@ -65,17 +75,17 @@ export function Navbar() {
             </Link>
           </div>
 
-          <div className="hidden md:flex space-x-1">
+          <div className="hidden lg:flex space-x-1 overflow-x-auto no-scrollbar">
             {visibleItems.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex items-center gap-2 px-3 py-2 rounded-md text-xs transition-all hover:text-accent",
+                  "flex items-center gap-2 px-3 py-2 rounded-md text-[11px] font-bold uppercase transition-all hover:text-accent whitespace-nowrap",
                   pathname === item.href ? "nav-link-active" : "text-muted-foreground"
                 )}
               >
-                <item.icon size={16} />
+                <item.icon size={14} />
                 {item.label}
               </Link>
             ))}
@@ -93,7 +103,6 @@ export function Navbar() {
             >
               <Coins size={14} />
               {isPiConnected ? "Pi Connecté" : "Connecter Pi"}
-              {isPiConnected && <ShieldCheck size={12} className="animate-pulse" />}
             </Button>
 
             <DropdownMenu>
@@ -103,25 +112,25 @@ export function Navbar() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="bg-card border-white/10 w-48">
-                <DropdownMenuLabel>Changer de Rôle</DropdownMenuLabel>
+                <DropdownMenuLabel>Mode Simulation</DropdownMenuLabel>
                 <DropdownMenuSeparator className="bg-white/5" />
                 <DropdownMenuItem onClick={() => setCurrentRole("ADMIN")} className={currentRole === "ADMIN" ? "text-accent" : ""}>
                   Administrateur
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setCurrentRole("SELLER")} className={currentRole === "SELLER" ? "text-accent" : ""}>
-                  Vendeur (Stock)
+                  Vendeur
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setCurrentRole("CASHIER")} className={currentRole === "CASHIER" ? "text-accent" : ""}>
-                  Caissier (POS)
+                  Caissier
                 </DropdownMenuItem>
                 <DropdownMenuSeparator className="bg-white/5" />
                 <Link href="/">
-                   <DropdownMenuItem className="text-destructive">Se déconnecter</DropdownMenuItem>
+                   <DropdownMenuItem className="text-destructive">Déconnexion</DropdownMenuItem>
                 </Link>
               </DropdownMenuContent>
             </DropdownMenu>
 
-            <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setIsOpen(!isOpen)}>
+            <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setIsOpen(!isOpen)}>
               {isOpen ? <X /> : <Menu />}
             </Button>
           </div>
@@ -130,15 +139,15 @@ export function Navbar() {
 
       {/* Mobile Menu */}
       {isOpen && (
-        <div className="md:hidden bg-background border-b border-white/10 py-4 px-4 space-y-2">
+        <div className="lg:hidden bg-background border-b border-white/10 py-4 px-4 space-y-2">
           {visibleItems.map((item) => (
             <Link
               key={item.href}
               href={item.href}
               onClick={() => setIsOpen(false)}
               className={cn(
-                "flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-all",
-                pathname === item.href ? "bg-primary/20 text-accent font-semibold" : "text-muted-foreground hover:bg-white/5"
+                "flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-all uppercase font-bold",
+                pathname === item.href ? "bg-primary/20 text-accent" : "text-muted-foreground hover:bg-white/5"
               )}
             >
               <item.icon size={18} />
