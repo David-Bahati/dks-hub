@@ -1,3 +1,7 @@
+
+import { redirect } from 'next/navigation';
+
 export default function Home() {
-  return <></>;
+  // Redirect to public shop as landing page
+  redirect('/shop');
 }

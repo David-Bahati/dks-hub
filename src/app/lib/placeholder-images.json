@@ -1,0 +1,29 @@
+
+{
+  "placeholderImages": [
+    {
+      "id": "keyboard-1",
+      "description": "Mechanical gaming keyboard",
+      "imageUrl": "https://picsum.photos/seed/keyboard1/600/400",
+      "imageHint": "mechanical keyboard"
+    },
+    {
+      "id": "mouse-1",
+      "description": "Wireless gaming mouse",
+      "imageUrl": "https://picsum.photos/seed/mouse1/600/400",
+      "imageHint": "gaming mouse"
+    },
+    {
+      "id": "screen-1",
+      "description": "Ultra-wide gaming monitor",
+      "imageUrl": "https://picsum.photos/seed/screen1/600/400",
+      "imageHint": "gaming monitor"
+    },
+    {
+      "id": "hero-bg",
+      "description": "Modern computer shop interior",
+      "imageUrl": "https://picsum.photos/seed/shop/1200/600",
+      "imageHint": "computer shop"
+    }
+  ]
+}
