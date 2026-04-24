@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Lock, Mail, Loader2 } from "lucide-react";
+import { Lock, Mail, Loader2, Info } from "lucide-react";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -48,6 +48,11 @@ export default function LoginPage() {
       });
     }
     setIsLoading(false);
+  };
+
+  const fillCredentials = (e: string, p: string) => {
+    setEmail(e);
+    setPassword(p);
   };
 
   return (
@@ -108,11 +113,33 @@ export default function LoginPage() {
             </Button>
           </form>
 
-          <div className="mt-6 p-4 rounded-lg bg-white/5 border border-white/5 text-[10px] text-muted-foreground">
-            <p className="font-bold mb-1 uppercase tracking-wider">Identifiants de test :</p>
-            <p>Admin: admin@dks.com / admin123</p>
-            <p>Vendeur: vendeur@dks.com / vendeur123</p>
-            <p>Caissier: caissier@dks.com / caissier123</p>
+          <div className="mt-8 space-y-3">
+            <div className="flex items-center gap-2 text-xs font-bold text-accent uppercase tracking-wider">
+              <Info size={14} /> Comptes de Test
+            </div>
+            <div className="grid grid-cols-1 gap-2">
+              <button 
+                onClick={() => fillCredentials("admin@dks.com", "admin123")}
+                className="text-left p-2 rounded bg-white/5 border border-white/5 hover:bg-white/10 transition-colors text-[10px]"
+              >
+                <span className="font-bold block text-foreground">ADMINISTRATEUR</span>
+                admin@dks.com / admin123
+              </button>
+              <button 
+                onClick={() => fillCredentials("vendeur@dks.com", "vendeur123")}
+                className="text-left p-2 rounded bg-white/5 border border-white/5 hover:bg-white/10 transition-colors text-[10px]"
+              >
+                <span className="font-bold block text-foreground">VENDEUR</span>
+                vendeur@dks.com / vendeur123
+              </button>
+              <button 
+                onClick={() => fillCredentials("caissier@dks.com", "caissier123")}
+                className="text-left p-2 rounded bg-white/5 border border-white/5 hover:bg-white/10 transition-colors text-[10px]"
+              >
+                <span className="font-bold block text-foreground">CAISSIER</span>
+                caissier@dks.com / caissier123
+              </button>
+            </div>
           </div>
         </CardContent>
       </Card>
