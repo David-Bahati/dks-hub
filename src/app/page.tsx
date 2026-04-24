@@ -2,7 +2,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { 
@@ -17,10 +17,11 @@ import {
   Search,
   CheckCircle,
   Printer,
-  ChevronRight
+  ChevronRight,
+  User
 } from "lucide-react";
 import { MOCK_PRODUCTS } from "@/lib/mock-data";
-import { Product, PI_CONVERSION_RATE } from "@/lib/types";
+import { Product, PI_CONVERSION_RATE, User as UserType } from "@/lib/types";
 import { 
   Sheet, 
   SheetContent, 
@@ -45,6 +46,7 @@ export default function LandingPage() {
   const [search, setSearch] = useState("");
   const [isOrdering, setIsOrdering] = useState(false);
   const [showReceipt, setShowReceipt] = useState(false);
+  const [currentUser, setCurrentUser] = useState<UserType | null>(null);
   const [orderSummary, setOrderSummary] = useState<{
     id: string;
     items: CartItem[];
@@ -53,6 +55,13 @@ export default function LandingPage() {
   } | null>(null);
 
   const { toast } = useToast();
+
+  useEffect(() => {
+    const savedUser = localStorage.getItem("dks_user");
+    if (savedUser) {
+      setCurrentUser(JSON.parse(savedUser));
+    }
+  }, []);
 
   const addToCart = (product: Product) => {
     setCart(prev => {
@@ -86,7 +95,6 @@ export default function LandingPage() {
 
   const handleCheckout = async () => {
     setIsOrdering(true);
-    // Simulate payment process
     await new Promise(resolve => setTimeout(resolve, 2000));
     
     const summary = {
@@ -124,10 +132,10 @@ export default function LandingPage() {
           <div className="flex items-center gap-4">
             <Sheet>
               <SheetTrigger asChild>
-                <Button variant="outline" className="relative border-white/10 hover:bg-white/5">
+                <Button variant="outline" className="relative border-white/10 hover:bg-white/5 h-10 w-10 p-0">
                   <ShoppingCart size={20} />
                   {cart.length > 0 && (
-                    <span className="absolute -top-2 -right-2 bg-accent text-accent-foreground text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">
+                    <span className="absolute -top-1 -right-1 bg-accent text-accent-foreground text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
                       {cart.length}
                     </span>
                   )}
@@ -192,8 +200,11 @@ export default function LandingPage() {
               </SheetContent>
             </Sheet>
 
-            <Link href="/dashboard">
-              <Button className="bg-primary hover:bg-primary/90 text-sm font-bold">Espace Pro</Button>
+            <Link href={currentUser ? "/dashboard" : "/login"}>
+              <Button className="bg-primary hover:bg-primary/90 text-sm font-bold gap-2">
+                <User size={18} />
+                {currentUser ? "Tableau de bord" : "Espace Pro"}
+              </Button>
             </Link>
           </div>
         </div>

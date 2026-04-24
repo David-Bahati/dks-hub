@@ -2,7 +2,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { 
   LayoutDashboard, 
   Package, 
@@ -17,9 +17,10 @@ import {
   Settings,
   Tags,
   FileText,
-  UserPlus
+  UserPlus,
+  LogOut
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -30,9 +31,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { UserRole } from "@/lib/types";
+import { User, UserRole } from "@/lib/types";
 
-// Définition des éléments de navigation avec permissions par rôle
 const NAV_ITEMS = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, roles: ["ADMIN"] },
   { label: "Produit", href: "/inventory", icon: Package, roles: ["ADMIN", "SELLER"] },
@@ -48,17 +48,26 @@ const NAV_ITEMS = [
 
 export function Navbar() {
   const pathname = usePathname();
+  const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [isPiConnected, setIsPiConnected] = useState(false);
-  const [currentRole, setCurrentRole] = useState<UserRole>("ADMIN");
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
 
-  const togglePiConnection = () => {
-    setIsPiConnected(!isPiConnected);
+  useEffect(() => {
+    const savedUser = localStorage.getItem("dks_user");
+    if (savedUser) {
+      setCurrentUser(JSON.parse(savedUser));
+    }
+  }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem("dks_user");
+    setCurrentUser(null);
+    router.push("/login");
   };
 
-  // Filtre les éléments du menu selon le rôle actif
   const visibleItems = NAV_ITEMS.filter(item => 
-    item.roles.includes("ANY") || item.roles.includes(currentRole)
+    item.roles.includes("ANY") || (currentUser && item.roles.includes(currentUser.role))
   );
 
   const getRoleLabel = (role: UserRole) => {
@@ -71,7 +80,7 @@ export function Navbar() {
   };
 
   return (
-    <nav className="sticky top-0 z-50 bg-background/80 backdrop-blur-lg border-b border-white/10">
+    <nav className="sticky top-0 z-40 bg-background/80 backdrop-blur-lg border-b border-white/10">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16 items-center">
           <div className="flex items-center gap-2">
@@ -85,8 +94,7 @@ export function Navbar() {
             </Link>
           </div>
 
-          {/* Navigation Desktop filtrée */}
-          <div className="hidden lg:flex space-x-1 overflow-x-auto no-scrollbar">
+          <div className="hidden lg:flex space-x-1">
             {visibleItems.map((item) => (
               <Link
                 key={item.href}
@@ -106,7 +114,7 @@ export function Navbar() {
             <Button 
               variant="outline" 
               size="sm"
-              onClick={togglePiConnection}
+              onClick={() => setIsPiConnected(!isPiConnected)}
               className={cn(
                 "hidden sm:flex gap-2 border-white/10 transition-colors text-xs",
                 isPiConnected ? "bg-accent/20 border-accent/50 text-accent" : "hover:bg-accent/10"
@@ -116,37 +124,31 @@ export function Navbar() {
               {isPiConnected ? "Pi Connecté" : "Connecter Pi"}
             </Button>
 
-            {/* Menu de sélection de rôle pour la simulation */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="flex items-center gap-2 rounded-full hover:bg-white/5 border border-white/10 px-3 h-10">
-                  <UserCircle className="text-accent" size={20} />
-                  <span className="text-[10px] font-bold uppercase hidden md:inline-block text-muted-foreground">
-                    {getRoleLabel(currentRole)}
-                  </span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="bg-card border-white/10 w-56">
-                <DropdownMenuLabel>Simulation de Rôle</DropdownMenuLabel>
-                <DropdownMenuSeparator className="bg-white/5" />
-                <DropdownMenuItem onClick={() => setCurrentRole("ADMIN")} className={cn("gap-2", currentRole === "ADMIN" && "text-accent")}>
-                  <div className={cn("w-2 h-2 rounded-full", currentRole === "ADMIN" ? "bg-accent" : "bg-transparent")} />
-                  Administrateur (Tout)
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setCurrentRole("SELLER")} className={cn("gap-2", currentRole === "SELLER" && "text-accent")}>
-                  <div className={cn("w-2 h-2 rounded-full", currentRole === "SELLER" ? "bg-accent" : "bg-transparent")} />
-                  Vendeur (Stock/Clients)
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setCurrentRole("CASHIER")} className={cn("gap-2", currentRole === "CASHIER" && "text-accent")}>
-                  <div className={cn("w-2 h-2 rounded-full", currentRole === "CASHIER" ? "bg-accent" : "bg-transparent")} />
-                  Caissier (POS/Ventes)
-                </DropdownMenuItem>
-                <DropdownMenuSeparator className="bg-white/5" />
-                <Link href="/">
-                   <DropdownMenuItem className="text-destructive">Déconnexion</DropdownMenuItem>
-                </Link>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            {currentUser ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="flex items-center gap-2 rounded-full hover:bg-white/5 border border-white/10 px-3 h-10">
+                    <UserCircle className="text-accent" size={20} />
+                    <div className="flex flex-col items-start leading-none text-left">
+                      <span className="text-[10px] font-bold uppercase text-foreground">{currentUser.name}</span>
+                      <span className="text-[8px] uppercase text-muted-foreground">{getRoleLabel(currentUser.role)}</span>
+                    </div>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="bg-card border-white/10 w-56">
+                  <DropdownMenuLabel>Mon Compte</DropdownMenuLabel>
+                  <DropdownMenuSeparator className="bg-white/5" />
+                  <DropdownMenuItem onClick={handleLogout} className="text-destructive gap-2">
+                    <LogOut size={16} />
+                    Déconnexion
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <Link href="/login">
+                <Button className="bg-accent text-accent-foreground font-bold px-6">Login</Button>
+              </Link>
+            )}
 
             <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setIsOpen(!isOpen)}>
               {isOpen ? <X /> : <Menu />}
@@ -155,7 +157,6 @@ export function Navbar() {
         </div>
       </div>
 
-      {/* Menu Mobile filtré */}
       {isOpen && (
         <div className="lg:hidden bg-background border-b border-white/10 py-4 px-4 space-y-2">
           {visibleItems.map((item) => (
@@ -172,6 +173,15 @@ export function Navbar() {
               {item.label}
             </Link>
           ))}
+          {currentUser && (
+            <Button 
+              variant="destructive" 
+              onClick={handleLogout} 
+              className="w-full mt-4 flex items-center justify-center gap-2"
+            >
+              <LogOut size={18} /> Déconnexion
+            </Button>
+          )}
         </div>
       )}
     </nav>

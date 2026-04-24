@@ -3,7 +3,8 @@ export type UserRole = 'ADMIN' | 'SELLER' | 'CASHIER' | 'VISITOR';
 
 export interface User {
   id: string;
-  username: string;
+  email: string;
+  name: string;
   role: UserRole;
 }
 
@@ -47,4 +48,4 @@ export interface Order {
   orderDate: string;
 }
 
-export const PI_CONVERSION_RATE = 314.159; // Taux fixé (ex: 1 Pi = 314.159 USD)
+export const PI_CONVERSION_RATE = 314.159;
