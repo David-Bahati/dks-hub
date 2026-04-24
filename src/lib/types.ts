@@ -13,6 +13,7 @@ export type Category = 'keyboard' | 'mouse' | 'screen' | 'headset' | 'other';
 export interface Product {
   id: string;
   name: string;
+  description: string;
   category: Category;
   purchasePrice: number;
   sellingPrice: number;

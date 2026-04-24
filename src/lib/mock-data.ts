@@ -5,6 +5,7 @@ export const MOCK_PRODUCTS: Product[] = [
   {
     id: 'p1',
     name: 'Logitech G Pro X',
+    description: 'Clavier mécanique haute performance avec switches interchangeables pour les pros.',
     category: 'keyboard',
     purchasePrice: 120,
     sellingPrice: 159.99,
@@ -15,6 +16,7 @@ export const MOCK_PRODUCTS: Product[] = [
   {
     id: 'p2',
     name: 'Razer DeathAdder V3',
+    description: 'Souris gaming ultra-légère pour une précision chirurgicale et une ergonomie parfaite.',
     category: 'mouse',
     purchasePrice: 45,
     sellingPrice: 69.99,
@@ -25,6 +27,7 @@ export const MOCK_PRODUCTS: Product[] = [
   {
     id: 'p3',
     name: 'Samsung Odyssey G7',
+    description: 'Moniteur incurvé 240Hz avec technologie QLED pour une immersion totale dans vos jeux.',
     category: 'screen',
     purchasePrice: 450,
     sellingPrice: 599.99,
@@ -35,6 +38,7 @@ export const MOCK_PRODUCTS: Product[] = [
   {
     id: 'p4',
     name: 'SteelSeries Apex 7',
+    description: 'Clavier mécanique robuste avec écran OLED intelligent intégré pour vos stats.',
     category: 'keyboard',
     purchasePrice: 130,
     sellingPrice: 179.99,

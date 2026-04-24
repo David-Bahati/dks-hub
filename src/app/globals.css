@@ -1,29 +1,30 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    --background: 225 15% 12%;
-    --foreground: 0 0% 98%;
-    --card: 225 15% 15%;
-    --card-foreground: 0 0% 98%;
-    --popover: 225 15% 12%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 225 70% 45%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 225 15% 20%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 225 10% 25%;
-    --muted-foreground: 225 5% 70%;
-    --accent: 195 80% 65%;
-    --accent-foreground: 225 15% 10%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 225 10% 25%;
-    --input: 225 10% 25%;
-    --ring: 195 80% 65%;
-    --radius: 0.75rem;
+    --background: 230 20% 8%;
+    --foreground: 0 0% 100%;
+    --card: 230 20% 12%;
+    --card-foreground: 0 0% 100%;
+    --popover: 230 20% 8%;
+    --popover-foreground: 0 0% 100%;
+    --primary: 220 100% 60%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 230 20% 15%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 230 20% 20%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 190 100% 50%;
+    --accent-foreground: 230 20% 8%;
+    --destructive: 0 100% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 230 20% 20%;
+    --input: 230 20% 20%;
+    --ring: 190 100% 50%;
+    --radius: 1rem;
   }
 }
 
@@ -32,49 +33,66 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground font-body antialiased;
-    background-image: radial-gradient(circle at top right, rgba(102, 227, 255, 0.05), transparent),
-                      radial-gradient(circle at bottom left, rgba(44, 124, 207, 0.05), transparent);
+    @apply bg-background text-foreground font-body antialiased selection:bg-accent/30 selection:text-accent;
+    background-image: 
+      radial-gradient(circle at 0% 0%, rgba(56, 189, 248, 0.08) 0%, transparent 50%),
+      radial-gradient(circle at 100% 100%, rgba(37, 99, 235, 0.08) 0%, transparent 50%);
+    background-attachment: fixed;
   }
 }
 
 .glossy-card {
-  @apply bg-card/80 backdrop-blur-md border border-white/10 shadow-xl;
-  background-image: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, transparent 100%);
+  @apply bg-card/40 backdrop-blur-xl border border-white/10 shadow-2xl;
+  background-image: linear-gradient(135deg, rgba(255, 255, 255, 0.03) 0%, transparent 100%);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glossy-card:hover {
+  @apply border-white/20 bg-card/60;
+  transform: translateY(-2px);
 }
 
 .neon-glow {
-  box-shadow: 0 0 15px rgba(102, 227, 255, 0.3);
+  box-shadow: 0 0 20px rgba(56, 189, 248, 0.2);
+}
+
+.premium-gradient-text {
+  @apply text-transparent bg-clip-text bg-gradient-to-r from-accent via-primary to-accent;
+  background-size: 200% auto;
+  animation: shine 5s linear infinite;
+}
+
+@keyframes shine {
+  to { background-position: 200% center; }
 }
 
 .nav-link-active {
-  @apply text-accent font-semibold;
-  text-shadow: 0 0 8px rgba(102, 227, 255, 0.5);
+  @apply text-accent font-bold;
+  text-shadow: 0 0 10px rgba(56, 189, 248, 0.4);
 }
 
-/* Page Loading Animation */
 .loading-bar {
   position: fixed;
   top: 0;
   left: 0;
-  height: 3px;
-  background: hsl(var(--accent));
+  height: 2px;
+  background: linear-gradient(90deg, transparent, hsl(var(--accent)), transparent);
   z-index: 9999;
-  animation: loading-progress 2s ease-in-out infinite;
-  box-shadow: 0 0 10px hsl(var(--accent));
+  width: 100%;
+  animation: loading-progress 1.5s ease-in-out infinite;
 }
 
 @keyframes loading-progress {
-  0% { width: 0; left: 0; }
-  50% { width: 70%; left: 15%; }
-  100% { width: 0; left: 100%; }
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
 }
 
-.spinner-glow {
-  animation: pulse-glow 2s infinite;
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
 }
-
-@keyframes pulse-glow {
-  0%, 100% { filter: drop-shadow(0 0 2px rgba(102, 227, 255, 0.5)); }
-  50% { filter: drop-shadow(0 0 15px rgba(102, 227, 255, 0.8)); }
+.custom-scrollbar::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  @apply bg-white/10 rounded-full hover:bg-white/20;
 }
