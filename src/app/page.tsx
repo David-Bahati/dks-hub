@@ -1,23 +1,79 @@
 
+"use client";
+
 import Link from "next/link";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { 
   ShoppingCart, 
-  ShieldCheck, 
   Coins, 
   Smartphone, 
   Zap, 
   ArrowRight,
-  Monitor,
-  MousePointer2,
-  Keyboard
+  Plus,
+  Minus,
+  Trash2,
+  PackageCheck,
+  Search
 } from "lucide-react";
+import { MOCK_PRODUCTS } from "@/lib/mock-data";
+import { Product, PI_CONVERSION_RATE } from "@/lib/types";
+import { 
+  Sheet, 
+  SheetContent, 
+  SheetHeader, 
+  SheetTitle, 
+  SheetTrigger,
+  SheetFooter
+} from "@/components/ui/sheet";
+import { Input } from "@/components/ui/input";
+import { useToast } from "@/hooks/use-toast";
+
+interface CartItem extends Product {
+  quantity: number;
+}
 
 export default function LandingPage() {
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [search, setSearch] = useState("");
+  const { toast } = useToast();
+
+  const addToCart = (product: Product) => {
+    setCart(prev => {
+      const existing = prev.find(item => item.id === product.id);
+      if (existing) {
+        return prev.map(item => item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item);
+      }
+      return [...prev, { ...product, quantity: 1 }];
+    });
+    toast({
+      title: "Ajouté au panier",
+      description: `${product.name} a été ajouté.`,
+    });
+  };
+
+  const removeFromCart = (id: string) => {
+    setCart(prev => prev.filter(item => item.id !== id));
+  };
+
+  const updateQuantity = (id: string, delta: number) => {
+    setCart(prev => prev.map(item => {
+      if (item.id === id) {
+        return { ...item, quantity: Math.max(1, item.quantity + delta) };
+      }
+      return item;
+    }));
+  };
+
+  const totalUSD = cart.reduce((acc, item) => acc + (item.sellingPrice * item.quantity), 0);
+  const totalPi = totalUSD / PI_CONVERSION_RATE;
+
+  const publishedProducts = MOCK_PRODUCTS.filter(p => p.isPublished && p.name.toLowerCase().includes(search.toLowerCase()));
+
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
-      {/* Header Simplifié */}
+      {/* Header */}
       <header className="border-b border-white/5 bg-background/50 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -26,129 +82,153 @@ export default function LandingPage() {
             </div>
             <span className="text-xl font-bold tracking-tight">Shop<span className="text-accent">Manager</span></span>
           </div>
-          <div className="flex gap-4">
-            <Link href="/shop">
-              <Button variant="ghost" className="text-sm">Boutique</Button>
-            </Link>
+          
+          <div className="flex items-center gap-4">
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button variant="outline" className="relative border-white/10 hover:bg-white/5">
+                  <ShoppingCart size={20} />
+                  {cart.length > 0 && (
+                    <span className="absolute -top-2 -right-2 bg-accent text-accent-foreground text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">
+                      {cart.length}
+                    </span>
+                  )}
+                </Button>
+              </SheetTrigger>
+              <SheetContent className="bg-card border-l border-white/10 flex flex-col h-full">
+                <SheetHeader>
+                  <SheetTitle className="text-xl font-bold flex items-center gap-2">
+                    <ShoppingCart className="text-accent" /> Votre Panier
+                  </SheetTitle>
+                </SheetHeader>
+                <div className="flex-1 overflow-y-auto py-6">
+                  {cart.length === 0 ? (
+                    <div className="text-center text-muted-foreground mt-20">
+                      <PackageCheck size={48} className="mx-auto mb-4 opacity-20" />
+                      <p>Votre panier est vide.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {cart.map(item => (
+                        <div key={item.id} className="flex gap-4 p-3 bg-white/5 rounded-xl border border-white/5 group">
+                          <img src={item.imageUrl} className="w-16 h-16 rounded-lg object-cover" />
+                          <div className="flex-1">
+                            <h4 className="text-sm font-bold line-clamp-1">{item.name}</h4>
+                            <p className="text-xs text-accent font-bold">${item.sellingPrice}</p>
+                            <div className="flex items-center gap-3 mt-2">
+                               <button onClick={() => updateQuantity(item.id, -1)} className="hover:text-accent"><Minus size={14}/></button>
+                               <span className="text-sm font-bold">{item.quantity}</span>
+                               <button onClick={() => updateQuantity(item.id, 1)} className="hover:text-accent"><Plus size={14}/></button>
+                            </div>
+                          </div>
+                          <button onClick={() => removeFromCart(item.id)} className="text-muted-foreground hover:text-destructive self-start">
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <SheetFooter className="border-t border-white/10 pt-6 flex-col items-stretch gap-4">
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Total USD</span>
+                      <span className="font-bold">${totalUSD.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-lg">
+                      <span className="text-accent font-bold">Total Pi</span>
+                      <span className="text-accent font-black">{totalPi.toFixed(4)} π</span>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground text-center">Taux: 1 π = ${PI_CONVERSION_RATE}</p>
+                  </div>
+                  <Button className="w-full bg-accent text-accent-foreground font-bold h-12 neon-glow">
+                    Finaliser la commande
+                  </Button>
+                </SheetFooter>
+              </SheetContent>
+            </Sheet>
+
             <Link href="/dashboard">
-              <Button className="bg-primary hover:bg-primary/90 text-sm">Espace Pro</Button>
+              <Button className="bg-primary hover:bg-primary/90 text-sm font-bold">Espace Pro</Button>
             </Link>
           </div>
         </div>
       </header>
 
       {/* Hero Section */}
-      <section className="relative pt-20 pb-32 overflow-hidden">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full -z-10 opacity-20 pointer-events-none">
-           <div className="absolute top-0 left-1/4 w-96 h-96 bg-accent rounded-full blur-[120px]" />
-           <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-primary rounded-full blur-[120px]" />
+      <section className="relative pt-16 pb-16 overflow-hidden">
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full -z-10 opacity-10 pointer-events-none">
+           <div className="absolute top-0 left-1/4 w-96 h-96 bg-accent rounded-full blur-[150px]" />
+           <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-primary rounded-full blur-[150px]" />
         </div>
 
         <div className="max-w-7xl mx-auto px-4 text-center">
-          <Badge className="mb-6 bg-accent/10 text-accent border-accent/20 px-4 py-1.5 animate-bounce">
-            Nouveau : Paiements Pi Network Disponibles 🚀
+          <Badge className="mb-6 bg-accent/10 text-accent border-accent/20 px-4 py-1.5 font-bold">
+            ⚡ Taux Pi Network : 1 π = ${PI_CONVERSION_RATE}
           </Badge>
-          <h1 className="text-5xl md:text-8xl font-black font-headline mb-8 tracking-tighter leading-tight">
-            VOTRE SETUP <br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-accent to-primary">NEXT GEN</span>
+          <h1 className="text-5xl md:text-7xl font-black font-headline mb-6 tracking-tighter leading-tight">
+            LE MATÉRIEL <br />
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-accent to-primary">DU FUTUR ICI</span>
           </h1>
-          <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-10 leading-relaxed">
-            Découvrez le meilleur du matériel informatique haut de gamme. 
-            Une expérience d'achat fluide avec paiement en Pi, Mobile Money ou Cash.
+          <p className="text-lg text-muted-foreground max-w-xl mx-auto mb-12">
+            Paiement sécurisé en Pi Network, Mobile Money ou Cash. 
+            Livraison express pour tous vos setups gaming et bureautiques.
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-            <Link href="/shop">
-              <Button size="lg" className="h-16 px-8 text-lg font-bold bg-accent text-accent-foreground hover:bg-accent/90 neon-glow gap-2">
-                <ShoppingCart size={20} />
-                Passer Commande
-              </Button>
-            </Link>
-            <Link href="/shop">
-              <Button size="lg" variant="outline" className="h-16 px-8 text-lg border-white/10 hover:bg-white/5 gap-2">
-                Voir le Catalogue
-                <ArrowRight size={20} />
-              </Button>
-            </Link>
+
+          <div className="relative max-w-2xl mx-auto mb-16">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input 
+              placeholder="Chercher un clavier, souris, écran..." 
+              className="h-14 pl-12 bg-card/50 border-white/10 rounded-2xl focus:border-accent"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
           </div>
         </div>
       </section>
 
-      {/* Features */}
-      <section className="py-24 bg-white/5 border-y border-white/5">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
-            <div className="flex flex-col items-center text-center p-6 rounded-2xl bg-card border border-white/10 hover:border-accent/50 transition-colors">
-              <div className="w-16 h-16 rounded-2xl bg-accent/10 flex items-center justify-center mb-6">
-                <Coins className="text-accent" size={32} />
+      {/* Product List */}
+      <section className="pb-24 max-w-7xl mx-auto px-4 w-full">
+        <h2 className="text-2xl font-black mb-10 flex items-center gap-3">
+          <Zap className="text-accent" /> CATALOGUE DISPONIBLE
+        </h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          {publishedProducts.map(product => {
+            const piPrice = product.sellingPrice / PI_CONVERSION_RATE;
+            return (
+              <div key={product.id} className="glossy-card border-none rounded-2xl overflow-hidden flex flex-col group">
+                <div className="aspect-[4/3] overflow-hidden relative">
+                  <img src={product.imageUrl} className="w-full h-full object-cover transition-transform group-hover:scale-110" />
+                  <div className="absolute top-3 right-3 bg-black/60 backdrop-blur-md px-2 py-1 rounded text-[10px] font-bold text-accent">
+                    Stock: {product.stockQuantity}
+                  </div>
+                </div>
+                <div className="p-4 flex-1 flex flex-col">
+                  <h3 className="font-bold text-sm mb-2 line-clamp-1">{product.name}</h3>
+                  <div className="mt-auto space-y-1 mb-4">
+                    <div className="text-lg font-black">${product.sellingPrice.toFixed(2)}</div>
+                    <div className="text-xs font-bold text-accent">{piPrice.toFixed(4)} π</div>
+                  </div>
+                  <Button 
+                    onClick={() => addToCart(product)}
+                    className="w-full bg-white/5 hover:bg-accent hover:text-accent-foreground border border-white/10 transition-all font-bold text-xs gap-2"
+                  >
+                    <Plus size={14} /> Ajouter
+                  </Button>
+                </div>
               </div>
-              <h3 className="text-2xl font-bold mb-3">Pi Network</h3>
-              <p className="text-muted-foreground">Pionniers du Web3, nous acceptons vos Pi pour tout achat d'équipement pro.</p>
-            </div>
-            <div className="flex flex-col items-center text-center p-6 rounded-2xl bg-card border border-white/10 hover:border-accent/50 transition-colors">
-              <div className="w-16 h-16 rounded-2xl bg-accent/10 flex items-center justify-center mb-6">
-                <Smartphone className="text-accent" size={32} />
-              </div>
-              <h3 className="text-2xl font-bold mb-3">Mobile Money</h3>
-              <p className="text-muted-foreground">Règlement instantané via vos opérateurs locaux pour une sécurité maximale.</p>
-            </div>
-            <div className="flex flex-col items-center text-center p-6 rounded-2xl bg-card border border-white/10 hover:border-accent/50 transition-colors">
-              <div className="w-16 h-16 rounded-2xl bg-accent/10 flex items-center justify-center mb-6">
-                <Zap className="text-accent" size={32} />
-              </div>
-              <h3 className="text-2xl font-bold mb-3">Service Express</h3>
-              <p className="text-muted-foreground">Traitement de commande en temps réel et livraison prioritaire pour les setups pro.</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Categories Preview */}
-      <section className="py-24">
-        <div className="max-w-7xl mx-auto px-4">
-          <h2 className="text-3xl md:text-5xl font-black mb-16 text-center">NOS UNIVERS</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
-            <div className="group relative h-64 rounded-3xl overflow-hidden border border-white/10">
-              <img src="https://picsum.photos/seed/keyboard-hero/800/600" alt="Keyboards" className="w-full h-full object-cover transition duration-500 group-hover:scale-110 opacity-40" />
-              <div className="absolute inset-0 bg-gradient-to-t from-black to-transparent" />
-              <div className="absolute bottom-6 left-6 flex items-center gap-3">
-                <Keyboard className="text-accent" />
-                <span className="text-2xl font-bold uppercase tracking-widest">Périphériques</span>
-              </div>
-            </div>
-            <div className="group relative h-64 rounded-3xl overflow-hidden border border-white/10">
-              <img src="https://picsum.photos/seed/monitor-hero/800/600" alt="Monitors" className="w-full h-full object-cover transition duration-500 group-hover:scale-110 opacity-40" />
-              <div className="absolute inset-0 bg-gradient-to-t from-black to-transparent" />
-              <div className="absolute bottom-6 left-6 flex items-center gap-3">
-                <Monitor className="text-accent" />
-                <span className="text-2xl font-bold uppercase tracking-widest">Écrans 4K</span>
-              </div>
-            </div>
-            <div className="group relative h-64 rounded-3xl overflow-hidden border border-white/10">
-              <img src="https://picsum.photos/seed/mouse-hero/800/600" alt="Gaming Gear" className="w-full h-full object-cover transition duration-500 group-hover:scale-110 opacity-40" />
-              <div className="absolute inset-0 bg-gradient-to-t from-black to-transparent" />
-              <div className="absolute bottom-6 left-6 flex items-center gap-3">
-                <MousePointer2 className="text-accent" />
-                <span className="text-2xl font-bold uppercase tracking-widest">Accessoires</span>
-              </div>
-            </div>
-          </div>
+            );
+          })}
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="mt-auto py-12 border-t border-white/5 bg-card">
-        <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center gap-8">
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded bg-primary flex items-center justify-center">
-              <span className="text-white font-bold text-xs uppercase">dks</span>
-            </div>
-            <span className="text-lg font-bold tracking-tight">Shop<span className="text-accent">Manager</span></span>
-          </div>
-          <p className="text-sm text-muted-foreground">© 2024 dks Group. Tous droits réservés. Propulsé par Pi Network.</p>
-          <div className="flex gap-6 text-muted-foreground">
-             <ShieldCheck size={20} className="hover:text-accent cursor-pointer transition-colors" />
-             <Coins size={20} className="hover:text-accent cursor-pointer transition-colors" />
-             <Smartphone size={20} className="hover:text-accent cursor-pointer transition-colors" />
+      <footer className="mt-auto py-10 border-t border-white/5 bg-card/30">
+        <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center gap-6">
+          <p className="text-sm text-muted-foreground">© 2024 dks ShopManager. Propulsé par Pi Network.</p>
+          <div className="flex gap-4">
+             <div className="flex items-center gap-1 text-[10px] uppercase font-bold text-muted-foreground"><Coins size={12}/> Pi Network</div>
+             <div className="flex items-center gap-1 text-[10px] uppercase font-bold text-muted-foreground"><Smartphone size={12}/> Mobile Money</div>
           </div>
         </div>
       </footer>

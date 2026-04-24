@@ -22,7 +22,9 @@ import {
   Trash2, 
   Filter,
   Package,
-  ArrowUpDown
+  ArrowUpDown,
+  Eye,
+  EyeOff
 } from "lucide-react";
 import {
   Dialog,
@@ -34,6 +36,8 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { cn } from "@/lib/utils";
 
 export default function Inventory() {
   const [products, setProducts] = useState<Product[]>(MOCK_PRODUCTS);
@@ -50,46 +54,51 @@ export default function Inventory() {
       <main className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
           <div>
-            <h1 className="text-3xl font-bold font-headline">Product Inventory</h1>
-            <p className="text-muted-foreground">Manage your stock, prices and listings.</p>
+            <h1 className="text-3xl font-bold font-headline">Inventaire Produits</h1>
+            <p className="text-muted-foreground">Gérez votre stock et publiez sur la boutique.</p>
           </div>
           
           <Dialog>
             <DialogTrigger asChild>
               <Button className="bg-primary hover:bg-primary/90 gap-2 neon-glow">
                 <Plus size={18} />
-                Add New Product
+                Nouveau Produit
               </Button>
             </DialogTrigger>
             <DialogContent className="bg-card border-white/10 text-foreground">
               <DialogHeader>
-                <DialogTitle>Add New Product</DialogTitle>
+                <DialogTitle>Enregistrer un Produit</DialogTitle>
               </DialogHeader>
               <div className="grid gap-4 py-4">
                 <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="name" className="text-right">Name</Label>
-                  <Input id="name" className="col-span-3 bg-background" placeholder="Logitech MX Master 3S" />
+                  <Label htmlFor="name" className="text-right text-xs">Nom</Label>
+                  <Input id="name" className="col-span-3 bg-background" placeholder="Ex: RTX 4090" />
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="category" className="text-right">Category</Label>
-                  <Input id="category" className="col-span-3 bg-background" placeholder="mouse" />
+                  <Label htmlFor="img" className="text-right text-xs">Lien Image</Label>
+                  <Input id="img" className="col-span-3 bg-background" placeholder="https://..." />
                 </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="cost" className="text-right">Cost Price</Label>
-                  <Input id="cost" type="number" className="col-span-3 bg-background" />
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor="cost" className="text-xs">Prix Achat ($)</Label>
+                    <Input id="cost" type="number" className="bg-background" />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor="price" className="text-xs">Prix Vente ($)</Label>
+                    <Input id="price" type="number" className="bg-background" />
+                  </div>
                 </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="price" className="text-right">Selling Price</Label>
-                  <Input id="price" type="number" className="col-span-3 bg-background" />
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="stock" className="text-right">Stock</Label>
-                  <Input id="stock" type="number" className="col-span-3 bg-background" />
+                <div className="flex items-center justify-between p-4 rounded-lg bg-white/5 border border-white/10">
+                  <div className="flex flex-col gap-1">
+                    <Label className="font-bold">Publier immédiatement</Label>
+                    <span className="text-[10px] text-muted-foreground">Rendre visible sur la boutique client</span>
+                  </div>
+                  <Switch id="published" />
                 </div>
               </div>
               <DialogFooter>
-                <Button variant="outline" className="border-white/10">Cancel</Button>
-                <Button className="bg-accent text-accent-foreground hover:bg-accent/80">Save Product</Button>
+                <Button variant="outline" className="border-white/10 text-xs">Annuler</Button>
+                <Button className="bg-accent text-accent-foreground hover:bg-accent/80 font-bold">Enregistrer & Publier</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -99,62 +108,65 @@ export default function Inventory() {
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
             <Input 
-              placeholder="Search products or categories..." 
-              className="pl-10 bg-card/50 border-white/10 focus:border-accent"
+              placeholder="Rechercher..." 
+              className="pl-10 bg-card/50 border-white/10"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-          <Button variant="outline" className="border-white/10 gap-2">
-            <Filter size={18} />
-            Filters
-          </Button>
         </div>
 
-        <div className="glossy-card rounded-xl overflow-hidden">
+        <div className="glossy-card rounded-xl overflow-hidden border-none">
           <Table>
             <TableHeader className="bg-white/5">
-              <TableRow className="border-white/10 hover:bg-transparent">
+              <TableRow className="border-white/10">
                 <TableHead className="w-[80px]">Image</TableHead>
-                <TableHead className="cursor-pointer">
-                  <div className="flex items-center gap-2">Name <ArrowUpDown size={14}/></div>
-                </TableHead>
-                <TableHead>Category</TableHead>
-                <TableHead className="text-right">Purchase</TableHead>
-                <TableHead className="text-right">Selling</TableHead>
+                <TableHead>Produit</TableHead>
+                <TableHead>Prix</TableHead>
                 <TableHead className="text-center">Stock</TableHead>
+                <TableHead className="text-center">Statut</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredProducts.map((product) => (
-                <TableRow key={product.id} className="border-white/5 hover:bg-white/5 transition-colors">
+                <TableRow key={product.id} className="border-white/5 hover:bg-white/5">
                   <TableCell>
-                    <div className="w-10 h-10 rounded-md overflow-hidden bg-muted">
+                    <div className="w-12 h-12 rounded-lg overflow-hidden bg-muted">
                       <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" />
                     </div>
                   </TableCell>
-                  <TableCell className="font-medium">{product.name}</TableCell>
                   <TableCell>
-                    <Badge variant="secondary" className="bg-white/10 capitalize">{product.category}</Badge>
+                    <div className="font-bold text-sm">{product.name}</div>
+                    <div className="text-[10px] text-muted-foreground uppercase">{product.category}</div>
                   </TableCell>
-                  <TableCell className="text-right text-muted-foreground">${product.purchasePrice.toFixed(2)}</TableCell>
-                  <TableCell className="text-right font-bold text-accent">${product.sellingPrice.toFixed(2)}</TableCell>
+                  <TableCell>
+                    <div className="text-sm font-bold text-accent">${product.sellingPrice.toFixed(2)}</div>
+                    <div className="text-[10px] text-muted-foreground">Achat: ${product.purchasePrice.toFixed(2)}</div>
+                  </TableCell>
                   <TableCell className="text-center">
-                    <span className={cn(
-                      "px-2 py-1 rounded-full text-xs font-bold",
-                      product.stockQuantity < 5 ? "bg-destructive/20 text-destructive" : "bg-green-500/20 text-green-400"
-                    )}>
+                    <Badge variant={product.stockQuantity < 5 ? "destructive" : "secondary"} className="text-[10px]">
                       {product.stockQuantity}
-                    </span>
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    {product.isPublished ? (
+                      <Badge className="bg-green-500/20 text-green-400 border-none flex items-center gap-1 mx-auto w-fit">
+                        <Eye size={12} /> Publié
+                      </Badge>
+                    ) : (
+                      <Badge className="bg-white/5 text-muted-foreground border-none flex items-center gap-1 mx-auto w-fit">
+                        <EyeOff size={12} /> Brouillon
+                      </Badge>
+                    )}
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
-                      <Button variant="ghost" size="icon" className="hover:bg-accent/20 hover:text-accent">
-                        <Edit2 size={16} />
+                      <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-accent/20">
+                        <Edit2 size={14} />
                       </Button>
-                      <Button variant="ghost" size="icon" className="hover:bg-destructive/20 hover:text-destructive">
-                        <Trash2 size={16} />
+                      <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-destructive/20 text-destructive">
+                        <Trash2 size={14} />
                       </Button>
                     </div>
                   </TableCell>
@@ -162,12 +174,6 @@ export default function Inventory() {
               ))}
             </TableBody>
           </Table>
-          {filteredProducts.length === 0 && (
-            <div className="py-20 text-center flex flex-col items-center justify-center">
-              <Package size={48} className="text-muted-foreground mb-4 opacity-20" />
-              <p className="text-muted-foreground">No products found matching your search.</p>
-            </div>
-          )}
         </div>
       </main>
     </div>

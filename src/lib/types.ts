@@ -17,6 +17,7 @@ export interface Product {
   sellingPrice: number;
   stockQuantity: number;
   imageUrl: string;
+  isPublished: boolean;
 }
 
 export type PaymentMode = 'PI_NETWORK' | 'MOBILE_MONEY' | 'CASH';
@@ -45,3 +46,5 @@ export interface Order {
   status: 'pending' | 'completed' | 'cancelled';
   orderDate: string;
 }
+
+export const PI_CONVERSION_RATE = 314.159; // Taux fixé (ex: 1 Pi = 314.159 USD)

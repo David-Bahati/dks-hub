@@ -9,14 +9,13 @@ import {
   ShoppingCart, 
   History, 
   Store,
-  LogOut,
   Menu,
   X,
   Coins,
   ShieldCheck,
   UserCircle
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -31,10 +30,10 @@ import { UserRole } from "@/lib/types";
 
 const NAV_ITEMS = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, roles: ["ADMIN"] },
-  { label: "Stock", href: "/inventory", icon: Package, roles: ["ADMIN", "SELLER"] },
-  { label: "Caisse (POS)", href: "/pos", icon: ShoppingCart, roles: ["ADMIN", "CASHIER"] },
-  { label: "Historique", href: "/sales", icon: History, roles: ["ADMIN"] },
-  { label: "Boutique", href: "/shop", icon: Store, roles: ["ANY"] },
+  { label: "Inventaire", href: "/inventory", icon: Package, roles: ["ADMIN", "SELLER"] },
+  { label: "Caisse", href: "/pos", icon: ShoppingCart, roles: ["ADMIN", "CASHIER"] },
+  { label: "Ventes", href: "/sales", icon: History, roles: ["ADMIN"] },
+  { label: "Accueil Boutique", href: "/", icon: Store, roles: ["ANY"] },
 ];
 
 export function Navbar() {
@@ -66,17 +65,17 @@ export function Navbar() {
             </Link>
           </div>
 
-          <div className="hidden md:flex space-x-2">
+          <div className="hidden md:flex space-x-1">
             {visibleItems.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-all hover:text-accent",
+                  "flex items-center gap-2 px-3 py-2 rounded-md text-xs transition-all hover:text-accent",
                   pathname === item.href ? "nav-link-active" : "text-muted-foreground"
                 )}
               >
-                <item.icon size={18} />
+                <item.icon size={16} />
                 {item.label}
               </Link>
             ))}
@@ -88,16 +87,15 @@ export function Navbar() {
               size="sm"
               onClick={togglePiConnection}
               className={cn(
-                "hidden sm:flex gap-2 border-white/10 transition-colors",
+                "hidden sm:flex gap-2 border-white/10 transition-colors text-xs",
                 isPiConnected ? "bg-accent/20 border-accent/50 text-accent" : "hover:bg-accent/10"
               )}
             >
-              <Coins size={16} />
+              <Coins size={14} />
               {isPiConnected ? "Pi Connecté" : "Connecter Pi"}
-              {isPiConnected && <ShieldCheck size={14} className="animate-pulse" />}
+              {isPiConnected && <ShieldCheck size={12} className="animate-pulse" />}
             </Button>
 
-            {/* Role Switcher (Simulation pour démo) */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="rounded-full hover:bg-white/5 border border-white/10">
@@ -105,7 +103,7 @@ export function Navbar() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="bg-card border-white/10 w-48">
-                <DropdownMenuLabel>Mode Utilisateur</DropdownMenuLabel>
+                <DropdownMenuLabel>Changer de Rôle</DropdownMenuLabel>
                 <DropdownMenuSeparator className="bg-white/5" />
                 <DropdownMenuItem onClick={() => setCurrentRole("ADMIN")} className={currentRole === "ADMIN" ? "text-accent" : ""}>
                   Administrateur
@@ -118,7 +116,7 @@ export function Navbar() {
                 </DropdownMenuItem>
                 <DropdownMenuSeparator className="bg-white/5" />
                 <Link href="/">
-                   <DropdownMenuItem className="text-destructive">Quitter</DropdownMenuItem>
+                   <DropdownMenuItem className="text-destructive">Se déconnecter</DropdownMenuItem>
                 </Link>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -133,26 +131,17 @@ export function Navbar() {
       {/* Mobile Menu */}
       {isOpen && (
         <div className="md:hidden bg-background border-b border-white/10 py-4 px-4 space-y-2">
-          <Button 
-            variant="outline" 
-            className="w-full justify-start gap-3 border-white/10 mb-4"
-            onClick={togglePiConnection}
-          >
-            <Coins size={18} className={isPiConnected ? "text-accent" : ""} />
-            {isPiConnected ? "Pi Network Connecté" : "Connecter Pi Network"}
-          </Button>
-          
           {visibleItems.map((item) => (
             <Link
               key={item.href}
               href={item.href}
               onClick={() => setIsOpen(false)}
               className={cn(
-                "flex items-center gap-3 px-4 py-3 rounded-lg text-base transition-all",
+                "flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-all",
                 pathname === item.href ? "bg-primary/20 text-accent font-semibold" : "text-muted-foreground hover:bg-white/5"
               )}
             >
-              <item.icon size={20} />
+              <item.icon size={18} />
               {item.label}
             </Link>
           ))}

@@ -1,5 +1,5 @@
 
-import { Product, Sale, Category } from './types';
+import { Product, Sale } from './types';
 
 export const MOCK_PRODUCTS: Product[] = [
   {
@@ -9,7 +9,8 @@ export const MOCK_PRODUCTS: Product[] = [
     purchasePrice: 120,
     sellingPrice: 159.99,
     stockQuantity: 15,
-    imageUrl: 'https://picsum.photos/seed/keyboard1/600/400'
+    imageUrl: 'https://picsum.photos/seed/keyboard1/600/400',
+    isPublished: true
   },
   {
     id: 'p2',
@@ -18,7 +19,8 @@ export const MOCK_PRODUCTS: Product[] = [
     purchasePrice: 45,
     sellingPrice: 69.99,
     stockQuantity: 24,
-    imageUrl: 'https://picsum.photos/seed/mouse1/600/400'
+    imageUrl: 'https://picsum.photos/seed/mouse1/600/400',
+    isPublished: true
   },
   {
     id: 'p3',
@@ -27,7 +29,8 @@ export const MOCK_PRODUCTS: Product[] = [
     purchasePrice: 450,
     sellingPrice: 599.99,
     stockQuantity: 8,
-    imageUrl: 'https://picsum.photos/seed/screen1/600/400'
+    imageUrl: 'https://picsum.photos/seed/screen1/600/400',
+    isPublished: true
   },
   {
     id: 'p4',
@@ -36,7 +39,8 @@ export const MOCK_PRODUCTS: Product[] = [
     purchasePrice: 130,
     sellingPrice: 179.99,
     stockQuantity: 3,
-    imageUrl: 'https://picsum.photos/seed/keyboard2/600/400'
+    imageUrl: 'https://picsum.photos/seed/keyboard2/600/400',
+    isPublished: false
   }
 ];
 
