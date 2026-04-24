@@ -11,11 +11,14 @@ import {
   Store,
   LogOut,
   Menu,
-  X
+  X,
+  Coins,
+  ShieldCheck
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 const NAV_ITEMS = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, role: "ADMIN" },
@@ -28,6 +31,12 @@ const NAV_ITEMS = [
 export function Navbar() {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
+  const [isPiConnected, setIsPiConnected] = useState(false);
+
+  // Simulate Pi Network connection
+  const togglePiConnection = () => {
+    setIsPiConnected(!isPiConnected);
+  };
 
   return (
     <nav className="sticky top-0 z-50 bg-background/80 backdrop-blur-lg border-b border-white/10">
@@ -42,7 +51,7 @@ export function Navbar() {
             </span>
           </div>
 
-          <div className="hidden md:flex space-x-4">
+          <div className="hidden md:flex space-x-2">
             {NAV_ITEMS.map((item) => (
               <Link
                 key={item.href}
@@ -58,13 +67,28 @@ export function Navbar() {
             ))}
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={togglePiConnection}
+              className={cn(
+                "hidden sm:flex gap-2 border-white/10 transition-colors",
+                isPiConnected ? "bg-accent/20 border-accent/50 text-accent" : "hover:bg-accent/10"
+              )}
+            >
+              <Coins size={16} />
+              {isPiConnected ? "Pi Connecté" : "Connecter Pi"}
+              {isPiConnected && <ShieldCheck size={14} className="animate-pulse" />}
+            </Button>
+
             <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setIsOpen(!isOpen)}>
               {isOpen ? <X /> : <Menu />}
             </Button>
-            <Button variant="outline" className="hidden md:flex gap-2 border-white/10 hover:border-accent/50 hover:bg-accent/10">
+            
+            <Button variant="outline" className="hidden lg:flex gap-2 border-white/10 hover:border-accent/50 hover:bg-accent/10">
               <LogOut size={16} />
-              Sign Out
+              Quitter
             </Button>
           </div>
         </div>
@@ -73,6 +97,15 @@ export function Navbar() {
       {/* Mobile Menu */}
       {isOpen && (
         <div className="md:hidden bg-background border-b border-white/10 py-4 px-4 space-y-2">
+          <Button 
+            variant="outline" 
+            className="w-full justify-start gap-3 border-white/10 mb-4"
+            onClick={togglePiConnection}
+          >
+            <Coins size={18} className={isPiConnected ? "text-accent" : ""} />
+            {isPiConnected ? "Pi Network Connecté" : "Connecter Pi Network"}
+          </Button>
+          
           {NAV_ITEMS.map((item) => (
             <Link
               key={item.href}
@@ -87,10 +120,6 @@ export function Navbar() {
               {item.label}
             </Link>
           ))}
-          <Button variant="destructive" className="w-full mt-4 flex gap-2">
-            <LogOut size={18} />
-            Sign Out
-          </Button>
         </div>
       )}
     </nav>
