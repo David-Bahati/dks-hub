@@ -12,7 +12,6 @@ import {
   Menu,
   X,
   Coins,
-  ShieldCheck,
   UserCircle,
   Users,
   Settings,
@@ -33,15 +32,16 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { UserRole } from "@/lib/types";
 
+// Définition des éléments de navigation avec permissions par rôle
 const NAV_ITEMS = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, roles: ["ADMIN"] },
   { label: "Produit", href: "/inventory", icon: Package, roles: ["ADMIN", "SELLER"] },
   { label: "Caisse", href: "/pos", icon: ShoppingCart, roles: ["ADMIN", "CASHIER"] },
-  { label: "Commande", href: "/dashboard/orders", icon: FileText, roles: ["ADMIN"] },
+  { label: "Commande", href: "/dashboard/orders", icon: FileText, roles: ["ADMIN", "SELLER"] },
   { label: "Catégorie", href: "/dashboard/categories", icon: Tags, roles: ["ADMIN"] },
-  { label: "Client", href: "/dashboard/customers", icon: Users, roles: ["ADMIN"] },
+  { label: "Client", href: "/dashboard/customers", icon: Users, roles: ["ADMIN", "SELLER"] },
   { label: "Utilisateurs", href: "/dashboard/users", icon: UserPlus, roles: ["ADMIN"] },
-  { label: "Rapport", href: "/sales", icon: History, roles: ["ADMIN"] },
+  { label: "Rapport", href: "/sales", icon: History, roles: ["ADMIN", "CASHIER"] },
   { label: "Paramètres", href: "/dashboard/settings", icon: Settings, roles: ["ADMIN"] },
   { label: "Boutique", href: "/", icon: Store, roles: ["ANY"] },
 ];
@@ -56,9 +56,19 @@ export function Navbar() {
     setIsPiConnected(!isPiConnected);
   };
 
+  // Filtre les éléments du menu selon le rôle actif
   const visibleItems = NAV_ITEMS.filter(item => 
     item.roles.includes("ANY") || item.roles.includes(currentRole)
   );
+
+  const getRoleLabel = (role: UserRole) => {
+    switch(role) {
+      case "ADMIN": return "Administrateur";
+      case "SELLER": return "Vendeur";
+      case "CASHIER": return "Caissier";
+      default: return "Visiteur";
+    }
+  };
 
   return (
     <nav className="sticky top-0 z-50 bg-background/80 backdrop-blur-lg border-b border-white/10">
@@ -75,6 +85,7 @@ export function Navbar() {
             </Link>
           </div>
 
+          {/* Navigation Desktop filtrée */}
           <div className="hidden lg:flex space-x-1 overflow-x-auto no-scrollbar">
             {visibleItems.map((item) => (
               <Link
@@ -105,23 +116,30 @@ export function Navbar() {
               {isPiConnected ? "Pi Connecté" : "Connecter Pi"}
             </Button>
 
+            {/* Menu de sélection de rôle pour la simulation */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="rounded-full hover:bg-white/5 border border-white/10">
-                  <UserCircle className="text-accent" />
+                <Button variant="ghost" className="flex items-center gap-2 rounded-full hover:bg-white/5 border border-white/10 px-3 h-10">
+                  <UserCircle className="text-accent" size={20} />
+                  <span className="text-[10px] font-bold uppercase hidden md:inline-block text-muted-foreground">
+                    {getRoleLabel(currentRole)}
+                  </span>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="bg-card border-white/10 w-48">
-                <DropdownMenuLabel>Mode Simulation</DropdownMenuLabel>
+              <DropdownMenuContent align="end" className="bg-card border-white/10 w-56">
+                <DropdownMenuLabel>Simulation de Rôle</DropdownMenuLabel>
                 <DropdownMenuSeparator className="bg-white/5" />
-                <DropdownMenuItem onClick={() => setCurrentRole("ADMIN")} className={currentRole === "ADMIN" ? "text-accent" : ""}>
-                  Administrateur
+                <DropdownMenuItem onClick={() => setCurrentRole("ADMIN")} className={cn("gap-2", currentRole === "ADMIN" && "text-accent")}>
+                  <div className={cn("w-2 h-2 rounded-full", currentRole === "ADMIN" ? "bg-accent" : "bg-transparent")} />
+                  Administrateur (Tout)
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setCurrentRole("SELLER")} className={currentRole === "SELLER" ? "text-accent" : ""}>
-                  Vendeur
+                <DropdownMenuItem onClick={() => setCurrentRole("SELLER")} className={cn("gap-2", currentRole === "SELLER" && "text-accent")}>
+                  <div className={cn("w-2 h-2 rounded-full", currentRole === "SELLER" ? "bg-accent" : "bg-transparent")} />
+                  Vendeur (Stock/Clients)
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setCurrentRole("CASHIER")} className={currentRole === "CASHIER" ? "text-accent" : ""}>
-                  Caissier
+                <DropdownMenuItem onClick={() => setCurrentRole("CASHIER")} className={cn("gap-2", currentRole === "CASHIER" && "text-accent")}>
+                  <div className={cn("w-2 h-2 rounded-full", currentRole === "CASHIER" ? "bg-accent" : "bg-transparent")} />
+                  Caissier (POS/Ventes)
                 </DropdownMenuItem>
                 <DropdownMenuSeparator className="bg-white/5" />
                 <Link href="/">
@@ -137,7 +155,7 @@ export function Navbar() {
         </div>
       </div>
 
-      {/* Mobile Menu */}
+      {/* Menu Mobile filtré */}
       {isOpen && (
         <div className="lg:hidden bg-background border-b border-white/10 py-4 px-4 space-y-2">
           {visibleItems.map((item) => (
