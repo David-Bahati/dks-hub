@@ -13,46 +13,61 @@ import {
   Menu,
   X,
   Coins,
-  ShieldCheck
+  ShieldCheck,
+  UserCircle
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { UserRole } from "@/lib/types";
 
 const NAV_ITEMS = [
-  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, role: "ADMIN" },
-  { label: "Inventory", href: "/inventory", icon: Package, role: "ADMIN" },
-  { label: "POS", href: "/pos", icon: ShoppingCart, role: "SELLER" },
-  { label: "Sales", href: "/sales", icon: History, role: "ADMIN" },
-  { label: "Public Shop", href: "/shop", icon: Store, role: "ANY" },
+  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, roles: ["ADMIN"] },
+  { label: "Stock", href: "/inventory", icon: Package, roles: ["ADMIN", "SELLER"] },
+  { label: "Caisse (POS)", href: "/pos", icon: ShoppingCart, roles: ["ADMIN", "CASHIER"] },
+  { label: "Historique", href: "/sales", icon: History, roles: ["ADMIN"] },
+  { label: "Boutique", href: "/shop", icon: Store, roles: ["ANY"] },
 ];
 
 export function Navbar() {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   const [isPiConnected, setIsPiConnected] = useState(false);
+  const [currentRole, setCurrentRole] = useState<UserRole>("ADMIN");
 
-  // Simulate Pi Network connection
   const togglePiConnection = () => {
     setIsPiConnected(!isPiConnected);
   };
+
+  const visibleItems = NAV_ITEMS.filter(item => 
+    item.roles.includes("ANY") || item.roles.includes(currentRole)
+  );
 
   return (
     <nav className="sticky top-0 z-50 bg-background/80 backdrop-blur-lg border-b border-white/10">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16 items-center">
           <div className="flex items-center gap-2">
-            <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center neon-glow">
-              <span className="text-white font-bold text-xl">dks</span>
-            </div>
-            <span className="text-xl font-bold tracking-tight hidden sm:block">
-              Shop<span className="text-accent">Manager</span>
-            </span>
+            <Link href="/" className="flex items-center gap-2">
+              <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center neon-glow">
+                <span className="text-white font-bold text-xl uppercase">dks</span>
+              </div>
+              <span className="text-xl font-bold tracking-tight hidden sm:block uppercase">
+                Shop<span className="text-accent">Manager</span>
+              </span>
+            </Link>
           </div>
 
           <div className="hidden md:flex space-x-2">
-            {NAV_ITEMS.map((item) => (
+            {visibleItems.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
@@ -82,13 +97,34 @@ export function Navbar() {
               {isPiConnected && <ShieldCheck size={14} className="animate-pulse" />}
             </Button>
 
+            {/* Role Switcher (Simulation pour démo) */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="rounded-full hover:bg-white/5 border border-white/10">
+                  <UserCircle className="text-accent" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="bg-card border-white/10 w-48">
+                <DropdownMenuLabel>Mode Utilisateur</DropdownMenuLabel>
+                <DropdownMenuSeparator className="bg-white/5" />
+                <DropdownMenuItem onClick={() => setCurrentRole("ADMIN")} className={currentRole === "ADMIN" ? "text-accent" : ""}>
+                  Administrateur
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setCurrentRole("SELLER")} className={currentRole === "SELLER" ? "text-accent" : ""}>
+                  Vendeur (Stock)
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setCurrentRole("CASHIER")} className={currentRole === "CASHIER" ? "text-accent" : ""}>
+                  Caissier (POS)
+                </DropdownMenuItem>
+                <DropdownMenuSeparator className="bg-white/5" />
+                <Link href="/">
+                   <DropdownMenuItem className="text-destructive">Quitter</DropdownMenuItem>
+                </Link>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
             <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setIsOpen(!isOpen)}>
               {isOpen ? <X /> : <Menu />}
-            </Button>
-            
-            <Button variant="outline" className="hidden lg:flex gap-2 border-white/10 hover:border-accent/50 hover:bg-accent/10">
-              <LogOut size={16} />
-              Quitter
             </Button>
           </div>
         </div>
@@ -106,7 +142,7 @@ export function Navbar() {
             {isPiConnected ? "Pi Network Connecté" : "Connecter Pi Network"}
           </Button>
           
-          {NAV_ITEMS.map((item) => (
+          {visibleItems.map((item) => (
             <Link
               key={item.href}
               href={item.href}
