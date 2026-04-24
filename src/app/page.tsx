@@ -10,12 +10,14 @@ import {
   Coins, 
   Smartphone, 
   Zap, 
-  ArrowRight,
   Plus,
   Minus,
   Trash2,
   PackageCheck,
-  Search
+  Search,
+  CheckCircle,
+  Printer,
+  ChevronRight
 } from "lucide-react";
 import { MOCK_PRODUCTS } from "@/lib/mock-data";
 import { Product, PI_CONVERSION_RATE } from "@/lib/types";
@@ -29,6 +31,10 @@ import {
 } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
+import {
+  Dialog,
+  DialogContent,
+} from "@/components/ui/dialog";
 
 interface CartItem extends Product {
   quantity: number;
@@ -37,6 +43,15 @@ interface CartItem extends Product {
 export default function LandingPage() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [search, setSearch] = useState("");
+  const [isOrdering, setIsOrdering] = useState(false);
+  const [showReceipt, setShowReceipt] = useState(false);
+  const [orderSummary, setOrderSummary] = useState<{
+    id: string;
+    items: CartItem[];
+    total: number;
+    date: string;
+  } | null>(null);
+
   const { toast } = useToast();
 
   const addToCart = (product: Product) => {
@@ -68,6 +83,29 @@ export default function LandingPage() {
 
   const totalUSD = cart.reduce((acc, item) => acc + (item.sellingPrice * item.quantity), 0);
   const totalPi = totalUSD / PI_CONVERSION_RATE;
+
+  const handleCheckout = async () => {
+    setIsOrdering(true);
+    // Simulate payment process
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    const summary = {
+      id: Math.random().toString(36).substring(2, 9).toUpperCase(),
+      items: [...cart],
+      total: totalUSD,
+      date: new Date().toLocaleString()
+    };
+    
+    setOrderSummary(summary);
+    setCart([]);
+    setIsOrdering(false);
+    setShowReceipt(true);
+    
+    toast({
+      title: "Commande Confirmée",
+      description: "Votre reçu a été généré.",
+    });
+  };
 
   const publishedProducts = MOCK_PRODUCTS.filter(p => p.isPublished && p.name.toLowerCase().includes(search.toLowerCase()));
 
@@ -129,22 +167,28 @@ export default function LandingPage() {
                     </div>
                   )}
                 </div>
-                <SheetFooter className="border-t border-white/10 pt-6 flex-col items-stretch gap-4">
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Total USD</span>
-                      <span className="font-bold">${totalUSD.toFixed(2)}</span>
+                {cart.length > 0 && (
+                  <SheetFooter className="border-t border-white/10 pt-6 flex-col items-stretch gap-4">
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Total USD</span>
+                        <span className="font-bold">${totalUSD.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between text-lg">
+                        <span className="text-accent font-bold">Total Pi</span>
+                        <span className="text-accent font-black">{totalPi.toFixed(4)} π</span>
+                      </div>
                     </div>
-                    <div className="flex justify-between text-lg">
-                      <span className="text-accent font-bold">Total Pi</span>
-                      <span className="text-accent font-black">{totalPi.toFixed(4)} π</span>
-                    </div>
-                    <p className="text-[10px] text-muted-foreground text-center">Taux: 1 π = ${PI_CONVERSION_RATE}</p>
-                  </div>
-                  <Button className="w-full bg-accent text-accent-foreground font-bold h-12 neon-glow">
-                    Finaliser la commande
-                  </Button>
-                </SheetFooter>
+                    <Button 
+                      className="w-full bg-accent text-accent-foreground font-bold h-12 neon-glow gap-2"
+                      onClick={handleCheckout}
+                      disabled={isOrdering}
+                    >
+                      {isOrdering ? "Traitement..." : "Finaliser la commande"}
+                      {!isOrdering && <ChevronRight size={18} />}
+                    </Button>
+                  </SheetFooter>
+                )}
               </SheetContent>
             </Sheet>
 
@@ -221,6 +265,56 @@ export default function LandingPage() {
           })}
         </div>
       </section>
+
+      {/* Receipt Dialog */}
+      <Dialog open={showReceipt} onOpenChange={setShowReceipt}>
+        <DialogContent className="bg-white text-black p-0 overflow-hidden sm:max-w-[400px]">
+          <div className="p-8 font-mono text-sm">
+            <div className="text-center mb-6 border-b border-dashed border-gray-300 pb-4">
+              <div className="flex justify-center mb-2">
+                <CheckCircle className="text-green-600" size={40} />
+              </div>
+              <h2 className="text-2xl font-black uppercase">COMMANDE RÉUSSIE</h2>
+              <p className="text-[10px] mt-1">ID: #{orderSummary?.id}</p>
+              <p className="text-[10px]">{orderSummary?.date}</p>
+            </div>
+            
+            <div className="space-y-2 mb-6">
+              {orderSummary?.items.map((item, idx) => (
+                <div key={idx} className="flex justify-between">
+                  <span>{item.quantity}x {item.name.substring(0, 15)}</span>
+                  <span>${(item.sellingPrice * item.quantity).toFixed(2)}</span>
+                </div>
+              ))}
+            </div>
+
+            <div className="border-t border-dashed border-gray-300 pt-4 space-y-2">
+              <div className="flex justify-between font-bold text-lg">
+                <span>TOTAL</span>
+                <span>${orderSummary?.total.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-accent font-bold">
+                <span>TOTAL PI</span>
+                <span>{(orderSummary ? orderSummary.total / PI_CONVERSION_RATE : 0).toFixed(4)} π</span>
+              </div>
+            </div>
+
+            <div className="text-center mt-8 text-[10px] space-y-1 opacity-70">
+              <p>Veuillez présenter ce reçu à la caisse</p>
+              <p>pour le retrait de vos articles.</p>
+              <p className="font-bold mt-4">MERCI DE VOTRE ACHAT !</p>
+            </div>
+          </div>
+          <div className="bg-gray-100 p-4 flex gap-2">
+            <Button className="flex-1 gap-2" onClick={() => window.print()}>
+              <Printer size={16} /> Imprimer Reçu
+            </Button>
+            <Button className="flex-1" variant="outline" onClick={() => setShowReceipt(false)}>
+              Fermer
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Footer */}
       <footer className="mt-auto py-10 border-t border-white/5 bg-card/30">
