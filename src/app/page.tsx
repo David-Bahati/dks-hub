@@ -2,6 +2,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -19,7 +20,9 @@ import {
   Printer,
   ChevronRight,
   User,
-  ArrowRight
+  ArrowRight,
+  Wallet,
+  CreditCard
 } from "lucide-react";
 import { MOCK_PRODUCTS } from "@/lib/mock-data";
 import { Product, PI_CONVERSION_RATE, User as UserType } from "@/lib/types";
@@ -36,7 +39,12 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Dialog,
   DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
+import { useRouter } from 'next/navigation';
+import { createPiPayment } from "@/lib/pi-payment";
 
 interface CartItem extends Product {
   quantity: number;
@@ -47,15 +55,18 @@ export default function LandingPage() {
   const [search, setSearch] = useState("");
   const [isOrdering, setIsOrdering] = useState(false);
   const [showReceipt, setShowReceipt] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [currentUser, setCurrentUser] = useState<UserType | null>(null);
   const [orderSummary, setOrderSummary] = useState<{
     id: string;
     items: CartItem[];
     total: number;
     date: string;
+    paymentMethod: string;
   } | null>(null);
 
   const { toast } = useToast();
+  const router = useRouter();
 
   useEffect(() => {
     const savedUser = localStorage.getItem("dks_user");
@@ -94,33 +105,115 @@ export default function LandingPage() {
   const totalUSD = cart.reduce((acc, item) => acc + (item.sellingPrice * item.quantity), 0);
   const totalPi = totalUSD / PI_CONVERSION_RATE;
 
-  const handleCheckout = async () => {
-    setIsOrdering(true);
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
+  const completeOrder = (method: string) => {
     const summary = {
       id: Math.random().toString(36).substring(2, 9).toUpperCase(),
       items: [...cart],
       total: totalUSD,
-      date: new Date().toLocaleString()
+      date: new Date().toLocaleString(),
+      paymentMethod: method,
     };
     
     setOrderSummary(summary);
     setCart([]);
-    setIsOrdering(false);
     setShowReceipt(true);
     
     toast({
-      title: "Commande Confirmée",
-      description: "Votre reçu de retrait a été généré.",
+      title: "Commande Validée et Payée",
+      description: "Votre reçu de retrait a été généré avec succès.",
+      className: "bg-green-600 border-none text-white"
     });
+
+    setIsOrdering(false);
+  }
+
+  const handlePayment = async (method: string) => {
+    if (!currentUser) {
+      router.push("/login");
+      return toast({ title: "Connexion requise", variant: "destructive" });
+    }
+
+    setIsOrdering(true);
+    setShowPaymentModal(false);
+
+    switch (method) {
+      case 'Pi Network':
+        const paymentData = {
+            amount: parseFloat(totalPi.toFixed(4)),
+            memo: `Commande DKS ShopManager (${currentUser.username})`,
+            metadata: { cart: cart.map(i => ({ id: i.id, qty: i.quantity })) }
+        };
+
+        const callbacks = {
+            onReadyForServerApproval: (paymentId: string) => {
+                console.log("[FRONTEND] onReadyForServerApproval", paymentId);
+                toast({ title: "Action requise", description: "Approbation de la transaction en cours..." });
+                
+                fetch("/api/pi/approve", {
+                    method: "POST",
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ paymentId })
+                });
+            },
+            onReadyForServerCompletion: (paymentId: string, txid: string) => {
+                console.log("[FRONTEND] onReadyForServerCompletion", paymentId, txid);
+                toast({ title: "Transaction soumise", description: "Finalisation et vérification du paiement..." });
+
+                fetch("/api/pi/complete", {
+                    method: "POST",
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ paymentId, txid })
+                }).then(async (res) => {
+                    if (res.ok) {
+                        console.log("[FRONTEND] La commande est finalisée avec succès par le backend.");
+                        completeOrder(method);
+                    } else {
+                        const { error } = await res.json();
+                        toast({ title: "Erreur de Finalisation", description: error || "Le serveur n'a pas pu vérifier la transaction.", variant: "destructive" });
+                        setIsOrdering(false);
+                    }
+                }).catch(err => {
+                    toast({ title: "Erreur Réseau", description: "Impossible de contacter le serveur pour finaliser le paiement.", variant: "destructive" });
+                    setIsOrdering(false);
+                });
+            },
+            onCancel: (paymentId: string) => {
+                console.log("[FRONTEND] onCancel", paymentId);
+                toast({ title: "Paiement Annulé", description: "La transaction a été annulée.", variant: "destructive" });
+                setIsOrdering(false);
+            },
+            onError: (error: Error, payment: any) => {
+                console.error("[FRONTEND] onError", error);
+                toast({ title: "Erreur de Paiement Pi", description: error.message, variant: "destructive" });
+                setIsOrdering(false);
+            }
+        };
+
+        try {
+          await createPiPayment(paymentData, callbacks);
+        } catch(error) {
+          setIsOrdering(false);
+        }
+
+        break;
+      case 'Mobile Money':
+        toast({ title: "Demande de paiement envoyée..." });
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        completeOrder(method);
+        break;
+      case 'Cash au retrait':
+        toast({ title: "Commande enregistrée" });
+        completeOrder(method);
+        break;
+    }
   };
 
   const publishedProducts = MOCK_PRODUCTS.filter(p => p.isPublished && p.name.toLowerCase().includes(search.toLowerCase()));
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col custom-scrollbar">
-      {/* Navbar Moderne */}
+      {/* ... (Le reste du JSX reste identique) ... */}
+            {/* Navbar */}
       <header className="border-b border-white/5 bg-background/40 backdrop-blur-2xl sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 h-20 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-3 group">
@@ -161,7 +254,7 @@ export default function LandingPage() {
                   ) : (
                     cart.map(item => (
                       <div key={item.id} className="flex gap-4 p-4 bg-white/5 rounded-3xl border border-white/5 group hover:border-white/20 transition-all">
-                        <img src={item.imageUrl} className="w-20 h-20 rounded-2xl object-cover" />
+                        <Image src={item.imageUrl} alt={item.name} width={80} height={80} className="w-20 h-20 rounded-2xl object-cover" />
                         <div className="flex-1">
                           <h4 className="text-sm font-black uppercase line-clamp-1">{item.name}</h4>
                           <p className="text-xs text-accent font-black mt-1">${item.sellingPrice} | {(item.sellingPrice / PI_CONVERSION_RATE).toFixed(4)} π</p>
@@ -194,10 +287,10 @@ export default function LandingPage() {
                     </div>
                     <Button 
                       className="w-full bg-accent text-accent-foreground font-black h-14 rounded-2xl neon-glow gap-3 uppercase italic text-lg"
-                      onClick={handleCheckout}
+                      onClick={() => setShowPaymentModal(true)}
                       disabled={isOrdering}
                     >
-                      {isOrdering ? "Traitement..." : "Confirmer l'Achat"}
+                      {isOrdering ? "Traitement en cours..." : "Finaliser la Commande"}
                       {!isOrdering && <ArrowRight size={20} />}
                     </Button>
                   </SheetFooter>
@@ -215,7 +308,7 @@ export default function LandingPage() {
         </div>
       </header>
 
-      {/* Hero Section Immersif */}
+      {/* Hero Section */}
       <section className="relative pt-24 pb-32 overflow-hidden">
         <div className="absolute inset-0 -z-10">
            <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-accent/10 rounded-full blur-[120px] animate-pulse" />
@@ -247,17 +340,13 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Liste de Produits Moderne */}
+      {/* Liste de Produits */}
       <section className="pb-32 max-w-7xl mx-auto px-4 w-full">
         <div className="flex items-center justify-between mb-12">
           <h2 className="text-3xl font-black flex items-center gap-4 uppercase italic">
             <Zap className="text-accent fill-accent" size={32} /> 
             Catalogue <span className="text-accent">Live</span>
           </h2>
-          <div className="flex gap-2">
-            <Badge variant="outline" className="border-white/10 uppercase text-[10px] font-black">Nouveautés</Badge>
-            <Badge variant="outline" className="border-white/10 uppercase text-[10px] font-black">Populaire</Badge>
-          </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
@@ -266,7 +355,7 @@ export default function LandingPage() {
             return (
               <div key={product.id} className="glossy-card rounded-[2.5rem] overflow-hidden flex flex-col group border-none">
                 <div className="aspect-square overflow-hidden relative">
-                  <img src={product.imageUrl} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
+                  <Image src={product.imageUrl} alt={product.name} fill className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
                   <div className="absolute top-5 right-5 bg-black/80 backdrop-blur-xl px-4 py-1.5 rounded-full text-[10px] font-black text-accent border border-accent/20">
                     {product.stockQuantity} EN STOCK
                   </div>
@@ -298,7 +387,42 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Reçu de Retrait Professionnel */}
+      {/* Modal de Sélection de Paiement */}
+      <Dialog open={showPaymentModal} onOpenChange={setShowPaymentModal}>
+        <DialogContent className="bg-card/95 backdrop-blur-2xl border-white/10 sm:max-w-md rounded-[2rem]">
+          <DialogHeader className="pb-4 border-b border-white/10">
+            <DialogTitle className="text-2xl font-black uppercase italic flex items-center gap-3">
+              <CreditCard className="text-accent" /> Mode de Paiement
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground pt-2">
+              Veuillez sélectionner votre méthode de paiement préférée pour finaliser la transaction.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-6 flex flex-col gap-4">
+            <Button
+              onClick={() => handlePayment('Pi Network')}
+              className="w-full h-16 bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-400 border border-yellow-500/20 transition-all font-black uppercase italic gap-4 rounded-2xl text-lg justify-start px-6"
+            >
+              <Coins size={24} /> Payer avec Pi Network
+            </Button>
+            <Button
+              onClick={() => handlePayment('Mobile Money')}
+              className="w-full h-16 bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 border border-orange-500/20 transition-all font-black uppercase italic gap-4 rounded-2xl text-lg justify-start px-6"
+            >
+              <Smartphone size={24} /> Payer par Mobile Money
+            </Button>
+            <Button
+              onClick={() => handlePayment('Cash au retrait')}
+              className="w-full h-16 bg-green-500/10 hover:bg-green-500/20 text-green-400 border border-green-500/20 transition-all font-black uppercase italic gap-4 rounded-2xl text-lg justify-start px-6"
+            >
+              <Wallet size={24} /> Paiement au Retrait
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+
+      {/* Reçu de Retrait */}
       <Dialog open={showReceipt} onOpenChange={setShowReceipt}>
         <DialogContent className="bg-white text-black p-0 overflow-hidden sm:max-w-[450px] rounded-[2rem] border-none">
           <div className="p-10 font-mono text-sm relative">
@@ -324,7 +448,11 @@ export default function LandingPage() {
               ))}
             </div>
 
-            <div className="border-t border-dashed border-gray-300 pt-6 space-y-3">
+            <div className="border-t border-dashed border-gray-300 pt-6 space-y-4">
+               <div className="flex justify-between font-bold text-xs">
+                <span className="text-gray-500">MÉTHODE</span>
+                <span>{orderSummary?.paymentMethod}</span>
+              </div>
               <div className="flex justify-between font-black text-xl">
                 <span>TOTAL USD</span>
                 <span>${orderSummary?.total.toFixed(2)}</span>
@@ -359,7 +487,7 @@ export default function LandingPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Footer Moderne */}
+      {/* Footer */}
       <footer className="mt-auto py-16 border-t border-white/5 bg-black/40 backdrop-blur-3xl">
         <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center gap-10">
           <div className="space-y-4">

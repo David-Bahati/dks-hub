@@ -1,11 +1,13 @@
 
-export type UserRole = 'ADMIN' | 'SELLER' | 'CASHIER' | 'VISITOR';
+import { Timestamp } from "firebase/firestore";
 
-export interface User {
-  id: string;
-  email: string;
-  name: string;
-  role: UserRole;
+// The complete user object, combining Auth and Firestore data
+export interface AppUser {
+  uid: string;                 // From Firebase Auth
+  email: string | null;          // From Firebase Auth
+  name: string;                 // From Firestore
+  role: 'admin' | 'customer';    // From Firestore
+  createdAt: Timestamp;        // From Firestore
 }
 
 export type Category = 'keyboard' | 'mouse' | 'screen' | 'headset' | 'other';
@@ -15,7 +17,7 @@ export interface Product {
   name: string;
   description: string;
   category: Category;
-  purchasePrice: number;
+  // purchasePrice: number; // Let's simplify for now
   sellingPrice: number;
   stockQuantity: number;
   imageUrl: string;
@@ -31,22 +33,13 @@ export interface SaleItem {
   price: number;
 }
 
-export interface Sale {
-  id: string;
-  items: SaleItem[];
-  totalAmount: number;
-  paymentMode: PaymentMode;
-  saleDate: string;
-  sellerId: string;
-}
-
 export interface Order {
   id: string;
-  customerName: string;
+  customer: string;
   items: SaleItem[];
-  totalAmount: number;
-  status: 'pending' | 'completed' | 'cancelled';
-  orderDate: string;
+  total: number;
+  status: 'En attente' | 'Terminé' | 'Annulé';
+  date: Timestamp; // Dates from Firestore are Timestamps
 }
 
 export const PI_CONVERSION_RATE = 314.159;

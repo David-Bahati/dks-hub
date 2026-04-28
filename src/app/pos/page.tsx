@@ -39,6 +39,8 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
+import Image from "next/image";
 
 interface CartItem extends Product {
   quantity: number;
@@ -145,7 +147,7 @@ export default function POS() {
                 onClick={() => addToCart(product)}
               >
                 <div className="aspect-square relative overflow-hidden rounded-t-lg">
-                  <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                  <Image src={product.imageUrl} alt={product.name} fill className="object-cover group-hover:scale-105 transition-transform" />
                   <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-sm px-2 py-1 rounded-md text-xs font-bold text-accent">
                     {product.stockQuantity} en stock
                   </div>

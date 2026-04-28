@@ -46,6 +46,8 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
+import Image from "next/image";
+import { cn } from "@/lib/utils";
 
 const CATEGORIES: { value: Category; label: string }[] = [
   { value: 'keyboard', label: 'Claviers' },
@@ -104,7 +106,7 @@ export default function Inventory() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8 py-6">
                 <div className="space-y-6">
                   <div className="space-y-2">
-                    <Label className="text-xs font-bold uppercase text-muted-foreground">Nom de l'article</Label>
+                    <Label className="text-xs font-bold uppercase text-muted-foreground">Nom de l&apos;article</Label>
                     <Input className="bg-background/50 border-white/10" placeholder="Ex: RTX 5090 Founders Edition" />
                   </div>
                   
@@ -148,7 +150,7 @@ export default function Inventory() {
                     >
                       {previewImage ? (
                         <>
-                          <img src={previewImage} className="w-full h-full object-cover" />
+                          <Image src={previewImage} alt="Aperçu de l&apos;image" fill className="object-cover" />
                           <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
                             <Upload className="text-white" />
                           </div>
@@ -180,7 +182,7 @@ export default function Inventory() {
               </div>
               <DialogFooter className="gap-3">
                 <Button variant="ghost" className="hover:bg-white/5 rounded-xl">Annuler</Button>
-                <Button className="bg-accent text-accent-foreground hover:bg-accent/80 font-bold px-8 rounded-xl shadow-lg">Enregistrer l'article</Button>
+                <Button className="bg-accent text-accent-foreground hover:bg-accent/80 font-bold px-8 rounded-xl shadow-lg">Enregistrer l&apos;article</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -212,8 +214,8 @@ export default function Inventory() {
               {filteredProducts.map((product) => (
                 <TableRow key={product.id} className="border-white/5 hover:bg-white/5 group transition-colors">
                   <TableCell>
-                    <div className="w-16 h-16 rounded-2xl overflow-hidden bg-muted/50 border border-white/10">
-                      <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" />
+                    <div className="w-16 h-16 rounded-2xl overflow-hidden bg-muted/50 border border-white/10 relative">
+                      <Image src={product.imageUrl} alt={product.name} fill className="object-cover" />
                     </div>
                   </TableCell>
                   <TableCell>

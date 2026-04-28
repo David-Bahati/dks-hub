@@ -3,7 +3,7 @@
 
 import { Navbar } from "@/components/layout/Navbar";
 import { useState } from "react";
-import { MOCK_SALES } from "@/lib/mock-data";
+import { MOCK_ORDERS } from "@/lib/mock-data";
 import { 
   Table, 
   TableBody, 
@@ -17,9 +17,10 @@ import { Input } from "@/components/ui/input";
 import { Search, Download, Calendar as CalendarIcon, Filter } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
+import { Order } from "@/lib/types";
 
 export default function SalesHistory() {
-  const [sales] = useState(MOCK_SALES);
+  const [sales] = useState(MOCK_ORDERS);
 
   return (
     <div className="min-h-screen bg-background">
@@ -63,12 +64,12 @@ export default function SalesHistory() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {sales.map((sale) => (
-                <TableRow key={sale.id} className="border-white/5 hover:bg-white/5">
+              {sales.map((sale, index) => (
+                <TableRow key={index} className="border-white/5 hover:bg-white/5">
                   <TableCell className="text-sm">
-                    {format(new Date(sale.saleDate), "MMM dd, yyyy • HH:mm")}
+                    {format(sale.date.toDate(), "MMM dd, yyyy • HH:mm")}
                   </TableCell>
-                  <TableCell className="font-mono text-xs text-accent">#{sale.id.toUpperCase()}</TableCell>
+                  <TableCell className="font-mono text-xs text-accent">#{index}</TableCell>
                   <TableCell>
                     <div className="flex flex-col gap-1">
                       {sale.items.map((item, idx) => (
@@ -80,11 +81,11 @@ export default function SalesHistory() {
                   </TableCell>
                   <TableCell>
                     <Badge variant="secondary" className="bg-white/10 uppercase text-[10px]">
-                      {sale.paymentMode.replace('_', ' ')}
+                      {sale.status}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right font-bold text-lg">
-                    ${sale.totalAmount.toFixed(2)}
+                    ${sale.total.toFixed(2)}
                   </TableCell>
                 </TableRow>
               ))}

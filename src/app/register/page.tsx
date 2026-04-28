@@ -7,35 +7,35 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { User, Lock, ArrowRight, Home } from 'lucide-react';
+import { User, Mail, Lock, ArrowRight, Home } from 'lucide-react';
 
-export default function LoginPage() {
+export default function RegisterPage() {
   const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleRegister = (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
-    // --- Simulation d'authentification ---
-    // Dans une vraie application, vous appelleriez votre API backend ici.
+    // --- Simulation d'inscription ---
     setTimeout(() => {
-      if (username && password) {
-        const user = {
+      if (username && email && password) {
+        const newUser = {
           id: `user_${new Date().getTime()}`,
           username: username,
-          email: `${username.toLowerCase()}@example.com`,
+          email: email,
         };
 
-        // Sauvegarde de l'utilisateur dans le localStorage pour simuler la session
-        localStorage.setItem('dks_user', JSON.stringify(user));
+        // Sauvegarde et connexion automatique de l'utilisateur
+        localStorage.setItem('dks_user', JSON.stringify(newUser));
 
         toast({
-          title: 'Connexion réussie',
-          description: `Bienvenue, ${username} !`,
+          title: 'Inscription réussie',
+          description: 'Votre compte a été créé avec succès.',
         });
 
         // Redirection vers le tableau de bord
@@ -43,8 +43,8 @@ export default function LoginPage() {
 
       } else {
         toast({
-          title: 'Erreur de connexion',
-          description: 'Veuillez entrer un nom d'utilisateur et un mot de passe.',
+          title: 'Formulaire incomplet',
+          description: 'Veuillez remplir tous les champs.',
           variant: 'destructive',
         });
         setIsLoading(false);
@@ -59,17 +59,17 @@ export default function LoginPage() {
           <Home size={20} />
         </Button>
       </Link>
-      
+
       <div className="w-full max-w-sm">
         <div className="text-center mb-10">
            <div className="w-16 h-16 rounded-3xl bg-primary flex items-center justify-center neon-glow mx-auto mb-6">
               <span className="text-white font-black text-3xl italic uppercase">dks</span>
             </div>
-          <h1 className="text-4xl font-black font-headline tracking-tighter uppercase italic">Espace <span className="premium-gradient-text">Pro</span></h1>
-          <p className="text-muted-foreground mt-2">Connectez-vous pour gérer votre activité.</p>
+          <h1 className="text-4xl font-black font-headline tracking-tighter uppercase italic">Créer un Compte</h1>
+          <p className="text-muted-foreground mt-2">Rejoignez notre communauté de passionnés.</p>
         </div>
 
-        <form onSubmit={handleLogin} className="space-y-6">
+        <form onSubmit={handleRegister} className="space-y-6">
           <div className="relative">
             <User className="absolute left-5 top-1/2 -translate-y-1/2 text-muted-foreground" size={20} />
             <Input
@@ -78,6 +78,17 @@ export default function LoginPage() {
               className="h-14 pl-14 rounded-2xl bg-card/60 border-white/10 focus:border-accent text-base"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
+              disabled={isLoading}
+            />
+          </div>
+          <div className="relative">
+            <Mail className="absolute left-5 top-1/2 -translate-y-1/2 text-muted-foreground" size={20} />
+            <Input
+              type="email"
+              placeholder="Adresse e-mail"
+              className="h-14 pl-14 rounded-2xl bg-card/60 border-white/10 focus:border-accent text-base"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               disabled={isLoading}
             />
           </div>
@@ -98,16 +109,16 @@ export default function LoginPage() {
             className="w-full h-14 bg-accent text-accent-foreground font-black rounded-2xl neon-glow gap-3 uppercase italic text-lg"
             disabled={isLoading}
           >
-            {isLoading ? "Connexion en cours..." : "Se connecter"}
+            {isLoading ? "Création en cours..." : "S'inscrire"}
             {!isLoading && <ArrowRight size={20}/>}
           </Button>
         </form>
 
         <div className="text-center mt-8">
           <p className="text-sm text-muted-foreground">
-            Vous n'avez pas de compte ?{" "}
-            <Link href="/register" className="font-bold text-accent hover:underline">
-              Inscrivez-vous
+            Vous avez déjà un compte ?{" "}
+            <Link href="/login" className="font-bold text-accent hover:underline">
+              Connectez-vous
             </Link>
           </p>
         </div>

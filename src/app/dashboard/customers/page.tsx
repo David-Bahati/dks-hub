@@ -20,7 +20,7 @@ export default function CustomersPage() {
       <main className="max-w-7xl mx-auto px-4 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold font-headline uppercase tracking-tighter">Base Clients</h1>
-          <p className="text-muted-foreground">Gérez vos relations clients et l'historique de fidélité.</p>
+          <p className="text-muted-foreground">Gérez vos relations clients et l&apos;historique de fidélité.</p>
         </div>
 
         <Card className="glossy-card border-none">
