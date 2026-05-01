@@ -25,7 +25,8 @@ import {
   Headset,
   ArrowRight,
   Clock,
-  CheckCircle2
+  CheckCircle2,
+  Sparkles
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -144,11 +145,13 @@ function DashboardPage() {
                         <p className="text-xs text-muted-foreground font-bold uppercase tracking-widest">Ravi de vous revoir, {user?.name}</p>
                     </div>
                 </div>
-                <Link href="/">
-                    <Button variant="outline" className="rounded-xl border-white/10 h-10 gap-2 font-bold text-xs uppercase italic">
-                        <ShoppingCart size={14} /> Boutique
-                    </Button>
-                </Link>
+                <div className="flex items-center gap-3">
+                    <Link href="/">
+                        <Button variant="outline" className="rounded-xl border-white/10 h-10 gap-2 font-bold text-xs uppercase italic">
+                            <ShoppingCart size={14} /> Boutique
+                        </Button>
+                    </Link>
+                </div>
             </div>
         </header>
 
@@ -164,7 +167,7 @@ function DashboardPage() {
                         <h2 className="text-4xl font-black uppercase italic leading-tight">VOTRE SETUP,<br /><span className="text-accent">NOTRE PRIORITÉ</span></h2>
                         <p className="text-muted-foreground text-sm max-w-md">Découvrez vos dernières transactions et gérez vos préférences en toute sécurité.</p>
                         <Button className="bg-primary hover:bg-primary/90 h-12 rounded-xl px-8 font-black uppercase italic gap-2 mt-4" asChild>
-                            <Link href="/shop">Continuer mes achats <ArrowRight size={18} /></Link>
+                            <Link href="/">Continuer mes achats <ArrowRight size={18} /></Link>
                         </Button>
                     </CardContent>
                 </Card>
@@ -188,7 +191,7 @@ function DashboardPage() {
                                 <div className="p-3 bg-white/5 rounded-xl border border-white/5 space-y-1">
                                     <p className="text-[10px] text-muted-foreground uppercase font-black">Mode de paiement</p>
                                     <p className="text-xs font-bold flex items-center gap-2">
-                                        {lastOrder.paymentMethod === 'PI_NETWORK' ? <Package className="w-3 h-3 text-accent" /> : <DollarSign className="w-3 h-3 text-accent" />}
+                                        <Package className="w-3 h-3 text-accent" />
                                         {lastOrder.paymentMethod?.replace('_', ' ')}
                                     </p>
                                 </div>
@@ -232,7 +235,7 @@ function DashboardPage() {
     );
   }
 
-  // --- VUE ADMIN / STAFF (Existante) ---
+  // --- VUE ADMIN / STAFF ---
   return (
     <div className="flex min-h-screen w-full flex-col bg-muted/40">
       <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6 py-4">
