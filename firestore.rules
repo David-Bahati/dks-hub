@@ -26,7 +26,6 @@ service cloud.firestore {
     }
 
     function isStaff() {
-      // Un utilisateur est staff s'il existe dans l'une des collections de rôles
       return isAdmin() || isSeller() || isCashier();
     }
 
@@ -42,17 +41,17 @@ service cloud.firestore {
 
     match /admins/{adminId} {
       allow read: if isSignedIn();
-      allow write: if isAdmin() || (isSignedIn() && request.auth.uid == adminId);
+      allow write: if isAdmin() || isOwner(adminId);
     }
 
     match /sellers/{sellerId} {
       allow read: if isSignedIn();
-      allow write: if isAdmin() || (isSignedIn() && request.auth.uid == sellerId);
+      allow write: if isAdmin() || isOwner(sellerId);
     }
 
     match /cashiers/{cashierId} {
       allow read: if isSignedIn();
-      allow write: if isAdmin() || (isSignedIn() && request.auth.uid == cashierId);
+      allow write: if isAdmin() || isOwner(cashierId);
     }
 
     match /categories/{categoryId} {
@@ -70,22 +69,24 @@ service cloud.firestore {
     }
 
     match /orders/{orderId} {
-      // Un client peut créer une commande s'il est connecté
+      // Un client peut créer une commande
       allow create: if isSignedIn();
       
-      // Lecture d'une commande unique
-      allow get: if isSignedIn() && (isStaff() || resource.data.userId == request.auth.uid);
-      
-      // Pour lister les commandes, Firestore exige que la requête soit filtrée par userId si l'utilisateur n'est pas staff
-      allow list: if isSignedIn() && (isStaff() || (resource.data.userId == request.auth.uid));
+      // Lecture autorisée si c'est le propriétaire ou un membre du staff
+      // Firestore utilise cette règle pour valider les listes filtrées par userId
+      allow read: if isSignedIn() && (
+        isStaff() || 
+        (resource != null && resource.data.userId == request.auth.uid) ||
+        (resource == null && request.auth.uid != null) // Permet la vérification initiale
+      );
       
       allow update: if isStaff();
       allow delete: if isAdmin();
     }
 
     match /sales/{saleId} {
-      allow create: if isStaff();
       allow read: if isStaff();
+      allow create: if isStaff();
       allow update, delete: if isAdmin();
     }
 
