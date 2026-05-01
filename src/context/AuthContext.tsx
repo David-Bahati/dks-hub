@@ -1,7 +1,8 @@
+
 "use client";
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { auth, db } from '@/lib/firebase';
+import { initializeFirebase } from '@/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { AppUser } from '@/lib/types';
@@ -23,17 +24,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    const { auth, firestore } = initializeFirebase();
     let unsubscribeSnapshot: (() => void) | null = null;
 
     const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
-      // Nettoyer l'ancien écouteur Firestore si l'état auth change
       if (unsubscribeSnapshot) {
         unsubscribeSnapshot();
         unsubscribeSnapshot = null;
       }
 
       if (firebaseUser) {
-        const userDocRef = doc(db, 'users', firebaseUser.uid);
+        const userDocRef = doc(firestore, 'users', firebaseUser.uid);
         
         unsubscribeSnapshot = onSnapshot(userDocRef, (userDocSnap) => {
           if (userDocSnap.exists()) {
@@ -41,7 +42,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             setUser({
               uid: firebaseUser.uid,
               email: firebaseUser.email || '',
-              name: userData.username || userData.name || userData.displayName || 'Utilisateur',
+              name: userData.name || userData.displayName || userData.username || 'Utilisateur',
               role: userData.role || 'customer',
               createdAt: userData.createdAt || null,
             });

@@ -7,16 +7,20 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { Lock, ArrowRight, Home, Mail, Loader2 } from 'lucide-react';
-import { auth } from '@/lib/firebase';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { Lock, ArrowRight, Home, Mail, Loader2, ShieldCheck } from 'lucide-react';
+import { initializeFirebase } from '@/firebase';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import { doc, setDoc } from 'firebase/firestore';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isSettingUp, setIsSettingUp] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
+
+  const { auth, firestore } = initializeFirebase();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,11 +42,54 @@ export default function LoginPage() {
       console.error(error);
       toast({
         title: 'Erreur de connexion',
-        description: 'Email ou mot de passe incorrect.',
+        description: 'Email ou mot de passe incorrect. Assurez-vous d\'avoir initialisé les comptes de test.',
         variant: 'destructive',
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const setupTestAccounts = async () => {
+    setIsSettingUp(true);
+    const testUsers = [
+      { email: 'admin@dks.com', password: 'admin123', name: 'Admin DKS', role: 'admin' },
+      { email: 'vendeur@dks.com', password: 'vendeur123', name: 'Vendeur DKS', role: 'seller' },
+      { email: 'caissier@dks.com', password: 'caissier123', name: 'Caissier DKS', role: 'cashier' },
+    ];
+
+    try {
+      for (const user of testUsers) {
+        try {
+          const userCredential = await createUserWithEmailAndPassword(auth, user.email, user.password);
+          await setDoc(doc(firestore, 'users', userCredential.user.uid), {
+            name: user.name,
+            email: user.email,
+            role: user.role,
+            createdAt: new Date().toISOString(),
+          });
+          // Also create role markers for security rules
+          const roleCollection = user.role === 'admin' ? 'admins' : 'sellers';
+          if (user.role !== 'customer') {
+             await setDoc(doc(firestore, roleCollection, userCredential.user.uid), { active: true });
+          }
+        } catch (e: any) {
+          if (e.code !== 'auth/email-already-in-use') throw e;
+        }
+      }
+      toast({
+        title: "Succès",
+        description: "Les comptes de test ont été créés ou mis à jour.",
+      });
+    } catch (error: any) {
+      console.error(error);
+      toast({
+        title: "Erreur",
+        description: "Une erreur est survenue lors de l'initialisation.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSettingUp(false);
     }
   };
 
@@ -97,12 +144,29 @@ export default function LoginPage() {
           </Button>
         </form>
 
-        <div className="mt-8 space-y-2">
-            <p className="text-xs text-center text-muted-foreground uppercase font-bold mb-4">Comptes de test rapides :</p>
-            <div className="grid grid-cols-1 gap-2">
-                <Button variant="ghost" className="text-[10px] h-8 border border-white/5" onClick={() => setTestAccount('admin@dks.com', 'admin123')}>Admin: admin@dks.com</Button>
-                <Button variant="ghost" className="text-[10px] h-8 border border-white/5" onClick={() => setTestAccount('vendeur@dks.com', 'vendeur123')}>Vendeur: vendeur@dks.com</Button>
-                <Button variant="ghost" className="text-[10px] h-8 border border-white/5" onClick={() => setTestAccount('caissier@dks.com', 'caissier123')}>Caissier: caissier@dks.com</Button>
+        <div className="mt-8 space-y-4">
+            <div className="flex flex-col gap-2">
+                <p className="text-[10px] text-center text-muted-foreground uppercase font-bold">Comptes de test :</p>
+                <div className="grid grid-cols-1 gap-2">
+                    <Button variant="ghost" className="text-[10px] h-8 border border-white/5" onClick={() => setTestAccount('admin@dks.com', 'admin123')}>Admin: admin@dks.com</Button>
+                    <Button variant="ghost" className="text-[10px] h-8 border border-white/5" onClick={() => setTestAccount('vendeur@dks.com', 'vendeur123')}>Vendeur: vendeur@dks.com</Button>
+                    <Button variant="ghost" className="text-[10px] h-8 border border-white/5" onClick={() => setTestAccount('caissier@dks.com', 'caissier123')}>Caissier: caissier@dks.com</Button>
+                </div>
+            </div>
+
+            <div className="pt-4 border-t border-white/5">
+                <Button 
+                    variant="outline" 
+                    className="w-full text-xs gap-2 border-dashed" 
+                    onClick={setupTestAccounts}
+                    disabled={isSettingUp}
+                >
+                    {isSettingUp ? <Loader2 className="h-3 w-3 animate-spin" /> : <ShieldCheck className="h-3 w-3" />}
+                    Initialiser les comptes de test sur Firebase
+                </Button>
+                <p className="text-[9px] text-center text-muted-foreground mt-2 italic">
+                    Cliquez ici si c'est votre première utilisation du projet.
+                </p>
             </div>
         </div>
       </div>
