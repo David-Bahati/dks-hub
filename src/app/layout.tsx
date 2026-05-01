@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { CartProvider } from "@/context/CartContext";
 import { AuthProvider } from "@/context/AuthContext";
 import { Toaster } from "@/components/ui/toaster";
+import { FirebaseClientProvider } from "@/firebase";
 
 const fontSans = FontSans({
   subsets: ["latin"],
@@ -25,12 +26,14 @@ export default function RootLayout({
   return (
     <html lang="fr" suppressHydrationWarning>
       <body className={cn("min-h-screen bg-background font-sans antialiased", fontSans.variable)}>
-        <AuthProvider>
-          <CartProvider>
-            <main>{children}</main>
-            <Toaster />
-          </CartProvider>
-        </AuthProvider>
+        <FirebaseClientProvider>
+          <AuthProvider>
+            <CartProvider>
+              <main>{children}</main>
+              <Toaster />
+            </CartProvider>
+          </AuthProvider>
+        </FirebaseClientProvider>
       </body>
     </html>
   );
