@@ -33,7 +33,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, onSnapshot, doc, serverTimestamp, setDoc, addDoc, deleteDoc } from 'firebase/firestore';
 import { Product } from '@/lib/types';
 import { PlusCircle, Edit, Trash2, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -47,7 +47,7 @@ function ProductsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
+  const [isPublished, setIsPublished] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -66,18 +66,17 @@ function ProductsPage() {
 
   const openModal = (product: Product | null = null) => {
     setEditingProduct(product);
+    setIsPublished(product ? product.isPublished : true);
     setIsModalOpen(true);
   };
 
   const closeModal = () => {
     setEditingProduct(null);
     setIsModalOpen(false);
-    setIsSaving(false);
   };
 
   const handleSave = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setIsSaving(true);
     const formData = new FormData(e.currentTarget);
     
     const sellingPrice = parseFloat(formData.get('sellingPrice') as string);
@@ -90,7 +89,6 @@ function ProductsPage() {
             description: "Veuillez vérifier les prix et quantités.", 
             variant: "destructive" 
         });
-        setIsSaving(false);
         return;
     }
 
@@ -101,35 +99,31 @@ function ProductsPage() {
       sellingPrice,
       purchasePrice,
       stockQuantity,
-      imageUrl: formData.get('imageUrl') as string || (editingProduct?.imageUrl || 'https://picsum.photos/seed/hardware/600/400'),
-      isPublished: formData.get('isPublished') === 'on',
+      imageUrl: formData.get('imageUrl') as string || (editingProduct?.imageUrl || `https://picsum.photos/seed/${Math.random()}/600/400`),
+      isPublished: isPublished,
       updatedAt: serverTimestamp()
     };
 
     if (editingProduct) {
       const docRef = doc(db, "products", editingProduct.id);
-      updateDoc(docRef, productData)
-        .then(() => {
-            toast({ title: "Produit mis à jour", description: "Les modifications ont été enregistrées." });
-            closeModal();
-        })
+      // NON-BLOCKING MUTATION: On ne met pas "await"
+      setDoc(docRef, productData, { merge: true })
         .catch(async (error) => {
             errorEmitter.emit('permission-error', new FirestorePermissionError({
                 path: docRef.path,
                 operation: 'update',
                 requestResourceData: productData
             }));
-            setIsSaving(false);
         });
+      
+      toast({ title: "Produit mis à jour", description: "Les modifications sont appliquées." });
+      closeModal();
     } else {
       const colRef = collection(db, "products");
+      // NON-BLOCKING MUTATION: On ne met pas "await"
       addDoc(colRef, {
         ...productData,
         createdAt: serverTimestamp()
-      })
-      .then(() => {
-        toast({ title: "Produit créé", description: "Le nouvel article a été ajouté au catalogue." });
-        closeModal();
       })
       .catch(async (error) => {
         errorEmitter.emit('permission-error', new FirestorePermissionError({
@@ -137,8 +131,10 @@ function ProductsPage() {
             operation: 'create',
             requestResourceData: productData
         }));
-        setIsSaving(false);
       });
+
+      toast({ title: "Produit créé", description: "Le nouvel article a été ajouté au catalogue." });
+      closeModal();
     }
   };
 
@@ -271,8 +267,8 @@ function ProductsPage() {
 
               <div className="space-y-4">
                 <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Image URL</Label>
-                    <Input name="imageUrl" placeholder="https://..." defaultValue={editingProduct?.imageUrl} className="h-12 bg-background/50 border-white/10 rounded-xl" />
+                    <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Image URL (Optionnel)</Label>
+                    <Input name="imageUrl" placeholder="Laissez vide pour une image aléatoire" defaultValue={editingProduct?.imageUrl} className="h-12 bg-background/50 border-white/10 rounded-xl" />
                 </div>
                 <div className="space-y-2">
                     <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Description technique</Label>
@@ -283,15 +279,18 @@ function ProductsPage() {
                         <span className="text-xs font-bold uppercase italic">Visibilité publique</span>
                         <span className="text-[9px] text-muted-foreground">Publier l'article sur la boutique</span>
                     </div>
-                    <Switch name="isPublished" defaultChecked={editingProduct?.isPublished ?? true} />
+                    <Switch 
+                      checked={isPublished} 
+                      onCheckedChange={setIsPublished} 
+                    />
                 </div>
               </div>
             </div>
 
             <DialogFooter className="gap-3">
               <Button type="button" variant="ghost" onClick={closeModal} className="rounded-xl font-bold uppercase text-[10px]">Annuler</Button>
-              <Button type="submit" className="bg-accent text-accent-foreground font-black uppercase italic rounded-xl px-10 h-12" disabled={isSaving}>
-                {isSaving ? <Loader2 className="animate-spin" /> : "Sauvegarder l'article"}
+              <Button type="submit" className="bg-accent text-accent-foreground font-black uppercase italic rounded-xl px-10 h-12">
+                Sauvegarder l'article
               </Button>
             </DialogFooter>
           </form>
