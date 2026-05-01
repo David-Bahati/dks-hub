@@ -323,7 +323,7 @@ function DashboardPage() {
                     <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Revenu Global Boutique</CardTitle>
                     <p className="text-[9px] text-accent font-bold uppercase tracking-widest">Temps réel</p>
                 </div>
-                <div className="w-12 h-12 rounded-2xl bg-accent/10 flex items-center justify-center text-accent shadow-[0_0_20px_rgba(56,189,248,0.2)]">
+                <div className="w-12 h-12 rounded-2xl bg-accent/10 flex items-center justify-center text-accent shadow-[0_0_20px_rgba(56,189,248,0.3)] group-hover:shadow-[0_0_30px_rgba(56,189,248,0.5)] transition-all">
                     <DollarSign className="h-6 w-6" />
                 </div>
               </CardHeader>
@@ -343,7 +343,7 @@ function DashboardPage() {
              <Card className="glossy-card border-none rounded-[2.5rem] group">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Ventes Jour</CardTitle>
-                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-all duration-500">
+                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white shadow-[0_0_15px_rgba(37,99,235,0.2)] group-hover:shadow-[0_0_25px_rgba(37,99,235,0.4)] transition-all duration-500">
                     <TrendingUp className="h-5 w-5" />
                 </div>
               </CardHeader>
@@ -358,7 +358,7 @@ function DashboardPage() {
              <Card className="glossy-card border-none rounded-[2.5rem] group">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Inventaire</CardTitle>
-                <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white group-hover:bg-white group-hover:text-black transition-all duration-500">
+                <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white group-hover:bg-white group-hover:text-black shadow-[0_0_15px_rgba(255,255,255,0.05)] group-hover:shadow-[0_0_25px_rgba(255,255,255,0.15)] transition-all duration-500">
                     <Package className="h-5 w-5" />
                 </div>
               </CardHeader>
@@ -370,7 +370,7 @@ function DashboardPage() {
           </div>
 
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7">
-            <Card className="lg:col-span-4 glossy-card border-none rounded-[3rem] overflow-hidden">
+            <Card className="lg:col-span-4 glossy-card border-none rounded-[2.5rem] overflow-hidden">
               <CardHeader className="border-b border-white/5 bg-white/[0.02] flex flex-row items-center justify-between py-6 px-8">
                 <CardTitle className="text-lg font-bold uppercase italic flex items-center gap-3">
                    <AlertTriangle className="text-destructive animate-pulse" size={20} />
@@ -414,7 +414,7 @@ function DashboardPage() {
               </CardContent>
             </Card>
 
-            <Card className="lg:col-span-3 glossy-card border-none rounded-[3rem] overflow-hidden">
+            <Card className="lg:col-span-3 glossy-card border-none rounded-[2.5rem] overflow-hidden">
               <CardHeader className="border-b border-white/5 bg-white/[0.02] py-6 px-8">
                 <CardTitle className="text-lg font-bold uppercase italic flex items-center gap-3">
                     <ShoppingBag size={20} className="text-accent" />
