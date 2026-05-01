@@ -11,7 +11,7 @@ interface LogoProps {
 
 /**
  * Composant Logo épuré en Flat Design.
- * Intégration directe de l'image sur fond transparent.
+ * Utilise un lien direct pour Google Drive afin de garantir l'affichage.
  */
 export function Logo({ className, size = "md", showText = false }: LogoProps) {
   const [error, setError] = useState(false);
@@ -30,13 +30,13 @@ export function Logo({ className, size = "md", showText = false }: LogoProps) {
     xl: "text-6xl",
   };
 
-  // Lien direct optimisé pour Google Drive (uc?id=)
+  // Format direct pour Google Drive (uc?export=view&id=)
   const fileId = "1kUOuBsul6BfUvpIeM1EYJ6Uo0qE8jPGX";
-  const logoUrl = `https://docs.google.com/uc?id=${fileId}`;
+  const logoUrl = `https://docs.google.com/uc?export=view&id=${fileId}`;
 
   return (
-    <div className={cn("flex items-center gap-3 transition-opacity duration-300", className)}>
-      <div className={cn("relative flex items-center justify-center", sizeClasses[size])}>
+    <div className={cn("flex items-center gap-3", className)}>
+      <div className={cn("relative flex items-center justify-center overflow-hidden", sizeClasses[size])}>
         {!error ? (
           <img 
             src={logoUrl} 
