@@ -23,7 +23,9 @@ import {
   Headset,
   ArrowRight,
   Clock,
-  Sparkles
+  Sparkles,
+  Search,
+  Plus
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -51,6 +53,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, where, orderBy, limit } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { cn } from "@/lib/utils";
 
 const adminNavLinks = [
   { href: "/dashboard", icon: LineChart, label: "Aperçu" },
@@ -237,22 +240,28 @@ function DashboardPage() {
 
   // --- VUE ADMIN / STAFF ---
   return (
-    <div className="flex min-h-screen w-full flex-col bg-muted/40">
-      <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6 py-4">
+    <div className="flex min-h-screen w-full flex-col bg-background">
+      <header className="sticky top-0 z-30 flex h-20 items-center gap-4 border-b border-white/5 bg-background/40 backdrop-blur-2xl px-6">
          <Sheet>
             <SheetTrigger asChild>
-              <Button size="icon" variant="outline" className="sm:hidden">
-                <PanelLeft className="h-5 w-5" />
+              <Button size="icon" variant="ghost" className="sm:hidden text-muted-foreground">
+                <PanelLeft className="h-6 w-6" />
                 <span className="sr-only">Menu</span>
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="sm:max-w-xs bg-card border-white/10">
-              <nav className="grid gap-6 text-lg font-medium mt-10">
+            <SheetContent side="left" className="sm:max-w-xs bg-card/95 backdrop-blur-3xl border-white/10 p-0">
+                <div className="p-8 border-b border-white/5">
+                    <span className="text-2xl font-black uppercase italic tracking-tighter">DKS <span className="text-accent font-light">Admin</span></span>
+                </div>
+              <nav className="grid gap-2 p-4">
                  {adminNavLinks.map(link => (
                    <Link
                     key={link.href}
                     href={link.href}
-                    className={`flex items-center gap-4 px-2.5 ${pathname === link.href ? 'text-accent' : 'text-muted-foreground hover:text-foreground'}`}
+                    className={cn(
+                        "flex items-center gap-4 px-4 py-3 rounded-xl transition-all text-sm font-bold uppercase italic",
+                        pathname === link.href ? 'bg-accent text-accent-foreground shadow-lg' : 'text-muted-foreground hover:bg-white/5 hover:text-white'
+                    )}
                   >
                     <link.icon className="h-5 w-5" />
                     {link.label}
@@ -262,139 +271,187 @@ function DashboardPage() {
             </SheetContent>
           </Sheet>
 
-        <Link
-            href="/"
-            className="group flex h-9 w-9 shrink-0 items-center justify-center gap-2 rounded-xl bg-primary text-lg font-semibold text-primary-foreground md:h-10 md:w-10 md:text-base mr-auto"
-          >
-             <span className="text-white font-black text-sm italic uppercase">DKS</span>
-        </Link>
+        <div className="flex-1 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+                <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center neon-glow">
+                    <span className="text-white font-black text-sm italic uppercase">DKS</span>
+                </div>
+                <h2 className="text-xl md:text-2xl tracking-tighter">
+                    <span className="font-light text-muted-foreground uppercase">Tableau de bord</span>{" "}
+                    <span className="font-black text-white uppercase italic">Admin</span>
+                </h2>
+            </div>
 
-         <nav className="hidden sm:flex items-center space-x-2 bg-card/40 backdrop-blur-sm border border-white/10 rounded-2xl p-1.5">
-            {adminNavLinks.map((link) => (
-              <Link key={link.href} href={link.href}>
-                <Button
-                  variant={pathname === link.href ? "secondary" : "ghost"}
-                  size="sm"
-                  className={`rounded-xl px-4 gap-2 font-bold ${pathname === link.href ? 'bg-accent text-accent-foreground' : 'text-muted-foreground'}`}
+            <nav className="hidden sm:flex items-center gap-1 bg-white/5 p-1 rounded-2xl border border-white/5">
+                {adminNavLinks.map((link) => (
+                    <Link key={link.href} href={link.href}>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className={cn(
+                                "rounded-xl px-4 gap-2 font-black uppercase italic text-[10px] transition-all",
+                                pathname === link.href ? 'bg-accent text-accent-foreground shadow-lg' : 'text-muted-foreground hover:text-white'
+                            )}
+                        >
+                            <link.icon className="h-4 w-4" />
+                            <span className="hidden lg:inline">{link.label}</span>
+                        </Button>
+                    </Link>
+                ))}
+            </nav>
+
+            <div className="flex items-center gap-3">
+                <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    onClick={fetchAdminData} 
+                    className="h-10 w-10 text-muted-foreground hover:text-accent hover:bg-accent/10 rounded-xl transition-all group"
                 >
-                  <link.icon className="h-4 w-4" />
-                  <span className="hidden lg:inline">{link.label}</span>
+                    <RefreshCw size={18} className={cn("transition-transform duration-700", loading ? "animate-spin" : "group-hover:rotate-180")} />
                 </Button>
-              </Link>
-            ))}
-        </nav>
+            </div>
+        </div>
       </header>
 
-      <main className="flex-1 space-y-8 p-4 md:p-8 pt-6">
-          <div className="flex items-center justify-between space-y-2">
-            <h2 className="text-3xl font-black uppercase italic tracking-tighter">Tableau de <span className="text-accent">Bord Admin</span></h2>
-            <div className="flex items-center space-x-2">
-               <Button variant="outline" size="sm" onClick={fetchAdminData} className="border-white/10 bg-white/5 rounded-xl gap-2 font-bold uppercase text-[10px]">
-                 <RefreshCw size={12} className={loading ? "animate-spin" : ""} />
-                 Actualiser
-               </Button>
-            </div>
+      <main className="flex-1 p-4 md:p-8 space-y-8">
+          {/* Stats Bento Grid */}
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+             <Card className="lg:col-span-2 glossy-card border-none rounded-[2.5rem] relative overflow-hidden group">
+              <div className="absolute -top-12 -right-12 w-48 h-48 bg-accent/5 rounded-full blur-3xl group-hover:bg-accent/10 transition-all duration-700" />
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <div className="space-y-1">
+                    <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Revenu Global de la Boutique</CardTitle>
+                    <p className="text-[9px] text-accent font-bold uppercase tracking-widest">Base de données synchronisée</p>
+                </div>
+                <div className="w-12 h-12 rounded-2xl bg-accent/10 flex items-center justify-center text-accent shadow-[0_0_20px_rgba(56,189,248,0.2)]">
+                    <DollarSign className="h-6 w-6" />
+                </div>
+              </CardHeader>
+              <CardContent className="pt-4">
+                <div className="text-5xl font-black font-mono tracking-tighter text-white">
+                    {formatCurrency(stats?.totalRevenueCDF || 0)} <span className="text-xl font-light opacity-30">CDF</span>
+                </div>
+                <div className="mt-4 flex items-center gap-4">
+                    <Badge variant="outline" className="border-white/10 bg-white/5 px-3 py-1 font-mono text-muted-foreground">
+                        ≈ {formatCurrency((stats?.totalRevenueCDF || 0) / rate)} USD
+                    </Badge>
+                    <span className="text-[10px] text-muted-foreground italic font-light">Taux appliqué : 1 USD = {rate} CDF</span>
+                </div>
+              </CardContent>
+            </Card>
+
+             <Card className="glossy-card border-none rounded-[2.5rem] group">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Activité du Jour</CardTitle>
+                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-all duration-500">
+                    <TrendingUp className="h-5 w-5" />
+                </div>
+              </CardHeader>
+              <CardContent className="pt-4">
+                <div className="text-3xl font-black font-mono">{stats?.todaySalesCount || 0}</div>
+                <p className="text-[10px] text-accent mt-2 uppercase font-black tracking-widest bg-accent/10 w-fit px-2 py-1 rounded-md">
+                    +{formatCurrency(stats?.todayRevenue || 0)} CDF
+                </p>
+              </CardContent>
+            </Card>
+
+             <Card className="glossy-card border-none rounded-[2.5rem] group">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Inventaire Global</CardTitle>
+                <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white group-hover:bg-white group-hover:text-black transition-all duration-500">
+                    <Package className="h-5 w-5" />
+                </div>
+              </CardHeader>
+              <CardContent className="pt-4">
+                <div className="text-3xl font-black font-mono">{stats?.totalProductsCount || 0}</div>
+                <p className="text-[10px] text-muted-foreground mt-2 uppercase font-bold tracking-widest">Articles référencés</p>
+              </CardContent>
+            </Card>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-             <Card className="glossy-card border-none">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Revenu Total (CDF)</CardTitle>
-                <DollarSign className="h-4 w-4 text-accent" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-black">{formatCurrency(stats?.totalRevenueCDF || 0)}</div>
-                <p className="text-[10px] text-muted-foreground mt-1 uppercase font-bold">≈ {formatCurrency((stats?.totalRevenueCDF || 0) / rate)} USD</p>
-              </CardContent>
-            </Card>
-             <Card className="glossy-card border-none">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Ventes aujourd'hui</CardTitle>
-                <TrendingUp className="h-4 w-4 text-accent" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-black">{stats?.todaySalesCount || 0}</div>
-                <p className="text-[10px] text-accent mt-1 uppercase font-bold">+{formatCurrency(stats?.todayRevenue || 0)} CDF</p>
-              </CardContent>
-            </Card>
-             <Card className="glossy-card border-none">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Total Transactions</CardTitle>
-                <ShoppingCart className="h-4 w-4 text-accent" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-black">{stats?.totalSalesCount || 0}</div>
-                <p className="text-[10px] text-muted-foreground mt-1 uppercase font-bold">Toutes périodes</p>
-              </CardContent>
-            </Card>
-             <Card className="glossy-card border-none">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Catalogue Produits</CardTitle>
-                <Package className="h-4 w-4 text-accent" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-black">{stats?.totalProductsCount || 0}</div>
-                <p className="text-[10px] text-muted-foreground mt-1 uppercase font-bold">Articles enregistrés</p>
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-            <Card className="col-span-4 glossy-card border-none">
-              <CardHeader>
-                <CardTitle className="text-lg font-bold uppercase italic flex items-center gap-2">
-                   <AlertTriangle className="text-destructive" size={20} />
-                   Alertes Stocks Faibles
+          {/* Main Dashboard Content */}
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7">
+            <Card className="lg:col-span-4 glossy-card border-none rounded-[3rem] overflow-hidden">
+              <CardHeader className="border-b border-white/5 bg-white/[0.02] flex flex-row items-center justify-between py-6 px-8">
+                <CardTitle className="text-lg font-black uppercase italic flex items-center gap-3">
+                   <AlertTriangle className="text-destructive animate-pulse" size={20} />
+                   Alertes Stock Critique
                 </CardTitle>
+                <Badge className="bg-destructive/20 text-destructive border-none font-black text-[10px] px-3">{lowStock.length} ALERTES</Badge>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-8">
                 {lowStock.length > 0 ? (
                     <div className="space-y-4">
                         {lowStock.map(item => (
-                            <div key={item.id} className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5">
-                                <div className="flex items-center gap-4">
-                                    <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center overflow-hidden">
-                                        <img src={item.imageUrl} alt={item.name} className="object-cover" />
+                            <div key={item.id} className="flex items-center justify-between p-5 bg-white/5 rounded-2xl border border-white/5 hover:bg-white/10 hover:border-white/10 transition-all group">
+                                <div className="flex items-center gap-5">
+                                    <div className="w-12 h-12 rounded-xl bg-background border border-white/5 flex items-center justify-center overflow-hidden">
+                                        <img src={item.imageUrl} alt={item.name} className="object-cover group-hover:scale-110 transition-transform duration-500" />
                                     </div>
                                     <div>
-                                        <p className="font-bold text-sm">{item.name}</p>
-                                        <p className="text-[10px] text-muted-foreground uppercase">{item.category}</p>
+                                        <p className="font-black text-sm uppercase italic">{item.name}</p>
+                                        <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">{item.category}</p>
                                     </div>
                                 </div>
                                 <div className="text-right">
-                                    <Badge variant="destructive" className="font-black">{item.stockQuantity} RESTANTS</Badge>
+                                    <Badge variant="destructive" className="font-black italic uppercase text-[10px] px-3 py-1 shadow-lg shadow-destructive/20">
+                                        {item.stockQuantity} RESTANTS
+                                    </Badge>
                                 </div>
                             </div>
                         ))}
                     </div>
                 ) : (
-                    <p className="text-center py-10 text-muted-foreground italic">Aucune alerte de stock pour le moment.</p>
+                    <div className="flex flex-col items-center justify-center py-20 text-center space-y-4 opacity-30">
+                        <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center">
+                            <Package size={40} className="text-muted-foreground" />
+                        </div>
+                        <div className="space-y-1">
+                            <p className="text-sm font-black uppercase italic tracking-widest">Tout est sous contrôle</p>
+                            <p className="text-[10px] font-bold">Votre inventaire est actuellement sain.</p>
+                        </div>
+                    </div>
                 )}
               </CardContent>
             </Card>
 
-            <Card className="col-span-3 glossy-card border-none">
-              <CardHeader>
-                <CardTitle className="text-lg font-bold uppercase italic">Ventes Récentes</CardTitle>
+            <Card className="lg:col-span-3 glossy-card border-none rounded-[3rem] overflow-hidden">
+              <CardHeader className="border-b border-white/5 bg-white/[0.02] py-6 px-8">
+                <CardTitle className="text-lg font-black uppercase italic flex items-center gap-3">
+                    <ShoppingBag size={20} className="text-accent" />
+                    Flux de Ventes
+                </CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-8">
                 <div className="space-y-6">
                     {recentSales.map(sale => (
-                        <div key={sale.id} className="flex items-center gap-4">
-                            <div className="w-9 h-9 rounded-full bg-accent/20 flex items-center justify-center text-accent font-black text-xs">
+                        <div key={sale.id} className="flex items-center gap-5 group">
+                            <div className="w-11 h-11 rounded-2xl bg-accent/10 border border-accent/20 flex items-center justify-center text-accent font-black text-xs group-hover:bg-accent group-hover:text-black transition-all duration-300">
                                 {sale.cashierName?.substring(0, 1)}
                             </div>
                             <div className="flex-1">
-                                <p className="text-sm font-bold">{sale.cashierName}</p>
-                                <p className="text-[10px] text-muted-foreground">ID: #{sale.id.substring(0, 6)}</p>
-                            </div>
-                            <div className="text-right">
-                                <p className="font-black text-sm">{formatCurrency(sale.totalAmount)} CDF</p>
-                                <p className="text-[10px] text-accent font-bold uppercase">PAYÉ</p>
+                                <div className="flex items-center justify-between mb-1">
+                                    <p className="text-sm font-black uppercase italic">{sale.cashierName}</p>
+                                    <p className="font-mono font-black text-sm text-white">{formatCurrency(sale.totalAmount)} <span className="text-[9px] font-light opacity-30">CDF</span></p>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <p className="text-[9px] text-muted-foreground font-bold uppercase tracking-widest">REF: #{sale.id.substring(0, 8)}</p>
+                                    <Badge className="bg-accent/10 text-accent border-none text-[8px] font-black uppercase px-2 h-4">SUCCESS</Badge>
+                                </div>
                             </div>
                         </div>
                     ))}
-                    {recentSales.length === 0 && <p className="text-center py-10 text-muted-foreground">Aucune vente enregistrée.</p>}
+                    {recentSales.length === 0 && (
+                        <div className="flex flex-col items-center justify-center py-20 text-center space-y-4 opacity-30">
+                            <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center">
+                                <LineChart size={40} className="text-muted-foreground" />
+                            </div>
+                            <div className="space-y-1">
+                                <p className="text-sm font-black uppercase italic tracking-widest">Prêt pour l'activité</p>
+                                <p className="text-[10px] font-bold">Vos futures ventes apparaîtront ici.</p>
+                            </div>
+                        </div>
+                    )}
                 </div>
               </CardContent>
             </Card>
@@ -405,3 +462,4 @@ function DashboardPage() {
 }
 
 export default withAuth(DashboardPage);
+    

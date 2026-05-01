@@ -43,13 +43,13 @@
 }
 
 .glossy-card {
-  @apply bg-card/40 backdrop-blur-xl border border-white/10 shadow-2xl;
-  background-image: linear-gradient(135deg, rgba(255, 255, 255, 0.03) 0%, transparent 100%);
+  @apply bg-card/40 backdrop-blur-xl border border-white/5 shadow-2xl;
+  background-image: radial-gradient(circle at top left, rgba(255, 255, 255, 0.05) 0%, transparent 70%);
   transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .glossy-card:hover {
-  @apply border-white/20 bg-card/60;
+  @apply border-white/10 bg-card/60;
   transform: translateY(-8px);
   box-shadow: 0 20px 40px -20px rgba(0, 0, 0, 0.5);
 }
@@ -114,3 +114,4 @@ html {
 .btn-primary-hover:hover::after {
   @apply translate-x-0;
 }
+    
