@@ -37,7 +37,7 @@ import { collection, doc, serverTimestamp, setDoc, addDoc, deleteDoc } from 'fir
 import { Product } from '@/lib/types';
 import { PlusCircle, Edit, Trash2, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useCollection, useMemoFirebase } from '@/firebase';
+import { useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
 
 const CATEGORIES = ["keyboard", "mouse", "screen", "headset", "other"];
 
@@ -47,7 +47,6 @@ function ProductsPage() {
   const [isPublished, setIsPublished] = useState(true);
   const { toast } = useToast();
 
-  // Utilisation du hook standard pour une synchronisation temps réel fiable
   const productsQuery = useMemoFirebase(() => collection(db, "products"), []);
   const { data: products, isLoading } = useCollection<Product>(productsQuery);
 
@@ -84,23 +83,36 @@ function ProductsPage() {
       description: formData.get('description') as string,
       category: formData.get('category') as string,
       sellingPrice,
-      price: sellingPrice, // Compatibilité panier
+      price: sellingPrice,
       purchasePrice,
       stockQuantity,
-      imageUrl: formData.get('imageUrl') as string || (editingProduct?.imageUrl || `https://picsum.photos/seed/${Math.random()}/600/400`),
+      imageUrl: formData.get('imageUrl') as string || (editingProduct?.imageUrl || `https://picsum.photos/seed/${Math.floor(Math.random() * 1000)}/600/400`),
       isPublished: isPublished,
       updatedAt: serverTimestamp()
     };
 
     if (editingProduct) {
       const docRef = doc(db, "products", editingProduct.id);
-      setDoc(docRef, productData, { merge: true });
+      setDoc(docRef, productData, { merge: true })
+        .catch(async (error) => {
+          errorEmitter.emit('permission-error', new FirestorePermissionError({
+            path: docRef.path,
+            operation: 'update',
+            requestResourceData: productData
+          }));
+        });
       toast({ title: "Produit mis à jour", description: "Les modifications sont appliquées." });
     } else {
       const colRef = collection(db, "products");
       addDoc(colRef, {
         ...productData,
         createdAt: serverTimestamp()
+      }).catch(async (error) => {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
+          path: colRef.path,
+          operation: 'create',
+          requestResourceData: productData
+        }));
       });
       toast({ title: "Produit créé", description: "Le nouvel article a été ajouté au catalogue." });
     }
@@ -110,7 +122,12 @@ function ProductsPage() {
   const handleDelete = (id: string) => {
     if(window.confirm("Êtes-vous sûr de vouloir supprimer ce produit ?")){
         const docRef = doc(db, "products", id);
-        deleteDoc(docRef);
+        deleteDoc(docRef).catch(async (error) => {
+          errorEmitter.emit('permission-error', new FirestorePermissionError({
+            path: docRef.path,
+            operation: 'delete'
+          }));
+        });
         toast({ title: "Produit supprimé", variant: "destructive" });
     }
   };
@@ -183,10 +200,10 @@ function ProductsPage() {
         </div>
       </main>
 
-      <Dialog open={isModalOpen} onOpenChange={closeModal}>
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="glossy-card border-none rounded-[2.5rem] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-2xl font-black uppercase italic italic tracking-tighter">
+            <DialogTitle className="text-2xl font-black uppercase italic tracking-tighter">
                 {editingProduct ? 'Modifier le Produit' : 'Nouveau Produit Hardware'}
             </DialogTitle>
           </DialogHeader>
