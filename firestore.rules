@@ -30,7 +30,7 @@ service cloud.firestore {
     match /users/{userId} {
       allow get: if isOwner(userId) || isStaff();
       allow list: if isStaff();
-      allow create: if isOwner(userId);
+      allow create: if isSignedIn(); 
       allow update: if isOwner(userId) || isAdmin();
       allow delete: if isAdmin();
     }
@@ -38,59 +38,46 @@ service cloud.firestore {
     match /admins/{adminId} {
       allow get: if isSignedIn();
       allow list: if isAdmin();
-      allow create: if isOwner(adminId) || isAdmin();
-      allow update, delete: if isAdmin();
+      allow write: if isOwner(adminId) || isAdmin();
     }
 
     match /sellers/{sellerId} {
       allow get: if isSignedIn();
       allow list: if isAdmin();
-      allow create: if isOwner(sellerId) || isAdmin();
-      allow update, delete: if isAdmin();
+      allow write: if isOwner(sellerId) || isAdmin();
     }
 
     match /categories/{categoryId} {
-      allow get, list: if true;
-      allow create, update, delete: if isStaff();
+      allow read: if true;
+      allow write: if isStaff();
     }
 
     match /products/{productId} {
-      allow get, list: if true;
-      allow create, update, delete: if isStaff();
+      allow read: if true;
+      allow write: if isStaff();
     }
 
     match /customers/{customerId} {
-      allow get, list, create, update, delete: if isStaff();
+      allow read, write: if isStaff();
     }
 
-    match /paymentModes/{paymentModeId} {
-      allow get, list: if isStaff();
-      allow create, update, delete: if isAdmin();
-    }
-
-    // Unified Rules for Orders and Sales
     match /orders/{orderId} {
       allow create: if isSignedIn();
-      allow list: if isStaff() || (isSignedIn() && resource.data.userId == request.auth.uid);
-      allow get: if isStaff() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      // Un client peut lister ses propres commandes si sa requête est filtrée par userId
+      allow list: if isSignedIn() && (isStaff() || resource.data.userId == request.auth.uid);
+      allow get: if isSignedIn() && (isStaff() || resource.data.userId == request.auth.uid);
       allow update: if isStaff();
       allow delete: if isAdmin();
     }
 
     match /sales/{saleId} {
       allow create: if isStaff();
-      allow list, get: if isStaff();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
-    }
-
-    match /sales/{saleId}/saleItems/{saleItemId} {
-      allow list, get: if isStaff();
-      allow create, update, delete: if isStaff();
+      allow read: if isStaff();
+      allow update, delete: if isAdmin();
     }
 
     match /carts/{userId} {
-      allow get, write: if isOwner(userId);
+      allow read, write: if isOwner(userId);
     }
   }
 }

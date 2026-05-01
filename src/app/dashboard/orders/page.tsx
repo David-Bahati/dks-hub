@@ -17,14 +17,23 @@ export default function OrdersPage() {
 
   const ordersQuery = useMemoFirebase(() => {
     if (!user) return null;
-    // Si l'utilisateur est admin ou vendeur, il voit tout. Sinon, seulement ses commandes.
-    const isStaff = user.role === 'Admin' || user.role === 'Seller';
+    
+    // Le staff inclut les Admins, Sellers et Cashiers
+    const isStaff = user.role === 'Admin' || user.role === 'Seller' || user.role === 'Cashier';
     const baseRef = collection(db, "orders");
     
     if (isStaff) {
+      // Le staff voit toutes les commandes triées par date
       return query(baseRef, orderBy("createdAt", "desc"));
     }
-    return query(baseRef, where("userId", "==", user.uid), orderBy("createdAt", "desc"));
+    
+    // Le client voit uniquement ses propres commandes
+    // Important: Le filtre userId doit correspondre exactement à la règle resource.data.userId == request.auth.uid
+    return query(
+      baseRef, 
+      where("userId", "==", user.uid), 
+      orderBy("createdAt", "desc")
+    );
   }, [user]);
 
   const { data: orders, isLoading } = useCollection(ordersQuery);
@@ -37,7 +46,7 @@ export default function OrdersPage() {
       case 'pending_payment':
         return <Badge className="bg-orange-500/10 text-orange-400 border-none uppercase text-[10px] font-black px-3 py-1 flex items-center gap-1"><Clock size={12} /> Attente Cash</Badge>;
       case 'cancelled':
-        return <Badge className="bg-red-500/10 text-red-400 border-none uppercase text-[10px] font-black px-3 py-1 flex items-center gap-1"><XCircle size={12} /> Annulé</Badge>;
+        return <Badge className="bg-destructive/10 text-destructive border-none uppercase text-[10px] font-black px-3 py-1 flex items-center gap-1"><XCircle size={12} /> Annulé</Badge>;
       default:
         return <Badge className="bg-blue-500/10 text-blue-400 border-none uppercase text-[10px] font-black px-3 py-1 flex items-center gap-1"><Clock size={12} /> En cours</Badge>;
     }
@@ -105,7 +114,7 @@ export default function OrdersPage() {
                     </div>
                     <h2 className="text-4xl font-black uppercase italic mb-4">Aucune Commande</h2>
                     <p className="text-muted-foreground max-w-md">
-                        Le registre est actuellement vide. Les commandes de vos clients apparaîtront ici dès qu'elles seront validées.
+                        Le registre est actuellement vide. Les commandes apparaîtront ici dès qu'elles seront validées.
                     </p>
                 </div>
             )}
