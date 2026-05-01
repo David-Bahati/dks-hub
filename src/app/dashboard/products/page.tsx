@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import withAuth from '@/components/auth/withAuth'; // Import the HOC
+import withAuth from '@/components/auth/withAuth';
 import { Navbar } from "@/components/layout/Navbar";
 import { Button } from "@/components/ui/button";
 import { 
@@ -24,24 +24,33 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { 
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { Product } from '@/lib/types';
-import { PlusCircle, Edit, Trash2 } from 'lucide-react';
-import Image from 'next/image';
+import { PlusCircle, Edit, Trash2, Eye, EyeOff, Loader2, Upload } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+
+const CATEGORIES = ["keyboard", "mouse", "screen", "headset", "other"];
 
 function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, "products"), (snapshot) => {
-      const productsData: Product[] = [];
-      snapshot.forEach(doc => {
-        productsData.push({ id: doc.id, ...doc.data() } as Product);
-      });
+      const productsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Product[];
       setProducts(productsData);
       setIsLoading(false);
     });
@@ -58,30 +67,51 @@ function ProductsPage() {
     setIsModalOpen(false);
   };
 
-  const handleSave = async (formData: FormData) => {
+  const handleSave = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setIsSaving(true);
+    const formData = new FormData(e.currentTarget);
+    
     const productData = {
       name: formData.get('name') as string,
       description: formData.get('description') as string,
       category: formData.get('category') as string,
       sellingPrice: parseFloat(formData.get('sellingPrice') as string),
+      purchasePrice: parseFloat(formData.get('purchasePrice') as string || "0"),
       stockQuantity: parseInt(formData.get('stockQuantity') as string),
-      imageUrl: editingProduct ? editingProduct.imageUrl : '/placeholder.png',
-      isPublished: true,
+      imageUrl: formData.get('imageUrl') as string || (editingProduct?.imageUrl || 'https://picsum.photos/seed/hardware/600/400'),
+      isPublished: formData.get('isPublished') === 'on',
+      updatedAt: serverTimestamp()
     };
 
-    if (editingProduct) {
-      const productRef = doc(db, "products", editingProduct.id);
-      await updateDoc(productRef, productData);
-    } else {
-      await addDoc(collection(db, "products"), productData);
+    try {
+      if (editingProduct) {
+        await updateDoc(doc(db, "products", editingProduct.id), productData);
+        toast({ title: "Produit mis à jour", description: "Les modifications ont été enregistrées." });
+      } else {
+        await addDoc(collection(db, "products"), {
+          ...productData,
+          createdAt: serverTimestamp()
+        });
+        toast({ title: "Produit créé", description: "Le nouvel article a été ajouté au catalogue." });
+      }
+      closeModal();
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Erreur", description: "Une erreur est survenue lors de la sauvegarde.", variant: "destructive" });
+    } finally {
+      setIsSaving(false);
     }
-    closeModal();
   };
 
   const handleDelete = async (id: string) => {
     if(window.confirm("Êtes-vous sûr de vouloir supprimer ce produit ?")){
-        const productRef = doc(db, "products", id);
-        await deleteDoc(productRef);
+        try {
+            await deleteDoc(doc(db, "products", id));
+            toast({ title: "Produit supprimé", variant: "destructive" });
+        } catch (error) {
+            toast({ title: "Erreur", description: "Impossible de supprimer le produit.", variant: "destructive" });
+        }
     }
   };
 
@@ -91,44 +121,62 @@ function ProductsPage() {
       <main className="max-w-7xl mx-auto px-4 py-8">
         <div className="flex justify-between items-center mb-8">
           <div>
-            <h1 className="text-3xl font-bold font-headline uppercase tracking-tighter">Gestion des Produits</h1>
-            <p className="text-muted-foreground">Catalogue de produits en temps réel depuis Firestore.</p>
+            <h1 className="text-3xl font-bold font-headline uppercase tracking-tighter italic">Gestion du <span className="text-accent">Stock</span></h1>
+            <p className="text-muted-foreground">Pilotez votre inventaire hardware en temps réel.</p>
           </div>
-          <Button onClick={() => openModal()} className="bg-primary hover:bg-primary/90 gap-2 neon-glow font-bold">
-            <PlusCircle size={18} /> Ajouter un Produit
+          <Button onClick={() => openModal()} className="bg-primary hover:bg-primary/90 gap-2 neon-glow font-black uppercase italic rounded-2xl h-12 px-6">
+            <PlusCircle size={20} /> Ajouter un Produit
           </Button>
         </div>
 
-        <div className="glossy-card border-none rounded-xl overflow-hidden">
+        <div className="glossy-card border-none rounded-[2rem] overflow-hidden">
           <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Produit</TableHead>
-                <TableHead>Catégorie</TableHead>
-                <TableHead>Prix de Vente</TableHead>
-                <TableHead>Stock</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+            <TableHeader className="bg-white/5">
+              <TableRow className="border-white/5 hover:bg-transparent">
+                <TableHead className="uppercase font-black text-[10px] tracking-widest">Aperçu</TableHead>
+                <TableHead className="uppercase font-black text-[10px] tracking-widest">Produit</TableHead>
+                <TableHead className="uppercase font-black text-[10px] tracking-widest">Catégorie</TableHead>
+                <TableHead className="uppercase font-black text-[10px] tracking-widest text-right">Prix Vente</TableHead>
+                <TableHead className="uppercase font-black text-[10px] tracking-widest text-center">Stock</TableHead>
+                <TableHead className="uppercase font-black text-[10px] tracking-widest text-center">Statut</TableHead>
+                <TableHead className="text-right uppercase font-black text-[10px] tracking-widest">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
-                <TableRow><TableCell colSpan={5} className="text-center">Chargement des produits...</TableCell></TableRow>
+                <TableRow><TableCell colSpan={7} className="text-center py-20"><Loader2 className="animate-spin mx-auto opacity-50" /></TableCell></TableRow>
               ) : products.length > 0 ? products.map((product) => (
-                <TableRow key={product.id}>
-                  <TableCell className="font-medium flex items-center gap-4">
-                    <Image src={product.imageUrl} alt={product.name} width={40} height={40} className="rounded-lg object-cover" />
-                    {product.name}
+                <TableRow key={product.id} className="border-white/5 hover:bg-white/5 transition-colors">
+                  <TableCell>
+                    <div className="w-12 h-12 rounded-xl bg-muted overflow-hidden border border-white/5">
+                        <img src={product.imageUrl} alt={product.name} className="object-cover w-full h-full" />
+                    </div>
                   </TableCell>
-                  <TableCell>{product.category}</TableCell>
-                  <TableCell>${product.sellingPrice.toFixed(2)}</TableCell>
-                  <TableCell>{product.stockQuantity}</TableCell>
+                  <TableCell>
+                    <div className="font-bold">{product.name}</div>
+                    <div className="text-[10px] text-muted-foreground line-clamp-1 italic max-w-[200px]">{product.description}</div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="secondary" className="bg-white/5 uppercase text-[10px] font-bold border-none">{product.category}</Badge>
+                  </TableCell>
+                  <TableCell className="text-right font-black text-accent">${(product.sellingPrice || 0).toFixed(2)}</TableCell>
+                  <TableCell className="text-center">
+                    <Badge className={product.stockQuantity < 5 ? "bg-destructive/20 text-destructive border-none" : "bg-white/5 text-white border-none"}>
+                        {product.stockQuantity}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    {product.isPublished ? <Eye size={16} className="mx-auto text-green-400" /> : <EyeOff size={16} className="mx-auto text-muted-foreground opacity-50" />}
+                  </TableCell>
                   <TableCell className="text-right">
-                    <Button variant="ghost" size="icon" onClick={() => openModal(product)}><Edit className="h-4 w-4" /></Button>
-                    <Button variant="ghost" size="icon" onClick={() => handleDelete(product.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                    <div className="flex justify-end gap-1">
+                        <Button variant="ghost" size="icon" onClick={() => openModal(product)} className="h-8 w-8 hover:bg-white/10"><Edit className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleDelete(product.id)} className="h-8 w-8 text-destructive hover:bg-destructive/10"><Trash2 className="h-4 w-4" /></Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               )) : (
-                <TableRow><TableCell colSpan={5} className="text-center">Aucun produit trouvé.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={7} className="text-center py-20 opacity-30 italic">Aucun produit trouvé.</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
@@ -136,39 +184,72 @@ function ProductsPage() {
       </main>
 
       <Dialog open={isModalOpen} onOpenChange={closeModal}>
-        <DialogContent className="glossy-card border-none">
+        <DialogContent className="glossy-card border-none rounded-[2.5rem] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editingProduct ? 'Modifier le Produit' : 'Ajouter un Nouveau Produit'}</DialogTitle>
-            <DialogDescription>
-              Les changements seront sauvegardés dans Firestore.
-            </DialogDescription>
+            <DialogTitle className="text-2xl font-black uppercase italic italic tracking-tighter">
+                {editingProduct ? 'Modifier le Produit' : 'Nouveau Produit Hardware'}
+            </DialogTitle>
           </DialogHeader>
-          <form onSubmit={(e) => { e.preventDefault(); handleSave(new FormData(e.currentTarget)); }} className="space-y-4">
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="name" className="text-right">Nom</Label>
-                <Input id="name" name="name" defaultValue={editingProduct?.name} className="col-span-3" required />
+          <form onSubmit={handleSave} className="space-y-6 py-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Nom commercial</Label>
+                    <Input name="name" defaultValue={editingProduct?.name} className="h-12 bg-background/50 border-white/10 rounded-xl" required />
+                </div>
+                <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Catégorie technique</Label>
+                    <Select name="category" defaultValue={editingProduct?.category || "other"}>
+                        <SelectTrigger className="h-12 bg-background/50 border-white/10 rounded-xl">
+                            <SelectValue placeholder="Choisir une catégorie" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-card border-white/10">
+                            {CATEGORIES.map(cat => (
+                                <SelectItem key={cat} value={cat} className="uppercase font-bold text-xs">{cat}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Prix d'Achat ($)</Label>
+                        <Input name="purchasePrice" type="number" step="0.01" defaultValue={editingProduct?.purchasePrice || 0} className="h-12 bg-background/50 border-white/10 rounded-xl" required />
+                    </div>
+                    <div className="space-y-2">
+                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Prix de Vente ($)</Label>
+                        <Input name="sellingPrice" type="number" step="0.01" defaultValue={editingProduct?.sellingPrice} className="h-12 bg-background/50 border-white/10 rounded-xl" required />
+                    </div>
+                </div>
+                <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Stock Initial</Label>
+                    <Input name="stockQuantity" type="number" defaultValue={editingProduct?.stockQuantity} className="h-12 bg-background/50 border-white/10 rounded-xl" required />
+                </div>
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                 <Label htmlFor="description" className="text-right">Description</Label>
-                 <Textarea id="description" name="description" defaultValue={editingProduct?.description} className="col-span-3" required />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="category" className="text-right">Catégorie</Label>
-                <Input id="category" name="category" defaultValue={editingProduct?.category} className="col-span-3" required />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="sellingPrice" className="text-right">Prix</Label>
-                <Input id="sellingPrice" name="sellingPrice" type="number" step="0.01" defaultValue={editingProduct?.sellingPrice} className="col-span-3" required />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="stockQuantity" className="text-right">Stock</Label>
-                <Input id="stockQuantity" name="stockQuantity" type="number" defaultValue={editingProduct?.stockQuantity} className="col-span-3" required />
+
+              <div className="space-y-4">
+                <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Image URL</Label>
+                    <Input name="imageUrl" placeholder="https://..." defaultValue={editingProduct?.imageUrl} className="h-12 bg-background/50 border-white/10 rounded-xl" />
+                </div>
+                <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Description technique</Label>
+                    <Textarea name="description" defaultValue={editingProduct?.description} className="min-h-[120px] bg-background/50 border-white/10 rounded-xl resize-none" required />
+                </div>
+                <div className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/10">
+                    <div className="flex flex-col gap-1">
+                        <span className="text-xs font-bold uppercase italic">Visibilité publique</span>
+                        <span className="text-[9px] text-muted-foreground">Publier l'article sur la boutique</span>
+                    </div>
+                    <Switch name="isPublished" defaultChecked={editingProduct?.isPublished ?? true} />
+                </div>
               </div>
             </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={closeModal}>Annuler</Button>
-              <Button type="submit">Sauvegarder</Button>
+
+            <DialogFooter className="gap-3">
+              <Button type="button" variant="ghost" onClick={closeModal} className="rounded-xl font-bold uppercase text-[10px]">Annuler</Button>
+              <Button type="submit" className="bg-accent text-accent-foreground font-black uppercase italic rounded-xl px-10 h-12" disabled={isSaving}>
+                {isSaving ? <Loader2 className="animate-spin" /> : "Sauvegarder l'article"}
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>

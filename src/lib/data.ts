@@ -1,100 +1,69 @@
+
 import { collection, getDocs, query, where, Timestamp, limit, orderBy, getDoc, doc } from "firebase/firestore"; 
 import { db } from "./firebase";
-import { Product, Sale, User } from "./types";
+import { Product, Sale, AppUser } from "./types";
 
-// TODO: Rendre ce taux dynamique (depuis les paramètres de la base de données)
+/**
+ * Récupère le taux de change actuel (simulé, pourrait être dans Firestore)
+ */
 export async function getExchangeRate() {
-  return 2500;
+  return 2500; // 1 USD = 2500 CDF
 }
 
-// Récupère toutes les ventes
-async function getSales(): Promise<Sale[]> {
+/**
+ * Calcule les statistiques globales pour le dashboard
+ */
+export async function getDashboardStats() {
   const salesCol = collection(db, "sales");
-  const salesSnapshot = await getDocs(salesCol);
-  const salesList = salesSnapshot.docs.map(doc => ({
-    id: doc.id,
-    ...doc.data()
-  })) as Sale[];
-  return salesList;
-}
+  const productsCol = collection(db, "products");
+  
+  const [salesSnap, productsSnap] = await Promise.all([
+    getDocs(salesCol),
+    getDocs(productsCol)
+  ]);
 
-// Récupère tous les produits
-export async function getProducts(): Promise<Product[]> {
-    const productsCol = collection(db, "products");
-    const productsSnapshot = await getDocs(productsCol);
-    const productsList = productsSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-    })) as Product[];
-    return productsList;
-}
+  const sales = salesSnap.docs.map(d => d.data() as Sale);
+  const products = productsSnap.docs.map(d => d.data() as Product);
 
-// Calcule le revenu total
-export async function getTotalRevenue() {
-  const sales = await getSales();
-  const totalCDF = sales.reduce((acc, sale) => acc + sale.totalAmount, 0);
-  const exchangeRate = await getExchangeRate();
-  const totalUSD = totalCDF / exchangeRate;
+  const totalRevenueCDF = sales.reduce((acc, sale) => acc + (sale.totalAmount || 0), 0);
+  const totalSalesCount = sales.length;
+  const totalProductsCount = products.length;
 
-  return {
-    cdf: totalCDF,
-    usd: totalUSD,
-  };
-}
-
-// Calcule les revenus d'aujourd'hui
-export async function getTodayStats() {
-  const salesCol = collection(db, "sales");
+  // Calcul des revenus du jour
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const todayTimestamp = Timestamp.fromDate(today);
-
-  const q = query(salesCol, where("createdAt", ">=", todayTimestamp));
-  const querySnapshot = await getDocs(q);
-
-  let totalCDF = 0;
-  let salesCount = 0;
-
-  querySnapshot.forEach(doc => {
-    const sale = doc.data() as Sale;
-    totalCDF += sale.totalAmount;
-    salesCount++;
+  const todaySales = sales.filter(s => {
+    const date = s.createdAt?.toDate ? s.createdAt.toDate() : new Date(s.createdAt);
+    return date >= today;
   });
+  const todayRevenue = todaySales.reduce((acc, s) => acc + (s.totalAmount || 0), 0);
 
   return {
-    revenue: totalCDF,
-    sales: salesCount,
+    totalRevenueCDF,
+    totalSalesCount,
+    totalProductsCount,
+    todayRevenue,
+    todaySalesCount: todaySales.length
   };
 }
 
-// Récupère le nombre total de ventes
-export async function getTotalSales() {
-  const sales = await getSales();
-  return sales.length;
-}
-
-// Récupère le nombre total de produits
-export async function getTotalProducts() {
-    const productsCol = collection(db, "products");
-    const productsSnapshot = await getDocs(productsCol);
-    return productsSnapshot.size;
-}
-
-// Récupère les produits avec un stock faible
+/**
+ * Récupère les produits avec un stock faible
+ */
 export async function getLowStockItems(threshold = 5): Promise<Product[]> {
     const productsCol = collection(db, "products");
-    const q = query(productsCol, where("stock", "<=", threshold));
+    const q = query(productsCol, where("stockQuantity", "<=", threshold));
     const querySnapshot = await getDocs(q);
     
-    const lowStockList = querySnapshot.docs.map(doc => ({
+    return querySnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
     })) as Product[];
-
-    return lowStockList;
 }
 
-// Récupère les ventes récentes avec les noms des caissiers
+/**
+ * Récupère les ventes récentes
+ */
 export async function getRecentSales(count = 5): Promise<(Sale & { cashierName: string })[]> {
     const salesCol = collection(db, "sales");
     const q = query(salesCol, orderBy("createdAt", "desc"), limit(count));
@@ -103,11 +72,12 @@ export async function getRecentSales(count = 5): Promise<(Sale & { cashierName: 
     const recentSales = await Promise.all(salesSnapshot.docs.map(async (docSnapshot) => {
         const sale = { id: docSnapshot.id, ...docSnapshot.data() } as Sale;
         
-        let cashierName = "Utilisateur inconnu";
+        let cashierName = "Système";
         if (sale.userId) {
             const userDoc = await getDoc(doc(db, 'users', sale.userId));
             if (userDoc.exists()) {
-                cashierName = (userDoc.data() as User).username;
+                const userData = userDoc.data();
+                cashierName = userData.name || userData.displayName || "Inconnu";
             }
         }
 
