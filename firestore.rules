@@ -5,12 +5,8 @@ service cloud.firestore {
     /**
      * CORE PHILOSOPHY:
      * This ruleset implements a robust Role-Based Access Control (RBAC) system using "Existence-Based 
-     * Authorization" (DBAC). Instead of checking fields within a user document, permissions are derived 
-     * from the presence of a user's UID in specialized role collections (/admins or /sellers).
-     *
-     * BOOTSTRAP MODE:
-     * To allow initial setup from the client, we allow users to create their own role document 
-     * if it matches their UID.
+     * Authorization" (DBAC). Permissions are derived from the presence of a user's UID in 
+     * specialized role collections (/admins or /sellers).
      */
 
     // --- GLOBAL HELPER FUNCTIONS ---
@@ -38,17 +34,17 @@ service cloud.firestore {
     // --- COLLECTION RULES ---
 
     match /users/{userId} {
-      allow get: if isOwner(userId) || isAdmin();
-      allow list: if isAdmin();
+      allow get: if isOwner(userId) || isAdmin() || isSeller();
+      allow list: if isAdmin() || isSeller();
       allow create: if isOwner(userId);
-      allow update: if isExistingOwner(userId); // Simplified for prototype
+      allow update: if isExistingOwner(userId) || isAdmin();
       allow delete: if isAdmin();
     }
 
     match /admins/{adminId} {
       allow get: if isSignedIn();
       allow list: if isAdmin();
-      // Allow self-creation for bootstrapping the first admin
+      // Allow self-creation for bootstrapping
       allow create: if isOwner(adminId) || isAdmin();
       allow update, delete: if isAdmin();
     }
@@ -80,23 +76,31 @@ service cloud.firestore {
       allow create, update, delete: if isAdmin();
     }
 
+    // Customer Orders (matching the 'orders' collection used in the app)
+    match /orders/{orderId} {
+      allow create: if isSignedIn();
+      allow get, list: if isAdmin() || isSeller() || (resource != null && resource.data.userId == request.auth.uid);
+      allow update: if isAdmin() || isSeller();
+      allow delete: if isAdmin();
+    }
+
+    // Shopping Carts synchronization
+    match /carts/{userId} {
+      allow get, write: if isOwner(userId);
+    }
+
+    // Legacy Sales (kept for backend.json compatibility if needed)
     match /sales/{saleId} {
-      allow get: if isAdmin() 
-        || (resource.data.sellerId == request.auth.uid) 
-        || (resource.data.customerId == request.auth.uid);
-      allow list: if isSignedIn();
-      allow create: if isAdmin() || isSeller();
-      allow update: if isAdmin() || (resource != null && resource.data.sellerId == request.auth.uid);
+      allow get, list: if isAdmin() || isSeller() || (resource != null && resource.data.userId == request.auth.uid);
+      allow create: if isSignedIn();
+      allow update: if isAdmin() || isSeller();
       allow delete: if isAdmin();
     }
 
     match /sales/{saleId}/saleItems/{saleItemId} {
-      allow get: if isAdmin() 
-        || (resource.data.sellerId == request.auth.uid) 
-        || (resource.data.customerId == request.auth.uid);
-      allow list: if isSignedIn();
-      allow create: if isAdmin() || isSeller();
-      allow update: if isAdmin() || (resource != null && resource.data.sellerId == request.auth.uid);
+      allow get, list: if isAdmin() || isSeller() || (resource != null && resource.data.userId == request.auth.uid);
+      allow create: if isSignedIn();
+      allow update: if isAdmin() || isSeller();
       allow delete: if isAdmin();
     }
   }
