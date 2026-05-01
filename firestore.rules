@@ -41,17 +41,17 @@ service cloud.firestore {
 
     match /admins/{adminId} {
       allow read: if isSignedIn();
-      allow write: if isAdmin() || isOwner(adminId);
+      allow write: if isAdmin();
     }
 
     match /sellers/{sellerId} {
       allow read: if isSignedIn();
-      allow write: if isAdmin() || isOwner(sellerId);
+      allow write: if isAdmin();
     }
 
     match /cashiers/{cashierId} {
       allow read: if isSignedIn();
-      allow write: if isAdmin() || isOwner(cashierId);
+      allow write: if isAdmin();
     }
 
     match /categories/{categoryId} {
@@ -70,12 +70,10 @@ service cloud.firestore {
 
     match /orders/{orderId} {
       allow create: if isSignedIn();
-      // On sépare get et list pour plus de clarté
+      // On autorise la lecture si l'utilisateur est le proprio ou du staff
       allow get: if isSignedIn() && (isStaff() || resource.data.userId == request.auth.uid);
-      // La règle de listage doit être explicite pour que le moteur de filtrage Firestore l'accepte
-      allow list: if isSignedIn() && (isStaff() || resource.data.userId == request.auth.uid);
-      allow update: if isStaff();
-      allow delete: if isAdmin();
+      // Correction cruciale : la requête list doit être filtrée par userId côté client
+      allow list: if isSignedIn() && (isStaff() || request.query.limit <= 100);
     }
 
     match /sales/{saleId} {

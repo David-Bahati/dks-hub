@@ -1,7 +1,7 @@
 
 "use client";
 
-import { LogOut, LayoutDashboard, ShoppingCart, Settings, Users, Package, Bell, Loader2, PanelLeft, Home, Trash2, User } from 'lucide-react';
+import { LogOut, LayoutDashboard, ShoppingCart, Settings, Users, Package, Bell, Loader2, PanelLeft, Home, Trash2, User, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { auth } from '@/lib/firebase';
 import { signOut } from 'firebase/auth';
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { PI_CONVERSION_RATE } from '@/lib/constants';
+import { Badge } from '@/components/ui/badge';
 
 export function Navbar() {
     const { user, isLoading } = useAuth();
@@ -34,100 +35,110 @@ export function Navbar() {
 
     const navItems = [
         { label: 'Dashboard', href: '/dashboard', show: isStaff, icon: LayoutDashboard },
-        { label: 'Stock', href: '/dashboard/products', show: isAdmin || isSeller, icon: Package },
         { label: 'Caisse', href: '/pos', show: isAdmin || isCashier, icon: ShoppingCart },
         { label: 'Utilisateurs', href: '/dashboard/users', show: isAdmin, icon: Users },
-        { label: 'Mon Compte', href: '/dashboard', show: !isStaff && !!user, icon: User },
-        { label: 'Boutique', href: '/', show: true, icon: Home },
+        { label: 'Mon Hub', href: '/dashboard', show: !isStaff && !!user, icon: User },
+        { label: 'Catalogue', href: '#shop', show: pathname === '/', icon: Package },
+        { label: 'Boutique', href: '/', show: pathname !== '/', icon: Home },
     ];
 
     return (
-        <header className="border-b border-white/5 bg-background/40 backdrop-blur-2xl sticky top-0 z-50">
-            <div className="max-w-7xl mx-auto px-4 h-20 flex items-center justify-between">
-                <Link href="/" className="flex items-center gap-3 group">
-                    <div className="w-10 h-10 rounded-2xl bg-primary flex items-center justify-center neon-glow group-hover:scale-110 transition-transform">
-                        <span className="text-white font-black text-xl italic uppercase">dks</span>
+        <header className="border-b border-white/5 bg-background/60 backdrop-blur-3xl sticky top-0 z-[60] h-24">
+            <div className="max-w-7xl mx-auto px-6 h-full flex items-center justify-between">
+                <Link href="/" className="flex items-center gap-4 group">
+                    <div className="w-12 h-12 rounded-[1.25rem] bg-primary flex items-center justify-center neon-glow group-hover:scale-110 group-hover:rotate-6 transition-all duration-500">
+                        <span className="text-white font-black text-2xl italic uppercase">dks</span>
                     </div>
-                    <span className="text-2xl font-black tracking-tighter uppercase italic hidden sm:block">
+                    <span className="text-3xl font-black tracking-tighter uppercase italic hidden sm:block">
                         Shop<span className="text-accent">Manager</span>
                     </span>
                 </Link>
                 
-                <nav className="hidden md:flex items-center gap-2 bg-white/5 border border-white/10 rounded-2xl p-1">
+                <nav className="hidden lg:flex items-center gap-2 bg-white/5 border border-white/10 rounded-2xl p-1.5 backdrop-blur-md">
                     {navItems.filter(i => i.show).map((item) => (
                         <Link key={item.href} href={item.href}>
-                           <p className={`px-4 py-2 text-sm font-bold rounded-xl transition-colors ${pathname === item.href ? 'bg-accent text-accent-foreground' : 'hover:bg-white/10'}`}>{item.label}</p>
+                           <div className={`px-5 py-2.5 text-[11px] font-black uppercase italic tracking-widest rounded-xl transition-all flex items-center gap-2 ${pathname === item.href ? 'bg-accent text-accent-foreground shadow-lg shadow-accent/20' : 'hover:bg-white/10 hover:text-accent'}`}>
+                             <item.icon size={14} />
+                             {item.label}
+                           </div>
                         </Link>
                     ))}
                 </nav>
 
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-6">
                     {/* Cart Drawer for Customers */}
                     {!isStaff && (
                         <Sheet>
                             <SheetTrigger asChild>
-                                <Button variant="ghost" size="icon" className="relative rounded-full h-12 w-12 bg-white/5 border border-white/10">
-                                    <ShoppingCart size={20} />
-                                    {cartCount > 0 && <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-accent text-accent-foreground flex items-center justify-center text-[10px] font-black">{cartCount}</span>}
+                                <Button variant="ghost" size="icon" className="relative rounded-[1.25rem] h-14 w-14 bg-white/5 border border-white/10 hover:border-accent hover:bg-accent/5 transition-all group active:scale-90">
+                                    <ShoppingCart size={22} className="group-hover:text-accent transition-colors" />
+                                    {cartCount > 0 && (
+                                        <Badge className="absolute -top-1 -right-1 min-w-[22px] h-[22px] rounded-full bg-accent text-accent-foreground flex items-center justify-center text-[10px] font-black border-2 border-background p-0">
+                                            {cartCount}
+                                        </Badge>
+                                    )}
                                 </Button>
                             </SheetTrigger>
-                            <SheetContent className="bg-card border-white/10 w-full sm:max-w-md flex flex-col rounded-l-[3rem]">
-                                <SheetHeader className="pt-8">
-                                    <SheetTitle className="text-3xl font-black uppercase italic tracking-tighter">Votre <span className="text-accent">Panier</span></SheetTitle>
+                            <SheetContent className="bg-card/95 backdrop-blur-3xl border-white/10 w-full sm:max-w-md flex flex-col rounded-l-[3.5rem] p-0 overflow-hidden">
+                                <SheetHeader className="p-10 pb-0">
+                                    <Badge className="bg-accent/10 text-accent border-none w-fit mb-4 font-black text-[9px] uppercase tracking-widest">
+                                        <Sparkles className="w-3 h-3 mr-2" /> Panier Premium
+                                    </Badge>
+                                    <SheetTitle className="text-4xl font-black uppercase italic tracking-tighter">VOTRE <span className="text-accent">SÉLECTION</span></SheetTitle>
                                 </SheetHeader>
                                 
-                                <div className="flex-1 overflow-y-auto mt-8 space-y-4 pr-2 custom-scrollbar">
+                                <div className="flex-1 overflow-y-auto mt-8 space-y-4 px-10 pr-6 custom-scrollbar">
                                     {cartItems.length === 0 ? (
-                                        <div className="text-center py-20 opacity-30 flex flex-col items-center gap-4">
-                                            <ShoppingCart size={80} strokeWidth={1} />
-                                            <p className="font-bold uppercase italic text-sm">Votre panier est vide.</p>
+                                        <div className="text-center py-20 opacity-20 flex flex-col items-center gap-6">
+                                            <ShoppingCart size={120} strokeWidth={1} />
+                                            <p className="font-black uppercase italic text-sm tracking-widest">Panier vide pour le moment</p>
                                         </div>
                                     ) : (
                                         cartItems.map(item => (
-                                            <div key={item.id} className="flex justify-between items-center bg-white/5 p-5 rounded-[1.5rem] border border-white/5 hover:border-white/10 transition-all group">
+                                            <div key={item.id} className="flex justify-between items-center bg-white/5 p-6 rounded-[2rem] border border-white/5 hover:border-accent/20 transition-all group">
                                                 <div className="flex-1">
-                                                    <p className="font-bold text-sm group-hover:text-accent transition-colors">{item.name}</p>
-                                                    <p className="text-[10px] text-muted-foreground font-black uppercase mt-1">${(item.price || 0).toFixed(2)} x {item.quantity}</p>
+                                                    <p className="font-black uppercase italic text-sm group-hover:text-accent transition-colors line-clamp-1">{item.name}</p>
+                                                    <p className="text-[10px] text-muted-foreground font-black uppercase mt-1">
+                                                        <span className="text-white">${(item.price || 0).toFixed(2)}</span> x {item.quantity}
+                                                    </p>
                                                 </div>
                                                 <Button 
                                                     variant="ghost" 
                                                     size="icon" 
-                                                    className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-xl" 
+                                                    className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-2xl h-12 w-12 ml-4" 
                                                     onClick={() => removeFromCart(item.id)}
                                                 >
-                                                    <Trash2 size={16} />
+                                                    <Trash2 size={18} />
                                                 </Button>
                                             </div>
                                         ))
                                     )}
                                 </div>
 
-                                <div className="border-t border-white/10 pt-8 pb-8 space-y-6">
+                                <div className="p-10 bg-black/40 border-t border-white/5 space-y-8">
                                     <div className="flex justify-between items-end">
-                                        <span className="text-muted-foreground font-black uppercase text-[10px] tracking-widest">Total Estimé</span>
+                                        <span className="text-muted-foreground font-black uppercase text-[10px] tracking-widest">Estimation Total</span>
                                         <div className="text-right">
-                                            <p className="text-4xl font-black text-white">${totalPrice.toFixed(2)}</p>
-                                            <p className="text-accent font-black text-xs uppercase tracking-tighter">≈ {(totalPrice / PI_CONVERSION_RATE).toFixed(6)} π</p>
+                                            <p className="text-5xl font-black text-white tracking-tighter">${totalPrice.toFixed(2)}</p>
+                                            <p className="text-accent font-black text-[10px] uppercase tracking-widest mt-1">≈ {(totalPrice / PI_CONVERSION_RATE).toFixed(6)} π</p>
                                         </div>
                                     </div>
                                     
                                     <Button 
-                                        className="w-full h-16 bg-accent text-accent-foreground font-black uppercase italic text-lg rounded-2xl neon-glow disabled:opacity-30 disabled:grayscale" 
+                                        className="w-full h-20 bg-accent text-accent-foreground font-black uppercase italic text-xl rounded-[1.5rem] neon-glow shadow-xl active:scale-95 disabled:opacity-20" 
                                         asChild
                                         disabled={cartItems.length === 0}
                                     >
                                         {cartItems.length > 0 ? (
-                                            <Link href="/checkout">Procéder au paiement</Link>
+                                            <Link href="/checkout">Valider ma commande <ArrowRight className="ml-3" /></Link>
                                         ) : (
-                                            <span>Panier Vide</span>
+                                            <span>SÉLECTION VIDE</span>
                                         )}
                                     </Button>
                                     
-                                    {cartItems.length > 0 && (
-                                        <p className="text-[9px] text-center text-muted-foreground uppercase font-bold opacity-60">
-                                            Paiement sécurisé via Pi, M-Money ou Cash
-                                        </p>
-                                    )}
+                                    <p className="text-[9px] text-center text-muted-foreground uppercase font-black opacity-40 tracking-widest">
+                                        PAIEMENT SÉCURISÉ : PI (GCV) • M-MONEY • CASH
+                                    </p>
                                 </div>
                             </SheetContent>
                         </Sheet>
@@ -136,18 +147,18 @@ export function Navbar() {
                     {isLoading ? (
                         <Loader2 className="animate-spin h-6 w-6 opacity-50" />
                     ) : user ? (
-                        <div className="flex items-center gap-3 bg-white/5 pl-4 pr-1 py-1 rounded-2xl border border-white/10">
+                        <div className="flex items-center gap-4 bg-white/5 pl-5 pr-1.5 py-1.5 rounded-[1.5rem] border border-white/10 backdrop-blur-md">
                             <div className="text-right hidden sm:block">
-                                <p className="font-bold text-[11px] leading-tight">{user.name}</p>
-                                <p className="text-[9px] text-accent font-black uppercase tracking-tighter">{user.role}</p>
+                                <p className="font-black italic uppercase text-[11px] leading-tight tracking-tighter">{user.name}</p>
+                                <p className="text-[9px] text-accent font-black uppercase tracking-widest mt-0.5">{user.role}</p>
                             </div>
-                            <Button variant="ghost" size="icon" onClick={handleLogout} className="h-10 w-10 rounded-xl hover:bg-destructive/10 hover:text-destructive">
-                                <LogOut size={18} />
+                            <Button variant="ghost" size="icon" onClick={handleLogout} className="h-12 w-12 rounded-2xl hover:bg-destructive/10 hover:text-destructive transition-all active:scale-90">
+                                <LogOut size={20} />
                             </Button>
                         </div>
                     ) : (
-                        <Button asChild className="font-black uppercase italic rounded-xl h-12 bg-primary px-6 neon-glow">
-                            <Link href="/login">Espace Pro</Link>
+                        <Button asChild className="font-black uppercase italic rounded-2xl h-14 bg-primary px-8 neon-glow shadow-lg active:scale-95 text-xs">
+                            <Link href="/login">Accès Pro</Link>
                         </Button>
                     )}
                 </div>
@@ -155,3 +166,4 @@ export function Navbar() {
         </header>
     );
 }
+

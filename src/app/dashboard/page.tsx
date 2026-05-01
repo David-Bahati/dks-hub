@@ -83,7 +83,7 @@ function DashboardPage() {
 
   const isStaff = user?.role === 'Admin' || user?.role === 'Seller' || user?.role === 'Cashier';
 
-  // Pour les clients : Récupérer la dernière commande (uniquement si user est prêt et n'est pas staff)
+  // Pour les clients : Récupérer la dernière commande
   const lastOrderQuery = useMemoFirebase(() => {
     if (authLoading || !user?.uid || isStaff) return null;
     return query(
@@ -170,9 +170,9 @@ function DashboardPage() {
                     <CardContent className="p-10 space-y-4">
                         <Badge className="bg-accent/20 text-accent border-none font-black uppercase tracking-tighter px-3">Membre Premium DKS</Badge>
                         <h2 className="text-4xl font-black uppercase italic leading-tight">VOTRE SETUP,<br /><span className="text-accent">NOTRE PRIORITÉ</span></h2>
-                        <p className="text-muted-foreground text-sm max-w-md">Découvrez vos dernières transactions et gérez vos préférences en toute sécurité.</p>
+                        <p className="text-muted-foreground text-sm max-w-md font-light leading-relaxed">Découvrez vos dernières transactions et gérez vos préférences en toute sécurité sur notre plateforme ultra-sécurisée.</p>
                         <Button className="bg-primary hover:bg-primary/90 h-12 rounded-xl px-8 font-black uppercase italic gap-2 mt-4" asChild>
-                            <Link href="/">Continuer mes achats <ArrowRight size={18} /></Link>
+                            <Link href="/#shop">Continuer mes achats <ArrowRight size={18} /></Link>
                         </Button>
                     </CardContent>
                 </Card>
@@ -410,3 +410,4 @@ function DashboardPage() {
 }
 
 export default withAuth(DashboardPage);
+
