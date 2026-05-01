@@ -11,7 +11,7 @@ interface LogoProps {
 
 /**
  * Composant Logo épuré en Flat Design.
- * Version sans bordures ni fonds complexes pour une intégration fluide.
+ * Intégration directe de l'image sur fond transparent.
  */
 export function Logo({ className, size = "md", showText = false }: LogoProps) {
   const [error, setError] = useState(false);
@@ -30,7 +30,7 @@ export function Logo({ className, size = "md", showText = false }: LogoProps) {
     xl: "text-6xl",
   };
 
-  // Lien direct optimisé pour Google Drive
+  // Lien direct optimisé pour Google Drive (uc?id=)
   const fileId = "1kUOuBsul6BfUvpIeM1EYJ6Uo0qE8jPGX";
   const logoUrl = `https://docs.google.com/uc?id=${fileId}`;
 
@@ -45,7 +45,7 @@ export function Logo({ className, size = "md", showText = false }: LogoProps) {
             onError={() => setError(true)}
           />
         ) : (
-          <div className="bg-primary text-white font-black italic px-2 py-1 rounded-sm text-xs">
+          <div className="text-primary font-black italic text-xl">
             DKS
           </div>
         )}
@@ -56,7 +56,7 @@ export function Logo({ className, size = "md", showText = false }: LogoProps) {
           "font-black tracking-tighter uppercase italic leading-none text-foreground",
           textSizes[size]
         )}>
-          Double King <span className="text-accent">Shop</span>
+          Double King <span className="text-accent font-light">Shop</span>
         </span>
       )}
     </div>

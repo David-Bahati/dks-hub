@@ -43,89 +43,89 @@ export function Navbar() {
     ];
 
     return (
-        <header className="border-b border-white/5 bg-background/60 backdrop-blur-3xl sticky top-0 z-[60] h-24">
+        <header className="border-b border-white/5 bg-background/60 backdrop-blur-3xl sticky top-0 z-[60] h-20 transition-all">
             <div className="max-w-7xl mx-auto px-6 h-full flex items-center justify-between">
-                <Link href="/">
+                <Link href="/" className="hover:opacity-80 transition-opacity">
                     <Logo showText={true} className="hidden sm:flex" size="md" />
                     <Logo showText={false} className="sm:hidden" size="md" />
                 </Link>
                 
-                <nav className="hidden lg:flex items-center gap-2 bg-white/5 border border-white/10 rounded-2xl p-1.5 backdrop-blur-md">
+                <nav className="hidden lg:flex items-center gap-1">
                     {navItems.filter(i => i.show).map((item) => (
                         <Link key={item.href} href={item.href}>
-                           <div className={`px-5 py-2.5 text-[11px] font-black uppercase italic tracking-widest rounded-xl transition-all flex items-center gap-2 ${pathname === item.href ? 'bg-accent text-accent-foreground shadow-lg shadow-accent/20' : 'hover:bg-white/10 hover:text-accent'}`}>
-                             <item.icon size={14} />
+                           <div className={`px-4 py-2 text-[10px] font-black uppercase italic tracking-widest rounded-xl transition-all flex items-center gap-2 ${pathname === item.href ? 'text-accent' : 'text-muted-foreground hover:text-white'}`}>
+                             <item.icon size={14} className={pathname === item.href ? 'text-accent' : ''} />
                              {item.label}
                            </div>
                         </Link>
                     ))}
                 </nav>
 
-                <div className="flex items-center gap-6">
+                <div className="flex items-center gap-4">
                     {!isStaff && (
                         <Sheet>
                             <SheetTrigger asChild>
-                                <Button variant="ghost" size="icon" className="relative rounded-[1.25rem] h-14 w-14 bg-white/5 border border-white/10 hover:border-accent hover:bg-accent/5 transition-all group active:scale-90">
-                                    <ShoppingCart size={22} className="group-hover:text-accent transition-colors" />
+                                <Button variant="ghost" size="icon" className="relative h-10 w-10 text-muted-foreground hover:text-accent transition-colors">
+                                    <ShoppingCart size={20} />
                                     {cartCount > 0 && (
-                                        <Badge className="absolute -top-1 -right-1 min-w-[22px] h-[22px] rounded-full bg-accent text-accent-foreground flex items-center justify-center text-[10px] font-black border-2 border-background p-0">
+                                        <Badge className="absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full bg-accent text-accent-foreground flex items-center justify-center text-[9px] font-black p-0 border border-background">
                                             {cartCount}
                                         </Badge>
                                     )}
                                 </Button>
                             </SheetTrigger>
-                            <SheetContent className="bg-card/95 backdrop-blur-3xl border-white/10 w-full sm:max-w-md flex flex-col rounded-l-[3.5rem] p-0 overflow-hidden">
-                                <SheetHeader className="p-10 pb-0">
-                                    <Badge className="bg-accent/10 text-accent border-none w-fit mb-4 font-black text-[9px] uppercase tracking-widest">
+                            <SheetContent className="bg-card/95 backdrop-blur-3xl border-white/10 w-full sm:max-w-md flex flex-col p-0">
+                                <SheetHeader className="p-8 pb-0">
+                                    <Badge className="bg-accent/10 text-accent border-none w-fit mb-2 font-black text-[9px] uppercase tracking-widest">
                                         <Sparkles className="w-3 h-3 mr-2" /> Panier Premium
                                     </Badge>
-                                    <SheetTitle className="text-4xl font-black uppercase italic tracking-tighter">VOTRE <span className="text-accent">SÉLECTION</span></SheetTitle>
+                                    <SheetTitle className="text-3xl font-black uppercase italic tracking-tighter">Votre Sélection</SheetTitle>
                                 </SheetHeader>
                                 
-                                <div className="flex-1 overflow-y-auto mt-8 space-y-4 px-10 pr-6 custom-scrollbar">
+                                <div className="flex-1 overflow-y-auto mt-6 space-y-3 px-8 custom-scrollbar">
                                     {cartItems.length === 0 ? (
-                                        <div className="text-center py-20 opacity-20 flex flex-col items-center gap-6">
-                                            <ShoppingCart size={120} strokeWidth={1} />
-                                            <p className="font-black uppercase italic text-sm tracking-widest">Panier vide pour le moment</p>
+                                        <div className="text-center py-20 opacity-20 flex flex-col items-center gap-4">
+                                            <ShoppingCart size={80} strokeWidth={1} />
+                                            <p className="font-black uppercase italic text-xs tracking-widest">Panier vide</p>
                                         </div>
                                     ) : (
                                         cartItems.map(item => (
-                                            <div key={item.id} className="flex justify-between items-center bg-white/5 p-6 rounded-[2rem] border border-white/5 hover:border-accent/20 transition-all group">
+                                            <div key={item.id} className="flex justify-between items-center bg-white/5 p-4 rounded-2xl border border-white/5 hover:border-accent/20 transition-all">
                                                 <div className="flex-1">
-                                                    <p className="font-black uppercase italic text-sm group-hover:text-accent transition-colors line-clamp-1">{item.name}</p>
-                                                    <p className="text-[10px] text-muted-foreground font-black uppercase mt-1">
+                                                    <p className="font-black uppercase italic text-xs line-clamp-1">{item.name}</p>
+                                                    <p className="text-[9px] text-muted-foreground font-black uppercase mt-0.5">
                                                         <span className="text-white">${(item.price || 0).toFixed(2)}</span> x {item.quantity}
                                                     </p>
                                                 </div>
                                                 <Button 
                                                     variant="ghost" 
                                                     size="icon" 
-                                                    className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-2xl h-12 w-12 ml-4" 
+                                                    className="text-muted-foreground hover:text-destructive h-8 w-8 ml-2" 
                                                     onClick={() => removeFromCart(item.id)}
                                                 >
-                                                    <Trash2 size={18} />
+                                                    <Trash2 size={16} />
                                                 </Button>
                                             </div>
                                         ))
                                     )}
                                 </div>
 
-                                <div className="p-10 bg-black/40 border-t border-white/5 space-y-8">
+                                <div className="p-8 bg-black/40 border-t border-white/5 space-y-6">
                                     <div className="flex justify-between items-end">
-                                        <span className="text-muted-foreground font-black uppercase text-[10px] tracking-widest">Estimation Total</span>
+                                        <span className="text-muted-foreground font-black uppercase text-[9px] tracking-widest">Total</span>
                                         <div className="text-right">
-                                            <p className="text-5xl font-black text-white tracking-tighter">${totalPrice.toFixed(2)}</p>
-                                            <p className="text-accent font-black text-[10px] uppercase tracking-widest mt-1">≈ {(totalPrice / PI_CONVERSION_RATE).toFixed(6)} π</p>
+                                            <p className="text-4xl font-black text-white tracking-tighter">${totalPrice.toFixed(2)}</p>
+                                            <p className="text-accent font-black text-[9px] uppercase tracking-widest mt-0.5">≈ {(totalPrice / PI_CONVERSION_RATE).toFixed(4)} π</p>
                                         </div>
                                     </div>
                                     
                                     <Button 
-                                        className="w-full h-20 bg-accent text-accent-foreground font-black uppercase italic text-xl rounded-[1.5rem] neon-glow shadow-xl active:scale-95 disabled:opacity-20" 
+                                        className="w-full h-14 bg-accent text-accent-foreground font-black uppercase italic text-lg rounded-xl neon-glow disabled:opacity-20" 
                                         asChild
                                         disabled={cartItems.length === 0}
                                     >
                                         {cartItems.length > 0 ? (
-                                            <Link href="/checkout">Valider ma commande <ArrowRight className="ml-3" /></Link>
+                                            <Link href="/checkout">Commander <ArrowRight className="ml-2 h-5 w-5" /></Link>
                                         ) : (
                                             <span>SÉLECTION VIDE</span>
                                         )}
@@ -136,19 +136,19 @@ export function Navbar() {
                     )}
 
                     {isLoading ? (
-                        <Loader2 className="animate-spin h-6 w-6 opacity-50" />
+                        <Loader2 className="animate-spin h-5 w-5 text-muted-foreground" />
                     ) : user ? (
-                        <div className="flex items-center gap-4 bg-white/5 pl-5 pr-1.5 py-1.5 rounded-[1.5rem] border border-white/10 backdrop-blur-md">
+                        <div className="flex items-center gap-3">
                             <div className="text-right hidden sm:block">
-                                <p className="font-black italic uppercase text-[11px] leading-tight tracking-tighter">{user.name}</p>
-                                <p className="text-[9px] text-accent font-black uppercase tracking-widest mt-0.5">{user.role}</p>
+                                <p className="font-black italic uppercase text-[10px] leading-tight">{user.name}</p>
+                                <p className="text-[8px] text-accent font-black uppercase tracking-widest">{user.role}</p>
                             </div>
-                            <Button variant="ghost" size="icon" onClick={handleLogout} className="h-12 w-12 rounded-2xl hover:bg-destructive/10 hover:text-destructive transition-all active:scale-90">
-                                <LogOut size={20} />
+                            <Button variant="ghost" size="icon" onClick={handleLogout} className="h-10 w-10 text-muted-foreground hover:text-destructive transition-all">
+                                <LogOut size={18} />
                             </Button>
                         </div>
                     ) : (
-                        <Button asChild className="font-black uppercase italic rounded-2xl h-14 bg-primary px-8 neon-glow shadow-lg active:scale-95 text-xs">
+                        <Button asChild className="font-black uppercase italic rounded-xl h-10 bg-primary px-6 text-[10px] tracking-widest">
                             <Link href="/login">Accès Pro</Link>
                         </Button>
                     )}
