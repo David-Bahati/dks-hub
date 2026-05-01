@@ -6,11 +6,12 @@ import { Navbar } from "@/components/layout/Navbar";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Users, Mail, Phone, Loader2, UserPlus } from "lucide-react";
+import { Users, Mail, Phone, Loader2, UserPlus, ArrowLeft } from "lucide-react";
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot } from 'firebase/firestore';
 import withAuth from '@/components/auth/withAuth';
 import { Button } from '@/components/ui/button';
+import Link from 'next/link';
 
 function CustomersPage() {
   const [customers, setCustomers] = useState<any[]>([]);
@@ -29,12 +30,19 @@ function CustomersPage() {
     <div className="min-h-screen bg-background">
       <Navbar />
       <main className="max-w-7xl mx-auto px-4 py-8">
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-3xl font-bold font-headline uppercase tracking-tighter">Base Clients</h1>
-            <p className="text-muted-foreground">Gérez vos relations clients et l'historique de fidélité.</p>
+        <div className="flex justify-between items-start mb-12 gap-4">
+          <div className="flex items-start gap-4">
+             <Link href="/dashboard">
+                <Button variant="outline" className="h-12 w-12 rounded-2xl border-white/10 hover:bg-accent/10 hover:text-accent p-0 transition-all">
+                    <ArrowLeft size={20} />
+                </Button>
+             </Link>
+             <div>
+                <h1 className="text-3xl font-bold font-headline uppercase tracking-tighter italic">Base <span className="text-accent">Clients</span></h1>
+                <p className="text-muted-foreground">Gérez vos relations clients et l'historique de fidélité.</p>
+             </div>
           </div>
-          <Button className="bg-accent text-accent-foreground hover:bg-accent/90 gap-2 font-bold rounded-xl">
+          <Button className="bg-accent text-accent-foreground hover:bg-accent/90 gap-2 font-bold rounded-xl h-12 px-6 uppercase italic">
              <UserPlus size={18} /> Nouveau Client
           </Button>
         </div>

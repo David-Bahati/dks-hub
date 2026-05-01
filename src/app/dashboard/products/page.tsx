@@ -35,9 +35,10 @@ import { Switch } from "@/components/ui/switch";
 import { db } from '@/lib/firebase';
 import { collection, doc, serverTimestamp, setDoc, addDoc, deleteDoc } from 'firebase/firestore';
 import { Product } from '@/lib/types';
-import { PlusCircle, Edit, Trash2, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, Eye, EyeOff, Loader2, ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
+import Link from 'next/link';
 
 const CATEGORIES = ["keyboard", "mouse", "screen", "headset", "other"];
 
@@ -136,10 +137,17 @@ function ProductsPage() {
     <div className="min-h-screen bg-background text-foreground">
       <Navbar />
       <main className="max-w-7xl mx-auto px-4 py-8">
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-3xl font-bold font-headline uppercase tracking-tighter italic">Gestion du <span className="text-accent">Stock</span></h1>
-            <p className="text-muted-foreground">Pilotez votre inventaire hardware en temps réel.</p>
+        <div className="flex justify-between items-start mb-12 gap-4">
+          <div className="flex items-start gap-4">
+             <Link href="/dashboard">
+                <Button variant="outline" className="h-12 w-12 rounded-2xl border-white/10 hover:bg-accent/10 hover:text-accent p-0 transition-all">
+                    <ArrowLeft size={20} />
+                </Button>
+             </Link>
+             <div>
+                <h1 className="text-3xl font-bold font-headline uppercase tracking-tighter italic">Gestion du <span className="text-accent">Stock</span></h1>
+                <p className="text-muted-foreground">Pilotez votre inventaire hardware en temps réel.</p>
+             </div>
           </div>
           <Button onClick={() => openModal()} className="bg-primary hover:bg-primary/90 gap-2 neon-glow font-black uppercase italic rounded-2xl h-12 px-6">
             <PlusCircle size={20} /> Ajouter un Produit

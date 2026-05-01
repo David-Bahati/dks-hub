@@ -5,10 +5,11 @@ import { useState, useEffect } from 'react';
 import { Navbar } from "@/components/layout/Navbar";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Tags, Edit2, Trash2, Loader2 } from "lucide-react";
+import { Plus, Tags, Edit2, Trash2, Loader2, ArrowLeft } from "lucide-react";
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot } from 'firebase/firestore';
 import withAuth from '@/components/auth/withAuth';
+import Link from 'next/link';
 
 function CategoriesPage() {
   const [categories, setCategories] = useState<any[]>([]);
@@ -27,12 +28,19 @@ function CategoriesPage() {
     <div className="min-h-screen bg-background">
       <Navbar />
       <main className="max-w-7xl mx-auto px-4 py-8">
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-3xl font-bold font-headline uppercase tracking-tighter">Catégories</h1>
-            <p className="text-muted-foreground">Organisez vos produits informatiques par familles.</p>
+        <div className="flex justify-between items-start mb-12 gap-4">
+          <div className="flex items-start gap-4">
+             <Link href="/dashboard">
+                <Button variant="outline" className="h-12 w-12 rounded-2xl border-white/10 hover:bg-accent/10 hover:text-accent p-0 transition-all">
+                    <ArrowLeft size={20} />
+                </Button>
+             </Link>
+             <div>
+                <h1 className="text-3xl font-bold font-headline uppercase tracking-tighter italic">Gestion des <span className="text-accent">Catégories</span></h1>
+                <p className="text-muted-foreground">Organisez vos produits informatiques par familles.</p>
+             </div>
           </div>
-          <Button className="bg-primary hover:bg-primary/90 gap-2 neon-glow font-bold rounded-xl">
+          <Button className="bg-primary hover:bg-primary/90 gap-2 neon-glow font-black uppercase italic rounded-xl h-12 px-6">
             <Plus size={18} /> Nouvelle Catégorie
           </Button>
         </div>
@@ -44,11 +52,11 @@ function CategoriesPage() {
         ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {categories.length > 0 ? categories.map((cat) => (
-                <Card key={cat.id} className="glossy-card border-none hover:border-accent/50 transition-all">
+                <Card key={cat.id} className="glossy-card border-none hover:border-accent/50 transition-all rounded-[2rem]">
                 <CardHeader className="flex flex-row items-center justify-between">
                     <div className="flex items-center gap-3">
                     <span className="text-2xl">{cat.icon || "📦"}</span>
-                    <CardTitle className="text-xl font-bold">{cat.name}</CardTitle>
+                    <CardTitle className="text-xl font-bold italic uppercase">{cat.name}</CardTitle>
                     </div>
                     <Tags className="text-accent h-5 w-5 opacity-50" />
                 </CardHeader>
@@ -63,8 +71,8 @@ function CategoriesPage() {
                 </CardContent>
                 </Card>
             )) : (
-                <div className="col-span-full py-20 text-center bg-white/5 rounded-3xl border border-dashed border-white/10">
-                    <p className="text-muted-foreground">Aucune catégorie trouvée. Créez-en une pour commencer.</p>
+                <div className="col-span-full py-20 text-center bg-white/5 rounded-[2.5rem] border border-dashed border-white/10">
+                    <p className="text-muted-foreground italic">Aucune catégorie trouvée. Créez-en une pour commencer.</p>
                 </div>
             )}
             </div>

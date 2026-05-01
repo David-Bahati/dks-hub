@@ -6,14 +6,13 @@ import withAuth from "@/components/auth/withAuth";
 import { Navbar } from "@/components/layout/Navbar";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { UserPlus, Edit, Trash2 } from "lucide-react";
+import { UserPlus, Edit, Trash2, ArrowLeft } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { 
   Dialog, 
   DialogContent, 
   DialogHeader, 
   DialogTitle, 
-  DialogDescription, 
   DialogFooter 
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -22,6 +21,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { User } from '@/lib/types';
+import Link from 'next/link';
 
 const getRoleBadge = (role: string) => {
   switch (role) {
@@ -92,19 +92,26 @@ function UsersPage() {
     <div className="min-h-screen bg-background">
       <Navbar />
       <main className="max-w-7xl mx-auto px-4 py-8">
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-3xl font-bold font-headline uppercase tracking-tighter">Équipe & Utilisateurs</h1>
-            <p className="text-muted-foreground">Gérez les accès et les comptes de votre personnel.</p>
+        <div className="flex justify-between items-start mb-12 gap-4">
+          <div className="flex items-start gap-4">
+             <Link href="/dashboard">
+                <Button variant="outline" className="h-12 w-12 rounded-2xl border-white/10 hover:bg-accent/10 hover:text-accent p-0 transition-all">
+                    <ArrowLeft size={20} />
+                </Button>
+             </Link>
+             <div>
+                <h1 className="text-3xl font-bold font-headline uppercase tracking-tighter italic">Équipe & <span className="text-accent">Utilisateurs</span></h1>
+                <p className="text-muted-foreground">Gérez les accès et les comptes de votre personnel.</p>
+             </div>
           </div>
-          <Button onClick={() => openModal()} className="bg-primary hover:bg-primary/90 gap-2 neon-glow font-bold">
+          <Button onClick={() => openModal()} className="bg-primary hover:bg-primary/90 gap-2 neon-glow font-bold h-12 px-6 rounded-xl uppercase italic">
             <UserPlus size={18} /> Ajouter un Membre
           </Button>
         </div>
 
-        <Card className="glossy-card border-none">
+        <Card className="glossy-card border-none rounded-[2rem]">
           <CardHeader>
-            <CardTitle>Liste des utilisateurs</CardTitle>
+            <CardTitle className="text-lg font-black uppercase italic">Liste des utilisateurs</CardTitle>
           </CardHeader>
           <CardContent>
              <div className="space-y-4">
@@ -112,20 +119,20 @@ function UsersPage() {
                 <p className="text-center text-muted-foreground">Chargement...</p>
               ) : users.length > 0 ? (
                 users.map(user => (
-                  <div key={user.id} className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
+                  <div key={user.id} className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5 hover:bg-white/10 transition-colors">
                     <div>
-                      <p className="font-semibold">{user.displayName}</p>
-                      <p className="text-sm text-muted-foreground">{user.email}</p>
+                      <p className="font-bold">{user.displayName}</p>
+                      <p className="text-xs text-muted-foreground">{user.email}</p>
                     </div>
                     <div className="flex items-center gap-4">
                         <Badge className={getRoleBadge(user.role)}>{user.role}</Badge>
-                        <Button variant="ghost" size="icon" onClick={() => openModal(user)}><Edit size={16}/></Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleDelete(user.id)}><Trash2 size={16} className="text-destructive"/></Button>
+                        <Button variant="ghost" size="icon" onClick={() => openModal(user)} className="h-10 w-10 hover:bg-white/10"><Edit size={16}/></Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleDelete(user.id)} className="h-10 w-10 text-destructive hover:bg-destructive/10"><Trash2 size={16}/></Button>
                     </div>
                   </div>
                 ))
               ) : (
-                <p className="text-center text-muted-foreground">Aucun utilisateur trouvé.</p>
+                <p className="text-center text-muted-foreground py-10 italic">Aucun utilisateur trouvé.</p>
               )}
             </div>
           </CardContent>
@@ -133,37 +140,37 @@ function UsersPage() {
       </main>
 
        <Dialog open={isModalOpen} onOpenChange={closeModal}>
-        <DialogContent className="glossy-card border-none">
+        <DialogContent className="glossy-card border-none rounded-[2rem]">
           <DialogHeader>
-            <DialogTitle>{editingUser ? 'Modifier un Membre' : 'Inviter un Nouveau Membre'}</DialogTitle>
+            <DialogTitle className="text-xl font-black uppercase italic">{editingUser ? 'Modifier un Membre' : 'Inviter un Nouveau Membre'}</DialogTitle>
           </DialogHeader>
           <form onSubmit={(e) => { e.preventDefault(); handleSave(new FormData(e.currentTarget)); }}>
-            <div className="grid gap-4 py-4">
+            <div className="grid gap-6 py-4">
                <div className="space-y-2">
-                <Label htmlFor="displayName">Nom complet</Label>
-                <Input id="displayName" name="displayName" defaultValue={editingUser?.displayName} required />
+                <Label htmlFor="displayName" className="text-[10px] font-black uppercase tracking-widest opacity-60">Nom complet</Label>
+                <Input id="displayName" name="displayName" defaultValue={editingUser?.displayName} required className="h-12 bg-background/50 border-white/10 rounded-xl" />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="email">Adresse e-mail</Label>
-                <Input id="email" name="email" type="email" defaultValue={editingUser?.email} required />
+                <Label htmlFor="email" className="text-[10px] font-black uppercase tracking-widest opacity-60">Adresse e-mail</Label>
+                <Input id="email" name="email" type="email" defaultValue={editingUser?.email} required className="h-12 bg-background/50 border-white/10 rounded-xl" />
               </div>
               <div className="space-y-2">
-                 <Label>Rôle</Label>
+                 <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Rôle</Label>
                  <Select value={role} onValueChange={setRole}>
-                    <SelectTrigger>
+                    <SelectTrigger className="h-12 bg-background/50 border-white/10 rounded-xl">
                         <SelectValue placeholder="Sélectionner un rôle" />
                     </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="Admin">Admin</SelectItem>
-                        <SelectItem value="Manager">Manager</SelectItem>
-                        <SelectItem value="Member">Member</SelectItem>
+                    <SelectContent className="bg-card border-white/10">
+                        <SelectItem value="Admin" className="font-bold">Admin</SelectItem>
+                        <SelectItem value="Manager" className="font-bold">Manager</SelectItem>
+                        <SelectItem value="Member" className="font-bold">Member</SelectItem>
                     </SelectContent>
                  </Select>
               </div>
             </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={closeModal}>Annuler</Button>
-              <Button type="submit">Sauvegarder</Button>
+            <DialogFooter className="gap-2">
+              <Button type="button" variant="ghost" onClick={closeModal} className="font-bold uppercase text-[10px]">Annuler</Button>
+              <Button type="submit" className="bg-accent text-accent-foreground font-black uppercase italic rounded-xl px-8 h-12">Sauvegarder</Button>
             </DialogFooter>
           </form>
         </DialogContent>
