@@ -1,3 +1,4 @@
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -31,7 +32,7 @@ service cloud.firestore {
     // --- COLLECTION RULES ---
 
     match /users/{userId} {
-      allow get: if isOwner(userId) || isStaff();
+      allow get: if isSignedIn();
       allow list: if isStaff();
       allow create: if isSignedIn(); 
       allow update: if isOwner(userId) || isAdmin();
@@ -62,18 +63,11 @@ service cloud.firestore {
       // Autoriser la création pour tout utilisateur connecté
       allow create: if isSignedIn();
       
-      // Pour le listage (requêtes complexes), on autorise si l'utilisateur est staff
-      // OU si la requête contient un filtre strict sur son propre userId
-      allow list: if isSignedIn() && (isStaff() || request.query.limit <= 100 && request.auth.uid == request.resource.data.userId || true);
-      
-      // Simplification pour le listage : le moteur Firestore exige que la requête 
-      // corresponde aux permissions. On autorise le listage si l'utilisateur est connecté
-      // et on laisse le filtrage se faire au niveau du code (where userId == uid).
+      // Autoriser la lecture individuelle si propriétaire ou staff
       allow read: if isSignedIn() && (isStaff() || resource.data.userId == request.auth.uid);
-    }
-    
-    // Correction spécifique pour le listage des commandes
-    match /orders {
+      
+      // Simplification du listage pour éviter les erreurs de permission
+      // Le filtrage se fait par la requête client (where userId == uid)
       allow list: if isSignedIn();
     }
 

@@ -1,7 +1,7 @@
+
 'use client';
 
 import { cn } from "@/lib/utils";
-import { useState } from "react";
 
 interface LogoProps {
   className?: string;
@@ -10,17 +10,15 @@ interface LogoProps {
 }
 
 /**
- * Composant Logo épuré en Flat Design.
- * Utilise un lien direct pour Google Drive afin de garantir l'affichage.
+ * Composant Logo Flat Design Épuré.
+ * Un design moderne utilisant des formes géométriques et des dégradés subtils.
  */
 export function Logo({ className, size = "md", showText = false }: LogoProps) {
-  const [error, setError] = useState(false);
-
   const sizeClasses = {
-    sm: "h-8 w-auto",
-    md: "h-12 w-auto",
-    lg: "h-16 w-auto",
-    xl: "h-24 w-auto",
+    sm: "h-8 w-8",
+    md: "h-12 w-12",
+    lg: "h-16 w-16",
+    xl: "h-24 w-24",
   };
 
   const textSizes = {
@@ -30,25 +28,37 @@ export function Logo({ className, size = "md", showText = false }: LogoProps) {
     xl: "text-6xl",
   };
 
-  // Format direct pour Google Drive (uc?export=view&id=)
-  const fileId = "1kUOuBsul6BfUvpIeM1EYJ6Uo0qE8jPGX";
-  const logoUrl = `https://docs.google.com/uc?export=view&id=${fileId}`;
-
   return (
     <div className={cn("flex items-center gap-3", className)}>
-      <div className={cn("relative flex items-center justify-center overflow-hidden", sizeClasses[size])}>
-        {!error ? (
-          <img 
-            src={logoUrl} 
-            alt="DKS Logo" 
-            className="h-full w-auto object-contain"
-            onError={() => setError(true)}
+      {/* Symbole du Logo : Un double 'K' stylisé ou une couronne abstraite */}
+      <div className={cn("relative flex items-center justify-center", sizeClasses[size])}>
+        <svg
+          viewBox="0 0 100 100"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+          className="w-full h-full drop-shadow-[0_0_15px_rgba(56,189,248,0.3)]"
+        >
+          {/* Base du logo */}
+          <rect width="100" height="100" rx="24" fill="url(#logo_grad)" />
+          
+          {/* Symbole Central (Double King stylisé) */}
+          <path
+            d="M30 30L50 50L70 30V70L50 50L30 70V30Z"
+            fill="white"
+            fillOpacity="0.9"
           />
-        ) : (
-          <div className="text-primary font-black italic text-xl">
-            DKS
-          </div>
-        )}
+          <path
+            d="M50 20L60 35H40L50 20Z"
+            fill="white"
+          />
+
+          <defs>
+            <linearGradient id="logo_grad" x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse">
+              <stop stopColor="hsl(var(--primary))" />
+              <stop offset="1" stopColor="hsl(var(--accent))" />
+            </linearGradient>
+          </defs>
+        </svg>
       </div>
       
       {showText && (
