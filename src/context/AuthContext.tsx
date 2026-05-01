@@ -1,4 +1,3 @@
-
 "use client";
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
@@ -24,17 +23,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    let unsubscribeSnapshot: (() => void) | null = null;
+
     const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
+      // Nettoyer l'ancien écouteur Firestore si l'état auth change
+      if (unsubscribeSnapshot) {
+        unsubscribeSnapshot();
+        unsubscribeSnapshot = null;
+      }
+
       if (firebaseUser) {
         const userDocRef = doc(db, 'users', firebaseUser.uid);
         
-        const unsubscribeSnapshot = onSnapshot(userDocRef, (userDocSnap) => {
+        unsubscribeSnapshot = onSnapshot(userDocRef, (userDocSnap) => {
           if (userDocSnap.exists()) {
             const userData = userDocSnap.data();
             setUser({
               uid: firebaseUser.uid,
               email: firebaseUser.email || '',
-              name: userData.username || userData.name || 'Utilisateur',
+              name: userData.username || userData.name || userData.displayName || 'Utilisateur',
               role: userData.role || 'customer',
               createdAt: userData.createdAt || null,
             });
@@ -47,16 +54,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             });
           }
           setIsLoading(false);
+        }, (error) => {
+          console.error("AuthContext Snapshot Error:", error);
+          setIsLoading(false);
         });
-
-        return () => unsubscribeSnapshot();
       } else {
         setUser(null);
         setIsLoading(false);
       }
     });
 
-    return () => unsubscribeAuth();
+    return () => {
+      unsubscribeAuth();
+      if (unsubscribeSnapshot) unsubscribeSnapshot();
+    };
   }, []);
 
   return (
