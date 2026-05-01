@@ -1,7 +1,7 @@
 
 "use client";
 
-import { LogOut, LayoutDashboard, ShoppingCart, Settings, Users, Package, Bell, Loader2, PanelLeft, Home } from 'lucide-react';
+import { LogOut, LayoutDashboard, ShoppingCart, Settings, Users, Package, Bell, Loader2, PanelLeft, Home, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { Button } from "@/components/ui/button";
@@ -28,9 +28,9 @@ export function Navbar() {
         }
     };
 
-    const isAdmin = user?.role === 'admin';
-    const isSeller = user?.role === 'seller';
-    const isCashier = user?.role === 'cashier';
+    const isAdmin = user?.role === 'Admin';
+    const isSeller = user?.role === 'Seller';
+    const isCashier = user?.role === 'Cashier';
     const isStaff = isAdmin || isSeller || isCashier;
 
     const navItems = [
@@ -71,60 +71,82 @@ export function Navbar() {
                                     {cartCount > 0 && <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-accent text-accent-foreground flex items-center justify-center text-[10px] font-black">{cartCount}</span>}
                                 </Button>
                             </SheetTrigger>
-                            <SheetContent className="bg-card border-white/10 w-full sm:max-w-md flex flex-col">
-                                <SheetHeader>
-                                    <SheetTitle className="text-2xl font-black uppercase italic">Votre Panier</SheetTitle>
+                            <SheetContent className="bg-card border-white/10 w-full sm:max-w-md flex flex-col rounded-l-[3rem]">
+                                <SheetHeader className="pt-8">
+                                    <SheetTitle className="text-3xl font-black uppercase italic tracking-tighter">Votre <span className="text-accent">Panier</span></SheetTitle>
                                 </SheetHeader>
-                                <div className="flex-1 overflow-y-auto mt-8 space-y-4">
+                                
+                                <div className="flex-1 overflow-y-auto mt-8 space-y-4 pr-2 custom-scrollbar">
                                     {cartItems.length === 0 ? (
-                                        <div className="text-center py-20 opacity-30">
-                                            <ShoppingCart size={64} className="mx-auto mb-4" />
-                                            <p>Votre panier est vide.</p>
+                                        <div className="text-center py-20 opacity-30 flex flex-col items-center gap-4">
+                                            <ShoppingCart size={80} strokeWidth={1} />
+                                            <p className="font-bold uppercase italic text-sm">Votre panier est vide.</p>
                                         </div>
                                     ) : (
                                         cartItems.map(item => (
-                                            <div key={item.id} className="flex justify-between items-center bg-white/5 p-4 rounded-2xl border border-white/5">
-                                                <div>
-                                                    <p className="font-bold">{item.name}</p>
-                                                    <p className="text-xs text-muted-foreground">${item.price.toFixed(2)} x {item.quantity}</p>
+                                            <div key={item.id} className="flex justify-between items-center bg-white/5 p-5 rounded-[1.5rem] border border-white/5 hover:border-white/10 transition-all group">
+                                                <div className="flex-1">
+                                                    <p className="font-bold text-sm group-hover:text-accent transition-colors">{item.name}</p>
+                                                    <p className="text-[10px] text-muted-foreground font-black uppercase mt-1">${(item.price || 0).toFixed(2)} x {item.quantity}</p>
                                                 </div>
-                                                <Button variant="ghost" size="icon" className="text-destructive" onClick={() => removeFromCart(item.id)}>
-                                                    <LogOut size={16} />
+                                                <Button 
+                                                    variant="ghost" 
+                                                    size="icon" 
+                                                    className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-xl" 
+                                                    onClick={() => removeFromCart(item.id)}
+                                                >
+                                                    <Trash2 size={16} />
                                                 </Button>
                                             </div>
                                         ))
                                     )}
                                 </div>
-                                <div className="border-t border-white/10 pt-6 space-y-4">
+
+                                <div className="border-t border-white/10 pt-8 pb-8 space-y-6">
                                     <div className="flex justify-between items-end">
-                                        <span className="text-muted-foreground font-bold uppercase text-xs">Total à payer</span>
+                                        <span className="text-muted-foreground font-black uppercase text-[10px] tracking-widest">Total Estimé</span>
                                         <div className="text-right">
-                                            <p className="text-3xl font-black">${totalPrice.toFixed(2)}</p>
-                                            <p className="text-accent font-bold text-sm">≈ {(totalPrice / PI_CONVERSION_RATE).toFixed(4)} π</p>
+                                            <p className="text-4xl font-black text-white">${totalPrice.toFixed(2)}</p>
+                                            <p className="text-accent font-black text-xs uppercase tracking-tighter">≈ {(totalPrice / PI_CONVERSION_RATE).toFixed(6)} π</p>
                                         </div>
                                     </div>
-                                    <Button className="w-full h-14 bg-accent text-accent-foreground font-black uppercase italic text-lg rounded-2xl neon-glow" asChild>
-                                        <Link href="/checkout">Finaliser la commande</Link>
+                                    
+                                    <Button 
+                                        className="w-full h-16 bg-accent text-accent-foreground font-black uppercase italic text-lg rounded-2xl neon-glow disabled:opacity-30 disabled:grayscale" 
+                                        asChild
+                                        disabled={cartItems.length === 0}
+                                    >
+                                        {cartItems.length > 0 ? (
+                                            <Link href="/checkout">Procéder au paiement</Link>
+                                        ) : (
+                                            <span>Panier Vide</span>
+                                        )}
                                     </Button>
+                                    
+                                    {cartItems.length > 0 && (
+                                        <p className="text-[9px] text-center text-muted-foreground uppercase font-bold opacity-60">
+                                            Paiement sécurisé via Pi, M-Money ou Cash
+                                        </p>
+                                    )}
                                 </div>
                             </SheetContent>
                         </Sheet>
                     )}
 
                     {isLoading ? (
-                        <Loader2 className="animate-spin" />
+                        <Loader2 className="animate-spin h-6 w-6 opacity-50" />
                     ) : user ? (
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3 bg-white/5 pl-4 pr-1 py-1 rounded-2xl border border-white/10">
                             <div className="text-right hidden sm:block">
-                                <p className="font-bold text-sm">{user.name}</p>
-                                <p className="text-[10px] text-accent font-bold uppercase">{user.role}</p>
+                                <p className="font-bold text-[11px] leading-tight">{user.name}</p>
+                                <p className="text-[9px] text-accent font-black uppercase tracking-tighter">{user.role}</p>
                             </div>
-                            <Button variant="ghost" size="icon" onClick={handleLogout} className="h-10 w-10 rounded-full hover:bg-destructive/10 hover:text-destructive">
+                            <Button variant="ghost" size="icon" onClick={handleLogout} className="h-10 w-10 rounded-xl hover:bg-destructive/10 hover:text-destructive">
                                 <LogOut size={18} />
                             </Button>
                         </div>
                     ) : (
-                        <Button asChild className="font-bold rounded-xl h-12 bg-primary px-6">
+                        <Button asChild className="font-black uppercase italic rounded-xl h-12 bg-primary px-6 neon-glow">
                             <Link href="/login">Espace Pro</Link>
                         </Button>
                     )}
