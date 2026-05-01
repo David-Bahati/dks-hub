@@ -61,13 +61,20 @@ export default function CheckoutPage() {
                     <div className="w-20 h-20 bg-muted rounded-full flex items-center justify-center mx-auto mb-6">
                         <Info className="text-muted-foreground" size={40} />
                     </div>
-                    <h1 className="text-3xl font-bold uppercase italic">Votre panier est vide</h1>
-                    <p className="text-muted-foreground mt-4">Veuillez ajouter des articles avant de commander.</p>
-                    <Button className="mt-8" onClick={() => router.push('/')}>Retour à la boutique</Button>
+                    <h1 className="text-3xl font-bold uppercase italic text-white">Votre panier est vide</h1>
+                    <p className="text-muted-foreground mt-4 uppercase text-[10px] tracking-[0.3em] font-black">Redirection imminente...</p>
+                    <Button className="mt-8 rounded-xl font-black uppercase italic" onClick={() => router.push('/')}>Retour à la boutique</Button>
                 </main>
             </div>
         );
     }
+
+    const validatePhoneNumber = (phone: string) => {
+        // Regex pour les numéros RDC : 10 chiffres, commence par 08 ou 09
+        // Précisément : 081, 082, 083, 084, 085, 089, 090, 097, 098, 099
+        const rdcPhoneRegex = /^(081|082|083|084|085|089|090|097|098|099)\d{7}$/;
+        return rdcPhoneRegex.test(phone);
+    };
 
     const handlePlaceOrder = async () => {
         if (!user) {
@@ -80,13 +87,24 @@ export default function CheckoutPage() {
             return;
         }
 
-        if (paymentMethod === 'MOBILE_MONEY' && (!customerPhone || customerPhone.length < 9)) {
-            toast({
-                title: "Numéro requis",
-                description: "Veuillez saisir un numéro de téléphone valide pour le paiement mobile.",
-                variant: "destructive"
-            });
-            return;
+        if (paymentMethod === 'MOBILE_MONEY') {
+            if (!customerPhone) {
+                toast({
+                    title: "Numéro requis",
+                    description: "Veuillez saisir votre numéro de téléphone.",
+                    variant: "destructive"
+                });
+                return;
+            }
+
+            if (!validatePhoneNumber(customerPhone)) {
+                toast({
+                    title: "Format invalide",
+                    description: "Veuillez saisir un numéro valide (ex: 0812345678).",
+                    variant: "destructive"
+                });
+                return;
+            }
         }
 
         setIsProcessing(true);
@@ -108,7 +126,7 @@ export default function CheckoutPage() {
                     id: item.id,
                     name: item.name,
                     quantity: item.quantity,
-                    price: item.price
+                    price: item.price || item.sellingPrice || 0
                 })),
                 total: totalPrice,
                 paymentMethod: paymentMethod,
@@ -152,7 +170,7 @@ export default function CheckoutPage() {
                     <Button 
                         variant="ghost" 
                         onClick={() => router.back()}
-                        className="rounded-xl gap-2 font-bold uppercase italic text-[10px] tracking-widest text-muted-foreground hover:text-white"
+                        className="rounded-xl gap-2 font-black uppercase italic text-[10px] tracking-widest text-muted-foreground hover:text-white"
                     >
                         <ArrowLeft size={16} />
                         Retour au panier
@@ -220,12 +238,12 @@ export default function CheckoutPage() {
                                         </div>
                                     </div>
                                     <div className="p-6 rounded-2xl bg-white/5 border border-white/5 space-y-4">
-                                        <p className="text-sm text-muted-foreground leading-relaxed">
-                                            La transaction s'effectuera via le <strong>Pi Browser</strong>. Assurez-vous d'être connecté à votre compte Pi Network.
+                                        <p className="text-sm text-muted-foreground leading-relaxed font-light">
+                                            La transaction s'effectuera via le <strong>Pi Browser</strong>. Assurez-vous d'être connecté à votre compte Pi Network pour valider l'opération.
                                         </p>
-                                        <div className="bg-accent/5 border border-accent/20 p-4 rounded-xl flex justify-between items-center">
-                                            <span className="text-[10px] font-black uppercase text-accent">Total à transférer :</span>
-                                            <span className="font-black text-xl text-white">{(totalPrice / PI_CONVERSION_RATE).toFixed(8)} π</span>
+                                        <div className="bg-accent/5 border border-accent/20 p-5 rounded-xl flex justify-between items-center">
+                                            <span className="text-[10px] font-black uppercase text-accent tracking-[0.2em]">Total à transférer :</span>
+                                            <span className="font-black text-2xl text-white">{(totalPrice / PI_CONVERSION_RATE).toFixed(8)} π</span>
                                         </div>
                                     </div>
                                 </div>
@@ -244,7 +262,7 @@ export default function CheckoutPage() {
                                     </div>
                                     
                                     <div className="space-y-4">
-                                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-40">Opérateur Mobile</Label>
+                                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-40">Choisir votre Opérateur</Label>
                                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                                             {[
                                                 { id: "VODACOM", label: "Vodacom", color: "bg-red-600" },
@@ -270,21 +288,23 @@ export default function CheckoutPage() {
                                     </div>
 
                                     <div className="space-y-4">
-                                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-40">Numéro de téléphone</Label>
+                                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-40">Numéro de téléphone (RDC)</Label>
                                         <div className="relative group">
                                             <Phone className="absolute left-5 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-accent transition-colors" size={20} />
                                             <Input 
                                                 type="tel"
                                                 placeholder="08XXXXXXXX"
-                                                className="h-16 pl-14 rounded-2xl bg-background/50 border-white/5 focus:border-accent transition-all text-sm font-bold"
+                                                className="h-16 pl-14 rounded-2xl bg-background/50 border-white/5 focus:border-accent focus:ring-4 focus:ring-accent/5 transition-all text-sm font-bold"
                                                 value={customerPhone}
-                                                onChange={(e) => setCustomerPhone(e.target.value)}
+                                                onChange={(e) => setCustomerPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
                                             />
                                         </div>
-                                        <div className="bg-orange-500/5 border border-orange-500/10 p-4 rounded-xl flex items-start gap-3">
-                                            <Info className="text-orange-500 shrink-0" size={16} />
-                                            <p className="text-[10px] text-orange-200/60 leading-relaxed uppercase font-bold tracking-widest">
-                                                Vous recevrez une demande de confirmation USSD sur ce numéro après avoir validé la commande.
+                                        <div className="bg-orange-500/5 border border-orange-500/10 p-5 rounded-xl flex items-start gap-4">
+                                            <div className="w-6 h-6 rounded-full bg-orange-500/20 flex items-center justify-center shrink-0">
+                                                <Info className="text-orange-500" size={14} />
+                                            </div>
+                                            <p className="text-[10px] text-orange-200/60 leading-relaxed uppercase font-black tracking-widest">
+                                                Format requis : 10 chiffres (ex: 0812345678). Vous recevrez une demande de confirmation USSD sur ce numéro après validation.
                                             </p>
                                         </div>
                                     </div>
@@ -306,7 +326,7 @@ export default function CheckoutPage() {
                                         <p className="font-black uppercase italic mb-4 flex items-center gap-2">
                                             <Info size={16} /> Informations de Retrait
                                         </p>
-                                        Veuillez vous présenter à notre bureau <strong>Double King Shop (Immeuble Bahati, Boulevard de la Libération, Bunia)</strong> sous 24h muni de votre ID de commande.
+                                        Veuillez vous présenter à notre bureau <strong>Double King Shop (Immeuble Bahati, Boulevard de la Libération, Bunia)</strong> sous 24h muni de votre ID de commande pour finaliser l'achat.
                                     </div>
                                 </div>
                             )}
@@ -316,7 +336,7 @@ export default function CheckoutPage() {
                     <div className="space-y-8">
                         <Card className="glossy-card border-none rounded-[2.5rem] overflow-hidden sticky top-28">
                             <CardHeader className="bg-white/5 p-8 border-b border-white/5">
-                                <CardTitle className="text-lg font-black uppercase italic tracking-tighter">Votre Panier</CardTitle>
+                                <CardTitle className="text-lg font-black uppercase italic tracking-tighter">Résumé Commande</CardTitle>
                             </CardHeader>
                             <CardContent className="p-8 space-y-4">
                                 {cartItems.map(item => (
@@ -325,7 +345,7 @@ export default function CheckoutPage() {
                                             <span className="font-bold text-white/80 group-hover:text-white transition-colors">{item.name}</span>
                                             <span className="text-[9px] text-muted-foreground uppercase font-black">Qté: {item.quantity}</span>
                                         </div>
-                                        <span className="font-black text-white">${((item.price || 0) * item.quantity).toFixed(2)}</span>
+                                        <span className="font-black text-white">${((item.price || item.sellingPrice || 0) * item.quantity).toFixed(2)}</span>
                                     </div>
                                 ))}
                                 <div className="pt-6 mt-6 border-t border-white/5 space-y-4">
@@ -340,7 +360,7 @@ export default function CheckoutPage() {
                             </CardContent>
                             <CardFooter className="p-8 bg-white/5">
                                 <Button 
-                                    className="w-full h-20 bg-accent text-accent-foreground hover:bg-accent/90 rounded-2xl font-black uppercase italic text-xl gap-3 shadow-xl hover:scale-[1.02] active:scale-95 transition-all"
+                                    className="w-full h-20 bg-accent text-accent-foreground hover:bg-accent/90 rounded-2xl font-black uppercase italic text-xl gap-3 shadow-xl hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-30"
                                     onClick={handlePlaceOrder}
                                     disabled={isProcessing || cartItems.length === 0}
                                 >
