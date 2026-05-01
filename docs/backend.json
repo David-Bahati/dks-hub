@@ -1,10 +1,11 @@
+
 {
   "entities": {
     "User": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "User",
       "type": "object",
-      "description": "Represents a user of the ShopManager application with specific roles and access permissions. Authentication details (like passwords) are handled by an external system.",
+      "description": "Represents a user of the ShopManager application with specific roles and access permissions.",
       "properties": {
         "id": {
           "type": "string",
@@ -12,292 +13,104 @@
         },
         "email": {
           "type": "string",
-          "description": "User's email address, used for identification and login.",
+          "description": "User's email address.",
           "format": "email"
         },
         "firstName": {
-          "type": "string",
-          "description": "The first name of the user."
+          "type": "string"
         },
         "lastName": {
-          "type": "string",
-          "description": "The last name of the user."
+          "type": "string"
         },
         "role": {
           "type": "string",
-          "description": "The assigned role of the user, determining their access level. Expected values are 'Admin' or 'Seller'."
+          "enum": ["Admin", "Seller", "Cashier", "customer"]
         },
         "createdAt": {
           "type": "string",
-          "description": "Timestamp when the user record was created.",
           "format": "date-time"
         },
         "updatedAt": {
           "type": "string",
-          "description": "Timestamp when the user record was last updated.",
           "format": "date-time"
         }
       },
       "required": [
         "id",
         "email",
-        "firstName",
-        "lastName",
         "role",
         "createdAt",
         "updatedAt"
       ]
     },
-    "Category": {
+    "Order": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Category",
+      "title": "Order",
       "type": "object",
-      "description": "Represents a classification for products, allowing for organized product catalogs (e.g., keyboard, mouse, screen).",
+      "description": "Represents a customer order placed through the store.",
       "properties": {
         "id": {
-          "type": "string",
-          "description": "Unique identifier for the Category entity."
+          "type": "string"
         },
-        "name": {
+        "userId": {
           "type": "string",
-          "description": "The descriptive name of the product category."
+          "description": "The UID of the customer who placed the order."
+        },
+        "customerName": {
+          "type": "string"
+        },
+        "items": {
+          "type": "array"
+        },
+        "total": {
+          "type": "number"
+        },
+        "paymentMethod": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
         }
       },
-      "required": [
-        "id",
-        "name"
-      ]
+      "required": ["userId", "items", "total", "status", "createdAt"]
     },
     "Product": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Product",
       "type": "object",
-      "description": "Represents an item available for sale, including its inventory details, pricing, and associated metadata.",
+      "description": "Represents an item available for sale.",
       "properties": {
         "id": {
-          "type": "string",
-          "description": "Unique identifier for the Product entity."
+          "type": "string"
         },
         "name": {
-          "type": "string",
-          "description": "The name of the product."
+          "type": "string"
         },
         "description": {
-          "type": "string",
-          "description": "A detailed description of the product."
+          "type": "string"
         },
-        "categoryId": {
-          "type": "string",
-          "description": "Reference to the Category this product belongs to. (Relationship: Category 1:N Product)"
-        },
-        "purchasePrice": {
-          "type": "number",
-          "description": "The price at which the product was acquired by the seller."
+        "category": {
+          "type": "string"
         },
         "sellingPrice": {
-          "type": "number",
-          "description": "The standard price at which the product is sold to customers."
+          "type": "number"
         },
         "stockQuantity": {
-          "type": "number",
-          "description": "The current number of units of this product available in inventory."
+          "type": "number"
         },
         "imageUrl": {
           "type": "string",
-          "description": "URL of the primary image representing the product.",
           "format": "uri"
         },
-        "createdAt": {
-          "type": "string",
-          "description": "Timestamp when the product record was created.",
-          "format": "date-time"
-        },
-        "updatedAt": {
-          "type": "string",
-          "description": "Timestamp when the product record was last updated.",
-          "format": "date-time"
+        "isPublished": {
+          "type": "boolean"
         }
       },
-      "required": [
-        "id",
-        "name",
-        "categoryId",
-        "purchasePrice",
-        "sellingPrice",
-        "stockQuantity",
-        "imageUrl",
-        "createdAt",
-        "updatedAt"
-      ]
-    },
-    "Customer": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Customer",
-      "type": "object",
-      "description": "Represents a customer who places orders through the public-facing store or whose details are recorded during POS sales.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the Customer entity."
-        },
-        "firstName": {
-          "type": "string",
-          "description": "The first name of the customer."
-        },
-        "lastName": {
-          "type": "string",
-          "description": "The last name of the customer."
-        },
-        "email": {
-          "type": "string",
-          "description": "The email address of the customer.",
-          "format": "email"
-        },
-        "phoneNumber": {
-          "type": "string",
-          "description": "The primary phone number of the customer."
-        },
-        "address": {
-          "type": "string",
-          "description": "The physical address of the customer, potentially for shipping."
-        },
-        "createdAt": {
-          "type": "string",
-          "description": "Timestamp when the customer record was created.",
-          "format": "date-time"
-        },
-        "updatedAt": {
-          "type": "string",
-          "description": "Timestamp when the customer record was last updated.",
-          "format": "date-time"
-        }
-      },
-      "required": [
-        "id",
-        "firstName",
-        "lastName",
-        "email",
-        "phoneNumber",
-        "address",
-        "createdAt",
-        "updatedAt"
-      ]
-    },
-    "PaymentMode": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "PaymentMode",
-      "type": "object",
-      "description": "Defines the different methods customers can use to pay for their purchases (e.g., Cash, Pi Network, Mobile Money).",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the PaymentMode entity."
-        },
-        "name": {
-          "type": "string",
-          "description": "The display name of the payment mode (e.g., 'Pi Network', 'Mobile Money - Orange', 'Cash')."
-        },
-        "type": {
-          "type": "string",
-          "description": "The general classification of the payment mode (e.g., 'Crypto', 'Mobile Money', 'Cash')."
-        }
-      },
-      "required": [
-        "id",
-        "name",
-        "type"
-      ]
-    },
-    "Sale": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Sale",
-      "type": "object",
-      "description": "Represents a single completed transaction, encompassing details from both POS sales and customer orders.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the Sale transaction."
-        },
-        "saleDate": {
-          "type": "string",
-          "description": "The date and time when the sale or order was finalized.",
-          "format": "date-time"
-        },
-        "totalAmount": {
-          "type": "number",
-          "description": "The total monetary value of all items in this sale."
-        },
-        "paymentModeId": {
-          "type": "string",
-          "description": "Reference to the PaymentMode used for this transaction. (Relationship: PaymentMode 1:N Sale)"
-        },
-        "sellerId": {
-          "type": "string",
-          "description": "Reference to the User (Seller) who processed this sale via POS. Can be null for direct customer orders. (Relationship: User 1:N Sale)"
-        },
-        "customerId": {
-          "type": "string",
-          "description": "Reference to the Customer who placed this order. Can be null for walk-in POS sales. (Relationship: Customer 1:N Sale)"
-        },
-        "status": {
-          "type": "string",
-          "description": "The current status of the sale or order. Expected values are 'pending', 'completed', or 'cancelled'."
-        },
-        "createdAt": {
-          "type": "string",
-          "description": "Timestamp when the sale record was created.",
-          "format": "date-time"
-        },
-        "updatedAt": {
-          "type": "string",
-          "description": "Timestamp when the sale record was last updated.",
-          "format": "date-time"
-        }
-      },
-      "required": [
-        "id",
-        "saleDate",
-        "totalAmount",
-        "paymentModeId",
-        "status",
-        "createdAt",
-        "updatedAt"
-      ]
-    },
-    "SaleItem": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "SaleItem",
-      "type": "object",
-      "description": "Represents a specific product and its quantity within a larger Sale transaction.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the SaleItem entity."
-        },
-        "saleId": {
-          "type": "string",
-          "description": "Reference to the Sale transaction this item belongs to. (Relationship: Sale 1:N SaleItem)"
-        },
-        "productId": {
-          "type": "string",
-          "description": "Reference to the Product that was sold. (Relationship: Product 1:N SaleItem)"
-        },
-        "quantity": {
-          "type": "number",
-          "description": "The number of units of the product sold in this particular item."
-        },
-        "priceAtSale": {
-          "type": "number",
-          "description": "The price of a single unit of the product recorded at the time of the sale, to ensure historical accuracy."
-        }
-      },
-      "required": [
-        "id",
-        "saleId",
-        "productId",
-        "quantity",
-        "priceAtSale"
-      ]
+      "required": ["id", "name", "sellingPrice", "stockQuantity"]
     }
   },
   "auth": {
@@ -307,156 +120,33 @@
     ]
   },
   "firestore": {
-    "structure": [
-      {
-        "path": "/users/{userId}",
-        "definition": {
-          "entityName": "User",
-          "schema": {
-            "$ref": "#/backend/entities/User"
-          },
-          "description": "Stores individual user profiles. Access is typically restricted to the user themselves (for their own document) and administrators. Note: The 'role' field here is for informational/UI purposes; actual authorization roles are determined by existence in `/admins` or `/sellers` collections.",
-          "params": [
-            {
-              "name": "userId",
-              "description": "The unique identifier of the user, corresponding to `request.auth.uid`."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/admins/{adminId}",
-        "definition": {
-          "entityName": "User",
-          "schema": {
-            "$ref": "#/backend/entities/User"
-          },
-          "description": "Dedicated collection for administrative role assignment. The existence of a document here (with `adminId` matching `request.auth.uid`) grants administrative privileges. This design ensures Authorization Independence (DBAC - Existence over Content).",
-          "params": [
-            {
-              "name": "adminId",
-              "description": "The unique identifier of the user with 'Admin' role, corresponding to `request.auth.uid`."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/sellers/{sellerId}",
-        "definition": {
-          "entityName": "User",
-          "schema": {
-            "$ref": "#/backend/entities/User"
-          },
-          "description": "Dedicated collection for seller role assignment. The existence of a document here (with `sellerId` matching `request.auth.uid`) grants seller privileges. This design ensures Authorization Independence (DBAC - Existence over Content).",
-          "params": [
-            {
-              "name": "sellerId",
-              "description": "The unique identifier of the user with 'Seller' role, corresponding to `request.auth.uid`."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/categories/{categoryId}",
-        "definition": {
-          "entityName": "Category",
-          "schema": {
-            "$ref": "#/backend/entities/Category"
-          },
-          "description": "Stores product categories. Publicly readable for customer browsing. Write access restricted to Admin and Seller roles.",
-          "params": [
-            {
-              "name": "categoryId",
-              "description": "The unique identifier for a product category."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/products/{productId}",
-        "definition": {
-          "entityName": "Product",
-          "schema": {
-            "$ref": "#/backend/entities/Product"
-          },
-          "description": "Stores product details and inventory. Publicly readable for customer browsing. Write access restricted to Admin and Seller roles.",
-          "params": [
-            {
-              "name": "productId",
-              "description": "The unique identifier for a product."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/customers/{customerId}",
-        "definition": {
-          "entityName": "Customer",
-          "schema": {
-            "$ref": "#/backend/entities/Customer"
-          },
-          "description": "Stores customer information. Read/Write access restricted to Admin and Seller roles.",
-          "params": [
-            {
-              "name": "customerId",
-              "description": "The unique identifier for a customer."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/paymentModes/{paymentModeId}",
-        "definition": {
-          "entityName": "PaymentMode",
-          "schema": {
-            "$ref": "#/backend/entities/PaymentMode"
-          },
-          "description": "Stores available payment methods. Readable by Admin and Seller roles. Write access restricted to Admin roles.",
-          "params": [
-            {
-              "name": "paymentModeId",
-              "description": "The unique identifier for a payment mode."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/sales/{saleId}",
-        "definition": {
-          "entityName": "Sale",
-          "schema": {
-            "$ref": "#/backend/entities/Sale"
-          },
-          "description": "Stores details of individual sales transactions or customer orders. Includes `sellerId` and `customerId` fields for authorization. Readable by Admin, the associated Seller, or the associated Customer. Write access for Admin and associated Seller.",
-          "params": [
-            {
-              "name": "saleId",
-              "description": "The unique identifier for a sales transaction."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/sales/{saleId}/saleItems/{saleItemId}",
-        "definition": {
-          "entityName": "SaleItem",
-          "schema": {
-            "$ref": "#/backend/entities/SaleItem"
-          },
-          "description": "Stores individual items within a sale transaction. Includes denormalized `sellerId` and `customerId` from the parent `Sale` for Authorization Independence, allowing direct security rule checks without a `get()` call to the parent. Readable by Admin, the associated Seller (via `sellerId`), or the associated Customer (via `customerId`). Write access for Admin and associated Seller.",
-          "params": [
-            {
-              "name": "saleId",
-              "description": "The unique identifier of the parent sales transaction."
-            },
-            {
-              "name": "saleItemId",
-              "description": "The unique identifier for a specific item within the sales transaction."
-            }
-          ]
-        }
-      }
-    ],
-    "reasoning": "The Firestore structure is designed following the core principles of Authorization Independence, Structural Segregation, and DBAC. Authentication and authorization are primarily driven by `request.auth.uid` and database-backed roles, eliminating the need for custom claims.\n\n**Authorization Independence (CRITICAL):**\n-   **Global Roles:** Instead of relying on a `role` field within the main `/users/{userId}` document (which would require a `get()` call to check), dedicated collections `/admins/{adminId}` and `/sellers/{sellerId}` are used. The *existence* of a document with `request.auth.uid` in these collections grants the respective role. This ensures atomic and highly performant authorization checks without `get()` calls.\n-   **Nested Data (`SaleItem`):** The `SaleItem` entity is a subcollection of `Sale` (`/sales/{saleId}/saleItems/{saleItemId}`). To avoid a `get()` call to the parent `Sale` document to determine who can access a `SaleItem` (e.g., the `sellerId` or `customerId` of the `Sale`), the critical authorization fields (`sellerId` and `customerId`) from the parent `Sale` are **denormalized** into each `SaleItem` document. This allows security rules on `saleItems` to directly check `request.resource.data.sellerId` or `request.resource.data.customerId`, maintaining authorization independence.\n\n**QAPs (Rules are not Filters):**\n-   **Publicly Accessible Data:** Collections like `/categories` and `/products` are structured for broad public read access, allowing unauthenticated users (customers) to browse. `list` queries on these collections will not be filtered by security rules but are inherently secure as they grant full public read.\n-   **Role-Based Access:** Collections like `/users`, `/customers`, and `/paymentModes` are restricted to Admin/Seller roles. Any `list` query on these collections by unauthorized users will be rejected at the collection level, not filtered. Access to individual documents within these collections (e.g., `customers/{customerId}`) is secured based on the caller's role.\n-   **User/Customer Specific Data:** The `/sales` collection includes `sellerId` and `customerId` fields directly in the document. This enables efficient and secure QAPs for `list` operations, allowing sellers to query `sales.where('sellerId', '==', request.auth.uid)` and customers to query `sales.where('customerId', '==', request.auth.uid)`. The security rules would ensure that `request.query.where` clauses match the user's `uid` for `sellerId` or `customerId` if not an admin. Similarly, for `saleItems`, the denormalized `sellerId` and `customerId` allow for secure queries based on these fields (e.g., for a specific sale `saleItems.where('sellerId', '==', request.auth.uid)`).\n\n**Structural Segregation:**\n-   Each collection generally serves a single security posture. For example, `products` are publicly readable for browsing, but write operations are restricted to `Admin` and `Seller` roles. There's no mixing of public posts and private drafts within the same collection. All `User` related data (profiles, roles) are logically separated into `users`, `admins`, `sellers` collections, making role-based access clear and easy to manage.\n\nThis design prioritizes robust security rules that are simple, efficient, and easy to debug by avoiding complex `get()` calls and ensuring that all necessary authorization context is available directly within the document being accessed or through simple existence checks on role collections."
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles."
+    },
+    "/admins/{adminId}": {
+      "schema": "User",
+      "description": "Admin role assignment."
+    },
+    "/sellers/{sellerId}": {
+      "schema": "User",
+      "description": "Seller role assignment."
+    },
+    "/products/{productId}": {
+      "schema": "Product",
+      "description": "Hardware products inventory."
+    },
+    "/orders/{orderId}": {
+      "schema": "Order",
+      "description": "Customer orders."
+    },
+    "/sales/{saleId}": {
+      "schema": "Order",
+      "description": "POS sales records."
+    },
+    "/carts/{userId}": {
+      "schema": "object",
+      "description": "User shopping carts."
+    }
   }
 }
