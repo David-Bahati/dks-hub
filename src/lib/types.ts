@@ -1,45 +1,52 @@
 
-import { Timestamp } from "firebase/firestore";
+export type AppUser = {
+  uid: string;
+  email: string;
+  name: string;
+  role: 'admin' | 'seller' | 'cashier' | 'customer';
+  createdAt?: any;
+};
 
-// The complete user object, combining Auth and Firestore data
-export interface AppUser {
-  uid: string;                 // From Firebase Auth
-  email: string | null;          // From Firebase Auth
-  name: string;                 // From Firestore
-  role: 'admin' | 'customer';    // From Firestore
-  createdAt: Timestamp;        // From Firestore
-}
-
-export type Category = 'keyboard' | 'mouse' | 'screen' | 'headset' | 'other';
-
-export interface Product {
+export type Product = {
   id: string;
   name: string;
   description: string;
-  category: Category;
-  // purchasePrice: number; // Let's simplify for now
+  category: string;
   sellingPrice: number;
   stockQuantity: number;
   imageUrl: string;
   isPublished: boolean;
-}
+  price: number; // For cart compatibility
+  image?: string; // For cart compatibility
+};
 
-export type PaymentMode = 'PI_NETWORK' | 'MOBILE_MONEY' | 'CASH';
-
-export interface SaleItem {
+export type OrderItem = {
   productId: string;
   productName: string;
   quantity: number;
   price: number;
-}
+};
 
-export interface Order {
+export type Order = {
   id: string;
   customer: string;
-  items: SaleItem[];
+  userId?: string;
+  items: OrderItem[];
   total: number;
-  status: 'En attente' | 'Terminé' | 'Annulé';
-  date: Timestamp; // Dates from Firestore are Timestamps
-}
+  status: 'pending' | 'completed' | 'cancelled' | 'Terminé' | 'En attente' | 'Annulée';
+  createdAt: any;
+  date?: any;
+};
 
-export const PI_CONVERSION_RATE = 314.159;
+export type Sale = {
+  id: string;
+  userId: string;
+  items: { productId: string; quantity: number; price: number }[];
+  totalAmount: number;
+  status: 'Payé' | 'En attente' | 'Annulée';
+  createdAt: any;
+};
+
+export type PaymentMode = "CASH" | "MOBILE_MONEY" | "PI_NETWORK";
+
+export type Category = 'keyboard' | 'mouse' | 'screen' | 'headset' | 'other';

@@ -4,7 +4,8 @@
 import { Navbar } from "@/components/layout/Navbar";
 import { useState, useRef } from "react";
 import { MOCK_PRODUCTS } from "@/lib/mock-data";
-import { Product, PaymentMode, PI_CONVERSION_RATE } from "@/lib/types";
+import { Product, PaymentMode } from "@/lib/types";
+import { PI_CONVERSION_RATE } from "@/lib/constants";
 import { 
   Card, 
   CardContent, 
@@ -87,7 +88,7 @@ export default function POS() {
     }));
   };
 
-  const total = cart.reduce((acc, item) => acc + (item.sellingPrice * item.quantity), 0);
+  const total = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
 
   const handleCheckout = () => {
     if (cart.length === 0) return;
@@ -147,14 +148,14 @@ export default function POS() {
                 onClick={() => addToCart(product)}
               >
                 <div className="aspect-square relative overflow-hidden rounded-t-lg">
-                  <Image src={product.imageUrl} alt={product.name} fill className="object-cover group-hover:scale-105 transition-transform" />
+                  <Image src={product.image} alt={product.name} fill className="object-cover group-hover:scale-105 transition-transform" />
                   <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-sm px-2 py-1 rounded-md text-xs font-bold text-accent">
-                    {product.stockQuantity} en stock
+                    {product.stock} en stock
                   </div>
                 </div>
                 <CardContent className="p-3">
                   <h3 className="font-medium text-sm line-clamp-1">{product.name}</h3>
-                  <p className="text-accent font-bold mt-1">${product.sellingPrice.toFixed(2)}</p>
+                  <p className="text-accent font-bold mt-1">${product.price.toFixed(2)}</p>
                 </CardContent>
               </Card>
             ))}
@@ -184,7 +185,7 @@ export default function POS() {
                     <div key={item.id} className="p-4 flex items-center justify-between group">
                       <div className="flex-1">
                         <h4 className="text-sm font-medium">{item.name}</h4>
-                        <p className="text-xs text-muted-foreground">${item.sellingPrice.toFixed(2)} x {item.quantity}</p>
+                        <p className="text-xs text-muted-foreground">${item.price.toFixed(2)} x {item.quantity}</p>
                       </div>
                       <div className="flex items-center gap-3">
                         <div className="flex items-center gap-2 bg-white/5 rounded-lg px-2 py-1">
@@ -295,7 +296,7 @@ export default function POS() {
               {lastTransaction?.items.map((item, idx) => (
                 <div key={idx} className="flex justify-between">
                   <span>{item.quantity}x {item.name.substring(0, 20)}</span>
-                  <span>${(item.sellingPrice * item.quantity).toFixed(2)}</span>
+                  <span>${(item.price * item.quantity).toFixed(2)}</span>
                 </div>
               ))}
             </div>
