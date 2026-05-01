@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -88,13 +89,6 @@ export default function LoginPage() {
             updatedAt: serverTimestamp(),
           }, { merge: true });
 
-          const roleCollection = testUser.role.toLowerCase() + 's';
-          await setDoc(doc(firestore, roleCollection, uid), { 
-            id: uid, 
-            role: testUser.role.toLowerCase(),
-            updatedAt: serverTimestamp() 
-          }, { merge: true });
-
           await signOut(auth);
         }
       }
@@ -122,78 +116,92 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-background relative p-4 overflow-hidden">
-      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/10 rounded-full blur-[120px] -z-10" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-accent/10 rounded-full blur-[120px] -z-10" />
+      {/* Background Decorative Effects */}
+      <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-primary/5 rounded-full blur-[140px] -z-10 animate-pulse" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-accent/5 rounded-full blur-[140px] -z-10 animate-pulse delay-1000" />
 
-      <Link href="/" className="absolute top-6 left-6">
-        <Button variant="outline" className="h-12 w-12 rounded-2xl p-0 border-white/10 hover:bg-accent/10 hover:text-accent transition-all backdrop-blur-xl bg-white/5">
+      <Link href="/" className="absolute top-8 left-8">
+        <Button variant="ghost" className="h-12 w-12 rounded-2xl border border-white/5 hover:border-accent/30 hover:bg-accent/10 hover:text-accent transition-all backdrop-blur-xl bg-white/5">
           <Home size={20} />
         </Button>
       </Link>
       
-      <div className="w-full max-sm:max-w-[320px] max-w-sm">
-        <div className="text-center mb-10">
-          <Logo size="lg" className="justify-center mb-6" />
-          <Badge className="mb-4 bg-white/5 text-accent border-white/10 px-3 py-1 text-[10px] font-black uppercase tracking-widest">
+      <div className="w-full max-w-sm space-y-12">
+        <div className="text-center">
+          <Logo size="lg" className="justify-center mb-10 transition-transform hover:scale-105 duration-500" />
+          <Badge className="mb-6 bg-white/5 text-accent border-white/10 px-4 py-1.5 text-[10px] font-black uppercase tracking-[0.2em] backdrop-blur-md">
             <Sparkles className="w-3 h-3 mr-2" />
-            Accès Sécurisé
+            Accès Sécurisé Premium
           </Badge>
-          <h1 className="text-4xl font-black font-headline tracking-tighter uppercase italic">Connexion</h1>
-          <p className="text-muted-foreground mt-2 text-sm">Gérez vos achats ou votre espace pro.</p>
+          <h1 className="text-4xl md:text-5xl font-black font-headline tracking-tighter uppercase italic leading-none">Connexion</h1>
+          <p className="text-muted-foreground mt-4 text-sm font-light uppercase tracking-widest opacity-60">Gérez votre univers technologique</p>
         </div>
 
-        <form onSubmit={handleLogin} className="space-y-4">
-          <div className="relative">
-            <Mail className="absolute left-5 top-1/2 -translate-y-1/2 text-muted-foreground" size={20} />
-            <Input 
-              type="email" 
-              placeholder="Adresse email" 
-              className="h-14 pl-14 rounded-2xl bg-card/60 border-white/10 focus:border-accent text-base" 
-              value={email} 
-              onChange={(e) => setEmail(e.target.value)} 
-              disabled={isLoading} 
-            />
-          </div>
-          <div className="relative">
-            <Lock className="absolute left-5 top-1/2 -translate-y-1/2 text-muted-foreground" size={20} />
-            <Input 
-              type="password" 
-              placeholder="Mot de passe" 
-              className="h-14 pl-14 rounded-2xl bg-card/60 border-white/10 focus:border-accent text-base" 
-              value={password} 
-              onChange={(e) => setPassword(e.target.value)} 
-              disabled={isLoading} 
-            />
-          </div>
-          <Button type="submit" className="w-full h-16 bg-accent text-accent-foreground font-black rounded-2xl neon-glow gap-3 uppercase italic text-lg shadow-lg hover:shadow-accent/20 transition-all" disabled={isLoading}>
-            {isLoading ? <Loader2 className="animate-spin" /> : "Se connecter"}
-            {!isLoading && <ArrowRight size={20}/>}
-          </Button>
-        </form>
+        <div className="p-8 rounded-[2.5rem] bg-card/40 backdrop-blur-3xl border border-white/10 shadow-2xl relative overflow-hidden group">
+          {/* Subtle light effect in corner */}
+          <div className="absolute -top-24 -right-24 w-48 h-48 bg-accent/10 rounded-full blur-3xl group-hover:bg-accent/20 transition-all duration-700" />
+          
+          <form onSubmit={handleLogin} className="space-y-5 relative z-10">
+            <div className="space-y-4">
+              <div className="relative group/input">
+                <Mail className="absolute left-5 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within/input:text-accent transition-colors" size={18} />
+                <Input 
+                  type="email" 
+                  placeholder="Adresse email" 
+                  className="h-14 pl-14 rounded-2xl bg-background/50 border-white/5 focus:border-accent focus:ring-4 focus:ring-accent/5 text-sm transition-all duration-300" 
+                  value={email} 
+                  onChange={(e) => setEmail(e.target.value)} 
+                  disabled={isLoading} 
+                />
+              </div>
+              <div className="relative group/input">
+                <Lock className="absolute left-5 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within/input:text-accent transition-colors" size={18} />
+                <Input 
+                  type="password" 
+                  placeholder="Mot de passe" 
+                  className="h-14 pl-14 rounded-2xl bg-background/50 border-white/5 focus:border-accent focus:ring-4 focus:ring-accent/5 text-sm transition-all duration-300" 
+                  value={password} 
+                  onChange={(e) => setPassword(e.target.value)} 
+                  disabled={isLoading} 
+                />
+              </div>
+            </div>
 
-        <div className="mt-8 space-y-6">
+            <Button type="submit" className="w-full h-16 bg-accent text-accent-foreground font-black rounded-2xl neon-glow gap-3 uppercase italic text-lg shadow-xl hover:shadow-accent/30 hover:scale-[1.02] active:scale-95 transition-all duration-500 mt-4" disabled={isLoading}>
+              {isLoading ? <Loader2 className="animate-spin" /> : "Se connecter"}
+              {!isLoading && <ArrowRight size={20}/>}
+            </Button>
+          </form>
+        </div>
+
+        <div className="space-y-10">
             <div className="text-center">
-              <p className="text-xs text-muted-foreground font-bold uppercase tracking-wider">
-                Pas encore de compte ?{" "}
-                <Link href="/register" className="text-accent hover:underline ml-1">
+              <p className="text-xs text-muted-foreground font-bold uppercase tracking-[0.2em] opacity-40">
+                Pas encore membre ?{" "}
+                <Link href="/register" className="text-accent hover:underline ml-2 opacity-100">
                   Créer un compte
                 </Link>
               </p>
             </div>
 
-            <div className="pt-8 border-t border-white/5">
-                <div className="flex flex-col gap-2 mb-4">
-                    <p className="text-[10px] text-center text-muted-foreground uppercase font-black tracking-widest">Accès rapide (Staff) :</p>
-                    <div className="flex flex-wrap justify-center gap-2">
-                        <Button variant="ghost" className="text-[9px] h-7 px-2 border border-white/5 uppercase font-bold" onClick={() => setTestAccount('admin@dks.com', 'admin123')}>Admin</Button>
-                        <Button variant="ghost" className="text-[9px] h-7 px-2 border border-white/5 uppercase font-bold" onClick={() => setTestAccount('vendeur@dks.com', 'vendeur123')}>Vendeur</Button>
-                        <Button variant="ghost" className="text-[9px] h-7 px-2 border border-white/5 uppercase font-bold" onClick={() => setTestAccount('caissier@dks.com', 'caissier123')}>Caissier</Button>
-                    </div>
+            <div className="pt-10 border-t border-white/5 flex flex-col items-center gap-6">
+                <p className="text-[10px] text-muted-foreground uppercase font-black tracking-[0.3em] opacity-30">Accès rapide Staff</p>
+                <div className="flex flex-wrap justify-center gap-3">
+                    {['admin', 'vendeur', 'caissier'].map((role) => (
+                        <Button 
+                            key={role}
+                            variant="ghost" 
+                            className="text-[9px] h-9 px-4 border border-white/5 rounded-xl uppercase font-black tracking-widest hover:bg-white/5 hover:border-white/20 transition-all" 
+                            onClick={() => setTestAccount(`${role}@dks.com`, `${role}123`)}
+                        >
+                            {role}
+                        </Button>
+                    ))}
                 </div>
                 
                 <Button 
-                    variant="outline" 
-                    className="w-full text-[9px] h-8 gap-2 border-dashed border-white/10 bg-white/5 uppercase font-black tracking-tighter" 
+                    variant="ghost" 
+                    className="text-[9px] h-8 gap-2 opacity-20 hover:opacity-100 transition-opacity uppercase font-black tracking-widest" 
                     onClick={setupTestAccounts}
                     disabled={isSettingUp}
                 >
