@@ -77,7 +77,7 @@ export function Navbar() {
                                     <Badge className="bg-accent/10 text-accent border-none w-fit mb-2 font-black text-[9px] uppercase tracking-widest">
                                         <Sparkles className="w-3 h-3 mr-2" /> Panier Premium
                                     </Badge>
-                                    <SheetTitle className="text-2xl font-black uppercase italic tracking-tighter">Votre Sélection</SheetTitle>
+                                    <SheetTitle className="text-xl font-black uppercase italic tracking-tighter">Votre Sélection</SheetTitle>
                                 </SheetHeader>
                                 
                                 <div className="flex-1 overflow-y-auto mt-6 space-y-4 px-8 custom-scrollbar">
@@ -97,7 +97,7 @@ export function Navbar() {
                                                     <Button 
                                                         variant="ghost" 
                                                         size="icon" 
-                                                        className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 h-8 w-8 -mr-2 transition-colors" 
+                                                        className="text-muted-foreground/30 hover:text-destructive hover:bg-destructive/10 h-7 w-7 -mr-2 transition-all duration-300" 
                                                         onClick={() => removeFromCart(item.id)}
                                                     >
                                                         <Trash2 size={14} />
@@ -108,8 +108,9 @@ export function Navbar() {
                                                         <Button 
                                                             variant="ghost" 
                                                             size="icon" 
-                                                            className="h-7 w-7 rounded-lg hover:bg-white/5 text-muted-foreground"
+                                                            className="h-7 w-7 rounded-lg hover:bg-white/5 text-muted-foreground disabled:opacity-20 disabled:cursor-not-allowed"
                                                             onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                                                            disabled={item.quantity <= 1}
                                                         >
                                                             <Minus size={12} />
                                                         </Button>
