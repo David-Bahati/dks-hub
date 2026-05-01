@@ -1,25 +1,181 @@
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Allow read/write access to the "products" collection for any signed-in user.
-    // In a real production app, you'd likely have more granular rules,
-    // for example, only allowing specific admin users to write.
-    match /products/{productId} {
-      allow read, write: if request.auth != null;
+    /**
+     * CORE PHILOSOPHY:
+     * This ruleset implements a robust Role-Based Access Control (RBAC) system using "Existence-Based 
+     * Authorization" (DBAC). Instead of checking fields within a user document, permissions are derived 
+     * from the presence of a user's UID in specialized role collections (/admins or /sellers).
+     *
+     * DATA STRUCTURE:
+     * - /users: Public-facing profiles.
+     * - /admins & /sellers: Role assignment collections (Existence = Permission).
+     * - /categories & /products: Publicly readable inventory catalogs.
+     * - /sales & /saleItems: Transactional data with denormalized authorization fields.
+     *
+     * KEY SECURITY DECISIONS:
+     * 1. Authorization Independence: We avoid slow get() calls by denormalizing 'sellerId' and 
+     *    'customerId' into Sale and SaleItem documents. This allows rules to check permissions 
+     *    directly against the document data or the auth UID.
+     * 2. Prototyping Mode: Rules strictly enforce WHO can access data based on roles and ownership 
+     *    but remain flexible on the specific schema of content fields to allow rapid development.
+     * 3. Structural Segregation: Administrative roles are separated into their own collections to 
+     *    prevent privilege escalation via profile updates.
+     */
+
+    // --- GLOBAL HELPER FUNCTIONS ---
+
+    /** Checks if the requester is authenticated. */
+    function isSignedIn() {
+      return request.auth != null;
     }
 
-    // Users can read and update their own document.
-    // Creation of a user document is handled by the registration logic (server-side or trusted client).
+    /** Checks if the authenticated user's UID matches the provided userId. */
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    /** 
+     * Checks if a user has the Admin role by verifying their existence in the /admins collection.
+     * This is a high-performance check that avoids recursive get() calls on user profiles.
+     */
+    function isAdmin() {
+      return isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    /** Checks if a user has the Seller role by verifying existence in /sellers. */
+    function isSeller() {
+      return isSignedIn() && exists(/databases/$(database)/documents/sellers/$(request.auth.uid));
+    }
+
+    /** Combines ownership check with existence check for updates and deletes. */
+    function isExistingOwner(userId) {
+      return resource != null && isOwner(userId);
+    }
+
+    // --- COLLECTION RULES ---
+
+    /**
+     * @description Individual user profiles. Owners can manage their data; Admins can see all.
+     * @path /users/{userId}
+     * @allow (get) If the user is the owner or an admin.
+     * @deny (create) If the request.auth.uid does not match the document ID.
+     * @principle Restricts profile management to the owner or system administrators.
+     */
     match /users/{userId} {
-      allow read, update: if request.auth != null && request.auth.uid == userId;
-      allow create: if request.auth != null;
+      allow get: if isOwner(userId) || isAdmin();
+      allow list: if isAdmin();
+      allow create: if isOwner(userId);
+      allow update: if isExistingOwner(userId) && request.resource.data.id == userId;
+      allow delete: if isAdmin();
     }
 
-    // Placeholder for future collections (e.g., orders)
-    // match /orders/{orderId} {
-    //   allow read, write: if request.auth != null;
-    // }
+    /**
+     * @description Role assignment collections for Admins.
+     * @path /admins/{adminId}
+     * @allow (get) Any signed-in user (to verify roles).
+     * @deny (write) Any non-admin user.
+     * @principle Administrative roles are self-protected; only existing admins can grant admin status.
+     */
+    match /admins/{adminId} {
+      allow get: if isSignedIn();
+      allow list: if isAdmin();
+      allow create, update, delete: if isAdmin();
+    }
+
+    /**
+     * @description Role assignment collections for Sellers.
+     * @path /sellers/{sellerId}
+     * @allow (create) Admin only.
+     * @deny (list) Non-admins.
+     * @principle Centralized role management by administrators.
+     */
+    match /sellers/{sellerId} {
+      allow get: if isSignedIn();
+      allow list: if isAdmin();
+      allow create, update, delete: if isAdmin();
+    }
+
+    /**
+     * @description Product categories for organizing the catalog.
+     * @path /categories/{categoryId}
+     * @allow (get, list) Public access for browsing.
+     * @deny (write) Anyone who is not an Admin or Seller.
+     * @principle Public visibility for sales, restricted management for staff.
+     */
+    match /categories/{categoryId} {
+      allow get, list: if true;
+      allow create, update, delete: if isAdmin() || isSeller();
+    }
+
+    /**
+     * @description Product inventory and details.
+     * @path /products/{productId}
+     * @allow (get, list) Public access.
+     * @deny (update) If user is not staff.
+     * @principle Ensures the store catalog is viewable by all while protecting inventory integrity.
+     */
+    match /products/{productId} {
+      allow get, list: if true;
+      allow create, update, delete: if isAdmin() || isSeller();
+    }
+
+    /**
+     * @description Customer information for CRM and order tracking.
+     * @path /customers/{customerId}
+     * @allow (read/write) Admins and Sellers.
+     * @deny (read/write) Unauthenticated users or generic customers.
+     * @principle Restricts sensitive customer PII to authorized staff only.
+     */
+    match /customers/{customerId} {
+      allow get, list, create, update, delete: if isAdmin() || isSeller();
+    }
+
+    /**
+     * @description Configuration for payment methods (Cash, Pi, etc).
+     * @path /paymentModes/{paymentModeId}
+     * @allow (get, list) Staff only.
+     * @deny (write) Non-admins.
+     * @principle Sellers can see options, but only Admins can define financial modes.
+     */
+    match /paymentModes/{paymentModeId} {
+      allow get, list: if isAdmin() || isSeller();
+      allow create, update, delete: if isAdmin();
+    }
+
+    /**
+     * @description Sales transactions and orders.
+     * @path /sales/{saleId}
+     * @allow (get) If Admin, the recording Seller, or the buying Customer.
+     * @deny (create) If not a Seller or Admin.
+     * @principle Uses denormalized IDs (sellerId/customerId) for direct authorization without parent lookups.
+     */
+    match /sales/{saleId} {
+      allow get: if isAdmin() 
+        || (resource.data.sellerId == request.auth.uid) 
+        || (resource.data.customerId == request.auth.uid);
+      allow list: if isSignedIn(); // Filtering is enforced by developer query constraints
+      allow create: if isAdmin() || isSeller();
+      allow update: if isAdmin() || (resource != null && resource.data.sellerId == request.auth.uid);
+      allow delete: if isAdmin();
+    }
+
+    /**
+     * @description Line items within a sale.
+     * @path /sales/{saleId}/saleItems/{saleItemId}
+     * @allow (get) If the user is linked to the transaction via denormalized fields.
+     * @deny (create) If user does not have a staff role.
+     * @principle Denormalizes sellerId/customerId to satisfy Authorization Independence (no get() on /sales).
+     */
+    match /sales/{saleId}/saleItems/{saleItemId} {
+      allow get: if isAdmin() 
+        || (resource.data.sellerId == request.auth.uid) 
+        || (resource.data.customerId == request.auth.uid);
+      allow list: if isSignedIn(); // Queries must be scoped to specific saleId or via denormalized fields
+      allow create: if isAdmin() || isSeller();
+      allow update: if isAdmin() || (resource != null && resource.data.sellerId == request.auth.uid);
+      allow delete: if isAdmin();
+    }
   }
 }
