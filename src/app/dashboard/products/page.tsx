@@ -40,8 +40,6 @@ import { useToast } from '@/hooks/use-toast';
 import { useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
 import Link from 'next/link';
 
-const CATEGORIES = ["keyboard", "mouse", "screen", "headset", "other"];
-
 function ProductsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -50,6 +48,9 @@ function ProductsPage() {
 
   const productsQuery = useMemoFirebase(() => collection(db, "products"), []);
   const { data: products, isLoading } = useCollection<Product>(productsQuery);
+
+  const categoriesQuery = useMemoFirebase(() => collection(db, "categories"), []);
+  const { data: categories } = useCollection(categoriesQuery);
 
   const openModal = (product: Product | null = null) => {
     setEditingProduct(product);
@@ -224,14 +225,19 @@ function ProductsPage() {
                 </div>
                 <div className="space-y-2">
                     <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Catégorie technique</Label>
-                    <Select name="category" defaultValue={editingProduct?.category || "other"}>
+                    <Select name="category" defaultValue={editingProduct?.category}>
                         <SelectTrigger className="h-12 bg-background/50 border-white/10 rounded-xl">
                             <SelectValue placeholder="Choisir une catégorie" />
                         </SelectTrigger>
                         <SelectContent className="bg-card border-white/10">
-                            {CATEGORIES.map(cat => (
-                                <SelectItem key={cat} value={cat} className="uppercase font-bold text-xs">{cat}</SelectItem>
+                            {categories?.map((cat: any) => (
+                                <SelectItem key={cat.id} value={cat.name} className="uppercase font-bold text-xs">
+                                  {cat.icon} {cat.name}
+                                </SelectItem>
                             ))}
+                            {(!categories || categories.length === 0) && (
+                                <SelectItem value="default" disabled>Créez des catégories d'abord</SelectItem>
+                            )}
                         </SelectContent>
                     </Select>
                 </div>

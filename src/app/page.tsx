@@ -1,6 +1,7 @@
+
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Navbar } from '@/components/layout/Navbar';
 import { Button } from '@/components/ui/button';
 import { Product } from '@/lib/types';
@@ -22,7 +23,8 @@ import {
   Twitter,
   Linkedin,
   Facebook,
-  Cpu
+  Cpu,
+  Loader2
 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -30,6 +32,8 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Logo } from '@/components/ui/Logo';
+import { useCollection, useMemoFirebase } from '@/firebase';
+import { cn } from '@/lib/utils';
 
 const TESTIMONIALS = [
   {
@@ -67,13 +71,17 @@ const BRANDS = [
 export default function LandingPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const { addToCart } = useCart();
+
+  const categoriesQuery = useMemoFirebase(() => collection(db, "categories"), []);
+  const { data: categories } = useCollection(categoriesQuery);
 
   useEffect(() => {
     async function fetchPublishedProducts() {
       try {
-        const q = query(collection(db, "products"), where("isPublished", "==", true), firestoreLimit(8));
+        const q = query(collection(db, "products"), where("isPublished", "==", true), firestoreLimit(20));
         const snapshot = await getDocs(q);
         const productsList = snapshot.docs.map(doc => ({
           id: doc.id,
@@ -89,10 +97,14 @@ export default function LandingPage() {
     fetchPublishedProducts();
   }, []);
 
-  const filteredProducts = products.filter(p => 
-    p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.category.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredProducts = useMemo(() => {
+    return products.filter(p => {
+      const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                            p.category.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesCategory = selectedCategory ? p.category === selectedCategory : true;
+      return matchesSearch && matchesCategory;
+    });
+  }, [products, searchTerm, selectedCategory]);
 
   return (
     <div className="min-h-screen bg-background text-foreground selection:bg-primary/30 scroll-smooth">
@@ -168,7 +180,7 @@ export default function LandingPage() {
 
       {/* Shop Section */}
       <section id="shop" className="container max-w-7xl mx-auto px-6 py-40">
-        <div className="flex flex-col lg:flex-row justify-between items-end gap-12 mb-24">
+        <div className="flex flex-col lg:flex-row justify-between items-end gap-12 mb-16">
           <div className="max-w-2xl">
             <h2 className="text-5xl md:text-7xl font-black uppercase italic tracking-tighter mb-6">
               Derniers <span className="text-accent">Arrivages</span>
@@ -187,6 +199,34 @@ export default function LandingPage() {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
+        </div>
+
+        {/* Category Filter Bar */}
+        <div className="flex items-center gap-3 overflow-x-auto pb-8 mb-8 no-scrollbar">
+          <Button 
+            variant="ghost" 
+            onClick={() => setSelectedCategory(null)}
+            className={cn(
+                "rounded-xl h-12 px-6 font-black uppercase italic text-xs tracking-widest border border-white/5 whitespace-nowrap transition-all",
+                !selectedCategory ? "bg-accent text-black border-accent" : "bg-white/5 text-muted-foreground hover:bg-white/10"
+            )}
+          >
+            Tous les produits
+          </Button>
+          {categories?.map((cat: any) => (
+            <Button 
+              key={cat.id}
+              variant="ghost" 
+              onClick={() => setSelectedCategory(cat.name)}
+              className={cn(
+                  "rounded-xl h-12 px-6 font-black uppercase italic text-xs tracking-widest border border-white/5 whitespace-nowrap transition-all gap-2",
+                  selectedCategory === cat.name ? "bg-accent text-black border-accent" : "bg-white/5 text-muted-foreground hover:bg-white/10"
+              )}
+            >
+              <span>{cat.icon}</span>
+              {cat.name}
+            </Button>
+          ))}
         </div>
 
         {loading ? (
@@ -213,11 +253,6 @@ export default function LandingPage() {
                     <Badge className="bg-black/60 backdrop-blur-md border-none uppercase text-[9px] font-black px-4 py-1.5 tracking-widest w-fit">
                       {product.category}
                     </Badge>
-                    {(idx === 0 || idx === 3) && (
-                      <Badge className="bg-accent text-black border-none uppercase text-[9px] font-black px-4 py-1.5 tracking-widest w-fit">
-                        Nouveau
-                      </Badge>
-                    )}
                   </div>
                 </div>
                 
@@ -247,7 +282,7 @@ export default function LandingPage() {
               </Card>
             )) : (
               <div className="col-span-full py-32 text-center opacity-30">
-                 <p className="text-2xl font-black uppercase italic">Aucun résultat trouvé.</p>
+                 <p className="text-2xl font-black uppercase italic">Aucun produit trouvé dans cette catégorie.</p>
               </div>
             )}
           </div>
