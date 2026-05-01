@@ -9,8 +9,8 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Lock, ArrowRight, Home, Mail, Loader2, ShieldCheck, Sparkles } from 'lucide-react';
 import { initializeFirebase } from '@/firebase';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc, serverTimestamp, getDoc } from 'firebase/firestore';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from 'firebase/auth';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { Badge } from '@/components/ui/badge';
 
 export default function LoginPage() {
@@ -36,11 +36,8 @@ export default function LoginPage() {
     
     setIsLoading(true);
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      
+      await signInWithEmailAndPassword(auth, email, password);
       toast({ title: 'Connexion réussie', description: 'Ravi de vous revoir !' });
-      
-      // On redirige tout le monde vers le dashboard qui gère l'affichage par rôle
       router.push('/dashboard');
     } catch (error: any) {
       console.error(error);
@@ -57,50 +54,55 @@ export default function LoginPage() {
   const setupTestAccounts = async () => {
     setIsSettingUp(true);
     const testUsers = [
-      { email: 'admin@dks.com', password: 'admin123', name: 'Admin DKS', role: 'admin' },
-      { email: 'vendeur@dks.com', password: 'vendeur123', name: 'Vendeur DKS', role: 'seller' },
-      { email: 'caissier@dks.com', password: 'caissier123', name: 'Caissier DKS', role: 'cashier' },
+      { email: 'admin@dks.com', password: 'admin123', name: 'Admin DKS', role: 'Admin' },
+      { email: 'vendeur@dks.com', password: 'vendeur123', name: 'Vendeur DKS', role: 'Seller' },
+      { email: 'caissier@dks.com', password: 'caissier123', name: 'Caissier DKS', role: 'Cashier' },
     ];
 
     try {
-      for (const user of testUsers) {
+      // On se déconnecte d'abord pour être sûr de pouvoir créer/connecter les comptes de test
+      await signOut(auth);
+
+      for (const testUser of testUsers) {
         let uid;
         try {
-          try {
-            const userCredential = await createUserWithEmailAndPassword(auth, user.email, user.password);
+          // Tenter de créer l'utilisateur
+          const userCredential = await createUserWithEmailAndPassword(auth, testUser.email, testUser.password);
+          uid = userCredential.user.uid;
+        } catch (e: any) {
+          if (e.code === 'auth/email-already-in-use') {
+            // Si déjà existant, on se connecte pour obtenir son UID
+            const userCredential = await signInWithEmailAndPassword(auth, testUser.email, testUser.password);
             uid = userCredential.user.uid;
-          } catch (e: any) {
-            if (e.code === 'auth/email-already-in-use') {
-              const userCredential = await signInWithEmailAndPassword(auth, user.email, user.password);
-              uid = userCredential.user.uid;
-            } else {
-              throw e;
-            }
+          } else {
+            throw e;
           }
+        }
 
-          if (uid) {
-            await setDoc(doc(firestore, 'users', uid), {
-              id: uid,
-              email: user.email,
-              firstName: user.name.split(' ')[0],
-              lastName: user.name.split(' ')[1] || 'DKS',
-              displayName: user.name,
-              role: user.role.charAt(0).toUpperCase() + user.role.slice(1),
-              createdAt: serverTimestamp(),
-              updatedAt: serverTimestamp(),
-            }, { merge: true });
+        if (uid) {
+          // Création du document profil principal
+          await setDoc(doc(firestore, 'users', uid), {
+            id: uid,
+            email: testUser.email,
+            firstName: testUser.name.split(' ')[0],
+            lastName: testUser.name.split(' ')[1] || 'DKS',
+            displayName: testUser.name,
+            name: testUser.name,
+            role: testUser.role,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+          }, { merge: true });
 
-            const roleCollection = user.role === 'admin' ? 'admins' : 'sellers';
-            if (user.role !== 'customer') {
-               await setDoc(doc(firestore, roleCollection, uid), { 
-                 id: uid, 
-                 role: user.role,
-                 updatedAt: serverTimestamp() 
-               }, { merge: true });
-            }
-          }
-        } catch (innerError: any) {
-          console.error(`Error setting up ${user.email}:`, innerError);
+          // Injection dans la collection de rôle spécifique (admins, sellers, cashiers)
+          const roleCollection = testUser.role.toLowerCase() + 's';
+          await setDoc(doc(firestore, roleCollection, uid), { 
+            id: uid, 
+            role: testUser.role.toLowerCase(),
+            updatedAt: serverTimestamp() 
+          }, { merge: true });
+
+          // Déconnexion après chaque injection pour le suivant
+          await signOut(auth);
         }
       }
       
@@ -111,8 +113,8 @@ export default function LoginPage() {
     } catch (error: any) {
       console.error("Setup error:", error);
       toast({
-        title: "Erreur critique",
-        description: error.message || "Une erreur est survenue lors de l'initialisation.",
+        title: "Erreur lors de la réinitialisation",
+        description: error.message || "Vérifiez votre connexion ou les règles de sécurité.",
         variant: "destructive",
       });
     } finally {

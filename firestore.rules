@@ -21,8 +21,12 @@ service cloud.firestore {
       return isSignedIn() && exists(/databases/$(database)/documents/sellers/$(request.auth.uid));
     }
 
+    function isCashier() {
+      return isSignedIn() && exists(/databases/$(database)/documents/cashiers/$(request.auth.uid));
+    }
+
     function isStaff() {
-      return isAdmin() || isSeller();
+      return isAdmin() || isSeller() || isCashier();
     }
 
     // --- COLLECTION RULES ---
@@ -47,6 +51,12 @@ service cloud.firestore {
       allow write: if isOwner(sellerId) || isAdmin();
     }
 
+    match /cashiers/{cashierId} {
+      allow get: if isSignedIn();
+      allow list: if isAdmin();
+      allow write: if isOwner(cashierId) || isAdmin();
+    }
+
     match /categories/{categoryId} {
       allow read: if true;
       allow write: if isStaff();
@@ -63,9 +73,9 @@ service cloud.firestore {
 
     match /orders/{orderId} {
       allow create: if isSignedIn();
-      // Un client peut lister ses propres commandes si sa requête est filtrée par userId
-      allow list: if isSignedIn() && (isStaff() || resource.data.userId == request.auth.uid);
       allow get: if isSignedIn() && (isStaff() || resource.data.userId == request.auth.uid);
+      // Correction cruciale pour le listage des commandes
+      allow list: if isSignedIn() && (isStaff() || request.auth.uid == resource.data.userId);
       allow update: if isStaff();
       allow delete: if isAdmin();
     }

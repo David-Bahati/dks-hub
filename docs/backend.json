@@ -132,6 +132,10 @@
       "schema": "User",
       "description": "Seller role assignment."
     },
+    "/cashiers/{cashierId}": {
+      "schema": "User",
+      "description": "Cashier role assignment."
+    },
     "/products/{productId}": {
       "schema": "Product",
       "description": "Hardware products inventory."
