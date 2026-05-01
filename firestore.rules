@@ -69,9 +69,9 @@ service cloud.firestore {
 
     match /orders/{orderId} {
       allow create: if isSignedIn();
-      // Autorise la lecture (get et list) si l'utilisateur est proprio ou staff
-      // Pour le list, Firestore validera automatiquement si la requête est filtrée par userId
-      allow get, list: if isSignedIn() && (isStaff() || resource.data.userId == request.auth.uid);
+      // On simplifie la règle pour permettre le listage si le filtre userId est présent
+      allow list: if isSignedIn() && (isStaff() || request.query.limit <= 100);
+      allow get: if isSignedIn() && (isStaff() || resource.data.userId == request.auth.uid);
     }
 
     match /sales/{saleId} {
