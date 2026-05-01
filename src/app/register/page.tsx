@@ -11,6 +11,7 @@ import { User, Mail, Lock, ArrowRight, Home, Loader2, Sparkles } from 'lucide-re
 import { initializeFirebase } from '@/firebase';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { Badge } from '@/components/ui/badge';
 
 export default function RegisterPage() {
   const [name, setName] = useState('');
@@ -69,7 +70,8 @@ export default function RegisterPage() {
         description: 'Votre compte a été créé avec succès. Bon shopping !',
       });
 
-      router.push('/');
+      // Redirection vers le dashboard pour voir le Hub Client
+      router.push('/dashboard');
     } catch (error: any) {
       console.error(error);
       let message = "Une erreur est survenue lors de l'inscription.";
@@ -174,5 +176,3 @@ export default function RegisterPage() {
     </div>
   );
 }
-
-import { Badge } from '@/components/ui/badge';

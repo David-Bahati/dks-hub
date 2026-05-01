@@ -37,19 +37,11 @@ export default function LoginPage() {
     setIsLoading(true);
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const uid = userCredential.user.uid;
       
-      // Vérifier le rôle pour rediriger correctement
-      const userDoc = await getDoc(doc(firestore, 'users', uid));
-      const role = userDoc.data()?.role || 'customer';
-
       toast({ title: 'Connexion réussie', description: 'Ravi de vous revoir !' });
       
-      if (role === 'customer') {
-        router.push('/');
-      } else {
-        router.push('/dashboard');
-      }
+      // On redirige tout le monde vers le dashboard qui gère l'affichage par rôle
+      router.push('/dashboard');
     } catch (error: any) {
       console.error(error);
       toast({
