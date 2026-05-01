@@ -69,9 +69,10 @@ service cloud.firestore {
 
     match /orders/{orderId} {
       allow create: if isSignedIn();
-      // On simplifie la règle pour permettre le listage si le filtre userId est présent
-      allow list: if isSignedIn() && (isStaff() || request.query.limit <= 100);
-      allow get: if isSignedIn() && (isStaff() || resource.data.userId == request.auth.uid);
+      // Simplification majeure : read (get + list) autorisé si c'est le propriétaire ou du staff
+      allow read: if isSignedIn() && (isStaff() || resource.data.userId == request.auth.uid);
+      allow update: if isStaff();
+      allow delete: if isAdmin();
     }
 
     match /sales/{saleId} {

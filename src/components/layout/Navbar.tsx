@@ -14,7 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { Logo } from '@/components/ui/Logo';
 
 export function Navbar() {
-    const { user, isLoading } = useAuth();
+    const { user, isLoading: authLoading } = useAuth();
     const { cartItems, cartCount, totalPrice, removeFromCart } = useCart();
     const router = useRouter();
     const pathname = usePathname();
@@ -28,17 +28,13 @@ export function Navbar() {
         }
     };
 
-    const isAdmin = user?.role === 'Admin';
-    const isSeller = user?.role === 'Seller';
-    const isCashier = user?.role === 'Cashier';
-    const isStaff = isAdmin || isSeller || isCashier;
+    const isStaff = user?.role === 'Admin' || user?.role === 'Seller' || user?.role === 'Cashier';
 
     const navItems = [
         { label: 'Dashboard', href: '/dashboard', show: isStaff, icon: LayoutDashboard },
-        { label: 'Caisse', href: '/pos', show: isAdmin || isCashier, icon: ShoppingCart },
-        { label: 'Utilisateurs', href: '/dashboard/users', show: isAdmin, icon: Users },
+        { label: 'Caisse', href: '/pos', show: user?.role === 'Admin' || user?.role === 'Cashier', icon: ShoppingCart },
+        { label: 'Équipe', href: '/dashboard/users', show: user?.role === 'Admin', icon: Users },
         { label: 'Mon Hub', href: '/dashboard', show: !isStaff && !!user, icon: User },
-        { label: 'Catalogue', href: '#shop', show: pathname === '/', icon: Package },
         { label: 'Boutique', href: '/', show: pathname !== '/', icon: Home },
     ];
 
@@ -135,7 +131,7 @@ export function Navbar() {
                         </Sheet>
                     )}
 
-                    {isLoading ? (
+                    {authLoading ? (
                         <Loader2 className="animate-spin h-5 w-5 text-muted-foreground" />
                     ) : user ? (
                         <div className="flex items-center gap-3">

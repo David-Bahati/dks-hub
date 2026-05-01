@@ -56,7 +56,7 @@ export function Logo({ className, size = "md", showText = false }: LogoProps) {
           "font-black tracking-tighter uppercase italic leading-none text-foreground",
           textSizes[size]
         )}>
-          Double King <span className="text-accent font-light">Shop</span>
+          DKS <span className="text-accent font-light not-italic">Shop</span>
         </span>
       )}
     </div>
