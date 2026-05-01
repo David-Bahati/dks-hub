@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import withAuth from '@/components/auth/withAuth';
 import { Navbar } from "@/components/layout/Navbar";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { 
   Table, 
   TableBody, 
