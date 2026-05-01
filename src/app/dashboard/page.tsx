@@ -24,6 +24,7 @@ import {
   ArrowRight,
   Clock,
   Sparkles,
+  Tags,
   Search,
   Plus
 } from "lucide-react";
@@ -59,6 +60,7 @@ import { Logo } from "@/components/ui/Logo";
 const adminNavLinks = [
   { href: "/dashboard", icon: LineChart, label: "Aperçu" },
   { href: "/dashboard/products", icon: Package, label: "Produits" },
+  { href: "/dashboard/categories", icon: Tags, label: "Catégories" },
   { href: "/dashboard/orders", icon: ShoppingBag, label: "Commandes" },
   { href: "/dashboard/customers", icon: Users, label: "Clients" },
   { href: "/dashboard/users", icon: UsersRound, label: "Équipe" },
