@@ -27,17 +27,13 @@ service cloud.firestore {
       return isSignedIn() && exists(/databases/$(database)/documents/sellers/$(request.auth.uid));
     }
 
-    function isExistingOwner(userId) {
-      return resource != null && isOwner(userId);
-    }
-
     // --- COLLECTION RULES ---
 
     match /users/{userId} {
       allow get: if isOwner(userId) || isAdmin() || isSeller();
       allow list: if isAdmin() || isSeller();
       allow create: if isOwner(userId);
-      allow update: if isExistingOwner(userId) || isAdmin();
+      allow update: if isOwner(userId) || isAdmin();
       allow delete: if isAdmin();
     }
 
@@ -52,7 +48,7 @@ service cloud.firestore {
     match /sellers/{sellerId} {
       allow get: if isSignedIn();
       allow list: if isAdmin();
-      // Allow self-creation for bootstrapping or admin assignment
+      // Allow self-creation for bootstrapping
       allow create: if isOwner(sellerId) || isAdmin();
       allow update, delete: if isAdmin();
     }
@@ -76,32 +72,29 @@ service cloud.firestore {
       allow create, update, delete: if isAdmin();
     }
 
-    // Customer Orders (matching the 'orders' collection used in the app)
+    // Orders and Sales (Unified Rules)
+    // We allow users to list their own orders by checking resource.data.userId
     match /orders/{orderId} {
       allow create: if isSignedIn();
-      allow get, list: if isAdmin() || isSeller() || (resource != null && resource.data.userId == request.auth.uid);
+      allow get, list: if isAdmin() || isSeller() || (isSignedIn() && resource.data.userId == request.auth.uid);
       allow update: if isAdmin() || isSeller();
       allow delete: if isAdmin();
     }
 
-    // Shopping Carts synchronization
-    match /carts/{userId} {
-      allow get, write: if isOwner(userId);
-    }
-
-    // Legacy Sales (kept for backend.json compatibility if needed)
     match /sales/{saleId} {
-      allow get, list: if isAdmin() || isSeller() || (resource != null && resource.data.userId == request.auth.uid);
       allow create: if isSignedIn();
+      allow get, list: if isAdmin() || isSeller() || (isSignedIn() && resource.data.userId == request.auth.uid);
       allow update: if isAdmin() || isSeller();
       allow delete: if isAdmin();
     }
 
     match /sales/{saleId}/saleItems/{saleItemId} {
-      allow get, list: if isAdmin() || isSeller() || (resource != null && resource.data.userId == request.auth.uid);
-      allow create: if isSignedIn();
-      allow update: if isAdmin() || isSeller();
-      allow delete: if isAdmin();
+      allow get, list, create: if isSignedIn() && (isAdmin() || isSeller() || resource.data.userId == request.auth.uid);
+      allow update, delete: if isAdmin() || isSeller();
+    }
+
+    match /carts/{userId} {
+      allow get, write: if isOwner(userId);
     }
   }
 }
