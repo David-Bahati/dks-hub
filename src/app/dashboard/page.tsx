@@ -54,14 +54,15 @@ import { useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, where, orderBy, limit } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { cn } from "@/lib/utils";
+import { Logo } from "@/components/ui/Logo";
 
 const adminNavLinks = [
   { href: "/dashboard", icon: LineChart, label: "Aperçu" },
   { href: "/dashboard/products", icon: Package, label: "Produits" },
   { href: "/dashboard/orders", icon: ShoppingBag, label: "Commandes" },
   { href: "/dashboard/customers", icon: Users, label: "Clients" },
-  { href: "/dashboard/users", icon: UsersRound, label: "Utilisateurs" },
-  { href: "/dashboard/settings", icon: Settings, label: "Paramètres" },
+  { href: "/dashboard/users", icon: UsersRound, label: "Équipe" },
+  { href: "/dashboard/settings", icon: Settings, label: "Réglages" },
 ];
 
 const customerNavLinks = [
@@ -83,7 +84,6 @@ function DashboardPage() {
 
   const isStaff = user?.role === 'Admin' || user?.role === 'Seller' || user?.role === 'Cashier';
 
-  // Pour les clients : Récupérer la dernière commande
   const lastOrderQuery = useMemoFirebase(() => {
     if (authLoading || !user?.uid || isStaff) return null;
     return query(
@@ -135,19 +135,16 @@ function DashboardPage() {
     );
   }
 
-  // --- VUE CLIENT ---
   if (!isStaff) {
     return (
       <div className="flex min-h-screen w-full flex-col bg-background">
         <header className="border-b border-white/5 bg-background/40 backdrop-blur-2xl py-6 px-4 md:px-8">
             <div className="max-w-7xl mx-auto flex justify-between items-center">
                 <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-2xl bg-primary flex items-center justify-center neon-glow">
-                        <span className="text-white font-black text-xl italic uppercase">DKS</span>
-                    </div>
+                    <Logo size="md" />
                     <div>
-                        <h1 className="text-2xl font-black uppercase italic tracking-tighter">Mon Espace <span className="text-accent">Client</span></h1>
-                        <p className="text-xs text-muted-foreground font-bold uppercase tracking-widest">Ravi de vous revoir, {user?.name}</p>
+                        <h1 className="text-2xl font-black uppercase italic tracking-tighter leading-none">Mon Espace <span className="text-accent">Client</span></h1>
+                        <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest mt-1">Heureux de vous revoir, {user?.name}</p>
                     </div>
                 </div>
                 <div className="flex items-center gap-3">
@@ -238,32 +235,33 @@ function DashboardPage() {
     );
   }
 
-  // --- VUE ADMIN / STAFF ---
   return (
     <div className="flex min-h-screen w-full flex-col bg-background">
-      <header className="sticky top-0 z-30 flex h-20 items-center gap-4 border-b border-white/5 bg-background/40 backdrop-blur-2xl px-6">
+      <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b border-white/5 bg-background/40 backdrop-blur-2xl px-6">
          <Sheet>
             <SheetTrigger asChild>
               <Button size="icon" variant="ghost" className="sm:hidden text-muted-foreground">
-                <PanelLeft className="h-6 w-6" />
+                <PanelLeft className="h-5 w-5" />
                 <span className="sr-only">Menu</span>
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="sm:max-w-xs bg-card/95 backdrop-blur-3xl border-white/10 p-0">
+            <SheetContent side="left" className="sm:max-w-xs bg-card/95 backdrop-blur-3xl border-r border-white/5 p-0">
                 <div className="p-8 border-b border-white/5">
-                    <span className="text-2xl font-black uppercase italic tracking-tighter">DKS <span className="text-accent font-light">Admin</span></span>
+                   <Logo size="sm" showText={true} />
                 </div>
-              <nav className="grid gap-2 p-4">
+              <nav className="grid gap-1 p-4">
                  {adminNavLinks.map(link => (
                    <Link
                     key={link.href}
                     href={link.href}
                     className={cn(
-                        "flex items-center gap-4 px-4 py-3 rounded-xl transition-all text-sm font-bold uppercase italic",
-                        pathname === link.href ? 'bg-accent text-accent-foreground shadow-lg' : 'text-muted-foreground hover:bg-white/5 hover:text-white'
+                        "group flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all text-sm font-medium",
+                        pathname === link.href 
+                            ? 'bg-accent/10 text-accent border-l-2 border-accent rounded-l-none' 
+                            : 'text-slate-400 hover:bg-white/5 hover:text-white'
                     )}
                   >
-                    <link.icon className="h-5 w-5" />
+                    <link.icon className={cn("h-4 w-4 transition-transform group-hover:translate-x-0.5", pathname === link.href ? 'text-accent' : '')} />
                     {link.label}
                   </Link>
                  ))}
@@ -273,28 +271,31 @@ function DashboardPage() {
 
         <div className="flex-1 flex items-center justify-between">
             <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center neon-glow">
-                    <span className="text-white font-black text-sm italic uppercase">DKS</span>
-                </div>
-                <h2 className="text-xl md:text-2xl tracking-tighter">
-                    <span className="font-light text-muted-foreground uppercase">Tableau de bord</span>{" "}
-                    <span className="font-black text-white uppercase italic">Admin</span>
+                <Logo size="sm" />
+                <h2 className="text-lg md:text-xl tracking-tighter">
+                    <span className="font-light text-slate-400 uppercase">Tableau de bord</span>{" "}
+                    <span className="font-bold text-white uppercase italic">Admin</span>
                 </h2>
             </div>
 
-            <nav className="hidden sm:flex items-center gap-1 bg-white/5 p-1 rounded-2xl border border-white/5">
+            <nav className="hidden sm:flex items-center gap-0.5">
                 {adminNavLinks.map((link) => (
                     <Link key={link.href} href={link.href}>
                         <Button
                             variant="ghost"
                             size="sm"
                             className={cn(
-                                "rounded-xl px-4 gap-2 font-black uppercase italic text-[10px] transition-all",
-                                pathname === link.href ? 'bg-accent text-accent-foreground shadow-lg' : 'text-muted-foreground hover:text-white'
+                                "group rounded-none h-16 px-5 gap-2.5 font-medium transition-all text-[11px] relative",
+                                pathname === link.href 
+                                    ? 'text-accent' 
+                                    : 'text-slate-400 hover:text-white'
                             )}
                         >
-                            <link.icon className="h-4 w-4" />
-                            <span className="hidden lg:inline">{link.label}</span>
+                            <link.icon className={cn("h-4 w-4 transition-transform group-hover:translate-x-0.5", pathname === link.href ? 'text-accent' : '')} />
+                            <span>{link.label}</span>
+                            {pathname === link.href && (
+                                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-accent" />
+                            )}
                         </Button>
                     </Link>
                 ))}
@@ -305,50 +306,49 @@ function DashboardPage() {
                     variant="ghost" 
                     size="icon" 
                     onClick={fetchAdminData} 
-                    className="h-10 w-10 text-muted-foreground hover:text-accent hover:bg-accent/10 rounded-xl transition-all group"
+                    className="h-9 w-9 text-slate-400 hover:text-accent hover:bg-accent/10 rounded-xl transition-all group"
                 >
-                    <RefreshCw size={18} className={cn("transition-transform duration-700", loading ? "animate-spin" : "group-hover:rotate-180")} />
+                    <RefreshCw size={16} className={cn("transition-transform duration-700", loading ? "animate-spin" : "group-hover:rotate-180")} />
                 </Button>
             </div>
         </div>
       </header>
 
       <main className="flex-1 p-4 md:p-8 space-y-8">
-          {/* Stats Bento Grid */}
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
              <Card className="lg:col-span-2 glossy-card border-none rounded-[2.5rem] relative overflow-hidden group">
               <div className="absolute -top-12 -right-12 w-48 h-48 bg-accent/5 rounded-full blur-3xl group-hover:bg-accent/10 transition-all duration-700" />
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <div className="space-y-1">
-                    <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Revenu Global de la Boutique</CardTitle>
-                    <p className="text-[9px] text-accent font-bold uppercase tracking-widest">Base de données synchronisée</p>
+                    <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Revenu Global Boutique</CardTitle>
+                    <p className="text-[9px] text-accent font-bold uppercase tracking-widest">Temps réel</p>
                 </div>
                 <div className="w-12 h-12 rounded-2xl bg-accent/10 flex items-center justify-center text-accent shadow-[0_0_20px_rgba(56,189,248,0.2)]">
                     <DollarSign className="h-6 w-6" />
                 </div>
               </CardHeader>
               <CardContent className="pt-4">
-                <div className="text-5xl font-black font-mono tracking-tighter text-white">
+                <div className="text-5xl font-bold font-mono tracking-tighter text-white">
                     {formatCurrency(stats?.totalRevenueCDF || 0)} <span className="text-xl font-light opacity-30">CDF</span>
                 </div>
                 <div className="mt-4 flex items-center gap-4">
-                    <Badge variant="outline" className="border-white/10 bg-white/5 px-3 py-1 font-mono text-muted-foreground">
+                    <Badge variant="outline" className="border-white/5 bg-white/5 px-3 py-1 font-mono text-slate-400">
                         ≈ {formatCurrency((stats?.totalRevenueCDF || 0) / rate)} USD
                     </Badge>
-                    <span className="text-[10px] text-muted-foreground italic font-light">Taux appliqué : 1 USD = {rate} CDF</span>
+                    <span className="text-[10px] text-slate-500 italic font-light">Taux : 1 USD = {rate} CDF</span>
                 </div>
               </CardContent>
             </Card>
 
              <Card className="glossy-card border-none rounded-[2.5rem] group">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Activité du Jour</CardTitle>
+                <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Ventes Jour</CardTitle>
                 <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-all duration-500">
                     <TrendingUp className="h-5 w-5" />
                 </div>
               </CardHeader>
               <CardContent className="pt-4">
-                <div className="text-3xl font-black font-mono">{stats?.todaySalesCount || 0}</div>
+                <div className="text-3xl font-bold font-mono">{stats?.todaySalesCount || 0}</div>
                 <p className="text-[10px] text-accent mt-2 uppercase font-black tracking-widest bg-accent/10 w-fit px-2 py-1 rounded-md">
                     +{formatCurrency(stats?.todayRevenue || 0)} CDF
                 </p>
@@ -357,27 +357,26 @@ function DashboardPage() {
 
              <Card className="glossy-card border-none rounded-[2.5rem] group">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Inventaire Global</CardTitle>
+                <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Inventaire</CardTitle>
                 <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white group-hover:bg-white group-hover:text-black transition-all duration-500">
                     <Package className="h-5 w-5" />
                 </div>
               </CardHeader>
               <CardContent className="pt-4">
-                <div className="text-3xl font-black font-mono">{stats?.totalProductsCount || 0}</div>
-                <p className="text-[10px] text-muted-foreground mt-2 uppercase font-bold tracking-widest">Articles référencés</p>
+                <div className="text-3xl font-bold font-mono">{stats?.totalProductsCount || 0}</div>
+                <p className="text-[10px] text-slate-400 mt-2 uppercase font-bold tracking-widest">Articles actifs</p>
               </CardContent>
             </Card>
           </div>
 
-          {/* Main Dashboard Content */}
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7">
             <Card className="lg:col-span-4 glossy-card border-none rounded-[3rem] overflow-hidden">
               <CardHeader className="border-b border-white/5 bg-white/[0.02] flex flex-row items-center justify-between py-6 px-8">
-                <CardTitle className="text-lg font-black uppercase italic flex items-center gap-3">
+                <CardTitle className="text-lg font-bold uppercase italic flex items-center gap-3">
                    <AlertTriangle className="text-destructive animate-pulse" size={20} />
-                   Alertes Stock Critique
+                   Alertes Stock
                 </CardTitle>
-                <Badge className="bg-destructive/20 text-destructive border-none font-black text-[10px] px-3">{lowStock.length} ALERTES</Badge>
+                <Badge className="bg-destructive/10 text-destructive border-none font-black text-[10px] px-3">{lowStock.length} ALERTES</Badge>
               </CardHeader>
               <CardContent className="p-8">
                 {lowStock.length > 0 ? (
@@ -389,8 +388,8 @@ function DashboardPage() {
                                         <img src={item.imageUrl} alt={item.name} className="object-cover group-hover:scale-110 transition-transform duration-500" />
                                     </div>
                                     <div>
-                                        <p className="font-black text-sm uppercase italic">{item.name}</p>
-                                        <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">{item.category}</p>
+                                        <p className="font-bold text-sm uppercase italic">{item.name}</p>
+                                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{item.category}</p>
                                     </div>
                                 </div>
                                 <div className="text-right">
@@ -404,11 +403,11 @@ function DashboardPage() {
                 ) : (
                     <div className="flex flex-col items-center justify-center py-20 text-center space-y-4 opacity-30">
                         <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center">
-                            <Package size={40} className="text-muted-foreground" />
+                            <Package size={40} className="text-slate-400" />
                         </div>
                         <div className="space-y-1">
-                            <p className="text-sm font-black uppercase italic tracking-widest">Tout est sous contrôle</p>
-                            <p className="text-[10px] font-bold">Votre inventaire est actuellement sain.</p>
+                            <p className="text-sm font-bold uppercase italic tracking-widest text-slate-300">Inventaire Sain</p>
+                            <p className="text-[10px] font-bold text-slate-500">Aucun produit en rupture de stock.</p>
                         </div>
                     </div>
                 )}
@@ -417,9 +416,9 @@ function DashboardPage() {
 
             <Card className="lg:col-span-3 glossy-card border-none rounded-[3rem] overflow-hidden">
               <CardHeader className="border-b border-white/5 bg-white/[0.02] py-6 px-8">
-                <CardTitle className="text-lg font-black uppercase italic flex items-center gap-3">
+                <CardTitle className="text-lg font-bold uppercase italic flex items-center gap-3">
                     <ShoppingBag size={20} className="text-accent" />
-                    Flux de Ventes
+                    Flux Récent
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-8">
@@ -431,11 +430,11 @@ function DashboardPage() {
                             </div>
                             <div className="flex-1">
                                 <div className="flex items-center justify-between mb-1">
-                                    <p className="text-sm font-black uppercase italic">{sale.cashierName}</p>
-                                    <p className="font-mono font-black text-sm text-white">{formatCurrency(sale.totalAmount)} <span className="text-[9px] font-light opacity-30">CDF</span></p>
+                                    <p className="text-sm font-bold uppercase italic">{sale.cashierName}</p>
+                                    <p className="font-mono font-bold text-sm text-white">{formatCurrency(sale.totalAmount)} <span className="text-[9px] font-light opacity-30">CDF</span></p>
                                 </div>
                                 <div className="flex items-center justify-between">
-                                    <p className="text-[9px] text-muted-foreground font-bold uppercase tracking-widest">REF: #{sale.id.substring(0, 8)}</p>
+                                    <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">REF: #{sale.id.substring(0, 8)}</p>
                                     <Badge className="bg-accent/10 text-accent border-none text-[8px] font-black uppercase px-2 h-4">SUCCESS</Badge>
                                 </div>
                             </div>
@@ -444,11 +443,11 @@ function DashboardPage() {
                     {recentSales.length === 0 && (
                         <div className="flex flex-col items-center justify-center py-20 text-center space-y-4 opacity-30">
                             <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center">
-                                <LineChart size={40} className="text-muted-foreground" />
+                                <LineChart size={40} className="text-slate-400" />
                             </div>
                             <div className="space-y-1">
-                                <p className="text-sm font-black uppercase italic tracking-widest">Prêt pour l'activité</p>
-                                <p className="text-[10px] font-bold">Vos futures ventes apparaîtront ici.</p>
+                                <p className="text-sm font-bold uppercase italic tracking-widest text-slate-300">Prêt pour l'activité</p>
+                                <p className="text-[10px] font-bold text-slate-500">Vos futures ventes apparaîtront ici.</p>
                             </div>
                         </div>
                     )}
@@ -462,4 +461,3 @@ function DashboardPage() {
 }
 
 export default withAuth(DashboardPage);
-    
