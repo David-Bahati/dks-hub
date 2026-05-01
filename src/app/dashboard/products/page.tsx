@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import withAuth from '@/components/auth/withAuth';
 import { Navbar } from "@/components/layout/Navbar";
 import { Button } from "@/components/ui/button";
@@ -33,36 +33,23 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot, doc, serverTimestamp, setDoc, addDoc, deleteDoc } from 'firebase/firestore';
+import { collection, doc, serverTimestamp, setDoc, addDoc, deleteDoc } from 'firebase/firestore';
 import { Product } from '@/lib/types';
 import { PlusCircle, Edit, Trash2, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { errorEmitter } from '@/firebase/error-emitter';
-import { FirestorePermissionError } from '@/firebase/errors';
+import { useCollection, useMemoFirebase } from '@/firebase';
 
 const CATEGORIES = ["keyboard", "mouse", "screen", "headset", "other"];
 
 function ProductsPage() {
-  const [products, setProducts] = useState<Product[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [isPublished, setIsPublished] = useState(true);
   const { toast } = useToast();
 
-  useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, "products"), (snapshot) => {
-      const productsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Product[];
-      setProducts(productsData);
-      setIsLoading(false);
-    }, (error) => {
-        errorEmitter.emit('permission-error', new FirestorePermissionError({
-            path: 'products',
-            operation: 'list'
-        }));
-    });
-    return () => unsubscribe();
-  }, []);
+  // Utilisation du hook standard pour une synchronisation temps réel fiable
+  const productsQuery = useMemoFirebase(() => collection(db, "products"), []);
+  const { data: products, isLoading } = useCollection<Product>(productsQuery);
 
   const openModal = (product: Product | null = null) => {
     setEditingProduct(product);
@@ -97,6 +84,7 @@ function ProductsPage() {
       description: formData.get('description') as string,
       category: formData.get('category') as string,
       sellingPrice,
+      price: sellingPrice, // Compatibilité panier
       purchasePrice,
       stockQuantity,
       imageUrl: formData.get('imageUrl') as string || (editingProduct?.imageUrl || `https://picsum.photos/seed/${Math.random()}/600/400`),
@@ -106,56 +94,29 @@ function ProductsPage() {
 
     if (editingProduct) {
       const docRef = doc(db, "products", editingProduct.id);
-      // NON-BLOCKING MUTATION: On ne met pas "await"
-      setDoc(docRef, productData, { merge: true })
-        .catch(async (error) => {
-            errorEmitter.emit('permission-error', new FirestorePermissionError({
-                path: docRef.path,
-                operation: 'update',
-                requestResourceData: productData
-            }));
-        });
-      
+      setDoc(docRef, productData, { merge: true });
       toast({ title: "Produit mis à jour", description: "Les modifications sont appliquées." });
-      closeModal();
     } else {
       const colRef = collection(db, "products");
-      // NON-BLOCKING MUTATION: On ne met pas "await"
       addDoc(colRef, {
         ...productData,
         createdAt: serverTimestamp()
-      })
-      .catch(async (error) => {
-        errorEmitter.emit('permission-error', new FirestorePermissionError({
-            path: colRef.path,
-            operation: 'create',
-            requestResourceData: productData
-        }));
       });
-
       toast({ title: "Produit créé", description: "Le nouvel article a été ajouté au catalogue." });
-      closeModal();
     }
+    closeModal();
   };
 
   const handleDelete = (id: string) => {
     if(window.confirm("Êtes-vous sûr de vouloir supprimer ce produit ?")){
         const docRef = doc(db, "products", id);
-        deleteDoc(docRef)
-            .then(() => {
-                toast({ title: "Produit supprimé", variant: "destructive" });
-            })
-            .catch(async (error) => {
-                errorEmitter.emit('permission-error', new FirestorePermissionError({
-                    path: docRef.path,
-                    operation: 'delete'
-                }));
-            });
+        deleteDoc(docRef);
+        toast({ title: "Produit supprimé", variant: "destructive" });
     }
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background text-foreground">
       <Navbar />
       <main className="max-w-7xl mx-auto px-4 py-8">
         <div className="flex justify-between items-center mb-8">
@@ -184,10 +145,10 @@ function ProductsPage() {
             <TableBody>
               {isLoading ? (
                 <TableRow><TableCell colSpan={7} className="text-center py-20"><Loader2 className="animate-spin mx-auto opacity-50" /></TableCell></TableRow>
-              ) : products.length > 0 ? products.map((product) => (
+              ) : products && products.length > 0 ? products.map((product) => (
                 <TableRow key={product.id} className="border-white/5 hover:bg-white/5 transition-colors">
                   <TableCell>
-                    <div className="w-12 h-12 rounded-xl bg-muted overflow-hidden border border-white/5">
+                    <div className="w-12 h-12 rounded-xl bg-muted overflow-hidden border border-white/5 relative">
                         <img src={product.imageUrl} alt={product.name} className="object-cover w-full h-full" />
                     </div>
                   </TableCell>
@@ -198,7 +159,7 @@ function ProductsPage() {
                   <TableCell>
                     <Badge variant="secondary" className="bg-white/5 uppercase text-[10px] font-bold border-none">{product.category}</Badge>
                   </TableCell>
-                  <TableCell className="text-right font-black text-accent">${(product.sellingPrice || 0).toFixed(2)}</TableCell>
+                  <TableCell className="text-right font-black text-accent">${(product.sellingPrice || product.price || 0).toFixed(2)}</TableCell>
                   <TableCell className="text-center">
                     <Badge className={product.stockQuantity < 5 ? "bg-destructive/20 text-destructive border-none" : "bg-white/5 text-white border-none"}>
                         {product.stockQuantity}
@@ -256,7 +217,7 @@ function ProductsPage() {
                     </div>
                     <div className="space-y-2">
                         <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Prix de Vente ($)</Label>
-                        <Input name="sellingPrice" type="number" step="0.01" defaultValue={editingProduct?.sellingPrice} className="h-12 bg-background/50 border-white/10 rounded-xl" required />
+                        <Input name="sellingPrice" type="number" step="0.01" defaultValue={editingProduct?.sellingPrice || editingProduct?.price} className="h-12 bg-background/50 border-white/10 rounded-xl" required />
                     </div>
                 </div>
                 <div className="space-y-2">
