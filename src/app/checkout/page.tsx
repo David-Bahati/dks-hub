@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -16,10 +15,10 @@ import {
   Smartphone, 
   Banknote, 
   Info, 
-  CheckCircle2, 
   Loader2,
   MapPin,
-  ArrowRight
+  ArrowRight,
+  ShieldCheck
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -54,7 +53,8 @@ export default function CheckoutPage() {
                         <Info className="text-muted-foreground" size={40} />
                     </div>
                     <h1 className="text-3xl font-bold uppercase italic">Votre panier est vide</h1>
-                    <p className="text-muted-foreground mt-4">Redirection vers la boutique...</p>
+                    <p className="text-muted-foreground mt-4">Veuillez ajouter des articles avant de commander.</p>
+                    <Button className="mt-8" onClick={() => router.push('/')}>Retour à la boutique</Button>
                 </main>
             </div>
         );
@@ -68,6 +68,15 @@ export default function CheckoutPage() {
                 variant: "destructive"
             });
             router.push('/login');
+            return;
+        }
+
+        if (cartItems.length === 0) {
+            toast({
+                title: "Panier vide",
+                description: "Vous ne pouvez pas passer une commande vide.",
+                variant: "destructive"
+            });
             return;
         }
 
@@ -88,10 +97,11 @@ export default function CheckoutPage() {
                 paymentMethod: paymentMethod,
                 createdAt: serverTimestamp(),
                 status: paymentMethod === 'CASH' ? 'pending_payment' : 'pending',
-                updatedAt: serverTimestamp()
+                updatedAt: serverTimestamp(),
+                piValue: totalPrice / PI_CONVERSION_RATE
             };
 
-            const docRef = await addDoc(collection(db, "orders"), orderData);
+            await addDoc(collection(db, "orders"), orderData);
 
             toast({
                 title: "Commande enregistrée !",
@@ -121,15 +131,16 @@ export default function CheckoutPage() {
             <main className="max-w-5xl mx-auto px-4 py-12">
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     
-                    {/* Section Gauche : Récapitulatif & Paiement */}
                     <div className="lg:col-span-2 space-y-6">
                         <h1 className="text-4xl font-black uppercase italic tracking-tighter mb-8">
                             Finaliser ma <span className="text-accent">Commande</span>
                         </h1>
 
-                        {/* Choix du mode de paiement */}
                         <div className="space-y-4">
-                            <h2 className="text-xs font-black uppercase tracking-widest text-muted-foreground">Choisir un mode de paiement</h2>
+                            <h2 className="text-xs font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                                <ShieldCheck size={14} className="text-accent" />
+                                Mode de règlement sécurisé
+                            </h2>
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                 <Button 
                                     variant="outline"
@@ -140,7 +151,7 @@ export default function CheckoutPage() {
                                     onClick={() => setPaymentMethod("PI_NETWORK")}
                                 >
                                     <Coins size={24} />
-                                    <span className="font-bold uppercase italic text-xs">Pi Network</span>
+                                    <span className="font-bold uppercase italic text-xs">Pi Network (GCV)</span>
                                 </Button>
                                 <Button 
                                     variant="outline"
@@ -167,27 +178,29 @@ export default function CheckoutPage() {
                             </div>
                         </div>
 
-                        {/* Instructions contextuelles */}
                         <div className="p-6 rounded-[2rem] bg-card/40 border border-white/10 backdrop-blur-xl">
                             {paymentMethod === "PI_NETWORK" && (
-                                <div className="space-y-4">
+                                <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2">
                                     <div className="flex items-center gap-3 text-accent">
                                         <Coins size={20} />
-                                        <h3 className="font-black uppercase italic">Paiement via Pi Browser</h3>
+                                        <h3 className="font-black uppercase italic">Paiement via Pi Network (GCV Rate)</h3>
                                     </div>
                                     <p className="text-sm text-muted-foreground leading-relaxed">
-                                        Une fois la commande validée, vous serez redirigé vers l'interface de paiement sécurisée de Pi Network. Assurez-vous d'être dans le <strong>Pi Browser</strong> pour finaliser la transaction.
+                                        Nous appliquons le taux <strong>GCV (1 π = $314,159)</strong>. La transaction s'effectuera via le <strong>Pi Browser</strong>.
                                     </p>
+                                    <div className="bg-primary/10 border border-primary/20 p-4 rounded-xl text-primary-foreground text-xs">
+                                        Total en Pi : <span className="font-black text-accent">{(totalPrice / PI_CONVERSION_RATE).toFixed(8)} π</span>
+                                    </div>
                                 </div>
                             )}
                             {paymentMethod === "MOBILE_MONEY" && (
-                                <div className="space-y-4">
+                                <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2">
                                     <div className="flex items-center gap-3 text-accent">
                                         <Smartphone size={20} />
-                                        <h3 className="font-black uppercase italic">Mobile Money (Orange / Airtel / M-Pesa)</h3>
+                                        <h3 className="font-black uppercase italic">Mobile Money</h3>
                                     </div>
                                     <p className="text-sm text-muted-foreground">
-                                        Vous recevrez une demande de confirmation sur votre téléphone pour valider le montant de <strong>${totalPrice.toFixed(2)}</strong> converti au taux du jour.
+                                        Validation via Orange Money, Airtel Money ou M-Pesa. Le montant de <strong>${totalPrice.toFixed(2)}</strong> sera converti selon le taux CDF/USD du jour.
                                     </p>
                                 </div>
                             )}
@@ -195,21 +208,20 @@ export default function CheckoutPage() {
                                 <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2">
                                     <div className="flex items-center gap-3 text-orange-400">
                                         <MapPin size={20} />
-                                        <h3 className="font-black uppercase italic">Paiement au Bureau</h3>
+                                        <h3 className="font-black uppercase italic">Paiement au Bureau (Bunia)</h3>
                                     </div>
                                     <div className="bg-orange-500/10 border border-orange-500/20 p-4 rounded-xl text-orange-200 text-sm">
-                                        <strong>IMPORTANT :</strong> Votre commande sera réservée pendant 24h. Veuillez vous présenter au bureau <strong>Double King Shop (Immeuble Bahati, Bunia)</strong> pour régler en espèces et retirer vos articles.
+                                        <strong>IMPORTANT :</strong> Veuillez vous présenter à notre bureau <strong>Double King Shop (Immeuble Bahati, Bunia)</strong> sous 24h pour régler et retirer votre commande.
                                     </div>
                                 </div>
                             )}
                         </div>
                     </div>
 
-                    {/* Section Droite : Panier */}
                     <div className="space-y-6">
                         <Card className="glossy-card border-none rounded-[2.5rem] overflow-hidden">
                             <CardHeader className="bg-white/5">
-                                <CardTitle className="text-lg font-black uppercase italic">Votre Panier</CardTitle>
+                                <CardTitle className="text-lg font-black uppercase italic">Récapitulatif</CardTitle>
                             </CardHeader>
                             <CardContent className="p-6 space-y-4">
                                 {cartItems.map(item => (
@@ -218,7 +230,7 @@ export default function CheckoutPage() {
                                             <span className="font-bold">{item.name}</span>
                                             <span className="text-[10px] text-muted-foreground uppercase">Qté: {item.quantity}</span>
                                         </div>
-                                        <span className="font-black">${(item.price * item.quantity).toFixed(2)}</span>
+                                        <span className="font-black">${((item.price || 0) * item.quantity).toFixed(2)}</span>
                                     </div>
                                 ))}
                                 <div className="pt-4 space-y-2">
@@ -226,9 +238,10 @@ export default function CheckoutPage() {
                                         <span className="uppercase italic text-xs text-muted-foreground">Total</span>
                                         <span className="text-accent">${totalPrice.toFixed(2)}</span>
                                     </div>
-                                    <div className="text-right">
+                                    <div className="text-right flex flex-col items-end">
+                                        <Badge variant="outline" className="border-accent text-accent font-black text-[10px] mb-1">GCV RATE</Badge>
                                         <p className="text-[10px] font-bold text-muted-foreground uppercase">
-                                            ≈ {(totalPrice / PI_CONVERSION_RATE).toFixed(6)} π
+                                            ≈ {(totalPrice / PI_CONVERSION_RATE).toFixed(8)} π
                                         </p>
                                     </div>
                                 </div>
@@ -237,7 +250,7 @@ export default function CheckoutPage() {
                                 <Button 
                                     className="w-full h-16 bg-accent text-accent-foreground hover:bg-accent/90 rounded-2xl font-black uppercase italic text-lg gap-3 shadow-lg"
                                     onClick={handlePlaceOrder}
-                                    disabled={isProcessing}
+                                    disabled={isProcessing || cartItems.length === 0}
                                 >
                                     {isProcessing ? (
                                         <Loader2 className="animate-spin" />
