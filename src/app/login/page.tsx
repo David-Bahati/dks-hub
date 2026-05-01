@@ -60,32 +60,47 @@ export default function LoginPage() {
 
     try {
       for (const user of testUsers) {
+        let uid;
         try {
+          // Tenter de créer l'utilisateur
           const userCredential = await createUserWithEmailAndPassword(auth, user.email, user.password);
-          await setDoc(doc(firestore, 'users', userCredential.user.uid), {
+          uid = userCredential.user.uid;
+        } catch (e: any) {
+          if (e.code === 'auth/email-already-in-use') {
+            // Si l'utilisateur existe déjà, on se connecte pour récupérer son UID et forcer les permissions
+            const userCredential = await signInWithEmailAndPassword(auth, user.email, user.password);
+            uid = userCredential.user.uid;
+          } else {
+            throw e;
+          }
+        }
+
+        if (uid) {
+          // Créer ou mettre à jour le profil utilisateur
+          await setDoc(doc(firestore, 'users', uid), {
             name: user.name,
             email: user.email,
             role: user.role,
-            createdAt: new Date().toISOString(),
-          });
-          // Also create role markers for security rules
+            updatedAt: new Date().toISOString(),
+          }, { merge: true });
+
+          // Créer les marqueurs de rôles pour les règles de sécurité (admins ou sellers)
           const roleCollection = user.role === 'admin' ? 'admins' : 'sellers';
           if (user.role !== 'customer') {
-             await setDoc(doc(firestore, roleCollection, userCredential.user.uid), { active: true });
+             await setDoc(doc(firestore, roleCollection, uid), { active: true }, { merge: true });
           }
-        } catch (e: any) {
-          if (e.code !== 'auth/email-already-in-use') throw e;
         }
       }
+      
       toast({
-        title: "Succès",
-        description: "Les comptes de test ont été créés ou mis à jour.",
+        title: "Configuration terminée",
+        description: "Les permissions ont été injectées. Vous pouvez maintenant vous connecter.",
       });
     } catch (error: any) {
-      console.error(error);
+      console.error("Setup error:", error);
       toast({
         title: "Erreur",
-        description: "Une erreur est survenue lors de l'initialisation.",
+        description: error.message || "Une erreur est survenue lors de l'initialisation.",
         variant: "destructive",
       });
     } finally {
@@ -162,10 +177,10 @@ export default function LoginPage() {
                     disabled={isSettingUp}
                 >
                     {isSettingUp ? <Loader2 className="h-3 w-3 animate-spin" /> : <ShieldCheck className="h-3 w-3" />}
-                    Initialiser les comptes de test sur Firebase
+                    Réinitialiser les permissions Firebase
                 </Button>
                 <p className="text-[9px] text-center text-muted-foreground mt-2 italic">
-                    Cliquez ici si c'est votre première utilisation du projet.
+                    Cliquez ici pour corriger les erreurs de permissions ("Missing or insufficient permissions").
                 </p>
             </div>
         </div>
