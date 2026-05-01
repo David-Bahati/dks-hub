@@ -73,7 +73,7 @@ const customerNavLinks = [
 ];
 
 function DashboardPage() {
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const pathname = usePathname();
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<any>(null);
@@ -83,11 +83,16 @@ function DashboardPage() {
 
   const isStaff = user?.role === 'Admin' || user?.role === 'Seller' || user?.role === 'Cashier';
 
-  // Pour les clients : Récupérer la dernière commande
+  // Pour les clients : Récupérer la dernière commande (uniquement si user est prêt et n'est pas staff)
   const lastOrderQuery = useMemoFirebase(() => {
-    if (!user || isStaff) return null;
-    return query(collection(db, "orders"), where("userId", "==", user.uid), orderBy("createdAt", "desc"), limit(1));
-  }, [user, isStaff]);
+    if (authLoading || !user?.uid || isStaff) return null;
+    return query(
+      collection(db, "orders"), 
+      where("userId", "==", user.uid), 
+      orderBy("createdAt", "desc"), 
+      limit(1)
+    );
+  }, [user, isStaff, authLoading]);
   
   const { data: lastOrders } = useCollection(lastOrderQuery);
   const lastOrder = lastOrders?.[0];
@@ -95,10 +100,10 @@ function DashboardPage() {
   useEffect(() => {
     if (isStaff) {
       fetchAdminData();
-    } else {
+    } else if (!authLoading) {
       setLoading(false);
     }
-  }, [isStaff]);
+  }, [isStaff, authLoading]);
 
   const fetchAdminData = async () => {
     setLoading(true);
@@ -122,7 +127,7 @@ function DashboardPage() {
 
   const formatCurrency = (amount: number) => new Intl.NumberFormat('fr-FR').format(amount);
 
-  if (loading) {
+  if (loading || authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />

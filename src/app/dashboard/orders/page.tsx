@@ -13,30 +13,28 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 export default function OrdersPage() {
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
 
   const ordersQuery = useMemoFirebase(() => {
-    if (!user) return null;
+    // On attend que l'utilisateur soit chargé et qu'on ait son UID
+    if (authLoading || !user?.uid) return null;
     
-    // Le staff inclut les Admins, Sellers et Cashiers
     const isStaff = user.role === 'Admin' || user.role === 'Seller' || user.role === 'Cashier';
     const baseRef = collection(db, "orders");
     
     if (isStaff) {
-      // Le staff voit toutes les commandes triées par date
       return query(baseRef, orderBy("createdAt", "desc"));
     }
     
-    // Le client voit uniquement ses propres commandes
-    // Important: Le filtre userId doit correspondre exactement à la règle resource.data.userId == request.auth.uid
+    // Filtrage strict par userId pour respecter les règles de sécurité
     return query(
       baseRef, 
       where("userId", "==", user.uid), 
       orderBy("createdAt", "desc")
     );
-  }, [user]);
+  }, [user, authLoading]);
 
-  const { data: orders, isLoading } = useCollection(ordersQuery);
+  const { data: orders, isLoading: collectionLoading } = useCollection(ordersQuery);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -51,6 +49,8 @@ export default function OrdersPage() {
         return <Badge className="bg-blue-500/10 text-blue-400 border-none uppercase text-[10px] font-black px-3 py-1 flex items-center gap-1"><Clock size={12} /> En cours</Badge>;
     }
   };
+
+  const isLoading = authLoading || collectionLoading;
 
   return (
     <div className="min-h-screen w-full bg-background text-foreground">
