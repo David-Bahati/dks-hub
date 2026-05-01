@@ -26,6 +26,7 @@ service cloud.firestore {
     }
 
     function isStaff() {
+      // Un utilisateur est staff s'il existe dans l'une des collections de rôles
       return isAdmin() || isSeller() || isCashier();
     }
 
@@ -40,21 +41,18 @@ service cloud.firestore {
     }
 
     match /admins/{adminId} {
-      allow get: if isSignedIn();
-      allow list: if isAdmin();
-      allow write: if isOwner(adminId) || isAdmin();
+      allow read: if isSignedIn();
+      allow write: if isAdmin() || (isSignedIn() && request.auth.uid == adminId);
     }
 
     match /sellers/{sellerId} {
-      allow get: if isSignedIn();
-      allow list: if isAdmin();
-      allow write: if isOwner(sellerId) || isAdmin();
+      allow read: if isSignedIn();
+      allow write: if isAdmin() || (isSignedIn() && request.auth.uid == sellerId);
     }
 
     match /cashiers/{cashierId} {
-      allow get: if isSignedIn();
-      allow list: if isAdmin();
-      allow write: if isOwner(cashierId) || isAdmin();
+      allow read: if isSignedIn();
+      allow write: if isAdmin() || (isSignedIn() && request.auth.uid == cashierId);
     }
 
     match /categories/{categoryId} {
@@ -72,10 +70,15 @@ service cloud.firestore {
     }
 
     match /orders/{orderId} {
+      // Un client peut créer une commande s'il est connecté
       allow create: if isSignedIn();
+      
+      // Lecture d'une commande unique
       allow get: if isSignedIn() && (isStaff() || resource.data.userId == request.auth.uid);
-      // Correction cruciale pour le listage des commandes
-      allow list: if isSignedIn() && (isStaff() || request.auth.uid == resource.data.userId);
+      
+      // Pour lister les commandes, Firestore exige que la requête soit filtrée par userId si l'utilisateur n'est pas staff
+      allow list: if isSignedIn() && (isStaff() || (resource.data.userId == request.auth.uid));
+      
       allow update: if isStaff();
       allow delete: if isAdmin();
     }

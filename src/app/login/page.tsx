@@ -60,18 +60,17 @@ export default function LoginPage() {
     ];
 
     try {
-      // On se déconnecte d'abord pour être sûr de pouvoir créer/connecter les comptes de test
+      // Déconnexion initiale pour nettoyer la session
       await signOut(auth);
 
       for (const testUser of testUsers) {
         let uid;
         try {
-          // Tenter de créer l'utilisateur
+          // 1. Création ou connexion à l'utilisateur Auth
           const userCredential = await createUserWithEmailAndPassword(auth, testUser.email, testUser.password);
           uid = userCredential.user.uid;
         } catch (e: any) {
           if (e.code === 'auth/email-already-in-use') {
-            // Si déjà existant, on se connecte pour obtenir son UID
             const userCredential = await signInWithEmailAndPassword(auth, testUser.email, testUser.password);
             uid = userCredential.user.uid;
           } else {
@@ -80,7 +79,7 @@ export default function LoginPage() {
         }
 
         if (uid) {
-          // Création du document profil principal
+          // 2. Mise à jour du profil utilisateur global
           await setDoc(doc(firestore, 'users', uid), {
             id: uid,
             email: testUser.email,
@@ -89,11 +88,11 @@ export default function LoginPage() {
             displayName: testUser.name,
             name: testUser.name,
             role: testUser.role,
-            createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
           }, { merge: true });
 
-          // Injection dans la collection de rôle spécifique (admins, sellers, cashiers)
+          // 3. Injection dans la collection de rôle spécifique (admins, sellers, cashiers)
+          // Cette étape est CRUCIALE pour les règles isStaff()
           const roleCollection = testUser.role.toLowerCase() + 's';
           await setDoc(doc(firestore, roleCollection, uid), { 
             id: uid, 
@@ -101,20 +100,20 @@ export default function LoginPage() {
             updatedAt: serverTimestamp() 
           }, { merge: true });
 
-          // Déconnexion après chaque injection pour le suivant
+          // Déconnexion pour pouvoir traiter l'utilisateur suivant (nécessaire pour setDoc isOwner)
           await signOut(auth);
         }
       }
       
       toast({
         title: "Configuration terminée",
-        description: "Les permissions ont été injectées. Vous pouvez maintenant vous connecter.",
+        description: "Les permissions Admin, Vendeur et Caissier ont été injectées avec succès.",
       });
     } catch (error: any) {
       console.error("Setup error:", error);
       toast({
         title: "Erreur lors de la réinitialisation",
-        description: error.message || "Vérifiez votre connexion ou les règles de sécurité.",
+        description: error.message || "Vérifiez votre connexion.",
         variant: "destructive",
       });
     } finally {
@@ -138,7 +137,7 @@ export default function LoginPage() {
         </Button>
       </Link>
       
-      <div className="w-full max-w-sm">
+      <div className="w-full max-sm:max-w-[320px] max-w-sm">
         <div className="text-center mb-10">
           <div className="w-16 h-16 rounded-3xl bg-primary flex items-center justify-center neon-glow mx-auto mb-6">
             <span className="text-white font-black text-3xl italic uppercase">DKS</span>
