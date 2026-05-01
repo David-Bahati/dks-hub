@@ -16,25 +16,26 @@ export default function OrdersPage() {
   const { user, isLoading: authLoading } = useAuth();
 
   const ordersQuery = useMemoFirebase(() => {
-    // On attend que l'utilisateur soit chargé et qu'on ait son UID
+    // Crucial: n'exécuter la requête que si l'utilisateur est authentifié et son UID disponible
     if (authLoading || !user?.uid) return null;
     
     const isStaff = user.role === 'Admin' || user.role === 'Seller' || user.role === 'Cashier';
     const baseRef = collection(db, "orders");
     
     if (isStaff) {
+      // Pour le staff, on voit tout
       return query(baseRef, orderBy("createdAt", "desc"));
     }
     
-    // Filtrage strict par userId pour respecter les règles de sécurité
+    // Pour les clients, filtrage STRICT par userId
     return query(
       baseRef, 
       where("userId", "==", user.uid), 
       orderBy("createdAt", "desc")
     );
-  }, [user, authLoading]);
+  }, [user?.uid, user?.role, authLoading]);
 
-  const { data: orders, isLoading: collectionLoading } = useCollection(ordersQuery);
+  const { data: orders, isLoading: collectionLoading, error } = useCollection(ordersQuery);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -72,6 +73,12 @@ export default function OrdersPage() {
             {isLoading ? (
                 <div className="flex justify-center py-20">
                     <Loader2 className="animate-spin h-12 w-12 text-accent" />
+                </div>
+            ) : error ? (
+                <div className="text-center py-20 bg-destructive/10 rounded-[2rem] border border-destructive/20">
+                     <XCircle className="mx-auto mb-4 text-destructive" size={48} />
+                     <h2 className="text-xl font-black uppercase italic">Erreur de Permission</h2>
+                     <p className="text-muted-foreground mt-2">Impossible de charger vos commandes. Veuillez réinitialiser vos permissions sur la page de Login.</p>
                 </div>
             ) : orders && orders.length > 0 ? (
                 <div className="grid grid-cols-1 gap-4">
