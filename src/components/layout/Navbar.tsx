@@ -1,9 +1,9 @@
 
 "use client";
 
-import { LogOut, LayoutDashboard, ShoppingCart, Users, Package, Home, Trash2, User, Sparkles, ArrowRight, Loader2 } from 'lucide-react';
-import Link from 'next/link';
+import { LogOut, LayoutDashboard, ShoppingCart, Users, Package, Home, Trash2, User, Sparkles, ArrowRight, Loader2, Plus, Minus } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
+import Link from 'next/link';
 import { Button } from "@/components/ui/button";
 import { useAuth } from '@/context/AuthContext';
 import { useCart } from '@/context/CartContext';
@@ -13,10 +13,11 @@ import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/co
 import { PI_CONVERSION_RATE } from '@/lib/constants';
 import { Badge } from '@/components/ui/badge';
 import { Logo } from '@/components/ui/Logo';
+import { cn } from '@/lib/utils';
 
 export function Navbar() {
     const { user, isLoading: authLoading } = useAuth();
-    const { cartItems, cartCount, totalPrice, removeFromCart } = useCart();
+    const { cartItems, cartCount, totalPrice, removeFromCart, updateQuantity } = useCart();
     const router = useRouter();
     const pathname = usePathname();
 
@@ -72,14 +73,14 @@ export function Navbar() {
                                 </Button>
                             </SheetTrigger>
                             <SheetContent className="bg-card/95 backdrop-blur-3xl border-white/10 w-full sm:max-w-md flex flex-col p-0">
-                                <SheetHeader className="p-8 pb-0">
+                                <SheetHeader className="p-8 pt-12 pb-0">
                                     <Badge className="bg-accent/10 text-accent border-none w-fit mb-2 font-black text-[9px] uppercase tracking-widest">
                                         <Sparkles className="w-3 h-3 mr-2" /> Panier Premium
                                     </Badge>
-                                    <SheetTitle className="text-3xl font-black uppercase italic tracking-tighter">Votre Sélection</SheetTitle>
+                                    <SheetTitle className="text-2xl font-black uppercase italic tracking-tighter">Votre Sélection</SheetTitle>
                                 </SheetHeader>
                                 
-                                <div className="flex-1 overflow-y-auto mt-6 space-y-3 px-8 custom-scrollbar">
+                                <div className="flex-1 overflow-y-auto mt-6 space-y-4 px-8 custom-scrollbar">
                                     {cartItems.length === 0 ? (
                                         <div className="text-center py-20 opacity-20 flex flex-col items-center gap-4">
                                             <ShoppingCart size={80} strokeWidth={1} />
@@ -87,33 +88,60 @@ export function Navbar() {
                                         </div>
                                     ) : (
                                         cartItems.map(item => (
-                                            <div key={item.id} className="flex justify-between items-center bg-white/5 p-4 rounded-2xl border border-white/5 hover:border-accent/20 transition-all">
-                                                <div className="flex-1">
-                                                    <p className="font-black uppercase italic text-xs line-clamp-1">{item.name}</p>
-                                                    <p className="text-[9px] text-muted-foreground font-black uppercase mt-0.5">
-                                                        <span className="text-white">${(item.price || 0).toFixed(2)}</span> x {item.quantity}
+                                            <div key={item.id} className="flex flex-col gap-3 bg-white/5 p-5 rounded-[2rem] border border-white/5 hover:border-accent/10 transition-all group">
+                                                <div className="flex justify-between items-start">
+                                                    <div className="flex-1 pr-2">
+                                                        <p className="font-black uppercase italic text-[11px] line-clamp-1 text-white/90">{item.name}</p>
+                                                        <p className="text-[10px] text-accent font-black mt-1">${(item.price || 0).toFixed(2)}</p>
+                                                    </div>
+                                                    <Button 
+                                                        variant="ghost" 
+                                                        size="icon" 
+                                                        className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 h-8 w-8 -mr-2 transition-colors" 
+                                                        onClick={() => removeFromCart(item.id)}
+                                                    >
+                                                        <Trash2 size={14} />
+                                                    </Button>
+                                                </div>
+                                                <div className="flex items-center justify-between mt-1">
+                                                    <div className="flex items-center gap-3 bg-black/40 rounded-xl p-1 border border-white/5">
+                                                        <Button 
+                                                            variant="ghost" 
+                                                            size="icon" 
+                                                            className="h-7 w-7 rounded-lg hover:bg-white/5 text-muted-foreground"
+                                                            onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                                                        >
+                                                            <Minus size={12} />
+                                                        </Button>
+                                                        <span className="text-xs font-black w-4 text-center">{item.quantity}</span>
+                                                        <Button 
+                                                            variant="ghost" 
+                                                            size="icon" 
+                                                            className="h-7 w-7 rounded-lg hover:bg-white/5 text-muted-foreground"
+                                                            onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                                                        >
+                                                            <Plus size={12} />
+                                                        </Button>
+                                                    </div>
+                                                    <p className="text-[10px] font-black text-white/40 uppercase italic tracking-tighter">
+                                                        Total: <span className="text-white">${((item.price || 0) * item.quantity).toFixed(2)}</span>
                                                     </p>
                                                 </div>
-                                                <Button 
-                                                    variant="ghost" 
-                                                    size="icon" 
-                                                    className="text-muted-foreground hover:text-destructive h-8 w-8 ml-2" 
-                                                    onClick={() => removeFromCart(item.id)}
-                                                >
-                                                    <Trash2 size={16} />
-                                                </Button>
                                             </div>
                                         ))
                                     )}
                                 </div>
 
                                 <div className="p-8 bg-black/40 border-t border-white/5 space-y-6">
-                                    <div className="flex justify-between items-end">
-                                        <span className="text-muted-foreground font-black uppercase text-[9px] tracking-widest">Total</span>
-                                        <div className="text-right">
-                                            <p className="text-4xl font-black text-white tracking-tighter">${totalPrice.toFixed(2)}</p>
-                                            <p className="text-accent font-black text-[9px] uppercase tracking-widest mt-0.5">≈ {(totalPrice / PI_CONVERSION_RATE).toFixed(4)} π</p>
+                                    <div className="space-y-1">
+                                        <div className="flex justify-between items-end">
+                                            <span className="text-muted-foreground font-black uppercase text-[9px] tracking-widest">Total</span>
+                                            <div className="text-right">
+                                                <p className="text-4xl font-black text-white tracking-tighter">${totalPrice.toFixed(2)}</p>
+                                                <p className="text-accent font-black text-[9px] uppercase tracking-widest mt-0.5">≈ {(totalPrice / PI_CONVERSION_RATE).toFixed(4)} π</p>
+                                            </div>
                                         </div>
+                                        <p className="text-[9px] text-muted-foreground/30 font-bold uppercase tracking-widest text-right">Hors frais de livraison</p>
                                     </div>
                                     
                                     <Button 
