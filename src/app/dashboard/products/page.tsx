@@ -19,7 +19,6 @@ import {
   DialogContent, 
   DialogHeader, 
   DialogTitle, 
-  DialogDescription, 
   DialogFooter 
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -36,8 +35,10 @@ import { Switch } from "@/components/ui/switch";
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { Product } from '@/lib/types';
-import { PlusCircle, Edit, Trash2, Eye, EyeOff, Loader2, Upload } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
 
 const CATEGORIES = ["keyboard", "mouse", "screen", "headset", "other"];
 
@@ -54,6 +55,11 @@ function ProductsPage() {
       const productsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Product[];
       setProducts(productsData);
       setIsLoading(false);
+    }, (error) => {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
+            path: 'products',
+            operation: 'list'
+        }));
     });
     return () => unsubscribe();
   }, []);
@@ -66,53 +72,89 @@ function ProductsPage() {
   const closeModal = () => {
     setEditingProduct(null);
     setIsModalOpen(false);
+    setIsSaving(false);
   };
 
-  const handleSave = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSave = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsSaving(true);
     const formData = new FormData(e.currentTarget);
     
+    const sellingPrice = parseFloat(formData.get('sellingPrice') as string);
+    const purchasePrice = parseFloat(formData.get('purchasePrice') as string || "0");
+    const stockQuantity = parseInt(formData.get('stockQuantity') as string);
+
+    if (isNaN(sellingPrice) || isNaN(purchasePrice) || isNaN(stockQuantity)) {
+        toast({ 
+            title: "Données invalides", 
+            description: "Veuillez vérifier les prix et quantités.", 
+            variant: "destructive" 
+        });
+        setIsSaving(false);
+        return;
+    }
+
     const productData = {
       name: formData.get('name') as string,
       description: formData.get('description') as string,
       category: formData.get('category') as string,
-      sellingPrice: parseFloat(formData.get('sellingPrice') as string),
-      purchasePrice: parseFloat(formData.get('purchasePrice') as string || "0"),
-      stockQuantity: parseInt(formData.get('stockQuantity') as string),
+      sellingPrice,
+      purchasePrice,
+      stockQuantity,
       imageUrl: formData.get('imageUrl') as string || (editingProduct?.imageUrl || 'https://picsum.photos/seed/hardware/600/400'),
       isPublished: formData.get('isPublished') === 'on',
       updatedAt: serverTimestamp()
     };
 
-    try {
-      if (editingProduct) {
-        await updateDoc(doc(db, "products", editingProduct.id), productData);
-        toast({ title: "Produit mis à jour", description: "Les modifications ont été enregistrées." });
-      } else {
-        await addDoc(collection(db, "products"), {
-          ...productData,
-          createdAt: serverTimestamp()
+    if (editingProduct) {
+      const docRef = doc(db, "products", editingProduct.id);
+      updateDoc(docRef, productData)
+        .then(() => {
+            toast({ title: "Produit mis à jour", description: "Les modifications ont été enregistrées." });
+            closeModal();
+        })
+        .catch(async (error) => {
+            errorEmitter.emit('permission-error', new FirestorePermissionError({
+                path: docRef.path,
+                operation: 'update',
+                requestResourceData: productData
+            }));
+            setIsSaving(false);
         });
+    } else {
+      const colRef = collection(db, "products");
+      addDoc(colRef, {
+        ...productData,
+        createdAt: serverTimestamp()
+      })
+      .then(() => {
         toast({ title: "Produit créé", description: "Le nouvel article a été ajouté au catalogue." });
-      }
-      closeModal();
-    } catch (error) {
-      console.error(error);
-      toast({ title: "Erreur", description: "Une erreur est survenue lors de la sauvegarde.", variant: "destructive" });
-    } finally {
-      setIsSaving(false);
+        closeModal();
+      })
+      .catch(async (error) => {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
+            path: colRef.path,
+            operation: 'create',
+            requestResourceData: productData
+        }));
+        setIsSaving(false);
+      });
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = (id: string) => {
     if(window.confirm("Êtes-vous sûr de vouloir supprimer ce produit ?")){
-        try {
-            await deleteDoc(doc(db, "products", id));
-            toast({ title: "Produit supprimé", variant: "destructive" });
-        } catch (error) {
-            toast({ title: "Erreur", description: "Impossible de supprimer le produit.", variant: "destructive" });
-        }
+        const docRef = doc(db, "products", id);
+        deleteDoc(docRef)
+            .then(() => {
+                toast({ title: "Produit supprimé", variant: "destructive" });
+            })
+            .catch(async (error) => {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
+                    path: docRef.path,
+                    operation: 'delete'
+                }));
+            });
     }
   };
 
