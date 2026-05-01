@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -30,6 +29,7 @@ import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Logo } from '@/components/ui/Logo';
 
 const TESTIMONIALS = [
   {
@@ -122,13 +122,13 @@ export default function LandingPage() {
           </p>
 
           <div className="flex flex-col sm:flex-row justify-center gap-6 animate-in fade-in slide-in-from-bottom-10 duration-1000 delay-700">
-            <Button size="lg" className="h-20 px-12 rounded-2xl bg-primary text-white font-black uppercase italic text-lg shadow-[0_0_40px_-10px_hsl(var(--primary))] hover:shadow-[0_0_60px_-5px_hsl(var(--primary))] transition-all group scale-105 active:scale-95">
-              <Link href="#shop" className="flex items-center">
+            <Button size="lg" className="h-20 px-12 rounded-2xl bg-primary text-white font-black uppercase italic text-lg shadow-[0_0_40px_-10px_hsl(var(--primary))] hover:shadow-[0_0_60px_-5px_hsl(var(--primary))] transition-all group scale-105 active:scale-95" asChild>
+              <Link href="#shop">
                 Explorer le Stock
                 <ArrowRight className="ml-3 group-hover:translate-x-2 transition-transform" />
               </Link>
             </Button>
-            <Button size="lg" variant="outline" className="h-20 px-12 rounded-2xl border-primary/40 bg-transparent font-black uppercase italic text-lg text-primary hover:bg-primary/5 hover:border-primary transition-all active:scale-95">
+            <Button size="lg" variant="outline" className="h-20 px-12 rounded-2xl border-primary/40 bg-transparent font-black uppercase italic text-lg text-primary hover:bg-primary/5 hover:border-primary transition-all active:scale-95" asChild>
               <Link href="/login">Espace Client Pro</Link>
             </Button>
           </div>
@@ -305,12 +305,7 @@ export default function LandingPage() {
         <div className="container max-w-7xl mx-auto px-6">
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-20 mb-32">
             <div className="lg:col-span-2 space-y-10">
-              <div className="flex items-center gap-4">
-                 <div className="w-16 h-16 rounded-[1.5rem] bg-primary flex items-center justify-center shadow-2xl neon-glow">
-                    <span className="text-white font-black italic text-3xl">DKS</span>
-                 </div>
-                 <span className="text-4xl font-black uppercase italic tracking-tighter">Double King <span className="text-accent">Shop</span></span>
-              </div>
+              <Logo showText={true} size="lg" />
               <p className="text-muted-foreground text-lg font-light leading-relaxed max-w-md">
                 L'excellence informatique au cœur de l'Ituri. Nous fournissons le matériel qui propulse vos ambitions numériques.
               </p>
@@ -340,7 +335,7 @@ export default function LandingPage() {
               
               <div className="space-y-8">
                 <h4 className="font-black uppercase italic text-xs tracking-widest opacity-60">Suivez-nous</h4>
-                <div className="grid grid-cols-2 gap-3 w-fit">
+                <div className="flex flex-wrap gap-3 w-fit">
                   {[
                     { icon: Instagram, label: "Instagram", color: "hover:bg-pink-600" },
                     { icon: Facebook, label: "Facebook", color: "hover:bg-blue-600" },

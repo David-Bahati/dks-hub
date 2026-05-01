@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -12,6 +11,7 @@ import { initializeFirebase } from '@/firebase';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { Badge } from '@/components/ui/badge';
+import { Logo } from '@/components/ui/Logo';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -60,13 +60,11 @@ export default function LoginPage() {
     ];
 
     try {
-      // Déconnexion initiale pour nettoyer la session
       await signOut(auth);
 
       for (const testUser of testUsers) {
         let uid;
         try {
-          // 1. Création ou connexion à l'utilisateur Auth
           const userCredential = await createUserWithEmailAndPassword(auth, testUser.email, testUser.password);
           uid = userCredential.user.uid;
         } catch (e: any) {
@@ -79,7 +77,6 @@ export default function LoginPage() {
         }
 
         if (uid) {
-          // 2. Mise à jour du profil utilisateur global
           await setDoc(doc(firestore, 'users', uid), {
             id: uid,
             email: testUser.email,
@@ -91,8 +88,6 @@ export default function LoginPage() {
             updatedAt: serverTimestamp(),
           }, { merge: true });
 
-          // 3. Injection dans la collection de rôle spécifique (admins, sellers, cashiers)
-          // Cette étape est CRUCIALE pour les règles isStaff()
           const roleCollection = testUser.role.toLowerCase() + 's';
           await setDoc(doc(firestore, roleCollection, uid), { 
             id: uid, 
@@ -100,7 +95,6 @@ export default function LoginPage() {
             updatedAt: serverTimestamp() 
           }, { merge: true });
 
-          // Déconnexion pour pouvoir traiter l'utilisateur suivant (nécessaire pour setDoc isOwner)
           await signOut(auth);
         }
       }
@@ -139,9 +133,7 @@ export default function LoginPage() {
       
       <div className="w-full max-sm:max-w-[320px] max-w-sm">
         <div className="text-center mb-10">
-          <div className="w-16 h-16 rounded-3xl bg-primary flex items-center justify-center neon-glow mx-auto mb-6">
-            <span className="text-white font-black text-3xl italic uppercase">DKS</span>
-          </div>
+          <Logo size="lg" className="justify-center mb-6" />
           <Badge className="mb-4 bg-white/5 text-accent border-white/10 px-3 py-1 text-[10px] font-black uppercase tracking-widest">
             <Sparkles className="w-3 h-3 mr-2" />
             Accès Sécurisé

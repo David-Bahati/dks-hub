@@ -1,7 +1,6 @@
-
 "use client";
 
-import { LogOut, LayoutDashboard, ShoppingCart, Settings, Users, Package, Bell, Loader2, PanelLeft, Home, Trash2, User, Sparkles } from 'lucide-react';
+import { LogOut, LayoutDashboard, ShoppingCart, Users, Package, Home, Trash2, User, Sparkles, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { Button } from "@/components/ui/button";
@@ -12,6 +11,7 @@ import { signOut } from 'firebase/auth';
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { PI_CONVERSION_RATE } from '@/lib/constants';
 import { Badge } from '@/components/ui/badge';
+import { Logo } from '@/components/ui/Logo';
 
 export function Navbar() {
     const { user, isLoading } = useAuth();
@@ -45,13 +45,9 @@ export function Navbar() {
     return (
         <header className="border-b border-white/5 bg-background/60 backdrop-blur-3xl sticky top-0 z-[60] h-24">
             <div className="max-w-7xl mx-auto px-6 h-full flex items-center justify-between">
-                <Link href="/" className="flex items-center gap-4 group">
-                    <div className="w-12 h-12 rounded-[1.25rem] bg-primary flex items-center justify-center neon-glow group-hover:scale-110 group-hover:rotate-6 transition-all duration-500">
-                        <span className="text-white font-black text-2xl italic uppercase">dks</span>
-                    </div>
-                    <span className="text-3xl font-black tracking-tighter uppercase italic hidden sm:block">
-                        Shop<span className="text-accent">Manager</span>
-                    </span>
+                <Link href="/">
+                    <Logo showText={true} className="hidden sm:flex" size="md" />
+                    <Logo showText={false} className="sm:hidden" size="md" />
                 </Link>
                 
                 <nav className="hidden lg:flex items-center gap-2 bg-white/5 border border-white/10 rounded-2xl p-1.5 backdrop-blur-md">
@@ -66,7 +62,6 @@ export function Navbar() {
                 </nav>
 
                 <div className="flex items-center gap-6">
-                    {/* Cart Drawer for Customers */}
                     {!isStaff && (
                         <Sheet>
                             <SheetTrigger asChild>
@@ -135,10 +130,6 @@ export function Navbar() {
                                             <span>SÉLECTION VIDE</span>
                                         )}
                                     </Button>
-                                    
-                                    <p className="text-[9px] text-center text-muted-foreground uppercase font-black opacity-40 tracking-widest">
-                                        PAIEMENT SÉCURISÉ : PI (GCV) • M-MONEY • CASH
-                                    </p>
                                 </div>
                             </SheetContent>
                         </Sheet>
@@ -166,4 +157,3 @@ export function Navbar() {
         </header>
     );
 }
-
