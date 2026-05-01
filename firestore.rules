@@ -26,7 +26,8 @@ service cloud.firestore {
     }
 
     function isStaff() {
-      return isAdmin() || isSeller() || isCashier();
+      // Pour simplifier, on vérifie aussi le champ role dans le document user
+      return isAdmin() || isSeller() || isCashier() || (isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['Admin', 'Seller', 'Cashier', 'Manager']);
     }
 
     // --- COLLECTION RULES ---
@@ -35,7 +36,7 @@ service cloud.firestore {
       allow get: if isSignedIn();
       allow list: if isStaff();
       allow create: if isSignedIn(); 
-      allow update: if isOwner(userId) || isAdmin();
+      allow update: if isOwner(userId) || isStaff();
       allow delete: if isAdmin();
     }
 
@@ -60,14 +61,8 @@ service cloud.firestore {
     }
 
     match /orders/{orderId} {
-      // Autoriser la création pour tout utilisateur connecté
       allow create: if isSignedIn();
-      
-      // Autoriser la lecture individuelle si propriétaire ou staff
       allow read: if isSignedIn() && (isStaff() || resource.data.userId == request.auth.uid);
-      
-      // Simplification du listage pour éviter les erreurs de permission
-      // Le filtrage se fait par la requête client (where userId == uid)
       allow list: if isSignedIn();
     }
 
@@ -84,10 +79,6 @@ service cloud.firestore {
     match /categories/{categoryId} {
       allow read: if true;
       allow write: if isStaff();
-    }
-    
-    match /customers/{customerId} {
-      allow read, write: if isStaff();
     }
   }
 }

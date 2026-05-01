@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Users, Mail, Phone, Loader2, UserPlus, ArrowLeft } from "lucide-react";
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import withAuth from '@/components/auth/withAuth';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
@@ -18,11 +18,18 @@ function CustomersPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, "customers"), (snapshot) => {
+    // On récupère les utilisateurs qui ont le rôle 'customer'
+    const q = query(collection(db, "users"), where("role", "==", "customer"));
+    
+    const unsubscribe = onSnapshot(q, (snapshot) => {
       const custs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setCustomers(custs);
       setLoading(false);
+    }, (error) => {
+      console.error("Error fetching customers:", error);
+      setLoading(false);
     });
+    
     return () => unsubscribe();
   }, []);
 
@@ -64,8 +71,7 @@ function CustomersPage() {
                     <TableRow className="border-white/10 hover:bg-transparent">
                     <TableHead className="uppercase font-black text-[10px] tracking-widest">Client</TableHead>
                     <TableHead className="uppercase font-black text-[10px] tracking-widest">Contact</TableHead>
-                    <TableHead className="uppercase font-black text-[10px] tracking-widest">Localisation</TableHead>
-                    <TableHead className="text-right uppercase font-black text-[10px] tracking-widest">Inscrit le</TableHead>
+                    <TableHead className="uppercase font-black text-[10px] tracking-widest text-right">Inscrit le</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -74,10 +80,12 @@ function CustomersPage() {
                         <TableCell>
                         <div className="flex items-center gap-3">
                             <Avatar className="h-10 w-10 border border-white/10 bg-primary/20">
-                            <AvatarFallback className="text-accent font-black">{customer.firstName?.substring(0, 1)}{customer.lastName?.substring(0, 1)}</AvatarFallback>
+                            <AvatarFallback className="text-accent font-black">
+                                {(customer.firstName || customer.displayName || "C").substring(0, 1)}
+                            </AvatarFallback>
                             </Avatar>
                             <div>
-                                <span className="font-bold block">{customer.firstName} {customer.lastName}</span>
+                                <span className="font-bold block">{customer.displayName || `${customer.firstName} ${customer.lastName}`}</span>
                                 <span className="text-[10px] text-muted-foreground uppercase">ID: #{customer.id.substring(0, 6)}</span>
                             </div>
                         </div>
@@ -85,14 +93,11 @@ function CustomersPage() {
                         <TableCell>
                         <div className="flex flex-col text-xs text-muted-foreground gap-1">
                             <span className="flex items-center gap-2"><Mail size={12} className="text-accent"/> {customer.email}</span>
-                            <span className="flex items-center gap-2"><Phone size={12} className="text-accent"/> {customer.phoneNumber}</span>
+                            {customer.phoneNumber && <span className="flex items-center gap-2"><Phone size={12} className="text-accent"/> {customer.phoneNumber}</span>}
                         </div>
                         </TableCell>
-                        <TableCell>
-                            <span className="text-xs italic opacity-80">{customer.address || "Non renseigné"}</span>
-                        </TableCell>
                         <TableCell className="text-right font-black text-accent text-[10px] uppercase">
-                            {customer.createdAt?.toDate ? customer.createdAt.toDate().toLocaleDateString() : "N/A"}
+                            {customer.createdAt?.toDate ? customer.createdAt.toDate().toLocaleDateString() : "Récemment"}
                         </TableCell>
                     </TableRow>
                     ))}
