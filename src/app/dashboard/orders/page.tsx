@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from 'react';
@@ -10,7 +9,7 @@ import { useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, where, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 
 export default function OrdersPage() {
   const { user, isLoading: authLoading } = useAuth();
@@ -27,7 +26,7 @@ export default function OrdersPage() {
       return query(baseRef, orderBy("createdAt", "desc"));
     }
     
-    // Pour les clients, filtrage STRICT par userId
+    // Pour les clients, filtrage STRICT par userId pour correspondre aux règles Firestore
     return query(
       baseRef, 
       where("userId", "==", user.uid), 
@@ -84,7 +83,7 @@ export default function OrdersPage() {
                 <div className="grid grid-cols-1 gap-4">
                     {orders.map((order: any) => (
                         <Card key={order.id} className="glossy-card border-none rounded-[2rem] overflow-hidden">
-                            <CardContent className="p-8">
+                            <div className="p-8">
                                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                                     <div className="space-y-2">
                                         <div className="flex items-center gap-3">
@@ -110,7 +109,7 @@ export default function OrdersPage() {
                                         <p className="text-2xl font-black text-accent">${(order.total || 0).toFixed(2)}</p>
                                     </div>
                                 </div>
-                            </CardContent>
+                            </div>
                         </Card>
                     ))}
                 </div>

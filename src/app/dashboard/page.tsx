@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -14,8 +13,6 @@ import {
   TrendingUp,
   LineChart,
   Users,
-  ReceiptText,
-  Tag,
   UsersRound,
   ShoppingBag,
   PanelLeft,
@@ -25,7 +22,6 @@ import {
   Headset,
   ArrowRight,
   Clock,
-  CheckCircle2,
   Sparkles
 } from "lucide-react";
 
@@ -48,7 +44,7 @@ import {
     getLowStockItems,
     getRecentSales
 } from '@/lib/data';
-import { Product, Sale, Order } from '@/lib/types';
+import { Product } from '@/lib/types';
 import withAuth from '@/components/auth/withAuth';
 import { useAuth } from '@/context/AuthContext';
 import { useCollection, useMemoFirebase } from '@/firebase';
@@ -161,7 +157,6 @@ function DashboardPage() {
         </header>
 
         <main className="flex-1 max-w-7xl mx-auto w-full p-4 md:p-8 space-y-8">
-            {/* Bannière de Bienvenue / Statut */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <Card className="md:col-span-2 glossy-card border-none rounded-[2.5rem] overflow-hidden relative group">
                     <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity">
@@ -196,7 +191,7 @@ function DashboardPage() {
                                 <div className="p-3 bg-white/5 rounded-xl border border-white/5 space-y-1">
                                     <p className="text-[10px] text-muted-foreground uppercase font-black">Mode de paiement</p>
                                     <p className="text-xs font-bold flex items-center gap-2">
-                                        <Package className="w-3 h-3 text-accent" />
+                                        <ShoppingBag className="w-3 h-3 text-accent" />
                                         {lastOrder.paymentMethod?.replace('_', ' ')}
                                     </p>
                                 </div>
@@ -214,7 +209,6 @@ function DashboardPage() {
                 </Card>
             </div>
 
-            {/* Menu Client */}
             <div className="space-y-6">
                 <h3 className="text-xs font-black uppercase tracking-[0.3em] text-muted-foreground ml-2">Mon Hub Personnel</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
