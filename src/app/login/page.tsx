@@ -1,5 +1,4 @@
-
-"use client";
+'use client';
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -10,7 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Lock, ArrowRight, Home, Mail, Loader2, ShieldCheck } from 'lucide-react';
 import { initializeFirebase } from '@/firebase';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -62,33 +61,44 @@ export default function LoginPage() {
       for (const user of testUsers) {
         let uid;
         try {
-          // Tenter de créer l'utilisateur
-          const userCredential = await createUserWithEmailAndPassword(auth, user.email, user.password);
-          uid = userCredential.user.uid;
-        } catch (e: any) {
-          if (e.code === 'auth/email-already-in-use') {
-            // Si l'utilisateur existe déjà, on se connecte pour récupérer son UID et forcer les permissions
-            const userCredential = await signInWithEmailAndPassword(auth, user.email, user.password);
+          // 1. Authentification
+          try {
+            const userCredential = await createUserWithEmailAndPassword(auth, user.email, user.password);
             uid = userCredential.user.uid;
-          } else {
-            throw e;
+          } catch (e: any) {
+            if (e.code === 'auth/email-already-in-use') {
+              const userCredential = await signInWithEmailAndPassword(auth, user.email, user.password);
+              uid = userCredential.user.uid;
+            } else {
+              throw e;
+            }
           }
-        }
 
-        if (uid) {
-          // Créer ou mettre à jour le profil utilisateur
-          await setDoc(doc(firestore, 'users', uid), {
-            name: user.name,
-            email: user.email,
-            role: user.role,
-            updatedAt: new Date().toISOString(),
-          }, { merge: true });
+          if (uid) {
+            // 2. Création du profil utilisateur (respectant le schéma backend.json)
+            await setDoc(doc(firestore, 'users', uid), {
+              id: uid,
+              email: user.email,
+              firstName: user.name.split(' ')[0],
+              lastName: user.name.split(' ')[1] || 'DKS',
+              role: user.role.charAt(0).toUpperCase() + user.role.slice(1),
+              createdAt: serverTimestamp(),
+              updatedAt: serverTimestamp(),
+            }, { merge: true });
 
-          // Créer les marqueurs de rôles pour les règles de sécurité (admins ou sellers)
-          const roleCollection = user.role === 'admin' ? 'admins' : 'sellers';
-          if (user.role !== 'customer') {
-             await setDoc(doc(firestore, roleCollection, uid), { active: true }, { merge: true });
+            // 3. Attribution du rôle (grâce aux nouvelles règles de sécurité qui autorisent l'isOwner sur create)
+            const roleCollection = user.role === 'admin' ? 'admins' : 'sellers';
+            if (user.role !== 'customer') {
+               await setDoc(doc(firestore, roleCollection, uid), { 
+                 id: uid, 
+                 role: user.role,
+                 updatedAt: serverTimestamp() 
+               }, { merge: true });
+            }
           }
+        } catch (innerError: any) {
+          console.error(`Error setting up ${user.email}:`, innerError);
+          // On continue pour les autres utilisateurs même si l'un échoue
         }
       }
       
@@ -99,7 +109,7 @@ export default function LoginPage() {
     } catch (error: any) {
       console.error("Setup error:", error);
       toast({
-        title: "Erreur",
+        title: "Erreur critique",
         description: error.message || "Une erreur est survenue lors de l'initialisation.",
         variant: "destructive",
       });
