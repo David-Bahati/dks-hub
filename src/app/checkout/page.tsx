@@ -21,7 +21,9 @@ import {
   ArrowRight,
   ShieldCheck,
   CheckCircle2,
-  Phone
+  Phone,
+  ArrowLeft,
+  Lock
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -42,7 +44,6 @@ export default function CheckoutPage() {
     const [customerPhone, setCustomerPhone] = useState("");
     const [isProcessing, setIsProcessing] = useState(false);
 
-    // Rediriger si le panier est vide
     useEffect(() => {
         if (cartItems.length === 0 && !isProcessing) {
             const timer = setTimeout(() => {
@@ -91,13 +92,11 @@ export default function CheckoutPage() {
         setIsProcessing(true);
 
         try {
-            // Simulation d'envoi USSD pour Mobile Money
             if (paymentMethod === 'MOBILE_MONEY') {
                 toast({
                     title: "Requête USSD envoyée",
                     description: `Veuillez confirmer le paiement sur votre téléphone (${mobileNetwork}).`,
                 });
-                // On attend un peu pour simuler le processus
                 await new Promise(resolve => setTimeout(resolve, 3000));
             }
 
@@ -148,81 +147,104 @@ export default function CheckoutPage() {
     return (
         <div className="min-h-screen bg-background text-foreground">
             <Navbar />
-            <main className="max-w-5xl mx-auto px-4 py-12">
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    
-                    <div className="lg:col-span-2 space-y-6">
-                        <h1 className="text-4xl font-black uppercase italic tracking-tighter mb-8">
-                            Finaliser ma <span className="text-accent">Commande</span>
-                        </h1>
+            <main className="max-w-6xl mx-auto px-6 py-12">
+                <div className="mb-10 flex items-center justify-between">
+                    <Button 
+                        variant="ghost" 
+                        onClick={() => router.back()}
+                        className="rounded-xl gap-2 font-bold uppercase italic text-[10px] tracking-widest text-muted-foreground hover:text-white"
+                    >
+                        <ArrowLeft size={16} />
+                        Retour au panier
+                    </Button>
+                    <div className="flex items-center gap-2 text-accent">
+                        <Lock size={14} className="opacity-50" />
+                        <span className="text-[10px] font-black uppercase tracking-widest opacity-50">Paiement ultra-sécurisé & crypté</span>
+                    </div>
+                </div>
 
-                        <div className="space-y-4">
-                            <h2 className="text-xs font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
-                                <ShieldCheck size={14} className="text-accent" />
-                                Choisissez votre mode de paiement
-                            </h2>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+                    
+                    <div className="lg:col-span-2 space-y-10">
+                        <div className="space-y-2">
+                            <h1 className="text-5xl font-black uppercase italic tracking-tighter leading-none">
+                                FINALISER LA <span className="text-accent">COMMANDE</span>
+                            </h1>
+                            <p className="text-muted-foreground font-light uppercase tracking-widest text-xs opacity-60">Validation de votre sélection premium</p>
+                        </div>
+
+                        <div className="space-y-6">
+                            <div className="flex items-center gap-3">
+                                <ShieldCheck size={20} className="text-accent" />
+                                <h2 className="text-sm font-black uppercase tracking-widest italic">Modes de paiement acceptés</h2>
+                            </div>
+                            
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                                <Button 
-                                    variant="outline"
-                                    className={cn(
-                                        "h-24 flex-col gap-2 rounded-2xl border-white/10 transition-all",
-                                        paymentMethod === "PI_NETWORK" ? "bg-primary border-primary text-white neon-glow" : "bg-white/5 hover:bg-white/10"
-                                    )}
-                                    onClick={() => setPaymentMethod("PI_NETWORK")}
-                                >
-                                    <Coins size={24} />
-                                    <span className="font-bold uppercase italic text-xs">Pi Network (GCV)</span>
-                                </Button>
-                                <Button 
-                                    variant="outline"
-                                    className={cn(
-                                        "h-24 flex-col gap-2 rounded-2xl border-white/10 transition-all",
-                                        paymentMethod === "MOBILE_MONEY" ? "bg-primary border-primary text-white neon-glow" : "bg-white/5 hover:bg-white/10"
-                                    )}
-                                    onClick={() => setPaymentMethod("MOBILE_MONEY")}
-                                >
-                                    <Smartphone size={24} />
-                                    <span className="font-bold uppercase italic text-xs">Mobile Money</span>
-                                </Button>
-                                <Button 
-                                    variant="outline"
-                                    className={cn(
-                                        "h-24 flex-col gap-2 rounded-2xl border-white/10 transition-all",
-                                        paymentMethod === "CASH" ? "bg-primary border-primary text-white neon-glow" : "bg-white/5 hover:bg-white/10"
-                                    )}
-                                    onClick={() => setPaymentMethod("CASH")}
-                                >
-                                    <Banknote size={24} />
-                                    <span className="font-bold uppercase italic text-xs">Cash</span>
-                                </Button>
+                                {[
+                                    { id: "PI_NETWORK", label: "Pi Network (GCV)", icon: Coins },
+                                    { id: "MOBILE_MONEY", label: "Mobile Money", icon: Smartphone },
+                                    { id: "CASH", label: "Cash au Bureau", icon: Banknote }
+                                ].map((method) => (
+                                    <button 
+                                        key={method.id}
+                                        onClick={() => setPaymentMethod(method.id as PaymentMethod)}
+                                        className={cn(
+                                            "relative h-28 flex flex-col items-center justify-center gap-3 rounded-[1.5rem] border transition-all duration-300",
+                                            paymentMethod === method.id 
+                                                ? "bg-accent/10 border-accent shadow-[0_0_30px_rgba(56,189,248,0.1)]" 
+                                                : "bg-white/5 border-white/5 hover:bg-white/10 hover:border-white/20"
+                                        )}
+                                    >
+                                        <method.icon size={28} className={cn(paymentMethod === method.id ? "text-accent" : "text-muted-foreground")} />
+                                        <span className={cn("font-black uppercase italic text-[10px] tracking-widest", paymentMethod === method.id ? "text-white" : "text-muted-foreground")}>
+                                            {method.label}
+                                        </span>
+                                        {paymentMethod === method.id && (
+                                            <CheckCircle2 size={16} className="absolute top-3 right-3 text-accent animate-in zoom-in" />
+                                        )}
+                                    </button>
+                                ))}
                             </div>
                         </div>
 
-                        <div className="p-8 rounded-[2rem] bg-card/40 border border-white/10 backdrop-blur-xl">
+                        <div className="p-10 rounded-[2.5rem] bg-card/40 border border-white/5 backdrop-blur-3xl shadow-2xl">
                             {paymentMethod === "PI_NETWORK" && (
-                                <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2">
-                                    <div className="flex items-center gap-3 text-accent">
-                                        <Coins size={20} />
-                                        <h3 className="font-black uppercase italic">Paiement via Pi Network (GCV)</h3>
+                                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                    <div className="flex items-center gap-4 text-accent">
+                                        <div className="w-12 h-12 rounded-2xl bg-accent/10 flex items-center justify-center">
+                                            <Coins size={24} />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-black uppercase italic tracking-tighter">Paiement via Pi Network (GCV)</h3>
+                                            <p className="text-[10px] uppercase font-bold tracking-widest opacity-60">Consensus Global 1 π = $314,159</p>
+                                        </div>
                                     </div>
-                                    <p className="text-sm text-muted-foreground leading-relaxed">
-                                        Nous appliquons le taux <strong>GCV (1 π = $314,159)</strong>. La transaction s'effectuera via le <strong>Pi Browser</strong>.
-                                    </p>
-                                    <div className="bg-primary/10 border border-primary/20 p-4 rounded-xl text-primary-foreground text-xs">
-                                        Total à transférer : <span className="font-black text-accent">{(totalPrice / PI_CONVERSION_RATE).toFixed(8)} π</span>
+                                    <div className="p-6 rounded-2xl bg-white/5 border border-white/5 space-y-4">
+                                        <p className="text-sm text-muted-foreground leading-relaxed">
+                                            La transaction s'effectuera via le <strong>Pi Browser</strong>. Assurez-vous d'être connecté à votre compte Pi Network.
+                                        </p>
+                                        <div className="bg-accent/5 border border-accent/20 p-4 rounded-xl flex justify-between items-center">
+                                            <span className="text-[10px] font-black uppercase text-accent">Total à transférer :</span>
+                                            <span className="font-black text-xl text-white">{(totalPrice / PI_CONVERSION_RATE).toFixed(8)} π</span>
+                                        </div>
                                     </div>
                                 </div>
                             )}
 
                             {paymentMethod === "MOBILE_MONEY" && (
-                                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
-                                    <div className="flex items-center gap-3 text-accent">
-                                        <Smartphone size={20} />
-                                        <h3 className="font-black uppercase italic">Paiement Mobile Money</h3>
+                                <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                    <div className="flex items-center gap-4 text-accent">
+                                        <div className="w-12 h-12 rounded-2xl bg-accent/10 flex items-center justify-center">
+                                            <Smartphone size={24} />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-black uppercase italic tracking-tighter">Paiement Mobile Money</h3>
+                                            <p className="text-[10px] uppercase font-bold tracking-widest opacity-60">Confirmation instantanée par USSD</p>
+                                        </div>
                                     </div>
                                     
-                                    <div className="space-y-3">
-                                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Sélectionnez votre réseau</Label>
+                                    <div className="space-y-4">
+                                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-40">Opérateur Mobile</Label>
                                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                                             {[
                                                 { id: "VODACOM", label: "Vodacom", color: "bg-red-600" },
@@ -234,96 +256,91 @@ export default function CheckoutPage() {
                                                     key={net.id}
                                                     onClick={() => setMobileNetwork(net.id as MobileNetwork)}
                                                     className={cn(
-                                                        "p-3 rounded-xl border text-[10px] font-black uppercase transition-all flex flex-col items-center gap-2",
+                                                        "p-4 rounded-2xl border text-[10px] font-black uppercase transition-all flex flex-col items-center gap-2",
                                                         mobileNetwork === net.id 
-                                                            ? "bg-white text-black border-white scale-105 shadow-lg" 
-                                                            : "bg-white/5 border-white/10 text-muted-foreground hover:bg-white/10"
+                                                            ? "bg-white text-black border-white shadow-xl scale-105" 
+                                                            : "bg-white/5 border-white/5 text-muted-foreground hover:bg-white/10"
                                                     )}
                                                 >
-                                                    <div className={cn("w-3 h-3 rounded-full", net.color)} />
+                                                    <div className={cn("w-3 h-3 rounded-full shadow-lg", net.color)} />
                                                     {net.label}
                                                 </button>
                                             ))}
                                         </div>
                                     </div>
 
-                                    <div className="space-y-3">
-                                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Votre numéro de téléphone</Label>
-                                        <div className="relative">
-                                            <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
+                                    <div className="space-y-4">
+                                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-40">Numéro de téléphone</Label>
+                                        <div className="relative group">
+                                            <Phone className="absolute left-5 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-accent transition-colors" size={20} />
                                             <Input 
                                                 type="tel"
-                                                placeholder="Ex: 0823038945"
-                                                className="h-14 pl-12 rounded-xl bg-background/50 border-white/10"
+                                                placeholder="08XXXXXXXX"
+                                                className="h-16 pl-14 rounded-2xl bg-background/50 border-white/5 focus:border-accent transition-all text-sm font-bold"
                                                 value={customerPhone}
                                                 onChange={(e) => setCustomerPhone(e.target.value)}
                                             />
                                         </div>
-                                        <p className="text-[10px] text-muted-foreground italic">
-                                            Une demande de confirmation USSD sera envoyée automatiquement à ce numéro.
-                                        </p>
-                                    </div>
-
-                                    <div className="bg-accent/5 border border-accent/20 p-4 rounded-xl flex items-start gap-3">
-                                        <Info className="text-accent shrink-0" size={18} />
-                                        <div className="text-[10px] leading-relaxed">
-                                            <p className="font-bold text-accent uppercase mb-1">Indications Boutique</p>
-                                            <p>Numéro de réception DKS : <span className="font-black text-white">+243 823 038 945</span></p>
-                                            <p className="opacity-70 mt-1">Le montant de <strong>${totalPrice.toFixed(2)}</strong> sera converti au taux CDF/USD du jour.</p>
+                                        <div className="bg-orange-500/5 border border-orange-500/10 p-4 rounded-xl flex items-start gap-3">
+                                            <Info className="text-orange-500 shrink-0" size={16} />
+                                            <p className="text-[10px] text-orange-200/60 leading-relaxed uppercase font-bold tracking-widest">
+                                                Vous recevrez une demande de confirmation USSD sur ce numéro après avoir validé la commande.
+                                            </p>
                                         </div>
                                     </div>
                                 </div>
                             )}
 
                             {paymentMethod === "CASH" && (
-                                <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2">
-                                    <div className="flex items-center gap-3 text-orange-400">
-                                        <MapPin size={20} />
-                                        <h3 className="font-black uppercase italic">Paiement au Bureau (Bunia)</h3>
+                                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                    <div className="flex items-center gap-4 text-orange-400">
+                                        <div className="w-12 h-12 rounded-2xl bg-orange-400/10 flex items-center justify-center">
+                                            <MapPin size={24} />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-black uppercase italic tracking-tighter">Paiement au Bureau (Bunia)</h3>
+                                            <p className="text-[10px] uppercase font-bold tracking-widest opacity-60">Retrait direct en magasin</p>
+                                        </div>
                                     </div>
-                                    <div className="bg-orange-500/10 border border-orange-500/20 p-6 rounded-2xl text-orange-200 text-sm">
-                                        <p className="font-black uppercase italic mb-3 flex items-center gap-2">
-                                            <Info size={16} /> Attention
+                                    <div className="p-8 rounded-[2rem] bg-orange-500/5 border border-orange-500/10 text-orange-200 text-sm leading-relaxed">
+                                        <p className="font-black uppercase italic mb-4 flex items-center gap-2">
+                                            <Info size={16} /> Informations de Retrait
                                         </p>
-                                        <strong>IMPORTANT :</strong> Veuillez vous présenter à notre bureau <strong>Double King Shop (Immeuble Bahati, Boulevard de la Libération, Bunia)</strong> sous 24h pour régler et retirer votre commande.
-                                        <p className="mt-4 opacity-70 text-xs">Munissez-vous de votre numéro de commande qui vous sera communiqué après validation.</p>
+                                        Veuillez vous présenter à notre bureau <strong>Double King Shop (Immeuble Bahati, Boulevard de la Libération, Bunia)</strong> sous 24h muni de votre ID de commande.
                                     </div>
                                 </div>
                             )}
                         </div>
                     </div>
 
-                    <div className="space-y-6">
-                        <Card className="glossy-card border-none rounded-[2.5rem] overflow-hidden">
-                            <CardHeader className="bg-white/5">
-                                <CardTitle className="text-lg font-black uppercase italic">Récapitulatif</CardTitle>
+                    <div className="space-y-8">
+                        <Card className="glossy-card border-none rounded-[2.5rem] overflow-hidden sticky top-28">
+                            <CardHeader className="bg-white/5 p-8 border-b border-white/5">
+                                <CardTitle className="text-lg font-black uppercase italic tracking-tighter">Votre Panier</CardTitle>
                             </CardHeader>
-                            <CardContent className="p-6 space-y-4">
+                            <CardContent className="p-8 space-y-4">
                                 {cartItems.map(item => (
-                                    <div key={item.id} className="flex justify-between items-center text-sm border-b border-white/5 pb-2">
+                                    <div key={item.id} className="flex justify-between items-center text-xs group">
                                         <div className="flex flex-col">
-                                            <span className="font-bold">{item.name}</span>
-                                            <span className="text-[10px] text-muted-foreground uppercase">Qté: {item.quantity}</span>
+                                            <span className="font-bold text-white/80 group-hover:text-white transition-colors">{item.name}</span>
+                                            <span className="text-[9px] text-muted-foreground uppercase font-black">Qté: {item.quantity}</span>
                                         </div>
-                                        <span className="font-black">${((item.price || 0) * item.quantity).toFixed(2)}</span>
+                                        <span className="font-black text-white">${((item.price || 0) * item.quantity).toFixed(2)}</span>
                                     </div>
                                 ))}
-                                <div className="pt-4 space-y-2">
-                                    <div className="flex justify-between items-center font-black text-xl">
-                                        <span className="uppercase italic text-xs text-muted-foreground">Total</span>
-                                        <span className="text-accent">${totalPrice.toFixed(2)}</span>
-                                    </div>
-                                    <div className="text-right flex flex-col items-end">
-                                        <Badge variant="outline" className="border-accent text-accent font-black text-[10px] mb-1">GCV RATE (Pi)</Badge>
-                                        <p className="text-[10px] font-bold text-muted-foreground uppercase">
-                                            ≈ {(totalPrice / PI_CONVERSION_RATE).toFixed(8)} π
-                                        </p>
+                                <div className="pt-6 mt-6 border-t border-white/5 space-y-4">
+                                    <div className="flex justify-between items-end">
+                                        <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Montant Total</span>
+                                        <div className="text-right">
+                                            <p className="text-4xl font-black text-accent tracking-tighter leading-none">${totalPrice.toFixed(2)}</p>
+                                            <p className="text-[10px] font-bold text-muted-foreground uppercase mt-1">≈ {(totalPrice / PI_CONVERSION_RATE).toFixed(6)} π</p>
+                                        </div>
                                     </div>
                                 </div>
                             </CardContent>
-                            <CardFooter className="p-6 bg-white/5">
+                            <CardFooter className="p-8 bg-white/5">
                                 <Button 
-                                    className="w-full h-16 bg-accent text-accent-foreground hover:bg-accent/90 rounded-2xl font-black uppercase italic text-lg gap-3 shadow-lg"
+                                    className="w-full h-20 bg-accent text-accent-foreground hover:bg-accent/90 rounded-2xl font-black uppercase italic text-xl gap-3 shadow-xl hover:scale-[1.02] active:scale-95 transition-all"
                                     onClick={handlePlaceOrder}
                                     disabled={isProcessing || cartItems.length === 0}
                                 >
@@ -332,12 +349,19 @@ export default function CheckoutPage() {
                                     ) : (
                                         <>
                                             Confirmer
-                                            <ArrowRight size={20} />
+                                            <ArrowRight size={24} />
                                         </>
                                     )}
                                 </Button>
                             </CardFooter>
                         </Card>
+                        
+                        <div className="flex items-center gap-3 px-6 py-4 bg-white/5 rounded-2xl border border-white/5 opacity-40">
+                            <ShieldCheck size={20} className="text-accent" />
+                            <p className="text-[9px] font-bold uppercase tracking-widest leading-relaxed">
+                                Votre achat est protégé par la garantie DKS. Transaction cryptée SSL 256-bit.
+                            </p>
+                        </div>
                     </div>
 
                 </div>
