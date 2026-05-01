@@ -92,7 +92,7 @@ function DashboardPage() {
       orderBy("createdAt", "desc"), 
       limit(1)
     );
-  }, [user, isStaff, authLoading]);
+  }, [user?.uid, isStaff, authLoading]);
   
   const { data: lastOrders } = useCollection(lastOrderQuery);
   const lastOrder = lastOrders?.[0];
