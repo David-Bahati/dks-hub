@@ -22,7 +22,8 @@ import {
   Instagram,
   Twitter,
   Linkedin,
-  Facebook
+  Facebook,
+  Cpu
 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -49,9 +50,18 @@ const TESTIMONIALS = [
     name: "Dr. Marc Uziel",
     role: "Clinique de l'Espoir",
     content: "Nous avons équipé tout notre service informatique via DKS. Fiabilité et professionnalisme au rendez-vous.",
-    stars: 4,
+    stars: 5,
     avatar: "https://picsum.photos/seed/user3/100/100"
   }
+];
+
+const BRANDS = [
+  { name: "Nvidia", icon: Cpu },
+  { name: "Asus", icon: Cpu },
+  { name: "Logitech", icon: Cpu },
+  { name: "Razer", icon: Cpu },
+  { name: "MSI", icon: Cpu },
+  { name: "Intel", icon: Cpu }
 ];
 
 export default function LandingPage() {
@@ -89,8 +99,7 @@ export default function LandingPage() {
       <Navbar />
 
       {/* Hero Section */}
-      <section className="relative min-h-screen flex items-center justify-center pt-20 overflow-hidden px-4">
-        {/* Abstract Background elements */}
+      <section className="relative min-h-[90vh] flex items-center justify-center pt-20 overflow-hidden px-4">
         <div className="absolute top-0 left-0 w-full h-full -z-10 overflow-hidden">
           <div className="absolute top-[10%] left-[5%] w-[40vw] h-[40vw] bg-primary/10 rounded-full blur-[120px] animate-pulse" />
           <div className="absolute bottom-[10%] right-[5%] w-[40vw] h-[40vw] bg-accent/10 rounded-full blur-[120px] animate-pulse delay-700" />
@@ -107,51 +116,51 @@ export default function LandingPage() {
             <span className="premium-gradient-text">SANS LIMITES</span>
           </h1>
           
-          <p className="text-base md:text-xl text-muted-foreground font-light max-w-2xl mx-auto mb-14 leading-relaxed animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-500">
+          <p className="text-base md:text-lg text-muted-foreground font-light max-w-2xl mx-auto mb-14 leading-relaxed animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-500">
             Distributeur officiel de matériel informatique haute performance à Bunia. 
             <span className="text-foreground font-bold"> Payez en Pi (GCV), Mobile Money ou Cash.</span>
           </p>
 
           <div className="flex flex-col sm:flex-row justify-center gap-6 animate-in fade-in slide-in-from-bottom-10 duration-1000 delay-700">
-            <Button size="lg" className="h-20 px-12 rounded-2xl bg-primary text-white font-black uppercase italic text-lg shadow-[0_0_40px_-10px_hsl(var(--primary))] hover:shadow-[0_0_60px_-5px_hsl(var(--primary))] transition-all group scale-105 active:scale-95" asChild>
-              <Link href="#shop">
+            <Button size="lg" className="h-20 px-12 rounded-2xl bg-primary text-white font-black uppercase italic text-lg shadow-[0_0_40px_-10px_hsl(var(--primary))] hover:shadow-[0_0_60px_-5px_hsl(var(--primary))] transition-all group scale-105 active:scale-95">
+              <Link href="#shop" className="flex items-center">
                 Explorer le Stock
                 <ArrowRight className="ml-3 group-hover:translate-x-2 transition-transform" />
               </Link>
             </Button>
-            <Button size="lg" variant="outline" className="h-20 px-12 rounded-2xl border-white/10 bg-white/5 backdrop-blur-md font-black uppercase italic text-lg hover:bg-white/10 hover:border-accent transition-all active:scale-95" asChild>
+            <Button size="lg" variant="outline" className="h-20 px-12 rounded-2xl border-primary/40 bg-transparent font-black uppercase italic text-lg text-primary hover:bg-primary/5 hover:border-primary transition-all active:scale-95">
               <Link href="/login">Espace Client Pro</Link>
             </Button>
           </div>
         </div>
       </section>
 
-      {/* Features Section - Modern Grid */}
+      {/* Features Section */}
       <section className="py-32 border-y border-white/5 bg-white/[0.01]">
         <div className="container max-w-7xl mx-auto px-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-12 lg:gap-20">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-16">
             <div className="flex flex-col items-center text-center group">
               <div className="w-20 h-20 rounded-[2rem] bg-primary/10 flex items-center justify-center mb-8 group-hover:bg-primary group-hover:text-white transition-all duration-500 shadow-xl group-hover:scale-110">
-                <ShieldCheck className="w-10 h-10" />
+                <ShieldCheck className="w-10 h-10 stroke-[1.5]" />
               </div>
-              <h3 className="text-2xl font-black mb-4 uppercase italic">Garantie Totale</h3>
-              <p className="text-muted-foreground font-light leading-relaxed">Composants testés et certifiés originaux pour une longévité maximale dans les environnements exigeants.</p>
+              <h3 className="text-xl font-black mb-4 uppercase italic">Garantie Totale</h3>
+              <p className="text-muted-foreground font-light text-sm leading-relaxed max-w-[280px]">Composants testés et certifiés originaux pour une longévité maximale.</p>
             </div>
             
             <div className="flex flex-col items-center text-center group">
               <div className="w-20 h-20 rounded-[2rem] bg-accent/10 flex items-center justify-center mb-8 group-hover:bg-accent group-hover:text-black transition-all duration-500 shadow-xl group-hover:scale-110">
-                <Truck className="w-10 h-10" />
+                <Truck className="w-10 h-10 stroke-[1.5]" />
               </div>
-              <h3 className="text-2xl font-black mb-4 uppercase italic">Livraison Flash</h3>
-              <p className="text-muted-foreground font-light leading-relaxed">Service express à Bunia et Ituri. Vos composants sont livrés à domicile ou au bureau sous 2 heures.</p>
+              <h3 className="text-xl font-black mb-4 uppercase italic">Livraison Flash</h3>
+              <p className="text-muted-foreground font-light text-sm leading-relaxed max-w-[280px]">Service express à Bunia. Livraison à domicile sous 2 heures garanties.</p>
             </div>
             
             <div className="flex flex-col items-center text-center group sm:col-span-2 lg:col-span-1">
               <div className="w-20 h-20 rounded-[2rem] bg-white/5 flex items-center justify-center mb-8 group-hover:bg-white group-hover:text-black transition-all duration-500 shadow-xl group-hover:scale-110 border border-white/10">
-                <Headset className="w-10 h-10" />
+                <Headset className="w-10 h-10 stroke-[1.5]" />
               </div>
-              <h3 className="text-2xl font-black mb-4 uppercase italic">Support Expert</h3>
-              <p className="text-muted-foreground font-light leading-relaxed">Une équipe de techniciens passionnés disponible 6j/7 pour vous conseiller sur vos configurations.</p>
+              <h3 className="text-xl font-black mb-4 uppercase italic">Support Expert</h3>
+              <p className="text-muted-foreground font-light text-sm leading-relaxed max-w-[280px]">Une équipe de passionnés disponible 6j/7 pour conseiller vos configurations.</p>
             </div>
           </div>
         </div>
@@ -159,13 +168,13 @@ export default function LandingPage() {
 
       {/* Shop Section */}
       <section id="shop" className="container max-w-7xl mx-auto px-6 py-40">
-        <div className="flex flex-col lg:flex-row justify-between items-end gap-12 mb-20">
+        <div className="flex flex-col lg:flex-row justify-between items-end gap-12 mb-24">
           <div className="max-w-2xl">
             <h2 className="text-5xl md:text-7xl font-black uppercase italic tracking-tighter mb-6">
               Derniers <span className="text-accent">Arrivages</span>
             </h2>
             <p className="text-muted-foreground text-xl font-light">
-              Équipez-vous avec le meilleur de la technologie mondiale, disponible localement sans attente.
+              Le meilleur de la technologie mondiale, disponible localement.
             </p>
           </div>
           <div className="relative w-full max-w-lg group">
@@ -173,7 +182,7 @@ export default function LandingPage() {
             <input 
               type="text" 
               placeholder="Rechercher (RTX, Clavier, SSD...)" 
-              className="w-full h-20 pl-16 pr-8 bg-white/5 border border-white/10 rounded-3xl focus:outline-none focus:border-accent focus:ring-4 focus:ring-accent/10 transition-all text-lg font-medium"
+              className="w-full h-20 pl-16 pr-8 bg-white/5 border border-white/10 rounded-3xl focus:outline-none focus:border-accent focus:ring-4 focus:ring-accent/10 transition-all text-lg font-medium shadow-inner"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -190,28 +199,23 @@ export default function LandingPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-10">
             {filteredProducts.length > 0 ? filteredProducts.map((product, idx) => (
               <Card key={product.id} className="glossy-card rounded-[3rem] overflow-hidden group border-none flex flex-col h-full hover:scale-[1.02] transition-transform duration-500">
-                <div className="aspect-[4/5] relative overflow-hidden">
+                <div className="aspect-[4/5] relative overflow-hidden bg-black">
                   <Image 
                     src={product.imageUrl || `https://picsum.photos/seed/${product.id}/600/800`} 
                     alt={product.name} 
                     fill 
-                    className="object-cover group-hover:scale-110 transition-transform duration-1000"
+                    data-ai-hint="gaming hardware dark background"
+                    className="object-cover group-hover:scale-110 transition-transform duration-1000 opacity-90 group-hover:opacity-100"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent opacity-80" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-transparent to-transparent" />
                   
-                  {/* Badges Dynamiques */}
                   <div className="absolute top-8 left-8 flex flex-col gap-2">
                     <Badge className="bg-black/60 backdrop-blur-md border-none uppercase text-[9px] font-black px-4 py-1.5 tracking-widest w-fit">
                       {product.category}
                     </Badge>
-                    {idx === 0 && (
+                    {(idx === 0 || idx === 3) && (
                       <Badge className="bg-accent text-black border-none uppercase text-[9px] font-black px-4 py-1.5 tracking-widest w-fit">
                         Nouveau
-                      </Badge>
-                    )}
-                    {idx === 1 && (
-                      <Badge className="bg-primary text-white border-none uppercase text-[9px] font-black px-4 py-1.5 tracking-widest w-fit">
-                        Promo -10%
                       </Badge>
                     )}
                   </div>
@@ -219,23 +223,23 @@ export default function LandingPage() {
                 
                 <CardContent className="p-10 flex flex-col flex-1 relative z-10">
                   <h3 className="text-2xl font-black uppercase italic mb-4 line-clamp-1 group-hover:text-accent transition-colors">{product.name}</h3>
-                  <p className="text-sm text-muted-foreground font-light line-clamp-2 mb-10 flex-1">
+                  <p className="text-xs text-muted-foreground font-light line-clamp-2 mb-10 flex-1 leading-relaxed">
                     {product.description || "Matériel informatique de pointe pour professionnels et gamers exigeants."}
                   </p>
                   
                   <div className="space-y-6">
                     <div className="flex flex-col">
                       <span className="text-4xl font-black text-white">${product.sellingPrice.toFixed(2)}</span>
-                      <span className="text-accent font-black text-[10px] uppercase tracking-[0.2em] mt-1">
+                      <span className="text-muted-foreground font-black text-[9px] uppercase tracking-[0.2em] mt-1 opacity-60">
                          ≈ {(product.sellingPrice / PI_CONVERSION_RATE).toFixed(4)} π (GCV)
                       </span>
                     </div>
                     
                     <Button 
-                      className="w-full h-16 rounded-[1.5rem] bg-white/5 hover:bg-primary hover:text-white border border-white/10 hover:border-primary font-black uppercase italic transition-all gap-4 text-sm active:scale-95"
+                      className="w-full h-16 rounded-2xl bg-white/5 hover:bg-primary hover:text-white border border-white/10 hover:border-primary font-black uppercase italic transition-all gap-4 text-xs active:scale-95"
                       onClick={() => addToCart(product)}
                     >
-                      <ShoppingCart size={20} />
+                      <ShoppingCart size={18} />
                       Ajouter au panier
                     </Button>
                   </div>
@@ -250,25 +254,19 @@ export default function LandingPage() {
         )}
       </section>
 
-      {/* Social Proof / Testimonials */}
+      {/* Testimonials Section */}
       <section className="py-40 bg-white/[0.01] border-y border-white/5">
         <div className="container max-w-7xl mx-auto px-6">
           <div className="text-center mb-24">
             <h2 className="text-4xl md:text-6xl font-black uppercase italic tracking-tighter mb-6">ILS NOUS FONT <span className="text-primary">CONFIANCE</span></h2>
-            <p className="text-muted-foreground font-light text-xl">Rejoignez la communauté des leaders technologiques en Ituri.</p>
+            <p className="text-muted-foreground font-light text-lg">Rejoignez la communauté des leaders technologiques en Ituri.</p>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
             {TESTIMONIALS.map((t, i) => (
               <Card key={i} className="bg-card/30 border-white/5 p-10 rounded-[3rem] hover:bg-card/50 transition-all flex flex-col">
-                <div className="flex gap-1 mb-6">
-                  {[...Array(5)].map((_, starIdx) => (
-                    <Star key={starIdx} size={16} className={starIdx < t.stars ? "fill-accent text-accent" : "text-muted-foreground/30"} />
-                  ))}
-                </div>
-                <p className="text-lg italic font-light mb-8 flex-1 leading-relaxed">"{t.content}"</p>
-                <div className="flex items-center gap-4 border-t border-white/5 pt-8">
-                  <div className="w-14 h-14 rounded-2xl overflow-hidden border border-white/10">
+                <div className="flex items-center gap-4 mb-8">
+                  <div className="w-14 h-14 rounded-2xl overflow-hidden border border-white/10 shadow-lg">
                     <img src={t.avatar} alt={t.name} className="w-full h-full object-cover" />
                   </div>
                   <div>
@@ -276,14 +274,34 @@ export default function LandingPage() {
                     <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{t.role}</p>
                   </div>
                 </div>
+                <div className="flex gap-1 mb-6">
+                  {[...Array(5)].map((_, starIdx) => (
+                    <Star key={starIdx} size={14} className={starIdx < t.stars ? "fill-[#FFD700] text-[#FFD700]" : "text-white/10"} />
+                  ))}
+                </div>
+                <p className="text-base italic font-light leading-relaxed text-muted-foreground">"{t.content}"</p>
               </Card>
             ))}
           </div>
         </div>
       </section>
 
+      {/* Brands Section */}
+      <section className="py-24 border-b border-white/5">
+        <div className="container max-w-7xl mx-auto px-6">
+          <div className="flex flex-wrap justify-center items-center gap-12 md:gap-24 opacity-30 grayscale hover:grayscale-0 transition-all duration-700">
+            {BRANDS.map((brand, i) => (
+              <div key={i} className="flex items-center gap-3">
+                 <brand.icon size={24} />
+                 <span className="font-black uppercase italic text-lg tracking-tighter">{brand.name}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* Footer Professional */}
-      <footer className="bg-card/40 border-t border-white/5 pt-32 pb-16">
+      <footer className="bg-card/40 border-t border-white/5 pt-32 pb-24">
         <div className="container max-w-7xl mx-auto px-6">
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-20 mb-32">
             <div className="lg:col-span-2 space-y-10">
@@ -293,26 +311,25 @@ export default function LandingPage() {
                  </div>
                  <span className="text-4xl font-black uppercase italic tracking-tighter">Double King <span className="text-accent">Shop</span></span>
               </div>
-              <p className="text-muted-foreground text-xl font-light leading-relaxed max-w-md">
+              <p className="text-muted-foreground text-lg font-light leading-relaxed max-w-md">
                 L'excellence informatique au cœur de l'Ituri. Nous fournissons le matériel qui propulse vos ambitions numériques.
               </p>
               
-              {/* Newsletter */}
               <div className="space-y-4 pt-6">
-                <h4 className="font-black uppercase italic text-sm tracking-widest">Abonnez-vous aux exclusivités</h4>
+                <h4 className="font-black uppercase italic text-xs tracking-widest opacity-60">Abonnez-vous aux exclusivités</h4>
                 <div className="flex gap-3 max-w-md">
                   <div className="relative flex-1">
                     <Mail className="absolute left-5 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
                     <Input placeholder="Votre e-mail" className="h-16 pl-14 bg-white/5 border-white/10 rounded-2xl focus:border-accent" />
                   </div>
-                  <Button className="h-16 px-8 rounded-2xl bg-accent text-black font-black uppercase italic hover:bg-accent/80 active:scale-95">Rejoindre</Button>
+                  <Button className="h-16 px-8 rounded-2xl bg-accent text-black font-black uppercase italic hover:bg-accent/80 active:scale-95 text-sm">Rejoindre</Button>
                 </div>
               </div>
             </div>
             
             <div className="grid grid-cols-2 gap-10">
               <div className="space-y-8">
-                <h4 className="font-black uppercase italic text-sm tracking-widest">Navigation</h4>
+                <h4 className="font-black uppercase italic text-xs tracking-widest opacity-60">Navigation</h4>
                 <ul className="space-y-4 text-muted-foreground font-medium text-sm">
                   <li><Link href="#shop" className="hover:text-accent transition-colors">Catalogue Pro</Link></li>
                   <li><Link href="/login" className="hover:text-accent transition-colors">Espace Client</Link></li>
@@ -322,16 +339,16 @@ export default function LandingPage() {
               </div>
               
               <div className="space-y-8">
-                <h4 className="font-black uppercase italic text-sm tracking-widest">Suivez-nous</h4>
-                <div className="flex flex-wrap gap-4">
+                <h4 className="font-black uppercase italic text-xs tracking-widest opacity-60">Suivez-nous</h4>
+                <div className="grid grid-cols-2 gap-3 w-fit">
                   {[
                     { icon: Instagram, label: "Instagram", color: "hover:bg-pink-600" },
                     { icon: Facebook, label: "Facebook", color: "hover:bg-blue-600" },
                     { icon: Twitter, label: "Twitter", color: "hover:bg-sky-500" },
                     { icon: Linkedin, label: "Linkedin", color: "hover:bg-blue-800" }
                   ].map((soc, i) => (
-                    <div key={i} className={`w-12 h-12 rounded-[1rem] bg-white/5 flex items-center justify-center transition-all cursor-pointer border border-white/10 ${soc.color} group`}>
-                      <soc.icon size={20} className="group-hover:scale-110 transition-transform" />
+                    <div key={i} className={`w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center transition-all cursor-pointer border border-white/10 ${soc.color} group`}>
+                      <soc.icon size={18} className="group-hover:scale-110 transition-transform" />
                     </div>
                   ))}
                 </div>
@@ -339,21 +356,21 @@ export default function LandingPage() {
             </div>
 
             <div className="space-y-8">
-              <h4 className="font-black uppercase italic text-sm tracking-widest">Contact</h4>
+              <h4 className="font-black uppercase italic text-xs tracking-widest opacity-60">Contact</h4>
               <ul className="space-y-6 text-muted-foreground font-medium text-sm">
                 <li className="flex items-start gap-4">
-                  <span className="text-accent text-lg">📍</span> 
-                  <span className="leading-relaxed">Immeuble Bahati, <br />Boulevard de la Libération, Bunia</span>
+                  <span className="text-accent">📍</span> 
+                  <span className="leading-relaxed opacity-80">Immeuble Bahati, <br />Boulevard de la Libération, Bunia</span>
                 </li>
                 <li className="flex items-center gap-4">
-                  <span className="text-accent text-lg">📞</span> 
-                  <span className="font-black">+243 823 038 945</span>
+                  <span className="text-accent">📞</span> 
+                  <span className="font-black text-white">+243 823 038 945</span>
                 </li>
               </ul>
             </div>
           </div>
           
-          <div className="pt-12 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-6 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/30">
+          <div className="pt-12 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-6 text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground/20">
             <span>© {new Date().getFullYear()} DKS ShopManager. Excellence & Innovation technologique.</span>
             <div className="flex gap-10">
               <Link href="#" className="hover:text-white transition-colors">Conditions de Vente</Link>
@@ -365,4 +382,3 @@ export default function LandingPage() {
     </div>
   );
 }
-

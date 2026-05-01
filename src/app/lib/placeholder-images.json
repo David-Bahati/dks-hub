@@ -3,27 +3,27 @@
   "placeholderImages": [
     {
       "id": "keyboard-1",
-      "description": "Mechanical gaming keyboard",
+      "description": "Mechanical gaming keyboard dark background",
       "imageUrl": "https://picsum.photos/seed/keyboard1/600/400",
-      "imageHint": "mechanical keyboard"
+      "imageHint": "mechanical keyboard black"
     },
     {
       "id": "mouse-1",
-      "description": "Wireless gaming mouse",
+      "description": "Wireless gaming mouse dark background",
       "imageUrl": "https://picsum.photos/seed/mouse1/600/400",
-      "imageHint": "gaming mouse"
+      "imageHint": "gaming mouse black"
     },
     {
       "id": "screen-1",
-      "description": "Ultra-wide gaming monitor",
+      "description": "Ultra-wide gaming monitor dark background",
       "imageUrl": "https://picsum.photos/seed/screen1/600/400",
-      "imageHint": "gaming monitor"
+      "imageHint": "gaming monitor black"
     },
     {
       "id": "hero-bg",
-      "description": "Modern computer shop interior",
+      "description": "Modern computer shop interior luxury",
       "imageUrl": "https://picsum.photos/seed/shop/1200/600",
-      "imageHint": "computer shop"
+      "imageHint": "high end tech"
     }
   ]
 }
