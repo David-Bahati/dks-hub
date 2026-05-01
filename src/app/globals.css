@@ -24,7 +24,7 @@
     --border: 230 20% 20%;
     --input: 230 20% 20%;
     --ring: 190 100% 50%;
-    --radius: 1rem;
+    --radius: 1.5rem;
   }
 }
 
@@ -35,8 +35,9 @@
   body {
     @apply bg-background text-foreground font-body antialiased selection:bg-accent/30 selection:text-accent;
     background-image: 
-      radial-gradient(circle at 0% 0%, rgba(56, 189, 248, 0.08) 0%, transparent 50%),
-      radial-gradient(circle at 100% 100%, rgba(37, 99, 235, 0.08) 0%, transparent 50%);
+      radial-gradient(circle at 0% 0%, rgba(56, 189, 248, 0.05) 0%, transparent 40%),
+      radial-gradient(circle at 100% 100%, rgba(37, 99, 235, 0.05) 0%, transparent 40%),
+      radial-gradient(circle at 50% 50%, rgba(30, 41, 59, 1) 0%, rgba(15, 23, 42, 1) 100%);
     background-attachment: fixed;
   }
 }
@@ -44,12 +45,13 @@
 .glossy-card {
   @apply bg-card/40 backdrop-blur-xl border border-white/10 shadow-2xl;
   background-image: linear-gradient(135deg, rgba(255, 255, 255, 0.03) 0%, transparent 100%);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .glossy-card:hover {
   @apply border-white/20 bg-card/60;
-  transform: translateY(-2px);
+  transform: translateY(-8px);
+  box-shadow: 0 20px 40px -20px rgba(0, 0, 0, 0.5);
 }
 
 .neon-glow {
@@ -59,7 +61,7 @@
 .premium-gradient-text {
   @apply text-transparent bg-clip-text bg-gradient-to-r from-accent via-primary to-accent;
   background-size: 200% auto;
-  animation: shine 5s linear infinite;
+  animation: shine 8s linear infinite;
 }
 
 @keyframes shine {
@@ -68,18 +70,18 @@
 
 .nav-link-active {
   @apply text-accent font-bold;
-  text-shadow: 0 0 10px rgba(56, 189, 248, 0.4);
+  text-shadow: 0 0 15px rgba(56, 189, 248, 0.4);
 }
 
 .loading-bar {
   position: fixed;
   top: 0;
   left: 0;
-  height: 2px;
+  height: 3px;
   background: linear-gradient(90deg, transparent, hsl(var(--accent)), transparent);
   z-index: 9999;
   width: 100%;
-  animation: loading-progress 1.5s ease-in-out infinite;
+  animation: loading-progress 2s ease-in-out infinite;
 }
 
 @keyframes loading-progress {
@@ -88,11 +90,27 @@
 }
 
 .custom-scrollbar::-webkit-scrollbar {
-  width: 6px;
+  width: 8px;
 }
 .custom-scrollbar::-webkit-scrollbar-track {
-  @apply bg-transparent;
+  @apply bg-background;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb {
   @apply bg-white/10 rounded-full hover:bg-white/20;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+/* Custom button hover effect */
+.btn-primary-hover {
+  @apply relative overflow-hidden transition-all;
+}
+.btn-primary-hover::after {
+  content: '';
+  @apply absolute inset-0 bg-white/20 translate-x-[-100%] transition-transform duration-300;
+}
+.btn-primary-hover:hover::after {
+  @apply translate-x-0;
 }
