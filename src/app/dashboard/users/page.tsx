@@ -6,7 +6,7 @@ import withAuth from "@/components/auth/withAuth";
 import { Navbar } from "@/components/layout/Navbar";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { UserPlus, Edit, Trash2, ArrowLeft, Shield } from "lucide-react";
+import { UserPlus, Edit, Trash2, ArrowLeft, Shield, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { 
   Dialog, 
@@ -45,15 +45,15 @@ function UsersPage() {
   const [role, setRole] = useState("Seller");
 
   useEffect(() => {
-    // On filtre pour ne PAS afficher les 'customer' dans la liste du staff
-    // Note: Firestore supporte '!=' mais ici on va juste filtrer côté client ou via des rôles spécifiques
+    // Filtrage strict : on ne veut QUE le personnel (Admin, Seller, Cashier)
+    // On exclut explicitement le rôle 'customer'
     const q = collection(db, "users");
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const usersData: User[] = [];
       snapshot.forEach(doc => {
         const data = doc.data();
-        if (data.role !== 'customer') {
+        if (data.role && data.role !== 'customer') {
           usersData.push({ id: doc.id, ...data } as User);
         }
       });
