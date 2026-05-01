@@ -19,7 +19,13 @@ import {
   UsersRound,
   ShoppingBag,
   PanelLeft,
-  Loader2
+  Loader2,
+  LayoutDashboard,
+  User,
+  Headset,
+  ArrowRight,
+  Clock,
+  CheckCircle2
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -31,14 +37,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
   Sheet,
   SheetContent,
   SheetTrigger,
@@ -49,33 +47,59 @@ import {
     getLowStockItems,
     getRecentSales
 } from '@/lib/data';
-import { Product, Sale } from '@/lib/types';
+import { Product, Sale, Order } from '@/lib/types';
 import withAuth from '@/components/auth/withAuth';
+import { useAuth } from '@/context/AuthContext';
+import { useCollection, useMemoFirebase } from '@/firebase';
+import { collection, query, where, orderBy, limit } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
-const mainNavLinks = [
+const adminNavLinks = [
   { href: "/dashboard", icon: LineChart, label: "Aperçu" },
   { href: "/dashboard/products", icon: Package, label: "Produits" },
   { href: "/dashboard/orders", icon: ShoppingBag, label: "Commandes" },
   { href: "/dashboard/customers", icon: Users, label: "Clients" },
-  { href: "/dashboard/transactions", icon: ReceiptText, label: "Transactions" },
-  { href: "/dashboard/promotions", icon: Tag, label: "Promotions" },
   { href: "/dashboard/users", icon: UsersRound, label: "Utilisateurs" },
   { href: "/dashboard/settings", icon: Settings, label: "Paramètres" },
 ];
 
-interface RecentSale extends Sale {
-    cashierName: string;
-}
+const customerNavLinks = [
+  { href: "/dashboard", icon: LayoutDashboard, label: "Mon Hub", description: "Vue d'ensemble de mon compte" },
+  { href: "/dashboard/orders", icon: ShoppingBag, label: "Mes Commandes", description: "Suivi et historique d'achats" },
+  { href: "/cart", icon: ShoppingCart, label: "Mon Panier", description: "Articles en attente" },
+  { href: "/dashboard/settings", icon: User, label: "Mon Profil", description: "Gérer mes informations" },
+  { href: "#", icon: Headset, label: "Support Client", description: "Aide et assistance technique" },
+];
 
-function DashboardAdminPage() {
+function DashboardPage() {
+  const { user } = useAuth();
   const pathname = usePathname();
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<any>(null);
   const [lowStock, setLowStock] = useState<Product[]>([]);
-  const [recentSales, setRecentSales] = useState<RecentSale[]>([]);
+  const [recentSales, setRecentSales] = useState<any[]>([]);
   const [rate, setRate] = useState(2500);
 
-  const fetchData = async () => {
+  const isStaff = user?.role === 'Admin' || user?.role === 'Seller' || user?.role === 'Cashier';
+
+  // Pour les clients : Récupérer la dernière commande
+  const lastOrderQuery = useMemoFirebase(() => {
+    if (!user || isStaff) return null;
+    return query(collection(db, "orders"), where("userId", "==", user.uid), orderBy("createdAt", "desc"), limit(1));
+  }, [user, isStaff]);
+  
+  const { data: lastOrders } = useCollection(lastOrderQuery);
+  const lastOrder = lastOrders?.[0];
+
+  useEffect(() => {
+    if (isStaff) {
+      fetchAdminData();
+    } else {
+      setLoading(false);
+    }
+  }, [isStaff]);
+
+  const fetchAdminData = async () => {
     setLoading(true);
     try {
       const [dashboardStats, lowStockItems, recent, exchangeRate] = await Promise.all([
@@ -95,10 +119,6 @@ function DashboardAdminPage() {
     }
   };
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
   const formatCurrency = (amount: number) => new Intl.NumberFormat('fr-FR').format(amount);
 
   if (loading) {
@@ -109,6 +129,110 @@ function DashboardAdminPage() {
     );
   }
 
+  // --- VUE CLIENT ---
+  if (!isStaff) {
+    return (
+      <div className="flex min-h-screen w-full flex-col bg-background">
+        <header className="border-b border-white/5 bg-background/40 backdrop-blur-2xl py-6 px-4 md:px-8">
+            <div className="max-w-7xl mx-auto flex justify-between items-center">
+                <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-2xl bg-primary flex items-center justify-center neon-glow">
+                        <span className="text-white font-black text-xl italic uppercase">DKS</span>
+                    </div>
+                    <div>
+                        <h1 className="text-2xl font-black uppercase italic tracking-tighter">Mon Espace <span className="text-accent">Client</span></h1>
+                        <p className="text-xs text-muted-foreground font-bold uppercase tracking-widest">Ravi de vous revoir, {user?.name}</p>
+                    </div>
+                </div>
+                <Link href="/">
+                    <Button variant="outline" className="rounded-xl border-white/10 h-10 gap-2 font-bold text-xs uppercase italic">
+                        <ShoppingCart size={14} /> Boutique
+                    </Button>
+                </Link>
+            </div>
+        </header>
+
+        <main className="flex-1 max-w-7xl mx-auto w-full p-4 md:p-8 space-y-8">
+            {/* Bannière de Bienvenue / Statut */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <Card className="md:col-span-2 glossy-card border-none rounded-[2.5rem] overflow-hidden relative group">
+                    <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity">
+                        <Sparkles size={120} className="text-accent" />
+                    </div>
+                    <CardContent className="p-10 space-y-4">
+                        <Badge className="bg-accent/20 text-accent border-none font-black uppercase tracking-tighter px-3">Membre Premium DKS</Badge>
+                        <h2 className="text-4xl font-black uppercase italic leading-tight">VOTRE SETUP,<br /><span className="text-accent">NOTRE PRIORITÉ</span></h2>
+                        <p className="text-muted-foreground text-sm max-w-md">Découvrez vos dernières transactions et gérez vos préférences en toute sécurité.</p>
+                        <Button className="bg-primary hover:bg-primary/90 h-12 rounded-xl px-8 font-black uppercase italic gap-2 mt-4" asChild>
+                            <Link href="/shop">Continuer mes achats <ArrowRight size={18} /></Link>
+                        </Button>
+                    </CardContent>
+                </Card>
+
+                <Card className="glossy-card border-none rounded-[2.5rem]">
+                    <CardHeader>
+                        <CardTitle className="text-sm font-black uppercase italic tracking-widest flex items-center gap-2">
+                            <Clock size={16} className="text-accent" /> Dernière Commande
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        {lastOrder ? (
+                            <div className="space-y-4">
+                                <div className="flex justify-between items-start">
+                                    <div>
+                                        <p className="text-xs font-bold text-muted-foreground uppercase">ID: #{lastOrder.id.substring(0, 8)}</p>
+                                        <p className="text-xl font-black text-white">${lastOrder.total?.toFixed(2)}</p>
+                                    </div>
+                                    <Badge className="bg-green-500/10 text-green-400 border-none uppercase text-[10px] font-black">{lastOrder.status}</Badge>
+                                </div>
+                                <div className="p-3 bg-white/5 rounded-xl border border-white/5 space-y-1">
+                                    <p className="text-[10px] text-muted-foreground uppercase font-black">Mode de paiement</p>
+                                    <p className="text-xs font-bold flex items-center gap-2">
+                                        {lastOrder.paymentMethod === 'PI_NETWORK' ? <Package className="w-3 h-3 text-accent" /> : <DollarSign className="w-3 h-3 text-accent" />}
+                                        {lastOrder.paymentMethod?.replace('_', ' ')}
+                                    </p>
+                                </div>
+                                <Button variant="ghost" className="w-full text-xs font-black uppercase italic gap-2 h-10" asChild>
+                                    <Link href="/dashboard/orders">Voir le détail <ArrowRight size={14} /></Link>
+                                </Button>
+                            </div>
+                        ) : (
+                            <div className="text-center py-10 opacity-30 italic flex flex-col items-center gap-3">
+                                <ShoppingBag size={40} />
+                                <p className="text-xs font-bold">Aucune commande récente</p>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+            </div>
+
+            {/* Menu Client */}
+            <div className="space-y-6">
+                <h3 className="text-xs font-black uppercase tracking-[0.3em] text-muted-foreground ml-2">Mon Hub Personnel</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {customerNavLinks.slice(1).map((link, idx) => (
+                        <Link key={idx} href={link.href}>
+                            <Card className="glossy-card border-none rounded-[2rem] hover:border-accent/30 transition-all group overflow-hidden h-full">
+                                <CardContent className="p-6 flex items-start gap-4">
+                                    <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center group-hover:bg-accent group-hover:text-accent-foreground transition-all">
+                                        <link.icon size={24} />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <h4 className="font-black uppercase italic text-sm">{link.label}</h4>
+                                        <p className="text-[10px] text-muted-foreground font-bold">{link.description}</p>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </Link>
+                    ))}
+                </div>
+            </div>
+        </main>
+      </div>
+    );
+  }
+
+  // --- VUE ADMIN / STAFF (Existante) ---
   return (
     <div className="flex min-h-screen w-full flex-col bg-muted/40">
       <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6 py-4">
@@ -121,7 +245,7 @@ function DashboardAdminPage() {
             </SheetTrigger>
             <SheetContent side="left" className="sm:max-w-xs bg-card border-white/10">
               <nav className="grid gap-6 text-lg font-medium mt-10">
-                 {mainNavLinks.map(link => (
+                 {adminNavLinks.map(link => (
                    <Link
                     key={link.href}
                     href={link.href}
@@ -143,7 +267,7 @@ function DashboardAdminPage() {
         </Link>
 
          <nav className="hidden sm:flex items-center space-x-2 bg-card/40 backdrop-blur-sm border border-white/10 rounded-2xl p-1.5">
-            {mainNavLinks.slice(0, 5).map((link) => (
+            {adminNavLinks.map((link) => (
               <Link key={link.href} href={link.href}>
                 <Button
                   variant={pathname === link.href ? "secondary" : "ghost"}
@@ -160,9 +284,9 @@ function DashboardAdminPage() {
 
       <main className="flex-1 space-y-8 p-4 md:p-8 pt-6">
           <div className="flex items-center justify-between space-y-2">
-            <h2 className="text-3xl font-black uppercase italic tracking-tighter">Tableau de <span className="text-accent">Bord</span></h2>
+            <h2 className="text-3xl font-black uppercase italic tracking-tighter">Tableau de <span className="text-accent">Bord Admin</span></h2>
             <div className="flex items-center space-x-2">
-               <Button variant="outline" size="sm" onClick={fetchData} className="border-white/10 bg-white/5 rounded-xl gap-2 font-bold uppercase text-[10px]">
+               <Button variant="outline" size="sm" onClick={fetchAdminData} className="border-white/10 bg-white/5 rounded-xl gap-2 font-bold uppercase text-[10px]">
                  <RefreshCw size={12} className={loading ? "animate-spin" : ""} />
                  Actualiser
                </Button>
@@ -255,7 +379,7 @@ function DashboardAdminPage() {
                     {recentSales.map(sale => (
                         <div key={sale.id} className="flex items-center gap-4">
                             <div className="w-9 h-9 rounded-full bg-accent/20 flex items-center justify-center text-accent font-black text-xs">
-                                {sale.cashierName.substring(0, 1)}
+                                {sale.cashierName?.substring(0, 1)}
                             </div>
                             <div className="flex-1">
                                 <p className="text-sm font-bold">{sale.cashierName}</p>
@@ -277,4 +401,4 @@ function DashboardAdminPage() {
   );
 }
 
-export default withAuth(DashboardAdminPage);
+export default withAuth(DashboardPage);

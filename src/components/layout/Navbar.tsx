@@ -1,11 +1,10 @@
 
 "use client";
 
-import { LogOut, LayoutDashboard, ShoppingCart, Settings, Users, Package, Bell, Loader2, PanelLeft, Home, Trash2 } from 'lucide-react';
+import { LogOut, LayoutDashboard, ShoppingCart, Settings, Users, Package, Bell, Loader2, PanelLeft, Home, Trash2, User } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { Button } from "@/components/ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useAuth } from '@/context/AuthContext';
 import { useCart } from '@/context/CartContext';
 import { auth } from '@/lib/firebase';
@@ -38,6 +37,7 @@ export function Navbar() {
         { label: 'Stock', href: '/dashboard/products', show: isAdmin || isSeller, icon: Package },
         { label: 'Caisse', href: '/pos', show: isAdmin || isCashier, icon: ShoppingCart },
         { label: 'Utilisateurs', href: '/dashboard/users', show: isAdmin, icon: Users },
+        { label: 'Mon Compte', href: '/dashboard', show: !isStaff && !!user, icon: User },
         { label: 'Boutique', href: '/', show: true, icon: Home },
     ];
 
