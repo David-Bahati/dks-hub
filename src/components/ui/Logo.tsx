@@ -1,6 +1,7 @@
 'use client';
 
 import { cn } from "@/lib/utils";
+import { useState } from "react";
 
 interface LogoProps {
   className?: string;
@@ -10,14 +11,16 @@ interface LogoProps {
 
 /**
  * Composant Logo épuré en Flat Design.
- * Supprime le contour et le fond pour une intégration transparente.
+ * Version sans bordures ni fonds complexes pour une intégration fluide.
  */
 export function Logo({ className, size = "md", showText = false }: LogoProps) {
+  const [error, setError] = useState(false);
+
   const sizeClasses = {
-    sm: "w-8 h-8",
-    md: "w-12 h-12",
-    lg: "w-16 h-16",
-    xl: "w-24 h-24",
+    sm: "h-8 w-auto",
+    md: "h-12 w-auto",
+    lg: "h-16 w-auto",
+    xl: "h-24 w-auto",
   };
 
   const textSizes = {
@@ -27,25 +30,30 @@ export function Logo({ className, size = "md", showText = false }: LogoProps) {
     xl: "text-6xl",
   };
 
-  // URL directe du logo
-  const logoUrl = "https://lh3.googleusercontent.com/u/0/d/1kUOuBsul6BfUvpIeM1EYJ6Uo0qE8jPGX";
+  // Lien direct optimisé pour Google Drive
+  const fileId = "1kUOuBsul6BfUvpIeM1EYJ6Uo0qE8jPGX";
+  const logoUrl = `https://docs.google.com/uc?id=${fileId}`;
 
   return (
-    <div className={cn("flex items-center gap-4 group", className)}>
-      <div className={cn(
-        "flex items-center justify-center transition-all duration-500 group-hover:scale-110",
-        sizeClasses[size]
-      )}>
-        <img 
-          src={logoUrl} 
-          alt="DKS Logo" 
-          className="w-full h-full object-contain"
-        />
+    <div className={cn("flex items-center gap-3 transition-opacity duration-300", className)}>
+      <div className={cn("relative flex items-center justify-center", sizeClasses[size])}>
+        {!error ? (
+          <img 
+            src={logoUrl} 
+            alt="DKS Logo" 
+            className="h-full w-auto object-contain"
+            onError={() => setError(true)}
+          />
+        ) : (
+          <div className="bg-primary text-white font-black italic px-2 py-1 rounded-sm text-xs">
+            DKS
+          </div>
+        )}
       </div>
       
       {showText && (
         <span className={cn(
-          "font-black tracking-tighter uppercase italic leading-none",
+          "font-black tracking-tighter uppercase italic leading-none text-foreground",
           textSizes[size]
         )}>
           Double King <span className="text-accent">Shop</span>
