@@ -199,7 +199,6 @@ function POS() {
     <div className="min-h-screen bg-background flex flex-col">
       <Navbar />
       
-      {/* Styles pour l'impression */}
       <style jsx global>{`
         @media print {
           body * {
@@ -215,7 +214,7 @@ function POS() {
             width: 100%;
             background: white !important;
             color: black !important;
-            padding: 20px !important;
+            padding: 10px !important;
           }
           .no-print {
             display: none !important;
@@ -408,38 +407,36 @@ function POS() {
         </DialogContent>
       </Dialog>
 
-      {/* Receipt Dialog - FIX: Added internal scrolling */}
+      {/* Receipt Dialog */}
       <Dialog open={showReceipt} onOpenChange={setShowReceipt}>
-        <DialogContent className="bg-white text-black p-0 overflow-hidden sm:max-w-[420px] rounded-3xl shadow-2xl border-none flex flex-col max-h-[90vh]">
-          {/* Scrollable container for receipt content */}
-          <div className="flex-1 overflow-y-auto p-10 font-mono text-[11px] leading-relaxed receipt-to-print custom-scrollbar">
-            <div className="text-center mb-8 border-b-2 border-dashed border-gray-300 pb-8">
-              <div className="flex justify-center mb-4">
-                 <div className="bg-black text-white px-4 py-1 font-black text-xl italic tracking-tighter">DKS SHOP</div>
+        <DialogContent className="bg-white text-black p-0 overflow-hidden sm:max-w-[400px] rounded-3xl shadow-2xl border-none flex flex-col max-h-[95vh]">
+          <div className="flex-1 overflow-y-auto p-8 font-mono text-[10px] leading-tight receipt-to-print custom-scrollbar">
+            <div className="text-center mb-4 border-b-2 border-dashed border-gray-300 pb-4">
+              <div className="flex justify-center mb-2">
+                 <div className="bg-black text-white px-3 py-1 font-black text-lg italic tracking-tighter">DKS SHOP</div>
               </div>
-              <p className="text-[10px] font-black uppercase tracking-widest opacity-60">Solutions Hardware Professionnelles</p>
-              <div className="mt-4 space-y-1 text-[9px] font-bold uppercase">
+              <p className="text-[9px] font-black uppercase tracking-widest opacity-60">Matériel Informatique Premium</p>
+              <div className="mt-2 space-y-0.5 text-[8px] font-bold uppercase">
                 <p>Immeuble Bahati, Boulevard de la Libération</p>
-                <p>Bunia, Ituri, RDC</p>
-                <p>Tél: +243 823 038 945 | contact@dks.com</p>
+                <p>Bunia, Ituri, RDC | Tél: +243 823 038 945</p>
               </div>
 
-              <div className="mt-6 flex flex-col items-center gap-2">
-                <div className="w-24 h-24 p-2 border-2 border-black rounded-lg">
-                    <QrCode size={80} />
+              <div className="mt-4 flex flex-col items-center gap-1">
+                <div className="p-1 border-2 border-black rounded-md bg-white">
+                    <QrCode size={60} />
                 </div>
-                <p className="text-[8px] font-black uppercase tracking-widest opacity-40">Vérifier la Transaction</p>
+                <p className="text-[7px] font-black uppercase tracking-widest opacity-40">Vérifier la Transaction</p>
               </div>
 
-              <div className="mt-6 p-2 bg-gray-100 rounded-md inline-block w-full">
-                <p className="text-[9px] font-black">ID: #{lastTransaction?.id.toUpperCase().substring(0, 12)}</p>
-                <p className="text-[9px] font-black mt-1">CLIENT: {lastTransaction?.customerName.toUpperCase()}</p>
+              <div className="mt-4 p-1.5 bg-gray-100 rounded-md inline-block w-full text-center">
+                <p className="text-[8px] font-black">REÇU: #{lastTransaction?.id.toUpperCase().substring(0, 10)}</p>
+                <p className="text-[8px] font-black">CLIENT: {lastTransaction?.customerName.toUpperCase()}</p>
               </div>
-              <p className="text-[8px] mt-2 opacity-40 font-black">{lastTransaction?.date}</p>
+              <p className="text-[7px] mt-1 opacity-40 font-black">{lastTransaction?.date}</p>
             </div>
             
-            <div className="space-y-4 mb-8">
-              <div className="flex justify-between font-black border-b border-gray-100 pb-2 mb-2 uppercase">
+            <div className="space-y-2 mb-4">
+              <div className="flex justify-between font-black border-b border-gray-100 pb-1 mb-1 uppercase text-[9px]">
                 <span>Description</span>
                 <span>Total</span>
               </div>
@@ -447,9 +444,9 @@ function POS() {
                 const unitPrice = item.sellingPrice || item.price || 0;
                 return (
                   <div key={idx} className="flex justify-between items-start">
-                    <div className="flex-1 pr-4">
+                    <div className="flex-1 pr-2">
                       <div className="font-bold">{item.name.toUpperCase()}</div>
-                      <div className="text-[9px] opacity-60">
+                      <div className="text-[8px] opacity-60">
                         {item.quantity}x @${unitPrice.toFixed(2)}
                       </div>
                     </div>
@@ -459,42 +456,49 @@ function POS() {
               })}
             </div>
 
-            <div className="border-t-2 border-dashed border-gray-300 pt-8 space-y-2">
-              <div className="flex justify-between text-lg font-black">
-                <span>TOTAL PAYÉ (USD)</span>
+            <div className="border-t border-gray-100 pt-2 space-y-1">
+              <div className="flex justify-between font-bold text-[8px]">
+                <span>SOUS-TOTAL (USD)</span>
                 <span>${lastTransaction?.total.toFixed(2)}</span>
               </div>
-              <div className="flex justify-between font-bold opacity-60">
+              <div className="flex justify-between font-bold text-[8px] opacity-40">
+                <span>TAXE (0%)</span>
+                <span>$0.00</span>
+              </div>
+              <div className="flex justify-between text-base font-black border-t-2 border-dashed border-gray-300 pt-2 mt-1">
+                <span>TOTAL PAYÉ</span>
+                <span>${lastTransaction?.total.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between font-bold opacity-60 text-[8px] mt-1">
                 <span>VALEUR PI (π)</span>
                 <span>{(lastTransaction ? lastTransaction.total / PI_CONVERSION_RATE : 0).toFixed(6)} π</span>
               </div>
-              <div className="flex justify-between mt-6 pt-4 border-t border-gray-100 italic">
-                <span>MODE DE RÈGLEMENT :</span>
-                <span className="font-bold uppercase">{lastTransaction?.mode.replace('_', ' ')}</span>
+              <div className="flex justify-between mt-2 pt-2 border-t border-gray-100 italic font-black">
+                <span>RÈGLEMENT :</span>
+                <span>{lastTransaction?.mode.replace('_', ' ')}</span>
               </div>
             </div>
 
-            <div className="mt-8 mb-6 text-center">
-              <p className="text-[9px] font-black uppercase tracking-tighter opacity-40 italic border-y border-gray-100 py-2 leading-tight">
-                Les articles ne sont ni repris ni échangés
+            <div className="mt-4 text-center">
+              <p className="text-[8px] font-black uppercase tracking-tighter opacity-40 italic border-y border-gray-100 py-1">
+                Ni repris, ni échangés après sortie
               </p>
             </div>
 
-            <div className="text-center pt-4">
-              <div className="bg-black text-white px-4 py-2 inline-block font-black uppercase italic tracking-widest mb-3">
-                 Merci de votre visite
+            <div className="text-center pt-3">
+              <div className="bg-black text-white px-4 py-1.5 inline-block font-black uppercase italic tracking-widest text-[9px] mb-2">
+                 Merci de votre confiance
               </div>
-              <p className="text-[8px] font-bold opacity-40 uppercase tracking-widest">À bientôt chez Double King Shop</p>
+              <p className="text-[7px] font-bold opacity-40 uppercase tracking-widest">À bientôt chez Double King Shop</p>
             </div>
           </div>
 
-          {/* Fixed footer for buttons */}
-          <div className="bg-gray-100 p-6 flex gap-3 no-print border-t border-gray-200">
-            <Button className="flex-1 gap-2 bg-black text-white hover:bg-black/90 rounded-xl font-bold uppercase text-[10px]" onClick={handlePrint}>
-              <Printer size={16} /> Imprimer Reçu
+          <div className="bg-gray-100 p-4 flex gap-3 no-print border-t border-gray-200">
+            <Button className="flex-1 gap-2 bg-black text-white hover:bg-black/90 rounded-xl font-black uppercase text-[9px] h-12" onClick={handlePrint}>
+              <Printer size={16} /> Imprimer
             </Button>
-            <Button className="flex-1 gap-2 border-gray-300 rounded-xl font-bold uppercase text-[10px]" variant="outline" onClick={() => setShowReceipt(false)}>
-              <ArrowLeft size={16} className="mr-1" /> Retour
+            <Button className="flex-1 gap-2 border-gray-300 rounded-xl font-black uppercase text-[9px] h-12" variant="outline" onClick={() => setShowReceipt(false)}>
+              <ArrowLeft size={16} /> Retour
             </Button>
           </div>
         </DialogContent>
