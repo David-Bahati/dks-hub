@@ -19,11 +19,11 @@ import {
     Lock,
     Smartphone,
     Info,
-    ShieldAlert,
     Database,
     DollarSign,
     Coins,
-    RefreshCw
+    RefreshCw,
+    Loader2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -59,6 +59,7 @@ export default function SettingsPage() {
     const [language, setLanguage] = useState("fr");
     const [exchangeRate, setExchangeRate] = useState("2500");
     const [piValue, setPiValue] = useState(PI_CONVERSION_RATE.toString());
+    const [isFetchingRate, setIsFetchingRate] = useState(false);
 
     const handleLogout = async () => {
         try {
@@ -67,6 +68,35 @@ export default function SettingsPage() {
             router.push('/login');
         } catch (error) {
             console.error("Logout error:", error);
+        }
+    };
+
+    const fetchTodayRate = async () => {
+        setIsFetchingRate(true);
+        try {
+            // Utilisation d'une API de change publique gratuite
+            const response = await fetch('https://open.er-api.com/v6/latest/USD');
+            const data = await response.json();
+            if (data && data.rates && data.rates.CDF) {
+                // On arrondit le taux pour plus de propreté (souvent les taux officiels sont précis)
+                const rate = Math.round(data.rates.CDF);
+                setExchangeRate(rate.toString());
+                toast({
+                    title: "Taux récupéré",
+                    description: `Le taux officiel du jour est de ${rate} FC pour 1 USD.`,
+                });
+            } else {
+                throw new Error("Données de taux indisponibles");
+            }
+        } catch (error) {
+            console.error("Fetch rate error:", error);
+            toast({
+                title: "Erreur API",
+                description: "Impossible de récupérer le taux automatiquement. Veuillez le saisir manuellement.",
+                variant: "destructive"
+            });
+        } finally {
+            setIsFetchingRate(false);
         }
     };
 
@@ -282,9 +312,21 @@ export default function SettingsPage() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                             <Card className="glossy-card border-none rounded-[2.5rem]">
                                 <CardHeader className="p-10 pb-0">
-                                    <CardTitle className="text-lg font-black uppercase italic tracking-tighter flex items-center gap-3">
-                                        <RefreshCw className="text-accent" size={20} /> Taux de Change
-                                    </CardTitle>
+                                    <div className="flex justify-between items-start">
+                                        <CardTitle className="text-lg font-black uppercase italic tracking-tighter flex items-center gap-3">
+                                            <RefreshCw className="text-accent" size={20} /> Taux de Change
+                                        </CardTitle>
+                                        <Button 
+                                            variant="ghost" 
+                                            size="sm" 
+                                            onClick={fetchTodayRate}
+                                            disabled={isFetchingRate}
+                                            className="h-9 px-3 border border-white/10 rounded-xl hover:bg-accent/10 hover:text-accent gap-2 font-black uppercase italic text-[9px] tracking-widest"
+                                        >
+                                            {isFetchingRate ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+                                            Récupérer le taux du jour
+                                        </Button>
+                                    </div>
                                 </CardHeader>
                                 <CardContent className="p-10 space-y-8">
                                     <div className="space-y-4">
