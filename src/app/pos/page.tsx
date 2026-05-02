@@ -367,25 +367,41 @@ function POS() {
       <Dialog open={showReceipt} onOpenChange={setShowReceipt}>
         <DialogContent className="bg-white text-black p-0 overflow-hidden sm:max-w-[420px] rounded-3xl shadow-2xl border-none">
           <div className="p-10 font-mono text-[11px] leading-relaxed">
-            <div className="text-center mb-10 border-b-2 border-dashed border-gray-300 pb-8">
-              <h2 className="text-3xl font-black uppercase tracking-tighter italic">dks SHOP</h2>
-              <p className="text-[10px] font-bold mt-1 uppercase tracking-widest opacity-60">Professional Hardware Solutions</p>
-              <p className="text-[9px] mt-4 font-bold">BUNIA, IMMEUBLE BAHATI</p>
-              <p className="text-[9px] mt-1 font-bold">TRANS ID: {lastTransaction?.id.toUpperCase()}</p>
-              <p className="text-[9px] mt-1 font-bold">{lastTransaction?.date}</p>
+            <div className="text-center mb-8 border-b-2 border-dashed border-gray-300 pb-8">
+              <div className="flex justify-center mb-4">
+                 <div className="bg-black text-white px-4 py-1 font-black text-xl italic tracking-tighter">DKS SHOP</div>
+              </div>
+              <p className="text-[10px] font-black uppercase tracking-widest opacity-60">Solutions Hardware Professionnelles</p>
+              <div className="mt-4 space-y-1 text-[9px] font-bold uppercase">
+                <p>Immeuble Bahati, Boulevard de la Libération</p>
+                <p>Bunia, Ituri, RDC</p>
+                <p>Tél: +243 823 038 945 | contact@dks.com</p>
+              </div>
+              <div className="mt-6 p-2 bg-gray-100 rounded-md inline-block">
+                <p className="text-[9px] font-black">TRANS ID: #{lastTransaction?.id.toUpperCase().substring(0, 12)}</p>
+              </div>
+              <p className="text-[8px] mt-2 opacity-40 font-black">{lastTransaction?.date}</p>
             </div>
             
-            <div className="space-y-3 mb-10">
-              <div className="flex justify-between font-bold border-b border-gray-100 pb-2 mb-2">
-                <span>DESCRIPTION</span>
-                <span>TOTAL</span>
+            <div className="space-y-4 mb-8">
+              <div className="flex justify-between font-black border-b border-gray-100 pb-2 mb-2 uppercase">
+                <span>Description</span>
+                <span>Total</span>
               </div>
-              {lastTransaction?.items.map((item, idx) => (
-                <div key={idx} className="flex justify-between">
-                  <span className="flex-1 pr-4">{item.quantity}x {item.name.toUpperCase()}</span>
-                  <span className="font-bold">${((item.sellingPrice || item.price || 0) * item.quantity).toFixed(2)}</span>
-                </div>
-              ))}
+              {lastTransaction?.items.map((item, idx) => {
+                const unitPrice = item.sellingPrice || item.price || 0;
+                return (
+                  <div key={idx} className="flex justify-between items-start">
+                    <div className="flex-1 pr-4">
+                      <div className="font-bold">{item.name.toUpperCase()}</div>
+                      <div className="text-[9px] opacity-60">
+                        {item.quantity}x @${unitPrice.toFixed(2)}
+                      </div>
+                    </div>
+                    <span className="font-bold">${(unitPrice * item.quantity).toFixed(2)}</span>
+                  </div>
+                );
+              })}
             </div>
 
             <div className="border-t-2 border-dashed border-gray-300 pt-8 space-y-2">
@@ -397,17 +413,23 @@ function POS() {
                 <span>VALEUR PI (π)</span>
                 <span>{(lastTransaction ? lastTransaction.total / PI_CONVERSION_RATE : 0).toFixed(6)} π</span>
               </div>
-              <div className="flex justify-between mt-8 pt-4 border-t border-gray-100 italic">
+              <div className="flex justify-between mt-6 pt-4 border-t border-gray-100 italic">
                 <span>MODE DE RÈGLEMENT :</span>
                 <span className="font-bold uppercase">{lastTransaction?.mode.replace('_', ' ')}</span>
               </div>
             </div>
 
-            <div className="text-center mt-12 border-t-2 border-dashed border-gray-300 pt-10">
-              <div className="bg-black text-white px-4 py-2 inline-block font-black uppercase italic tracking-widest mb-4">
+            <div className="mt-8 mb-6 text-center">
+              <p className="text-[9px] font-black uppercase tracking-tighter opacity-40 italic border-y border-gray-100 py-2 leading-tight">
+                Les articles ne sont ni repris ni échangés
+              </p>
+            </div>
+
+            <div className="text-center pt-4">
+              <div className="bg-black text-white px-4 py-2 inline-block font-black uppercase italic tracking-widest mb-3">
                  Merci de votre visite
               </div>
-              <p className="text-[8px] font-bold opacity-40 uppercase tracking-widest">A bientôt chez Double King Shop</p>
+              <p className="text-[8px] font-bold opacity-40 uppercase tracking-widest">À bientôt chez Double King Shop</p>
             </div>
           </div>
           <div className="bg-gray-100 p-6 flex gap-3">
