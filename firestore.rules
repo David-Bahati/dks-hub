@@ -2,12 +2,12 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // --- RÈGLE DE DÉBLOCAGE TOTAL POUR UTILISATEURS CONNECTÉS ---
-    // Cette règle autorise toute lecture et écriture si l'utilisateur est authentifié.
-    // C'est la solution la plus simple pour arrêter les erreurs de permissions immédiatement.
+    // --- MODE TEST TOTAL ---
+    // Cette règle autorise TOUTE lecture et écriture par TOUT LE MONDE.
+    // À utiliser uniquement pour le développement et les tests.
     
     match /{document=**} {
-      allow read, write: if request.auth != null;
+      allow read, write: if true;
     }
   }
 }
