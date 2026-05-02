@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -104,14 +105,12 @@ export default function LoginPage() {
   const setupTestAccounts = async () => {
     setIsSettingUp(true);
     const testUsers = [
-      { email: 'admin@dks.com', password: 'admin123', name: 'Admin DKS', role: 'Admin' },
-      { email: 'vendeur@dks.com', password: 'vendeur123', name: 'Vendeur DKS', role: 'Seller' },
-      { email: 'caissier@dks.com', password: 'caissier123', name: 'Caissier DKS', role: 'Cashier' },
+      { email: 'admin@dks.com', password: 'admin123', name: 'Admin DKS', role: 'admin' },
+      { email: 'vendeur@dks.com', password: 'vendeur123', name: 'Vendeur DKS', role: 'seller' },
+      { email: 'caissier@dks.com', password: 'caissier123', name: 'Caissier DKS', role: 'cashier' },
     ];
 
     try {
-      await signOut(auth);
-
       for (const testUser of testUsers) {
         let uid;
         try {
@@ -134,11 +133,9 @@ export default function LoginPage() {
             lastName: testUser.name.split(' ')[1] || 'DKS',
             displayName: testUser.name,
             name: testUser.name,
-            role: testUser.role,
+            role: testUser.role, // lowercase for consistency
             updatedAt: serverTimestamp(),
           }, { merge: true });
-
-          await signOut(auth);
         }
       }
       
@@ -149,8 +146,8 @@ export default function LoginPage() {
     } catch (error: any) {
       console.error("Setup error:", error);
       toast({
-        title: "Erreur lors de la réinitialisation",
-        description: error.message || "Vérifiez votre connexion.",
+        title: "Erreur lors de la configuration",
+        description: error.message,
         variant: "destructive",
       });
     } finally {
@@ -230,7 +227,7 @@ export default function LoginPage() {
             <div className="grid grid-cols-2 gap-3">
               <Button 
                 variant="outline" 
-                className="h-14 rounded-2xl border-white/5 bg-white/5 hover:bg-white/10 hover:border-accent/50 hover:shadow-[0_0_20px_rgba(56,189,248,0.1)] transition-all gap-3 font-bold text-xs uppercase italic"
+                className="h-14 rounded-2xl border-white/5 bg-white/5 hover:bg-white/10 hover:border-accent transition-all gap-3 font-bold text-xs uppercase italic"
                 onClick={() => handleSocialLogin('google')}
                 disabled={isLoading || !!isSocialLoading}
               >
@@ -246,7 +243,7 @@ export default function LoginPage() {
               </Button>
               <Button 
                 variant="outline" 
-                className="h-14 rounded-2xl border-white/5 bg-white/5 hover:bg-white/10 hover:border-accent/50 hover:shadow-[0_0_20px_rgba(56,189,248,0.1)] transition-all gap-3 font-bold text-xs uppercase italic"
+                className="h-14 rounded-2xl border-white/5 bg-white/5 hover:bg-white/10 hover:border-accent transition-all gap-3 font-bold text-xs uppercase italic"
                 onClick={() => handleSocialLogin('github')}
                 disabled={isLoading || !!isSocialLoading}
               >

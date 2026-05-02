@@ -32,13 +32,17 @@ export function Navbar() {
     };
 
     const role = user?.role?.toLowerCase();
-    const isStaff = role === 'admin' || role === 'seller' || role === 'cashier';
+    const isStaff = role === 'admin' || role === 'seller' || role === 'cashier' || role === 'vendeur' || role === 'caissier';
 
-    // Fetch Unread Notifications
+    // Fetch Unread Notifications with robust checks
     const notificationsQuery = useMemoFirebase(() => {
         if (!user?.uid) return null;
         
-        if (isStaff) {
+        // Defensive check: only query if role is present
+        const staffRoles = ['admin', 'seller', 'cashier', 'vendeur', 'caissier'];
+        const isUserStaff = staffRoles.includes(user.role?.toLowerCase() || "");
+        
+        if (isUserStaff) {
             return query(
                 collection(db, "notifications"),
                 where("userId", "in", [user.uid, 'staff']),
@@ -55,7 +59,7 @@ export function Navbar() {
             orderBy("createdAt", "desc"),
             limit(5)
         );
-    }, [user?.uid, isStaff]);
+    }, [user?.uid, user?.role]);
 
     const { data: notifications } = useCollection(notificationsQuery);
     const unreadCount = notifications?.length || 0;
@@ -70,7 +74,7 @@ export function Navbar() {
 
     const navItems = [
         { label: 'Dashboard', href: '/dashboard', show: isStaff, icon: LayoutDashboard },
-        { label: 'Caisse', href: '/pos', show: role === 'admin' || role === 'cashier', icon: ShoppingCart },
+        { label: 'Caisse', href: '/pos', show: role === 'admin' || role === 'cashier' || role === 'caissier', icon: ShoppingCart },
         { label: 'Équipe', href: '/dashboard/users', show: role === 'admin', icon: Users },
         { label: 'Mon Hub', href: '/dashboard', show: !isStaff && !!user, icon: User },
         { label: 'Boutique', href: '/', show: pathname !== '/', icon: Home },

@@ -3,37 +3,31 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- GLOBAL HELPER FUNCTIONS ---
+    // --- FONCTIONS DE VÉRIFICATION ---
 
     function isSignedIn() {
       return request.auth != null;
     }
 
-    // Helper to get user profile data safely
-    function getUserData() {
-      let path = /databases/$(database)/documents/users/$(request.auth.uid);
-      return exists(path) ? get(path).data : null;
-    }
-
-    // Check if the current user has an administrative/staff role
+    // Vérifie si l'utilisateur a un rôle de staff (Admin, Seller, Cashier)
     function isStaff() {
-      let data = getUserData();
-      return isSignedIn() && data != null && (
-        data.role == 'Admin' || data.role == 'admin' || 
-        data.role == 'Seller' || data.role == 'seller' || 
-        data.role == 'Cashier' || data.role == 'cashier'
+      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
+      return isSignedIn() && userDoc != null && (
+        userDoc.data.role == 'Admin' || userDoc.data.role == 'admin' || 
+        userDoc.data.role == 'Seller' || userDoc.data.role == 'seller' || 
+        userDoc.data.role == 'Cashier' || userDoc.data.role == 'cashier'
       );
     }
 
-    // Check if the current user is an admin
+    // Vérifie si l'utilisateur est Admin
     function isAdmin() {
-      let data = getUserData();
-      return isSignedIn() && data != null && (
-        data.role == 'Admin' || data.role == 'admin'
+      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
+      return isSignedIn() && userDoc != null && (
+        userDoc.data.role == 'Admin' || userDoc.data.role == 'admin'
       );
     }
 
-    // --- COLLECTION RULES ---
+    // --- RÈGLES PAR COLLECTION ---
 
     match /users/{userId} {
       allow get: if isSignedIn();
@@ -55,18 +49,19 @@ service cloud.firestore {
 
     match /orders/{orderId} {
       allow create: if isSignedIn();
-      // Allow if staff or if the order belongs to the user
-      allow get, list: if isSignedIn() && (
+      // Un utilisateur peut voir ses commandes, le staff peut tout voir
+      allow read: if isSignedIn() && (
         isStaff() || 
         resource.data.userId == request.auth.uid
       );
     }
 
     match /notifications/{notifId} {
-      // Robust read rule
+      // Règle de lecture optimisée pour les requêtes "in" et les accès directs
       allow read: if isSignedIn() && (
-        isStaff() || 
-        resource.data.userId == request.auth.uid
+        resource.data.userId == request.auth.uid || 
+        resource.data.userId == 'staff' ||
+        isStaff()
       );
       
       allow create: if isSignedIn();
