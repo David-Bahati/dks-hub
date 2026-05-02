@@ -191,10 +191,6 @@ function POS() {
     p.category.toLowerCase().includes(search.toLowerCase())
   );
 
-  const handlePrint = () => {
-    window.print();
-  };
-
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <Navbar />
@@ -215,6 +211,7 @@ function POS() {
             background: white !important;
             color: black !important;
             padding: 10px !important;
+            box-shadow: none !important;
           }
           .no-print {
             display: none !important;
@@ -494,11 +491,18 @@ function POS() {
           </div>
 
           <div className="bg-gray-100 p-4 flex gap-3 no-print border-t border-gray-200">
-            <Button className="flex-1 gap-2 bg-black text-white hover:bg-black/90 rounded-xl font-black uppercase text-[9px] h-12" onClick={handlePrint}>
-              <Printer size={16} /> Imprimer
+            <Button 
+                className="flex-1 gap-2 bg-black text-white hover:bg-black/90 rounded-xl font-black uppercase text-[10px] h-14" 
+                onClick={() => window.print()}
+            >
+              <Printer size={18} /> Imprimer le Ticket
             </Button>
-            <Button className="flex-1 gap-2 border-gray-300 rounded-xl font-black uppercase text-[9px] h-12" variant="outline" onClick={() => setShowReceipt(false)}>
-              <ArrowLeft size={16} /> Retour
+            <Button 
+                className="flex-1 gap-2 border-black text-black hover:bg-black/5 rounded-xl font-black uppercase text-[10px] h-14" 
+                variant="outline" 
+                onClick={() => setShowReceipt(false)}
+            >
+              <ArrowLeft size={18} /> Nouvelle Vente
             </Button>
           </div>
         </DialogContent>
