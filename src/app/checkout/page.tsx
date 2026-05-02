@@ -34,6 +34,33 @@ import { Label } from "@/components/ui/label";
 type PaymentMethod = "PI_NETWORK" | "MOBILE_MONEY" | "CASH";
 type MobileNetwork = "VODACOM" | "AIRTEL" | "ORANGE" | "AFRICELL";
 
+const NETWORK_CONFIG = {
+  VODACOM: {
+    label: "Vodacom",
+    color: "bg-red-600",
+    prefixes: ["081", "082", "083"],
+    hint: "Commence par 081, 082 ou 083"
+  },
+  AIRTEL: {
+    label: "Airtel",
+    color: "bg-red-700",
+    prefixes: ["097", "098", "099"],
+    hint: "Commence par 097, 098 ou 099"
+  },
+  ORANGE: {
+    label: "Orange",
+    color: "bg-orange-500",
+    prefixes: ["084", "085", "089"],
+    hint: "Commence par 084, 085 ou 089"
+  },
+  AFRICELL: {
+    label: "Africell",
+    color: "bg-purple-600",
+    prefixes: ["090", "091"],
+    hint: "Commence par 090 ou 091"
+  }
+};
+
 export default function CheckoutPage() {
     const { cartItems, totalPrice, clearCart } = useCart();
     const { user } = useAuth();
@@ -69,11 +96,11 @@ export default function CheckoutPage() {
         );
     }
 
-    const validatePhoneNumber = (phone: string) => {
-        // Regex pour les numéros RDC : 10 chiffres, commence par 08 ou 09
-        // Précisément : 081, 082, 083, 084, 085, 089, 090, 097, 098, 099
-        const rdcPhoneRegex = /^(081|082|083|084|085|089|090|097|098|099)\d{7}$/;
-        return rdcPhoneRegex.test(phone);
+    const validatePhoneNumber = (phone: string, network: MobileNetwork) => {
+        const config = NETWORK_CONFIG[network];
+        const prefixPattern = config.prefixes.join("|");
+        const regex = new RegExp(`^(${prefixPattern})\\d{7}$`);
+        return regex.test(phone);
     };
 
     const handlePlaceOrder = async () => {
@@ -97,10 +124,10 @@ export default function CheckoutPage() {
                 return;
             }
 
-            if (!validatePhoneNumber(customerPhone)) {
+            if (!validatePhoneNumber(customerPhone, mobileNetwork)) {
                 toast({
                     title: "Format invalide",
-                    description: "Veuillez saisir un numéro valide (ex: 0812345678).",
+                    description: `Pour ${NETWORK_CONFIG[mobileNetwork].label}, le numéro doit être de 10 chiffres et ${NETWORK_CONFIG[mobileNetwork].hint}.`,
                     variant: "destructive"
                 });
                 return;
@@ -264,24 +291,19 @@ export default function CheckoutPage() {
                                     <div className="space-y-4">
                                         <Label className="text-[10px] font-black uppercase tracking-widest opacity-40">Choisir votre Opérateur</Label>
                                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                                            {[
-                                                { id: "VODACOM", label: "Vodacom", color: "bg-red-600" },
-                                                { id: "AIRTEL", label: "Airtel", color: "bg-red-700" },
-                                                { id: "ORANGE", label: "Orange", color: "bg-orange-500" },
-                                                { id: "AFRICELL", label: "Africell", color: "bg-purple-600" }
-                                            ].map((net) => (
+                                            {Object.entries(NETWORK_CONFIG).map(([id, config]) => (
                                                 <button
-                                                    key={net.id}
-                                                    onClick={() => setMobileNetwork(net.id as MobileNetwork)}
+                                                    key={id}
+                                                    onClick={() => setMobileNetwork(id as MobileNetwork)}
                                                     className={cn(
                                                         "p-4 rounded-2xl border text-[10px] font-black uppercase transition-all flex flex-col items-center gap-2",
-                                                        mobileNetwork === net.id 
+                                                        mobileNetwork === id 
                                                             ? "bg-white text-black border-white shadow-xl scale-105" 
                                                             : "bg-white/5 border-white/5 text-muted-foreground hover:bg-white/10"
                                                     )}
                                                 >
-                                                    <div className={cn("w-3 h-3 rounded-full shadow-lg", net.color)} />
-                                                    {net.label}
+                                                    <div className={cn("w-3 h-3 rounded-full shadow-lg", config.color)} />
+                                                    {config.label}
                                                 </button>
                                             ))}
                                         </div>
@@ -293,7 +315,7 @@ export default function CheckoutPage() {
                                             <Phone className="absolute left-5 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-accent transition-colors" size={20} />
                                             <Input 
                                                 type="tel"
-                                                placeholder="08XXXXXXXX"
+                                                placeholder={NETWORK_CONFIG[mobileNetwork].prefixes[0] + "XXXXXXX"}
                                                 className="h-16 pl-14 rounded-2xl bg-background/50 border-white/5 focus:border-accent focus:ring-4 focus:ring-accent/5 transition-all text-sm font-bold"
                                                 value={customerPhone}
                                                 onChange={(e) => setCustomerPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
@@ -303,9 +325,11 @@ export default function CheckoutPage() {
                                             <div className="w-6 h-6 rounded-full bg-orange-500/20 flex items-center justify-center shrink-0">
                                                 <Info className="text-orange-500" size={14} />
                                             </div>
-                                            <p className="text-[10px] text-orange-200/60 leading-relaxed uppercase font-black tracking-widest">
-                                                Format requis : 10 chiffres (ex: 0812345678). Vous recevrez une demande de confirmation USSD sur ce numéro après validation.
-                                            </p>
+                                            <div className="flex flex-col gap-1">
+                                                <p className="text-[10px] text-orange-200/60 leading-relaxed uppercase font-black tracking-widest">
+                                                    Format requis : 10 chiffres. Pour {NETWORK_CONFIG[mobileNetwork].label} : {NETWORK_CONFIG[mobileNetwork].hint}.
+                                                </p>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
