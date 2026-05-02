@@ -2,17 +2,12 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // --- FONCTION DE BASE ---
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    // --- RÈGLES ULTRA-SIMPLIFIÉES (MODE DÉPANNAGE) ---
-    // On autorise TOUT à TOUT utilisateur connecté pour débloquer l'application.
+    // --- RÈGLE DE DÉBLOCAGE TOTAL POUR UTILISATEURS CONNECTÉS ---
+    // Cette règle autorise toute lecture et écriture si l'utilisateur est authentifié.
+    // C'est la solution la plus simple pour arrêter les erreurs de permissions immédiatement.
     
     match /{document=**} {
-      allow read, write: if isSignedIn();
+      allow read, write: if request.auth != null;
     }
   }
 }

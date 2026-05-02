@@ -36,9 +36,9 @@ export function Navbar() {
 
     // Fetch Unread Notifications with robust checks
     const notificationsQuery = useMemoFirebase(() => {
-        if (!user?.uid) return null;
+        // CRITICAL: On attend que l'utilisateur ET son rôle soient chargés
+        if (!user?.uid || !user?.role) return null;
         
-        // Defensive check: only query if role is present
         const staffRoles = ['admin', 'seller', 'cashier', 'vendeur', 'caissier'];
         const isUserStaff = staffRoles.includes(user.role?.toLowerCase() || "");
         
