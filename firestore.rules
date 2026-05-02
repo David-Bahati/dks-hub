@@ -8,43 +8,11 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // --- RÈGLES SIMPLIFIÉES (MODE DÉPANNAGE) ---
-    // On autorise la lecture et l'écriture à tout utilisateur connecté
-    // pour éviter les erreurs de permissions lors du chargement initial.
-
-    match /notifications/{notifId} {
-      allow read, write: if isSignedIn();
-    }
-
-    match /users/{userId} {
-      allow read, write: if isSignedIn();
-    }
-
-    match /products/{productId} {
-      allow read: if true;
-      allow write: if isSignedIn();
-    }
-
-    match /categories/{categoryId} {
-      allow read: if true;
-      allow write: if isSignedIn();
-    }
-
-    match /orders/{orderId} {
-      allow read, write: if isSignedIn();
-    }
-
-    match /sales/{saleId} {
-      allow read, write: if isSignedIn();
-    }
-
-    match /carts/{userId} {
-      allow read, write: if isSignedIn() && request.auth.uid == userId;
-    }
+    // --- RÈGLES ULTRA-SIMPLIFIÉES (MODE DÉPANNAGE) ---
+    // On autorise TOUT à TOUT utilisateur connecté pour débloquer l'application.
     
-    match /system/{docId} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn();
+    match /{document=**} {
+      allow read, write: if isSignedIn();
     }
   }
 }
