@@ -4,10 +4,18 @@ import { Product, Sale, AppUser } from "./types";
 import { format, subDays, startOfDay, isSameDay } from "date-fns";
 
 /**
- * Récupère le taux de change actuel
+ * Récupère le taux de change actuel depuis Firestore ou une valeur par défaut
  */
 export async function getExchangeRate() {
-  return 2500; // 1 USD = 2500 CDF
+  try {
+    const configSnap = await getDoc(doc(db, "system", "config"));
+    if (configSnap.exists()) {
+      return configSnap.data().exchangeRate || 2500;
+    }
+    return 2500;
+  } catch (error) {
+    return 2500;
+  }
 }
 
 /**
@@ -25,7 +33,7 @@ export async function getDashboardStats() {
   const sales = salesSnap.docs.map(d => d.data() as Sale);
   const products = productsSnap.docs.map(d => d.data() as Product);
 
-  const totalRevenueCDF = sales.reduce((acc, sale) => acc + (sale.totalAmount || 0), 0);
+  const totalRevenueUSD = sales.reduce((acc, sale) => acc + (sale.totalAmount || 0), 0);
   const totalSalesCount = sales.length;
   const totalProductsCount = products.length;
 
@@ -37,8 +45,12 @@ export async function getDashboardStats() {
   });
   const todayRevenue = todaySales.reduce((acc, s) => acc + (s.totalAmount || 0), 0);
 
+  // On récupère le taux pour convertir le total global en CDF pour l'affichage principal
+  const rate = await getExchangeRate();
+
   return {
-    totalRevenueCDF,
+    totalRevenueUSD,
+    totalRevenueCDF: totalRevenueUSD * rate,
     totalSalesCount,
     totalProductsCount,
     todayRevenue,

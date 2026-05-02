@@ -604,7 +604,7 @@ function POS() {
                 variant="outline" 
                 onClick={() => setShowReceipt(false)}
             >
-              <ArrowLeft size={18} /> Retour
+              <ArrowLeft size={18} /> Nouvelle Vente
             </Button>
           </div>
         </DialogContent>

@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -357,7 +358,7 @@ function DashboardPage() {
                 </div>
                 <div className="mt-4 flex items-center gap-4">
                     <Badge variant="outline" className="border-white/5 bg-white/5 px-3 py-1 font-mono text-slate-400">
-                        ≈ {formatCurrency((stats?.totalRevenueCDF || 0) / rate)} USD
+                        ≈ {formatCurrency(stats?.totalRevenueUSD || 0)} USD
                     </Badge>
                     <span className="text-[10px] text-slate-500 italic font-light">Taux : 1 USD = {rate} CDF</span>
                 </div>
@@ -374,7 +375,7 @@ function DashboardPage() {
               <CardContent className="pt-4">
                 <div className="text-3xl font-bold font-mono">{stats?.todaySalesCount || 0}</div>
                 <p className="text-[10px] text-accent mt-2 uppercase font-black tracking-widest bg-accent/10 w-fit px-2 py-1 rounded-md">
-                    +{formatCurrency(stats?.todayRevenue || 0)} CDF
+                    +{formatCurrency(stats?.todayRevenue || 0)} USD
                 </p>
               </CardContent>
             </Card>
@@ -456,7 +457,7 @@ function DashboardPage() {
                                 <div className="flex-1">
                                     <div className="flex items-center justify-between mb-1">
                                         <p className="text-sm font-bold uppercase italic">{sale.cashierName}</p>
-                                        <p className="font-mono font-bold text-sm text-white">{formatCurrency(sale.totalAmount)} <span className="text-[9px] font-light opacity-30">CDF</span></p>
+                                        <p className="font-mono font-bold text-sm text-white">{formatCurrency(sale.totalAmount)} <span className="text-[9px] font-light opacity-30">USD</span></p>
                                     </div>
                                     <div className="flex items-center justify-between">
                                         <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">REF: #{sale.id.substring(0, 8)}</p>

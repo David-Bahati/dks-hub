@@ -291,9 +291,9 @@ function ProductsPage() {
                             className="h-7 px-2 text-[8px] font-black uppercase italic gap-1.5 border border-accent/20 bg-accent/5 text-accent hover:bg-accent hover:text-black transition-all"
                             disabled={isGenerating}
                             onClick={() => {
-                                const name = (document.getElementById('prod-name') as HTMLInputElement).value;
-                                const category = (document.getElementById('prod-category') as any).innerText || "";
-                                handleAiGenerate(name, category);
+                                const nameInput = document.getElementById('prod-name') as HTMLInputElement;
+                                const categoryInput = document.getElementById('prod-category') as any;
+                                handleAiGenerate(nameInput.value, categoryInput.innerText || "");
                             }}
                         >
                             {isGenerating ? <Loader2 size={10} className="animate-spin" /> : <Sparkles size={10} />}

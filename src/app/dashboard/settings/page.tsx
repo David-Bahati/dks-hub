@@ -129,6 +129,7 @@ export default function SettingsPage() {
     const fetchTodayRate = async () => {
         setIsFetchingRate(true);
         try {
+            // Utilisation d'une API gratuite pour récupérer le taux réel USD/CDF
             const response = await fetch('https://open.er-api.com/v6/latest/USD');
             const data = await response.json();
             if (data && data.rates && data.rates.CDF) {
