@@ -165,7 +165,29 @@ export default function CheckoutPage() {
                 piValue: totalPrice / PI_CONVERSION_RATE
             };
 
-            await addDoc(collection(db, "orders"), orderData);
+            const orderRef = await addDoc(collection(db, "orders"), orderData);
+
+            // Trigger Notification for Staff
+            await addDoc(collection(db, "notifications"), {
+                userId: 'staff',
+                title: "Nouvelle Commande !",
+                message: `Le client ${user.name} a passé une commande de $${totalPrice.toFixed(2)} (${paymentMethod}).`,
+                type: 'success',
+                isRead: false,
+                createdAt: serverTimestamp(),
+                link: '/dashboard/orders'
+            });
+
+            // Trigger Notification for Customer
+            await addDoc(collection(db, "notifications"), {
+                userId: user.uid,
+                title: "Commande Enregistrée",
+                message: "Votre commande est bien reçue. Vous recevrez une notification dès qu'elle sera prête.",
+                type: 'info',
+                isRead: false,
+                createdAt: serverTimestamp(),
+                link: '/dashboard/orders'
+            });
 
             toast({
                 title: "Commande enregistrée !",

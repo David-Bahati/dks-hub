@@ -3,7 +3,7 @@ export type AppUser = {
   uid: string;
   email: string;
   name: string;
-  role: 'admin' | 'seller' | 'cashier' | 'customer';
+  role: 'admin' | 'seller' | 'cashier' | 'customer' | 'Admin' | 'Seller' | 'Cashier';
   createdAt?: any;
 };
 
@@ -18,24 +18,28 @@ export type Product = {
   isPublished: boolean;
   price: number; // For cart compatibility
   image?: string; // For cart compatibility
+  purchasePrice?: number;
 };
 
 export type OrderItem = {
-  productId: string;
-  productName: string;
+  id?: string;
+  productId?: string;
+  name: string;
   quantity: number;
   price: number;
 };
 
 export type Order = {
   id: string;
-  customer: string;
+  customerName: string;
+  customerEmail?: string;
   userId?: string;
   items: OrderItem[];
   total: number;
-  status: 'pending' | 'completed' | 'cancelled' | 'Terminé' | 'En attente' | 'Annulée';
+  status: string;
+  paymentMethod: string;
   createdAt: any;
-  date?: any;
+  updatedAt: any;
 };
 
 export type Sale = {
@@ -43,8 +47,20 @@ export type Sale = {
   userId: string;
   items: { productId: string; quantity: number; price: number }[];
   totalAmount: number;
-  status: 'Payé' | 'En attente' | 'Annulée';
+  status: string;
+  paymentMode?: string;
   createdAt: any;
+};
+
+export type AppNotification = {
+  id: string;
+  userId: string;
+  title: string;
+  message: string;
+  type: 'info' | 'success' | 'warning' | 'error';
+  isRead: boolean;
+  createdAt: any;
+  link?: string;
 };
 
 export type PaymentMode = "CASH" | "MOBILE_MONEY" | "PI_NETWORK";

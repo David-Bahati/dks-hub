@@ -50,6 +50,22 @@
         "isPublished": { "type": "boolean" }
       },
       "required": ["id", "name", "sellingPrice", "stockQuantity"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "System or user alerts.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string", "description": "Recipient ID (or 'staff' for all employees)" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "type": { "type": "string", "enum": ["info", "success", "warning", "error"] },
+        "isRead": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "link": { "type": "string" }
+      },
+      "required": ["userId", "title", "message", "isRead", "createdAt"]
     }
   },
   "auth": {
@@ -60,18 +76,6 @@
       "schema": "User",
       "description": "User profiles."
     },
-    "/admins/{adminId}": {
-      "schema": "object",
-      "description": "Admin role assignment."
-    },
-    "/sellers/{sellerId}": {
-      "schema": "object",
-      "description": "Seller role assignment."
-    },
-    "/cashiers/{cashierId}": {
-      "schema": "object",
-      "description": "Cashier role assignment."
-    },
     "/products/{productId}": {
       "schema": "Product",
       "description": "Hardware products inventory."
@@ -80,13 +84,13 @@
       "schema": "Order",
       "description": "Customer orders."
     },
+    "/notifications/{notifId}": {
+      "schema": "Notification",
+      "description": "System notifications."
+    },
     "/sales/{saleId}": {
       "schema": "object",
       "description": "POS sales records."
-    },
-    "/carts/{userId}": {
-      "schema": "object",
-      "description": "User shopping carts."
     }
   }
 }

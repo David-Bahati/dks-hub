@@ -1,19 +1,22 @@
 
 "use client";
 
-import { LogOut, LayoutDashboard, ShoppingCart, Users, Package, Home, Trash2, User, Sparkles, ArrowRight, Loader2, Plus, Minus } from 'lucide-react';
+import { LogOut, LayoutDashboard, ShoppingCart, Users, Package, Home, Trash2, User, Sparkles, ArrowRight, Loader2, Plus, Minus, Bell, Check } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
+import { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { useAuth } from '@/context/AuthContext';
 import { useCart } from '@/context/CartContext';
-import { auth } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import { signOut } from 'firebase/auth';
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { PI_CONVERSION_RATE } from '@/lib/constants';
 import { Badge } from '@/components/ui/badge';
 import { Logo } from '@/components/ui/Logo';
 import { cn } from '@/lib/utils';
+import { useCollection, useMemoFirebase } from '@/firebase';
+import { collection, query, where, orderBy, limit, doc, updateDoc } from 'firebase/firestore';
 
 export function Navbar() {
     const { user, isLoading: authLoading } = useAuth();
@@ -30,12 +33,35 @@ export function Navbar() {
         }
     };
 
-    const isStaff = user?.role === 'Admin' || user?.role === 'Seller' || user?.role === 'Cashier';
+    const isStaff = user?.role === 'Admin' || user?.role === 'Seller' || user?.role === 'Cashier' || user?.role === 'admin' || user?.role === 'seller' || user?.role === 'cashier';
+
+    // Fetch Unread Notifications
+    const notificationsQuery = useMemoFirebase(() => {
+        if (!user?.uid) return null;
+        return query(
+            collection(db, "notifications"),
+            where("userId", "in", [user.uid, 'staff']),
+            where("isRead", "==", false),
+            orderBy("createdAt", "desc"),
+            limit(5)
+        );
+    }, [user?.uid]);
+
+    const { data: notifications } = useCollection(notificationsQuery);
+    const unreadCount = notifications?.length || 0;
+
+    const markAsRead = async (id: string) => {
+        try {
+            await updateDoc(doc(db, "notifications", id), { isRead: true });
+        } catch (error) {
+            console.error(error);
+        }
+    };
 
     const navItems = [
         { label: 'Dashboard', href: '/dashboard', show: isStaff, icon: LayoutDashboard },
-        { label: 'Caisse', href: '/pos', show: user?.role === 'Admin' || user?.role === 'Cashier', icon: ShoppingCart },
-        { label: 'Équipe', href: '/dashboard/users', show: user?.role === 'Admin', icon: Users },
+        { label: 'Caisse', href: '/pos', show: user?.role === 'Admin' || user?.role === 'Cashier' || user?.role === 'admin' || user?.role === 'cashier', icon: ShoppingCart },
+        { label: 'Équipe', href: '/dashboard/users', show: user?.role === 'Admin' || user?.role === 'admin', icon: Users },
         { label: 'Mon Hub', href: '/dashboard', show: !isStaff && !!user, icon: User },
         { label: 'Boutique', href: '/', show: pathname !== '/', icon: Home },
     ];
@@ -60,6 +86,61 @@ export function Navbar() {
                 </nav>
 
                 <div className="flex items-center gap-4">
+                    {/* Notification Bell */}
+                    {user && (
+                        <Sheet>
+                            <SheetTrigger asChild>
+                                <Button variant="ghost" size="icon" className="relative h-10 w-10 text-muted-foreground hover:text-accent transition-colors">
+                                    <Bell size={20} />
+                                    {unreadCount > 0 && (
+                                        <Badge className="absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full bg-destructive text-white flex items-center justify-center text-[9px] font-black p-0 border border-background animate-pulse">
+                                            {unreadCount}
+                                        </Badge>
+                                    )}
+                                </Button>
+                            </SheetTrigger>
+                            <SheetContent className="bg-card/95 backdrop-blur-3xl border-white/10 w-full sm:max-w-md flex flex-col p-0">
+                                <SheetHeader className="p-8 pt-12 pb-0">
+                                    <div className="flex justify-between items-end">
+                                        <div>
+                                            <Badge className="bg-accent/10 text-accent border-none w-fit mb-2 font-black text-[9px] uppercase tracking-widest">
+                                                Système Alertes
+                                            </Badge>
+                                            <SheetTitle className="text-xl font-black uppercase italic tracking-tighter">Notifications</SheetTitle>
+                                        </div>
+                                        <Link href="/dashboard/notifications" className="text-[10px] font-black uppercase italic text-accent hover:underline mb-1">
+                                            Voir tout
+                                        </Link>
+                                    </div>
+                                </SheetHeader>
+                                
+                                <div className="flex-1 overflow-y-auto mt-6 space-y-3 px-8 custom-scrollbar">
+                                    {notifications && notifications.length > 0 ? (
+                                        notifications.map(notif => (
+                                            <div key={notif.id} className="p-4 rounded-2xl bg-white/5 border border-white/5 space-y-1 hover:bg-white/10 transition-all relative group">
+                                                <div className="flex justify-between items-start gap-3">
+                                                    <h4 className="font-bold text-xs uppercase italic">{notif.title}</h4>
+                                                    <button onClick={() => markAsRead(notif.id)} className="h-6 w-6 rounded-lg bg-accent/10 text-accent flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <Check size={12} />
+                                                    </button>
+                                                </div>
+                                                <p className="text-[11px] text-muted-foreground leading-relaxed">{notif.message}</p>
+                                                <p className="text-[9px] text-white/20 font-bold uppercase tracking-widest pt-1">
+                                                    {notif.createdAt?.toDate ? notif.createdAt.toDate().toLocaleTimeString() : 'Maintenant'}
+                                                </p>
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <div className="text-center py-20 opacity-20 flex flex-col items-center gap-4">
+                                            <Bell size={80} strokeWidth={1} />
+                                            <p className="font-black uppercase italic text-xs tracking-widest">Aucune alerte</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </SheetContent>
+                        </Sheet>
+                    )}
+
                     {!isStaff && (
                         <Sheet>
                             <SheetTrigger asChild>
