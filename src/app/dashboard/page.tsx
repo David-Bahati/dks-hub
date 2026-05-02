@@ -242,7 +242,7 @@ function DashboardPage() {
 
   return (
     <div className="flex min-h-screen w-full flex-col bg-background">
-      <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b border-white/5 bg-background/40 backdrop-blur-2xl px-6">
+      <header className="sticky top-0 z-30 flex h-20 items-center gap-4 border-b border-white/5 bg-background/40 backdrop-blur-2xl px-6">
          <Sheet>
             <SheetTrigger asChild>
               <Button size="icon" variant="ghost" className="sm:hidden text-muted-foreground">
@@ -275,7 +275,7 @@ function DashboardPage() {
           </Sheet>
 
         <div className="flex-1 flex items-center justify-between">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-6">
                 <Logo size="sm" />
                 <h2 className="text-lg md:text-xl tracking-tighter">
                     <span className="font-light text-slate-400 uppercase">Tableau de bord</span>{" "}
@@ -283,14 +283,14 @@ function DashboardPage() {
                 </h2>
             </div>
 
-            <nav className="hidden sm:flex items-center gap-0.5">
+            <nav className="hidden lg:flex items-center gap-2">
                 {filteredNavLinks.map((link) => (
                     <Link key={link.href} href={link.href}>
                         <Button
                             variant="ghost"
                             size="sm"
                             className={cn(
-                                "group rounded-none h-16 px-5 gap-2.5 font-medium transition-all text-[11px] relative",
+                                "group rounded-none h-20 px-5 gap-2.5 font-medium transition-all text-[11px] relative",
                                 pathname === link.href 
                                     ? 'text-accent' 
                                     : 'text-slate-400 hover:text-white'
@@ -306,10 +306,10 @@ function DashboardPage() {
                 ))}
             </nav>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-6">
                 {user?.role === 'Cashier' && (
                   <Link href="/pos">
-                    <Button className="bg-accent text-black font-black uppercase italic text-[10px] rounded-xl h-9 px-4">
+                    <Button className="bg-accent text-black font-black uppercase italic text-xs rounded-2xl h-11 px-6 shadow-xl shadow-accent/10 hover:scale-105 active:scale-95 transition-all">
                       Aller à la Caisse
                     </Button>
                   </Link>
@@ -318,9 +318,9 @@ function DashboardPage() {
                     variant="ghost" 
                     size="icon" 
                     onClick={fetchAdminData} 
-                    className="h-9 w-9 text-slate-400 hover:text-accent hover:bg-accent/10 rounded-xl transition-all group"
+                    className="h-10 w-10 text-slate-400 hover:text-accent hover:bg-accent/10 rounded-xl transition-all group"
                 >
-                    <RefreshCw size={16} className={cn("transition-transform duration-700", loading ? "animate-spin" : "group-hover:rotate-180")} />
+                    <RefreshCw size={18} className={cn("transition-transform duration-700", loading ? "animate-spin" : "group-hover:rotate-180")} />
                 </Button>
             </div>
         </div>
