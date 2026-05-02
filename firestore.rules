@@ -18,16 +18,16 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      let role = getUserData().role;
-      return isSignedIn() && (role == 'Admin' || role == 'admin');
+      let data = getUserData();
+      return isSignedIn() && (data.role == 'Admin' || data.role == 'admin');
     }
 
     function isStaff() {
-      let role = getUserData().role;
+      let data = getUserData();
       return isSignedIn() && (
-        role == 'Admin' || role == 'admin' || 
-        role == 'Seller' || role == 'seller' || 
-        role == 'Cashier' || role == 'cashier'
+        data.role == 'Admin' || data.role == 'admin' || 
+        data.role == 'Seller' || data.role == 'seller' || 
+        data.role == 'Cashier' || data.role == 'cashier'
       );
     }
 
@@ -49,7 +49,7 @@ service cloud.firestore {
     match /orders/{orderId} {
       allow create: if isSignedIn();
       allow get: if isSignedIn() && (isStaff() || resource.data.userId == request.auth.uid);
-      allow list: if isSignedIn() && (isStaff() || resource.data.userId == request.auth.uid);
+      allow list: if isSignedIn() && (isStaff() || (resource.data.userId == request.auth.uid));
     }
 
     match /notifications/{notifId} {
@@ -72,6 +72,11 @@ service cloud.firestore {
     match /categories/{categoryId} {
       allow read: if true;
       allow write: if isStaff();
+    }
+
+    match /system/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
     }
 
     match /admins/{id} { allow read: if isSignedIn(); }

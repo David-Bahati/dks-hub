@@ -31,8 +31,7 @@ import {
   User as UserIcon,
   ArrowLeft,
   History,
-  Clock,
-  Eye
+  Clock
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -52,7 +51,7 @@ import {
 } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { db } from "@/lib/firebase";
-import { collection, onSnapshot, doc, updateDoc, addDoc, serverTimestamp, increment, query, orderBy, limit } from "firebase/firestore";
+import { collection, onSnapshot, doc, updateDoc, addDoc, serverTimestamp, increment, query, orderBy, limit, getDoc } from "firebase/firestore";
 import { useAuth } from "@/context/AuthContext";
 import withAuth from "@/components/auth/withAuth";
 
@@ -71,6 +70,7 @@ function POS() {
   const [showReceipt, setShowReceipt] = useState(false);
   const [loadingProducts, setLoadingProducts] = useState(true);
   const [recentSales, setRecentSales] = useState<any[]>([]);
+  const [exchangeRate, setExchangeRate] = useState(2500);
   const [lastTransaction, setLastTransaction] = useState<{
     id: string;
     items: any[];
@@ -83,9 +83,9 @@ function POS() {
   const { toast } = useToast();
   const { user } = useAuth();
 
-  // Fetch Products
+  // Fetch Products & Config
   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, "products"), (snapshot) => {
+    const unsubscribeProds = onSnapshot(collection(db, "products"), (snapshot) => {
       const productsData = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
@@ -93,7 +93,16 @@ function POS() {
       setProducts(productsData);
       setLoadingProducts(false);
     });
-    return () => unsubscribe();
+
+    const fetchConfig = async () => {
+        const configSnap = await getDoc(doc(db, "system", "config"));
+        if (configSnap.exists()) {
+            setExchangeRate(configSnap.data().exchangeRate || 2500);
+        }
+    };
+    fetchConfig();
+
+    return () => unsubscribeProds();
   }, []);
 
   // Fetch Recent Sales for History
@@ -169,11 +178,12 @@ function POS() {
             customerName: finalCustomerName,
             items: cart.map(item => ({
                 productId: item.id,
-                name: item.name, // Important to save name for reprinting
+                name: item.name,
                 quantity: item.quantity,
                 price: item.price || item.sellingPrice || 0
             })),
             totalAmount: total,
+            totalCDF: total * exchangeRate,
             paymentMode: paymentMode,
             createdAt: serverTimestamp(),
             status: 'Payé'
@@ -231,6 +241,8 @@ function POS() {
     p.name.toLowerCase().includes(search.toLowerCase()) ||
     p.category.toLowerCase().includes(search.toLowerCase())
   );
+
+  const formatCurrency = (amount: number) => new Intl.NumberFormat('fr-FR').format(amount);
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -313,9 +325,6 @@ function POS() {
                                 </div>
                             </div>
                         ))}
-                        {recentSales.length === 0 && (
-                            <div className="text-center py-20 opacity-20 italic">Aucune vente récente</div>
-                        )}
                     </div>
                 </SheetContent>
             </Sheet>
@@ -401,7 +410,7 @@ function POS() {
                   <span className="text-xs font-black uppercase text-muted-foreground tracking-widest">Total Transaction</span>
                   <div className="text-right">
                     <span className="text-3xl font-black text-accent">${total.toFixed(2)}</span>
-                    <p className="text-[10px] font-bold text-muted-foreground uppercase">≈ {(total / PI_CONVERSION_RATE).toFixed(4)} π</p>
+                    <p className="text-[10px] font-bold text-muted-foreground uppercase">≈ {formatCurrency(total * exchangeRate)} FC</p>
                   </div>
                 </div>
               </div>
@@ -468,6 +477,7 @@ function POS() {
             <div className="text-center pt-4">
               <p className="text-xs text-muted-foreground uppercase font-black tracking-[0.2em] mb-2">Montant à encaisser</p>
               <h2 className="text-5xl font-black text-accent">${total.toFixed(2)}</h2>
+              <p className="text-lg font-bold text-white/40 mt-1">≈ {formatCurrency(total * exchangeRate)} Francs Congolais</p>
             </div>
             
             <div className="w-full p-6 rounded-3xl bg-white/5 border border-white/10 flex flex-col gap-6">
@@ -551,10 +561,14 @@ function POS() {
                 <span>$0.00</span>
               </div>
               <div className="flex justify-between text-base font-black border-t-2 border-dashed border-gray-300 pt-2 mt-1">
-                <span>TOTAL PAYÉ</span>
+                <span>TOTAL PAYÉ ($)</span>
                 <span>${lastTransaction?.total.toFixed(2)}</span>
               </div>
-              <div className="flex justify-between font-bold opacity-60 text-[8px] mt-1">
+              <div className="flex justify-between font-black opacity-60 text-[8px] mt-1">
+                <span>TOTAL PAYÉ (FC)</span>
+                <span>{formatCurrency((lastTransaction?.total || 0) * exchangeRate)} FC</span>
+              </div>
+              <div className="flex justify-between font-bold opacity-40 text-[8px] mt-1">
                 <span>VALEUR PI (π)</span>
                 <span>{(lastTransaction ? lastTransaction.total / PI_CONVERSION_RATE : 0).toFixed(6)} π</span>
               </div>

@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -9,15 +10,11 @@ import {
     Settings, 
     Mail, 
     Phone, 
-    Globe, 
-    Bell, 
     LogOut, 
     ArrowLeft,
-    Camera,
     CheckCircle2,
     Lock,
     Smartphone,
-    Info,
     Database,
     DollarSign,
     Coins,
@@ -36,20 +33,12 @@ import {
     TabsList, 
     TabsTrigger 
 } from "@/components/ui/tabs";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
 import { useAuth } from '@/context/AuthContext';
 import { auth, db } from '@/lib/firebase';
 import { signOut } from 'firebase/auth';
-import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, updateDoc, serverTimestamp, getDoc, setDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { cn } from '@/lib/utils';
 import { PI_CONVERSION_RATE } from '@/lib/constants';
 
 export default function SettingsPage() {
@@ -64,17 +53,31 @@ export default function SettingsPage() {
     const [isSaving, setIsSaving] = useState(false);
 
     // System States
-    const [language, setLanguage] = useState("fr");
     const [exchangeRate, setExchangeRate] = useState("2500");
     const [piValue, setPiValue] = useState(PI_CONVERSION_RATE.toString());
     const [isFetchingRate, setIsFetchingRate] = useState(false);
+    const [isSavingSystem, setIsSavingSystem] = useState(false);
 
     useEffect(() => {
         if (user) {
             setName(user.name || "");
             setEmail(user.email || "");
         }
+        fetchSystemConfig();
     }, [user]);
+
+    const fetchSystemConfig = async () => {
+        try {
+            const configRef = doc(db, "system", "config");
+            const configSnap = await getDoc(configRef);
+            if (configSnap.exists()) {
+                setExchangeRate(configSnap.data().exchangeRate?.toString() || "2500");
+                setPiValue(configSnap.data().piValue?.toString() || PI_CONVERSION_RATE.toString());
+            }
+        } catch (error) {
+            console.error("Config fetch error:", error);
+        }
+    };
 
     const isAdmin = user?.role?.toLowerCase() === 'admin';
 
@@ -107,6 +110,22 @@ export default function SettingsPage() {
         }
     };
 
+    const handleSaveSystem = async () => {
+        setIsSavingSystem(true);
+        try {
+            await setDoc(doc(db, "system", "config"), {
+                exchangeRate: parseInt(exchangeRate),
+                piValue: parseFloat(piValue),
+                updatedAt: serverTimestamp()
+            }, { merge: true });
+            toast({ title: "Configuration sauvegardée", description: "Le taux de change a été mis à jour pour toute la boutique." });
+        } catch (error) {
+            toast({ title: "Erreur", variant: "destructive" });
+        } finally {
+            setIsSavingSystem(false);
+        }
+    };
+
     const fetchTodayRate = async () => {
         setIsFetchingRate(true);
         try {
@@ -117,7 +136,7 @@ export default function SettingsPage() {
                 setExchangeRate(rate.toString());
                 toast({
                     title: "Taux récupéré",
-                    description: `Le taux officiel est de ${rate} FC.`,
+                    description: `Le taux officiel est de ${rate} FC. N'oubliez pas de sauvegarder.`,
                 });
             }
         } catch (error) {
@@ -274,17 +293,26 @@ export default function SettingsPage() {
                                           </Button>
                                       </div>
                                   </CardHeader>
-                                  <CardContent className="p-10">
-                                      <Label className="text-[10px] font-black uppercase opacity-60">1 USD en Franc Congolais (CDF)</Label>
-                                      <div className="relative mt-2">
-                                          <span className="absolute left-5 top-1/2 -translate-y-1/2 text-muted-foreground font-black">FC</span>
-                                          <Input 
-                                              type="number" 
-                                              value={exchangeRate}
-                                              onChange={(e) => setExchangeRate(e.target.value)}
-                                              className="h-16 pl-14 bg-background/50 border-white/5 rounded-2xl text-lg font-bold" 
-                                          />
+                                  <CardContent className="p-10 space-y-6">
+                                      <div>
+                                          <Label className="text-[10px] font-black uppercase opacity-60">1 USD en Franc Congolais (CDF)</Label>
+                                          <div className="relative mt-2">
+                                              <span className="absolute left-5 top-1/2 -translate-y-1/2 text-muted-foreground font-black">FC</span>
+                                              <Input 
+                                                  type="number" 
+                                                  value={exchangeRate}
+                                                  onChange={(e) => setExchangeRate(e.target.value)}
+                                                  className="h-16 pl-14 bg-background/50 border-white/5 rounded-2xl text-lg font-bold" 
+                                              />
+                                          </div>
                                       </div>
+                                      <Button 
+                                          onClick={handleSaveSystem}
+                                          disabled={isSavingSystem}
+                                          className="w-full bg-accent text-black font-black uppercase italic rounded-xl h-12"
+                                      >
+                                          {isSavingSystem ? <Loader2 className="animate-spin" /> : "Appliquer à la boutique"}
+                                      </Button>
                                   </CardContent>
                               </Card>
 
@@ -305,6 +333,7 @@ export default function SettingsPage() {
                                               className="h-16 pl-14 bg-background/50 border-white/5 rounded-2xl text-lg font-bold" 
                                           />
                                       </div>
+                                      <p className="mt-4 text-[9px] text-muted-foreground uppercase font-black tracking-widest italic text-center">Valeur Consensus GCV: $314,159</p>
                                   </CardContent>
                               </Card>
                           </div>

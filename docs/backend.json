@@ -91,6 +91,10 @@
     "/sales/{saleId}": {
       "schema": "object",
       "description": "POS sales records."
+    },
+    "/system/{docId}": {
+      "schema": "object",
+      "description": "Global shop configuration (exchange rates, etc.)"
     }
   }
 }

@@ -35,15 +35,18 @@ import { Switch } from "@/components/ui/switch";
 import { db } from '@/lib/firebase';
 import { collection, doc, serverTimestamp, setDoc, addDoc, deleteDoc } from 'firebase/firestore';
 import { Product } from '@/lib/types';
-import { PlusCircle, Edit, Trash2, Eye, EyeOff, Loader2, ArrowLeft } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, Eye, EyeOff, Loader2, ArrowLeft, Sparkles } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
 import Link from 'next/link';
+import { generateProductDescription } from '@/ai/flows/generate-product-description';
 
 function ProductsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [isPublished, setIsPublished] = useState(true);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [aiDescription, setAiDescription] = useState("");
   const { toast } = useToast();
 
   const productsQuery = useMemoFirebase(() => collection(db, "products"), []);
@@ -55,12 +58,31 @@ function ProductsPage() {
   const openModal = (product: Product | null = null) => {
     setEditingProduct(product);
     setIsPublished(product ? product.isPublished : true);
+    setAiDescription(product ? product.description : "");
     setIsModalOpen(true);
   };
 
   const closeModal = () => {
     setEditingProduct(null);
+    setAiDescription("");
     setIsModalOpen(false);
+  };
+
+  const handleAiGenerate = async (productName: string, category: string) => {
+    if (!productName) {
+        toast({ title: "Nom requis", description: "Entrez un nom de produit pour générer la description.", variant: "destructive" });
+        return;
+    }
+    setIsGenerating(true);
+    try {
+        const desc = await generateProductDescription({ productName, category });
+        setAiDescription(desc);
+        toast({ title: "IA: Description générée !", description: "Relisez-la avant d'enregistrer." });
+    } catch (error) {
+        toast({ title: "Erreur IA", description: "Impossible de générer le texte.", variant: "destructive" });
+    } finally {
+        setIsGenerating(false);
+    }
   };
 
   const handleSave = (e: React.FormEvent<HTMLFormElement>) => {
@@ -82,7 +104,7 @@ function ProductsPage() {
 
     const productData = {
       name: formData.get('name') as string,
-      description: formData.get('description') as string,
+      description: aiDescription,
       category: formData.get('category') as string,
       sellingPrice,
       price: sellingPrice,
@@ -221,12 +243,12 @@ function ProductsPage() {
               <div className="space-y-4">
                 <div className="space-y-2">
                     <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Nom commercial</Label>
-                    <Input name="name" defaultValue={editingProduct?.name} className="h-12 bg-background/50 border-white/10 rounded-xl" required />
+                    <Input id="prod-name" name="name" defaultValue={editingProduct?.name} className="h-12 bg-background/50 border-white/10 rounded-xl" required />
                 </div>
                 <div className="space-y-2">
                     <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Catégorie technique</Label>
                     <Select name="category" defaultValue={editingProduct?.category}>
-                        <SelectTrigger className="h-12 bg-background/50 border-white/10 rounded-xl">
+                        <SelectTrigger id="prod-category" className="h-12 bg-background/50 border-white/10 rounded-xl">
                             <SelectValue placeholder="Choisir une catégorie" />
                         </SelectTrigger>
                         <SelectContent className="bg-card border-white/10">
@@ -235,9 +257,6 @@ function ProductsPage() {
                                   {cat.icon} {cat.name}
                                 </SelectItem>
                             ))}
-                            {(!categories || categories.length === 0) && (
-                                <SelectItem value="default" disabled>Créez des catégories d'abord</SelectItem>
-                            )}
                         </SelectContent>
                     </Select>
                 </div>
@@ -262,9 +281,32 @@ function ProductsPage() {
                     <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Image URL (Optionnel)</Label>
                     <Input name="imageUrl" placeholder="Laissez vide pour une image aléatoire" defaultValue={editingProduct?.imageUrl} className="h-12 bg-background/50 border-white/10 rounded-xl" />
                 </div>
-                <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Description technique</Label>
-                    <Textarea name="description" defaultValue={editingProduct?.description} className="min-h-[120px] bg-background/50 border-white/10 rounded-xl resize-none" required />
+                <div className="space-y-2 relative">
+                    <div className="flex justify-between items-end mb-1">
+                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Description technique</Label>
+                        <Button 
+                            type="button" 
+                            size="sm" 
+                            variant="ghost" 
+                            className="h-7 px-2 text-[8px] font-black uppercase italic gap-1.5 border border-accent/20 bg-accent/5 text-accent hover:bg-accent hover:text-black transition-all"
+                            disabled={isGenerating}
+                            onClick={() => {
+                                const name = (document.getElementById('prod-name') as HTMLInputElement).value;
+                                const category = (document.getElementById('prod-category') as any).innerText || "";
+                                handleAiGenerate(name, category);
+                            }}
+                        >
+                            {isGenerating ? <Loader2 size={10} className="animate-spin" /> : <Sparkles size={10} />}
+                            Magie IA
+                        </Button>
+                    </div>
+                    <Textarea 
+                      name="description" 
+                      value={aiDescription} 
+                      onChange={(e) => setAiDescription(e.target.value)}
+                      className="min-h-[120px] bg-background/50 border-white/10 rounded-xl resize-none text-xs leading-relaxed" 
+                      required 
+                    />
                 </div>
                 <div className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/10">
                     <div className="flex flex-col gap-1">
