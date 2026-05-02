@@ -9,22 +9,19 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
-
     function getUserData() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      let path = /databases/$(database)/documents/users/$(request.auth.uid);
+      return exists(path) ? get(path).data : null;
     }
 
     function isAdmin() {
       let data = getUserData();
-      return isSignedIn() && (data.role == 'Admin' || data.role == 'admin');
+      return isSignedIn() && data != null && (data.role == 'Admin' || data.role == 'admin');
     }
 
     function isStaff() {
       let data = getUserData();
-      return isSignedIn() && (
+      return isSignedIn() && data != null && (
         data.role == 'Admin' || data.role == 'admin' || 
         data.role == 'Seller' || data.role == 'seller' || 
         data.role == 'Cashier' || data.role == 'cashier'
@@ -37,11 +34,16 @@ service cloud.firestore {
       allow get: if isSignedIn();
       allow list: if isSignedIn() && isStaff();
       allow create: if isSignedIn(); 
-      allow update: if isOwner(userId) || isStaff();
+      allow update: if isSignedIn() && (request.auth.uid == userId || isStaff());
       allow delete: if isAdmin();
     }
 
     match /products/{productId} {
+      allow read: if true;
+      allow write: if isStaff();
+    }
+
+    match /categories/{categoryId} {
       allow read: if true;
       allow write: if isStaff();
     }
@@ -53,10 +55,19 @@ service cloud.firestore {
     }
 
     match /notifications/{notifId} {
-      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || resource.data.userId == 'staff');
+      // Un utilisateur peut lire ses propres notifications ou celles destinées au staff s'il est staff
+      allow read: if isSignedIn() && (
+        resource.data.userId == request.auth.uid || 
+        resource.data.userId == 'staff' ||
+        isStaff()
+      );
       allow create: if isSignedIn();
-      allow update: if isSignedIn() && (resource.data.userId == request.auth.uid || resource.data.userId == 'staff');
-      allow delete: if isAdmin();
+      allow update: if isSignedIn() && (
+        resource.data.userId == request.auth.uid || 
+        resource.data.userId == 'staff' ||
+        isStaff()
+      );
+      allow delete: if isStaff();
     }
 
     match /sales/{saleId} {
@@ -66,21 +77,12 @@ service cloud.firestore {
     }
 
     match /carts/{userId} {
-      allow read, write: if isOwner(userId);
+      allow read, write: if isSignedIn() && request.auth.uid == userId;
     }
     
-    match /categories/{categoryId} {
-      allow read: if true;
-      allow write: if isStaff();
-    }
-
     match /system/{docId} {
       allow read: if isSignedIn();
       allow write: if isAdmin();
     }
-
-    match /admins/{id} { allow read: if isSignedIn(); }
-    match /sellers/{id} { allow read: if isSignedIn(); }
-    match /cashiers/{id} { allow read: if isSignedIn(); }
   }
 }
