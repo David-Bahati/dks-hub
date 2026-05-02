@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -68,7 +67,6 @@ export default function LoginPage() {
       const result = await signInWithPopup(auth, provider);
       const firebaseUser = result.user;
 
-      // Vérifier si l'utilisateur existe dans Firestore, sinon le créer
       const userDocRef = doc(firestore, 'users', firebaseUser.uid);
       const userDoc = await getDoc(userDocRef);
 
@@ -167,7 +165,6 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-background relative p-4 overflow-hidden">
-      {/* Background Decorative Effects */}
       <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-primary/5 rounded-full blur-[140px] -z-10 animate-pulse" />
       <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-accent/5 rounded-full blur-[140px] -z-10 animate-pulse delay-1000" />
 
@@ -233,7 +230,7 @@ export default function LoginPage() {
             <div className="grid grid-cols-2 gap-3">
               <Button 
                 variant="outline" 
-                className="h-14 rounded-2xl border-white/5 bg-white/5 hover:bg-white/10 hover:border-white/20 transition-all gap-3 font-bold text-xs uppercase italic"
+                className="h-14 rounded-2xl border-white/5 bg-white/5 hover:bg-white/10 hover:border-accent/50 hover:shadow-[0_0_20px_rgba(56,189,248,0.1)] transition-all gap-3 font-bold text-xs uppercase italic"
                 onClick={() => handleSocialLogin('google')}
                 disabled={isLoading || !!isSocialLoading}
               >
@@ -249,7 +246,7 @@ export default function LoginPage() {
               </Button>
               <Button 
                 variant="outline" 
-                className="h-14 rounded-2xl border-white/5 bg-white/5 hover:bg-white/10 hover:border-white/20 transition-all gap-3 font-bold text-xs uppercase italic"
+                className="h-14 rounded-2xl border-white/5 bg-white/5 hover:bg-white/10 hover:border-accent/50 hover:shadow-[0_0_20px_rgba(56,189,248,0.1)] transition-all gap-3 font-bold text-xs uppercase italic"
                 onClick={() => handleSocialLogin('github')}
                 disabled={isLoading || !!isSocialLoading}
               >

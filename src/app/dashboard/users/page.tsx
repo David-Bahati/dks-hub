@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -29,13 +28,14 @@ import { FirestorePermissionError } from '@/firebase/errors';
 import { useToast } from '@/hooks/use-toast';
 
 const getRoleBadge = (role: string) => {
-  switch (role) {
-    case 'Admin':
+  const r = role?.toLowerCase();
+  switch (r) {
+    case 'admin':
       return "bg-red-500/10 text-red-400 border-none";
-    case 'Seller':
-    case 'Manager':
+    case 'seller':
+    case 'manager':
       return "bg-blue-500/10 text-blue-400 border-none";
-    case 'Cashier':
+    case 'cashier':
       return "bg-green-500/10 text-green-400 border-none";
     default:
       return "bg-gray-500/10 text-gray-400 border-none";
@@ -54,7 +54,7 @@ function UsersPage() {
   const [role, setRole] = useState("Seller");
 
   useEffect(() => {
-    if (currentUser && currentUser.role !== 'Admin') {
+    if (currentUser && currentUser.role?.toLowerCase() !== 'admin') {
       router.replace('/dashboard');
       return;
     }
@@ -65,8 +65,9 @@ function UsersPage() {
       const usersData: any[] = [];
       snapshot.forEach(doc => {
         const data = doc.data();
-        // Filtrer pour ne montrer que le staff (pas les clients)
-        if (data.role && data.role !== 'customer') {
+        // Ne montrer que le staff (pas les clients) dans cet annuaire
+        const userRole = data.role?.toLowerCase();
+        if (userRole && userRole !== 'customer') {
           usersData.push({ id: doc.id, ...data });
         }
       });
@@ -77,6 +78,7 @@ function UsersPage() {
         path: 'users',
         operation: 'list'
       }));
+      setIsLoading(false);
     });
     return () => unsubscribe();
   }, [currentUser, router]);

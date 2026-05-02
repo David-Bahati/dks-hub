@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from 'react';
@@ -16,18 +15,17 @@ export default function OrdersPage() {
   const { user, isLoading: authLoading } = useAuth();
 
   const ordersQuery = useMemoFirebase(() => {
-    // Ne pas exécuter la requête tant que l'utilisateur n'est pas chargé
     if (authLoading || !user?.uid) return null;
     
-    const isStaff = user.role === 'Admin' || user.role === 'Seller' || user.role === 'Cashier';
+    const role = user.role?.toLowerCase();
+    const isStaff = role === 'admin' || role === 'seller' || role === 'cashier';
     const baseRef = collection(db, "orders");
     
     if (isStaff) {
-      // Pour le staff, on affiche tout par ordre chronologique
       return query(baseRef, orderBy("createdAt", "desc"));
     }
     
-    // Pour les clients, on filtre OBLIGATOIREMENT par userId pour respecter les règles de sécurité
+    // Filtre obligatoire pour les clients pour respecter les règles Firestore list
     return query(
       baseRef, 
       where("userId", "==", user.uid), 
@@ -62,7 +60,7 @@ export default function OrdersPage() {
         <header className="border-b border-white/5 bg-background/40 backdrop-blur-2xl sticky top-0 z-50">
             <div className="max-w-7xl mx-auto px-4 h-20 flex items-center justify-between">
                 <h1 className="text-2xl font-black tracking-tighter uppercase italic flex items-center gap-3">
-                    <ShoppingBag className="text-accent"/> Gestion des <span className="text-accent">Commandes</span>
+                    <ShoppingBag className="text-accent"/> {user?.role?.toLowerCase() === 'customer' ? 'Mes' : 'Gestion des'} <span className="text-accent">Commandes</span>
                 </h1>
                 <Link href="/dashboard">
                     <Button variant="outline" className="h-12 border-white/10 hover:bg-accent/10 hover:text-accent rounded-2xl gap-2 font-black uppercase italic text-xs">
@@ -81,12 +79,13 @@ export default function OrdersPage() {
             ) : error ? (
                 <div className="text-center py-20 bg-destructive/10 rounded-[2rem] border border-destructive/20 max-w-2xl mx-auto">
                      <XCircle className="mx-auto mb-4 text-destructive" size={48} />
-                     <h2 className="text-xl font-black uppercase italic">Accès Refusé</h2>
+                     <h2 className="text-xl font-black uppercase italic">Erreur d'accès</h2>
                      <p className="text-muted-foreground mt-2 text-sm px-8">
-                        Vous n'avez pas les permissions nécessaires pour voir ces données ou une erreur de filtrage est survenue. 
-                        Veuillez vous reconnecter pour rafraîchir vos droits.
+                        {error.message.includes('permissions') 
+                          ? "Vous n'avez pas les droits nécessaires pour voir ces commandes." 
+                          : "Une erreur est survenue lors de la récupération des données."}
                      </p>
-                     <Button className="mt-6 rounded-xl font-bold uppercase text-[10px]" variant="outline" onClick={() => window.location.reload()}>Réessayer</Button>
+                     <Button className="mt-6 rounded-xl font-bold uppercase text-[10px]" variant="outline" onClick={() => window.location.reload()}>Actualiser</Button>
                 </div>
             ) : orders && orders.length > 0 ? (
                 <div className="grid grid-cols-1 gap-4">
@@ -129,7 +128,7 @@ export default function OrdersPage() {
                     </div>
                     <h2 className="text-4xl font-black uppercase italic mb-4">Aucune Commande</h2>
                     <p className="text-muted-foreground max-w-md">
-                        Le registre est actuellement vide. Les commandes apparaîtront ici dès qu'elles seront validées.
+                        Votre registre de commandes est actuellement vide.
                     </p>
                 </div>
             )}

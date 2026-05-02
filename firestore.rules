@@ -1,4 +1,3 @@
-
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -19,14 +18,16 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return isSignedIn() && getUserData().role == 'Admin';
+      let role = getUserData().role;
+      return isSignedIn() && (role == 'Admin' || role == 'admin');
     }
 
     function isStaff() {
+      let role = getUserData().role;
       return isSignedIn() && (
-        getUserData().role == 'Admin' || 
-        getUserData().role == 'Seller' || 
-        getUserData().role == 'Cashier'
+        role == 'Admin' || role == 'admin' || 
+        role == 'Seller' || role == 'seller' || 
+        role == 'Cashier' || role == 'cashier'
       );
     }
 
@@ -34,7 +35,7 @@ service cloud.firestore {
 
     match /users/{userId} {
       allow get: if isSignedIn();
-      allow list: if isSignedIn() && isStaff(); // Seul le staff peut lister tous les utilisateurs
+      allow list: if isSignedIn() && isStaff();
       allow create: if isSignedIn(); 
       allow update: if isOwner(userId) || isStaff();
       allow delete: if isAdmin();
@@ -46,12 +47,10 @@ service cloud.firestore {
     }
 
     match /orders/{orderId} {
-      // Un client peut créer une commande
       allow create: if isSignedIn();
-      // Un utilisateur peut lire sa propre commande, ou le staff peut tout lire
       allow get: if isSignedIn() && (isStaff() || resource.data.userId == request.auth.uid);
-      // Pour lister, le client doit obligatoirement filtrer par son propre userId
-      allow list: if isSignedIn() && (isStaff() || (request.query.limit <= 100 && request.auth.uid == request.query.filters.userId));
+      // Les clients ne peuvent lister que leurs propres commandes (nécessite un filtre userId dans la requête)
+      allow list: if isSignedIn() && (isStaff() || resource.data.userId == request.auth.uid);
     }
 
     match /sales/{saleId} {
@@ -69,7 +68,6 @@ service cloud.firestore {
       allow write: if isStaff();
     }
 
-    // Compatibilité avec les anciennes collections de rôles si nécessaire
     match /admins/{id} { allow read: if isSignedIn(); }
     match /sellers/{id} { allow read: if isSignedIn(); }
     match /cashiers/{id} { allow read: if isSignedIn(); }
