@@ -57,14 +57,14 @@ import { db } from '@/lib/firebase';
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/ui/Logo";
 
-const adminNavLinks = [
-  { href: "/dashboard", icon: LineChart, label: "Aperçu" },
-  { href: "/dashboard/products", icon: Package, label: "Produits" },
-  { href: "/dashboard/categories", icon: Tags, label: "Catégories" },
-  { href: "/dashboard/orders", icon: ShoppingBag, label: "Commandes" },
-  { href: "/dashboard/customers", icon: Users, label: "Clients" },
-  { href: "/dashboard/users", icon: UsersRound, label: "Équipe" },
-  { href: "/dashboard/settings", icon: Settings, label: "Réglages" },
+const navConfig = [
+  { href: "/dashboard", icon: LineChart, label: "Aperçu", roles: ["Admin", "Seller", "Cashier"] },
+  { href: "/dashboard/products", icon: Package, label: "Produits", roles: ["Admin", "Seller"] },
+  { href: "/dashboard/categories", icon: Tags, label: "Catégories", roles: ["Admin", "Seller"] },
+  { href: "/dashboard/orders", icon: ShoppingBag, label: "Commandes", roles: ["Admin", "Seller", "Cashier"] },
+  { href: "/dashboard/customers", icon: Users, label: "Clients", roles: ["Admin", "Seller", "Cashier"] },
+  { href: "/dashboard/users", icon: UsersRound, label: "Équipe", roles: ["Admin"] },
+  { href: "/dashboard/settings", icon: Settings, label: "Réglages", roles: ["Admin"] },
 ];
 
 const customerNavLinks = [
@@ -85,6 +85,9 @@ function DashboardPage() {
   const [rate, setRate] = useState(2500);
 
   const isStaff = user?.role === 'Admin' || user?.role === 'Seller' || user?.role === 'Cashier';
+  const isAdmin = user?.role === 'Admin';
+
+  const filteredNavLinks = navConfig.filter(link => link.roles.includes(user?.role || ""));
 
   const lastOrderQuery = useMemoFirebase(() => {
     if (authLoading || !user?.uid || isStaff) return null;
@@ -252,7 +255,7 @@ function DashboardPage() {
                    <Logo size="sm" showText={true} />
                 </div>
               <nav className="grid gap-1 p-4">
-                 {adminNavLinks.map(link => (
+                 {filteredNavLinks.map(link => (
                    <Link
                     key={link.href}
                     href={link.href}
@@ -276,12 +279,12 @@ function DashboardPage() {
                 <Logo size="sm" />
                 <h2 className="text-lg md:text-xl tracking-tighter">
                     <span className="font-light text-slate-400 uppercase">Tableau de bord</span>{" "}
-                    <span className="font-bold text-white uppercase italic">Admin</span>
+                    <span className="font-bold text-white uppercase italic">{user?.role}</span>
                 </h2>
             </div>
 
             <nav className="hidden sm:flex items-center gap-0.5">
-                {adminNavLinks.map((link) => (
+                {filteredNavLinks.map((link) => (
                     <Link key={link.href} href={link.href}>
                         <Button
                             variant="ghost"
@@ -304,6 +307,13 @@ function DashboardPage() {
             </nav>
 
             <div className="flex items-center gap-3">
+                {user?.role === 'Cashier' && (
+                  <Link href="/pos">
+                    <Button className="bg-accent text-black font-black uppercase italic text-[10px] rounded-xl h-9 px-4">
+                      Aller à la Caisse
+                    </Button>
+                  </Link>
+                )}
                 <Button 
                     variant="ghost" 
                     size="icon" 

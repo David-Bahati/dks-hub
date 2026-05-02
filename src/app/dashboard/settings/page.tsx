@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { 
@@ -61,6 +61,8 @@ export default function SettingsPage() {
     const [piValue, setPiValue] = useState(PI_CONVERSION_RATE.toString());
     const [isFetchingRate, setIsFetchingRate] = useState(false);
 
+    const isAdmin = user?.role === 'Admin';
+
     const handleLogout = async () => {
         try {
             await signOut(auth);
@@ -74,11 +76,9 @@ export default function SettingsPage() {
     const fetchTodayRate = async () => {
         setIsFetchingRate(true);
         try {
-            // Utilisation d'une API de change publique gratuite
             const response = await fetch('https://open.er-api.com/v6/latest/USD');
             const data = await response.json();
             if (data && data.rates && data.rates.CDF) {
-                // On arrondit le taux pour plus de propreté (souvent les taux officiels sont précis)
                 const rate = Math.round(data.rates.CDF);
                 setExchangeRate(rate.toString());
                 toast({
@@ -109,7 +109,6 @@ export default function SettingsPage() {
 
     return (
         <div className="min-h-screen w-full bg-background text-foreground">
-            {/* Header Luxe */}
             <header className="border-b border-white/5 bg-background/40 backdrop-blur-2xl sticky top-0 z-50">
                 <div className="max-w-5xl mx-auto px-6 h-20 flex items-center justify-between">
                     <div className="flex items-center gap-4">
@@ -144,9 +143,11 @@ export default function SettingsPage() {
                         <TabsTrigger value="preferences" className="flex-1 rounded-xl font-black uppercase italic text-[10px] data-[state=active]:bg-accent data-[state=active]:text-black transition-all">
                             <Globe size={14} className="mr-2 hidden sm:inline" /> Préf.
                         </TabsTrigger>
-                        <TabsTrigger value="system" className="flex-1 rounded-xl font-black uppercase italic text-[10px] data-[state=active]:bg-accent data-[state=active]:text-black transition-all">
-                            <Database size={14} className="mr-2 hidden sm:inline" /> Système
-                        </TabsTrigger>
+                        {isAdmin && (
+                          <TabsTrigger value="system" className="flex-1 rounded-xl font-black uppercase italic text-[10px] data-[state=active]:bg-accent data-[state=active]:text-black transition-all">
+                              <Database size={14} className="mr-2 hidden sm:inline" /> Système
+                          </TabsTrigger>
+                        )}
                     </TabsList>
 
                     {/* SECTION PROFIL */}
@@ -308,85 +309,87 @@ export default function SettingsPage() {
                     </TabsContent>
 
                     {/* SECTION SYSTÈME & FINANCE */}
-                    <TabsContent value="system" className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                            <Card className="glossy-card border-none rounded-[2.5rem]">
-                                <CardHeader className="p-10 pb-0">
-                                    <div className="flex justify-between items-start">
-                                        <CardTitle className="text-lg font-black uppercase italic tracking-tighter flex items-center gap-3">
-                                            <RefreshCw className="text-accent" size={20} /> Taux de Change
-                                        </CardTitle>
-                                        <Button 
-                                            variant="ghost" 
-                                            size="sm" 
-                                            onClick={fetchTodayRate}
-                                            disabled={isFetchingRate}
-                                            className="h-9 px-3 border border-white/10 rounded-xl hover:bg-accent/10 hover:text-accent gap-2 font-black uppercase italic text-[9px] tracking-widest"
-                                        >
-                                            {isFetchingRate ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
-                                            Récupérer le taux du jour
-                                        </Button>
-                                    </div>
-                                </CardHeader>
-                                <CardContent className="p-10 space-y-8">
-                                    <div className="space-y-4">
-                                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 flex items-center gap-2 mb-2">
-                                            <DollarSign size={12} className="text-accent" /> 1 USD en Franc Congolais (CDF)
-                                        </Label>
-                                        <div className="relative">
-                                            <span className="absolute left-5 top-1/2 -translate-y-1/2 text-muted-foreground font-black">FC</span>
-                                            <Input 
-                                                type="number" 
-                                                value={exchangeRate}
-                                                onChange={(e) => setExchangeRate(e.target.value)}
-                                                className="h-16 pl-14 bg-background/50 border-white/5 rounded-2xl focus:border-accent text-lg font-bold" 
-                                            />
-                                        </div>
-                                        <p className="text-[9px] text-muted-foreground font-bold uppercase tracking-widest italic px-2">
-                                            Ce taux sera utilisé pour convertir les prix affichés en dollars vers le Franc Congolais à la caisse.
-                                        </p>
-                                    </div>
-                                </CardContent>
-                            </Card>
+                    {isAdmin && (
+                      <TabsContent value="system" className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                              <Card className="glossy-card border-none rounded-[2.5rem]">
+                                  <CardHeader className="p-10 pb-0">
+                                      <div className="flex justify-between items-start">
+                                          <CardTitle className="text-lg font-black uppercase italic tracking-tighter flex items-center gap-3">
+                                              <RefreshCw className="text-accent" size={20} /> Taux de Change
+                                          </CardTitle>
+                                          <Button 
+                                              variant="ghost" 
+                                              size="sm" 
+                                              onClick={fetchTodayRate}
+                                              disabled={isFetchingRate}
+                                              className="h-9 px-3 border border-white/10 rounded-xl hover:bg-accent/10 hover:text-accent gap-2 font-black uppercase italic text-[9px] tracking-widest"
+                                          >
+                                              {isFetchingRate ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+                                              Récupérer le taux du jour
+                                          </Button>
+                                      </div>
+                                  </CardHeader>
+                                  <CardContent className="p-10 space-y-8">
+                                      <div className="space-y-4">
+                                          <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 flex items-center gap-2 mb-2">
+                                              <DollarSign size={12} className="text-accent" /> 1 USD en Franc Congolais (CDF)
+                                          </Label>
+                                          <div className="relative">
+                                              <span className="absolute left-5 top-1/2 -translate-y-1/2 text-muted-foreground font-black">FC</span>
+                                              <Input 
+                                                  type="number" 
+                                                  value={exchangeRate}
+                                                  onChange={(e) => setExchangeRate(e.target.value)}
+                                                  className="h-16 pl-14 bg-background/50 border-white/5 rounded-2xl focus:border-accent text-lg font-bold" 
+                                              />
+                                          </div>
+                                          <p className="text-[9px] text-muted-foreground font-bold uppercase tracking-widest italic px-2">
+                                              Ce taux sera utilisé pour convertir les prix affichés en dollars vers le Franc Congolais à la caisse.
+                                          </p>
+                                      </div>
+                                  </CardContent>
+                              </Card>
 
-                            <Card className="glossy-card border-none rounded-[2.5rem]">
-                                <CardHeader className="p-10 pb-0">
-                                    <CardTitle className="text-lg font-black uppercase italic tracking-tighter flex items-center gap-3">
-                                        <Coins className="text-accent" size={20} /> Valeur Pi Network
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent className="p-10 space-y-8">
-                                    <div className="space-y-4">
-                                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 flex items-center gap-2 mb-2">
-                                            <Coins size={12} className="text-accent" /> 1 Pi (π) en Dollars (USD)
-                                        </Label>
-                                        <div className="relative">
-                                            <DollarSign className="absolute left-5 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
-                                            <Input 
-                                                type="number" 
-                                                value={piValue}
-                                                onChange={(e) => setPiValue(e.target.value)}
-                                                className="h-16 pl-14 bg-background/50 border-white/5 rounded-2xl focus:border-accent text-lg font-bold" 
-                                            />
-                                        </div>
-                                        <p className="text-[9px] text-muted-foreground font-bold uppercase tracking-widest italic px-2">
-                                            Consensus Global (GCV) par défaut : $314,159. Modifiez cette valeur pour ajuster le taux de conversion π.
-                                        </p>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        </div>
+                              <Card className="glossy-card border-none rounded-[2.5rem]">
+                                  <CardHeader className="p-10 pb-0">
+                                      <CardTitle className="text-lg font-black uppercase italic tracking-tighter flex items-center gap-3">
+                                          <Coins className="text-accent" size={20} /> Valeur Pi Network
+                                      </CardTitle>
+                                  </CardHeader>
+                                  <CardContent className="p-10 space-y-8">
+                                      <div className="space-y-4">
+                                          <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 flex items-center gap-2 mb-2">
+                                              <Coins size={12} className="text-accent" /> 1 Pi (π) en Dollars (USD)
+                                          </Label>
+                                          <div className="relative">
+                                              <DollarSign className="absolute left-5 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
+                                              <Input 
+                                                  type="number" 
+                                                  value={piValue}
+                                                  onChange={(e) => setPiValue(e.target.value)}
+                                                  className="h-16 pl-14 bg-background/50 border-white/5 rounded-2xl focus:border-accent text-lg font-bold" 
+                                              />
+                                          </div>
+                                          <p className="text-[9px] text-muted-foreground font-bold uppercase tracking-widest italic px-2">
+                                              Consensus Global (GCV) par défaut : $314,159. Modifiez cette valeur pour ajuster le taux de conversion π.
+                                          </p>
+                                      </div>
+                                  </CardContent>
+                              </Card>
+                          </div>
 
-                        <div className="flex justify-center mt-8">
-                            <Button 
-                                onClick={handleSaveFinance}
-                                className="h-16 px-12 rounded-2xl bg-accent text-black font-black uppercase italic text-lg shadow-xl hover:scale-[1.02] active:scale-95 transition-all gap-3"
-                            >
-                                <CheckCircle2 size={24} />
-                                Appliquer les taux système
-                            </Button>
-                        </div>
-                    </TabsContent>
+                          <div className="flex justify-center mt-8">
+                              <Button 
+                                  onClick={handleSaveFinance}
+                                  className="h-16 px-12 rounded-2xl bg-accent text-black font-black uppercase italic text-lg shadow-xl hover:scale-[1.02] active:scale-95 transition-all gap-3"
+                              >
+                                  <CheckCircle2 size={24} />
+                                  Appliquer les taux système
+                              </Button>
+                          </div>
+                      </TabsContent>
+                    )}
                 </Tabs>
 
                 {/* Footer Actions */}

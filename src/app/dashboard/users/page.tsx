@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import withAuth from "@/components/auth/withAuth";
 import { Navbar } from "@/components/layout/Navbar";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -22,6 +23,7 @@ import { db } from '@/lib/firebase';
 import { collection, onSnapshot, query, where, doc, updateDoc, deleteDoc, addDoc } from 'firebase/firestore';
 import { User } from '@/lib/types';
 import Link from 'next/link';
+import { useAuth } from '@/context/AuthContext';
 
 const getRoleBadge = (role: string) => {
   switch (role) {
@@ -38,6 +40,8 @@ const getRoleBadge = (role: string) => {
 };
 
 function UsersPage() {
+  const { user: currentUser } = useAuth();
+  const router = useRouter();
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -45,8 +49,11 @@ function UsersPage() {
   const [role, setRole] = useState("Seller");
 
   useEffect(() => {
-    // Filtrage strict : on ne veut QUE le personnel (Admin, Seller, Cashier)
-    // On exclut explicitement le rôle 'customer'
+    if (currentUser && currentUser.role !== 'Admin') {
+      router.replace('/dashboard');
+      return;
+    }
+
     const q = collection(db, "users");
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -61,7 +68,7 @@ function UsersPage() {
       setIsLoading(false);
     });
     return () => unsubscribe();
-  }, []);
+  }, [currentUser, router]);
 
   const openModal = (user: User | null = null) => {
     setEditingUser(user);
