@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -26,7 +25,8 @@ import {
   Sparkles,
   Tags,
   Search,
-  Plus
+  Plus,
+  BarChart3
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -46,7 +46,8 @@ import {
     getExchangeRate,
     getDashboardStats,
     getLowStockItems,
-    getRecentSales
+    getRecentSales,
+    getRevenueChartData
 } from '@/lib/data';
 import { Product } from '@/lib/types';
 import withAuth from '@/components/auth/withAuth';
@@ -56,6 +57,15 @@ import { collection, query, where, orderBy, limit } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/ui/Logo";
+import { 
+  AreaChart, 
+  Area, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  ResponsiveContainer 
+} from 'recharts';
 
 const navConfig = [
   { href: "/dashboard", icon: LineChart, label: "Aperçu", roles: ["Admin", "Seller", "Cashier"] },
@@ -82,12 +92,12 @@ function DashboardPage() {
   const [stats, setStats] = useState<any>(null);
   const [lowStock, setLowStock] = useState<Product[]>([]);
   const [recentSales, setRecentSales] = useState<any[]>([]);
+  const [chartData, setChartData] = useState<any[]>([]);
   const [rate, setRate] = useState(2500);
 
-  const isStaff = user?.role === 'Admin' || user?.role === 'Seller' || user?.role === 'Cashier';
-  const isAdmin = user?.role === 'Admin';
+  const isStaff = user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'seller' || user?.role?.toLowerCase() === 'cashier';
 
-  const filteredNavLinks = navConfig.filter(link => link.roles.includes(user?.role || ""));
+  const filteredNavLinks = navConfig.filter(link => link.roles.map(r => r.toLowerCase()).includes(user?.role?.toLowerCase() || ""));
 
   const lastOrderQuery = useMemoFirebase(() => {
     if (authLoading || !user?.uid || isStaff) return null;
@@ -113,16 +123,18 @@ function DashboardPage() {
   const fetchAdminData = async () => {
     setLoading(true);
     try {
-      const [dashboardStats, lowStockItems, recent, exchangeRate] = await Promise.all([
+      const [dashboardStats, lowStockItems, recent, exchangeRate, revenueData] = await Promise.all([
         getDashboardStats(),
         getLowStockItems(),
         getRecentSales(),
-        getExchangeRate()
+        getExchangeRate(),
+        getRevenueChartData()
       ]);
       setStats(dashboardStats);
       setLowStock(lowStockItems);
       setRecentSales(recent);
       setRate(exchangeRate);
+      setChartData(revenueData);
     } catch (error) {
       console.error("Dashboard data fetch error:", error);
     } finally {
@@ -307,7 +319,7 @@ function DashboardPage() {
             </nav>
 
             <div className="flex items-center gap-6">
-                {user?.role === 'Cashier' && (
+                {(user?.role?.toLowerCase() === 'cashier' || user?.role?.toLowerCase() === 'admin') && (
                   <Link href="/pos">
                     <Button className="bg-accent text-black font-black uppercase italic text-xs rounded-2xl h-11 px-6 shadow-xl shadow-accent/10 hover:scale-105 active:scale-95 transition-all">
                       Aller à la Caisse
@@ -381,8 +393,85 @@ function DashboardPage() {
             </Card>
           </div>
 
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7">
+          <div className="grid gap-6 grid-cols-1 lg:grid-cols-7">
+            {/* Chart Section */}
             <Card className="lg:col-span-4 glossy-card border-none rounded-[2.5rem] overflow-hidden">
+                <CardHeader className="flex flex-row items-center justify-between py-6 px-8">
+                    <CardTitle className="text-lg font-bold uppercase italic flex items-center gap-3">
+                        <BarChart3 className="text-accent" size={20} />
+                        Tendances Revenus (7j)
+                    </CardTitle>
+                </CardHeader>
+                <CardContent className="px-4 pb-8 h-[300px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={chartData}>
+                            <defs>
+                                <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="hsl(var(--accent))" stopOpacity={0.3}/>
+                                    <stop offset="95%" stopColor="hsl(var(--accent))" stopOpacity={0}/>
+                                </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" vertical={false} />
+                            <XAxis 
+                                dataKey="name" 
+                                axisLine={false} 
+                                tickLine={false} 
+                                tick={{fill: '#94a3b8', fontSize: 10}}
+                                dy={10}
+                            />
+                            <YAxis 
+                                hide 
+                            />
+                            <Tooltip 
+                                contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', borderRadius: '12px', fontSize: '12px' }}
+                                itemStyle={{ color: 'hsl(var(--accent))' }}
+                            />
+                            <Area 
+                                type="monotone" 
+                                dataKey="total" 
+                                stroke="hsl(var(--accent))" 
+                                strokeWidth={3}
+                                fillOpacity={1} 
+                                fill="url(#colorTotal)" 
+                            />
+                        </AreaChart>
+                    </ResponsiveContainer>
+                </CardContent>
+            </Card>
+
+            <Card className="lg:col-span-3 glossy-card border-none rounded-[2.5rem] overflow-hidden">
+                <CardHeader className="border-b border-white/5 bg-white/[0.02] py-6 px-8">
+                    <CardTitle className="text-lg font-bold uppercase italic flex items-center gap-3">
+                        <ShoppingBag size={20} className="text-accent" />
+                        Flux Récent
+                    </CardTitle>
+                </CardHeader>
+                <CardContent className="p-8">
+                    <div className="space-y-6">
+                        {recentSales.map(sale => (
+                            <div key={sale.id} className="flex items-center gap-5 group">
+                                <div className="w-11 h-11 rounded-2xl bg-accent/10 border border-accent/20 flex items-center justify-center text-accent font-black text-xs group-hover:bg-accent group-hover:text-black transition-all duration-300">
+                                    {sale.cashierName?.substring(0, 1)}
+                                </div>
+                                <div className="flex-1">
+                                    <div className="flex items-center justify-between mb-1">
+                                        <p className="text-sm font-bold uppercase italic">{sale.cashierName}</p>
+                                        <p className="font-mono font-bold text-sm text-white">{formatCurrency(sale.totalAmount)} <span className="text-[9px] font-light opacity-30">CDF</span></p>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">REF: #{sale.id.substring(0, 8)}</p>
+                                        <Badge className="bg-accent/10 text-accent border-none text-[8px] font-black uppercase px-2 h-4">SUCCESS</Badge>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid gap-6 grid-cols-1 lg:grid-cols-7">
+            <Card className="lg:col-span-7 glossy-card border-none rounded-[2.5rem] overflow-hidden">
               <CardHeader className="border-b border-white/5 bg-white/[0.02] flex flex-row items-center justify-between py-6 px-8">
                 <CardTitle className="text-lg font-bold uppercase italic flex items-center gap-3">
                    <AlertTriangle className="text-destructive animate-pulse" size={20} />
@@ -392,7 +481,7 @@ function DashboardPage() {
               </CardHeader>
               <CardContent className="p-8">
                 {lowStock.length > 0 ? (
-                    <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {lowStock.map(item => (
                             <div key={item.id} className="flex items-center justify-between p-5 bg-white/5 rounded-2xl border border-white/5 hover:bg-white/10 hover:border-white/10 transition-all group">
                                 <div className="flex items-center gap-5">
@@ -423,47 +512,6 @@ function DashboardPage() {
                         </div>
                     </div>
                 )}
-              </CardContent>
-            </Card>
-
-            <Card className="lg:col-span-3 glossy-card border-none rounded-[2.5rem] overflow-hidden">
-              <CardHeader className="border-b border-white/5 bg-white/[0.02] py-6 px-8">
-                <CardTitle className="text-lg font-bold uppercase italic flex items-center gap-3">
-                    <ShoppingBag size={20} className="text-accent" />
-                    Flux Récent
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-8">
-                <div className="space-y-6">
-                    {recentSales.map(sale => (
-                        <div key={sale.id} className="flex items-center gap-5 group">
-                            <div className="w-11 h-11 rounded-2xl bg-accent/10 border border-accent/20 flex items-center justify-center text-accent font-black text-xs group-hover:bg-accent group-hover:text-black transition-all duration-300">
-                                {sale.cashierName?.substring(0, 1)}
-                            </div>
-                            <div className="flex-1">
-                                <div className="flex items-center justify-between mb-1">
-                                    <p className="text-sm font-bold uppercase italic">{sale.cashierName}</p>
-                                    <p className="font-mono font-bold text-sm text-white">{formatCurrency(sale.totalAmount)} <span className="text-[9px] font-light opacity-30">CDF</span></p>
-                                </div>
-                                <div className="flex items-center justify-between">
-                                    <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">REF: #{sale.id.substring(0, 8)}</p>
-                                    <Badge className="bg-accent/10 text-accent border-none text-[8px] font-black uppercase px-2 h-4">SUCCESS</Badge>
-                                </div>
-                            </div>
-                        </div>
-                    ))}
-                    {recentSales.length === 0 && (
-                        <div className="flex flex-col items-center justify-center py-20 text-center space-y-4 opacity-30">
-                            <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center">
-                                <LineChart size={40} className="text-slate-400" />
-                            </div>
-                            <div className="space-y-1">
-                                <p className="text-sm font-bold uppercase italic tracking-widest text-slate-300">Prêt pour l'activité</p>
-                                <p className="text-[10px] font-bold text-slate-500">Vos futures ventes apparaîtront ici.</p>
-                            </div>
-                        </div>
-                    )}
-                </div>
               </CardContent>
             </Card>
           </div>

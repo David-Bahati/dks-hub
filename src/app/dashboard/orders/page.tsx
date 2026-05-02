@@ -3,16 +3,30 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Package, ArrowLeft, Loader2, ShoppingBag, Clock, CheckCircle, XCircle } from 'lucide-react';
+import { 
+  Package, 
+  ArrowLeft, 
+  Loader2, 
+  ShoppingBag, 
+  Clock, 
+  CheckCircle, 
+  XCircle,
+  CreditCard,
+  Truck,
+  Check
+} from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, where, orderBy } from 'firebase/firestore';
+import { collection, query, where, orderBy, doc, updateDoc, serverTimestamp, addDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
+import { useToast } from '@/hooks/use-toast';
 
 export default function OrdersPage() {
   const { user, isLoading: authLoading } = useAuth();
+  const { toast } = useToast();
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
 
   const ordersQuery = useMemoFirebase(() => {
     if (authLoading || !user?.uid) return null;
@@ -25,7 +39,6 @@ export default function OrdersPage() {
       return query(baseRef, orderBy("createdAt", "desc"));
     }
     
-    // Filtre obligatoire pour les clients pour respecter les règles Firestore list
     return query(
       baseRef, 
       where("userId", "==", user.uid), 
@@ -35,12 +48,44 @@ export default function OrdersPage() {
 
   const { data: orders, isLoading: collectionLoading, error } = useCollection(ordersQuery);
 
+  const updateOrderStatus = async (orderId: string, newStatus: string, userId: string) => {
+    setUpdatingId(orderId);
+    try {
+        await updateDoc(doc(db, "orders", orderId), {
+            status: newStatus,
+            updatedAt: serverTimestamp()
+        });
+
+        // Notifier le client du changement
+        await addDoc(collection(db, "notifications"), {
+            userId: userId,
+            title: "Statut Commande Mis à Jour",
+            message: `Votre commande #${orderId.substring(0, 8)} est passée au statut : ${newStatus.toUpperCase()}.`,
+            type: 'info',
+            isRead: false,
+            createdAt: serverTimestamp(),
+            link: '/dashboard/orders'
+        });
+
+        toast({
+            title: "Statut mis à jour",
+            description: `La commande est désormais : ${newStatus}`,
+        });
+    } catch (err) {
+        console.error(err);
+        toast({ title: "Erreur", description: "Impossible de modifier le statut.", variant: "destructive" });
+    } finally {
+        setUpdatingId(null);
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     const s = status?.toLowerCase();
     switch (s) {
       case 'completed':
       case 'payé':
       case 'terminé':
+      case 'payée':
         return <Badge className="bg-green-500/10 text-green-400 border-none uppercase text-[10px] font-black px-3 py-1 flex items-center gap-1"><CheckCircle size={12} /> Confirmé</Badge>;
       case 'pending_payment':
       case 'en attente':
@@ -54,13 +99,14 @@ export default function OrdersPage() {
   };
 
   const isLoading = authLoading || collectionLoading;
+  const isStaff = user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'seller' || user?.role?.toLowerCase() === 'cashier';
 
   return (
     <div className="min-h-screen w-full bg-background text-foreground">
         <header className="border-b border-white/5 bg-background/40 backdrop-blur-2xl sticky top-0 z-50">
             <div className="max-w-7xl mx-auto px-4 h-20 flex items-center justify-between">
                 <h1 className="text-2xl font-black tracking-tighter uppercase italic flex items-center gap-3">
-                    <ShoppingBag className="text-accent"/> {user?.role?.toLowerCase() === 'customer' ? 'Mes' : 'Gestion des'} <span className="text-accent">Commandes</span>
+                    <ShoppingBag className="text-accent"/> {isStaff ? 'Gestion des' : 'Mes'} <span className="text-accent">Commandes</span>
                 </h1>
                 <Link href="/dashboard">
                     <Button variant="outline" className="h-12 border-white/10 hover:bg-accent/10 hover:text-accent rounded-2xl gap-2 font-black uppercase italic text-xs">
@@ -80,12 +126,7 @@ export default function OrdersPage() {
                 <div className="text-center py-20 bg-destructive/10 rounded-[2rem] border border-destructive/20 max-w-2xl mx-auto">
                      <XCircle className="mx-auto mb-4 text-destructive" size={48} />
                      <h2 className="text-xl font-black uppercase italic">Erreur d'accès</h2>
-                     <p className="text-muted-foreground mt-2 text-sm px-8">
-                        {error.message.includes('permissions') 
-                          ? "Vous n'avez pas les droits nécessaires pour voir ces commandes." 
-                          : "Une erreur est survenue lors de la récupération des données."}
-                     </p>
-                     <Button className="mt-6 rounded-xl font-bold uppercase text-[10px]" variant="outline" onClick={() => window.location.reload()}>Actualiser</Button>
+                     <p className="text-muted-foreground mt-2 text-sm px-8">Vérifiez vos permissions Firestore.</p>
                 </div>
             ) : orders && orders.length > 0 ? (
                 <div className="grid grid-cols-1 gap-4">
@@ -112,9 +153,25 @@ export default function OrdersPage() {
                                         </div>
                                     </div>
 
-                                    <div className="text-right">
-                                        <p className="text-[10px] font-black uppercase text-muted-foreground mb-1">Mode: {order.paymentMethod?.replace('_', ' ')}</p>
-                                        <p className="text-2xl font-black text-accent">${(order.total || 0).toFixed(2)}</p>
+                                    <div className="flex items-center gap-6">
+                                        <div className="text-right">
+                                            <p className="text-[10px] font-black uppercase text-muted-foreground mb-1">Mode: {order.paymentMethod?.replace('_', ' ')}</p>
+                                            <p className="text-2xl font-black text-accent">${(order.total || 0).toFixed(2)}</p>
+                                        </div>
+
+                                        {isStaff && order.status !== 'payée' && order.status !== 'terminé' && (
+                                            <div className="flex gap-2">
+                                                <Button 
+                                                    size="sm" 
+                                                    className="bg-green-500 hover:bg-green-600 text-white rounded-xl h-12 px-4 gap-2 font-black uppercase text-[9px]"
+                                                    onClick={() => updateOrderStatus(order.id, 'payée', order.userId)}
+                                                    disabled={updatingId === order.id}
+                                                >
+                                                    {updatingId === order.id ? <Loader2 className="animate-spin h-3 w-3" /> : <Check size={14} />}
+                                                    Confirmer Paiement
+                                                </Button>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -127,9 +184,7 @@ export default function OrdersPage() {
                         <Package size={48} className="text-primary opacity-50" />
                     </div>
                     <h2 className="text-4xl font-black uppercase italic mb-4">Aucune Commande</h2>
-                    <p className="text-muted-foreground max-w-md">
-                        Votre registre de commandes est actuellement vide.
-                    </p>
+                    <p className="text-muted-foreground max-w-md">Le registre est actuellement vide.</p>
                 </div>
             )}
         </main>
