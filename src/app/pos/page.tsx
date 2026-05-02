@@ -29,7 +29,10 @@ import {
   Loader2,
   Printer,
   User as UserIcon,
-  ArrowLeft
+  ArrowLeft,
+  History,
+  Clock,
+  Eye
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -40,9 +43,16 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { db } from "@/lib/firebase";
-import { collection, onSnapshot, doc, updateDoc, addDoc, serverTimestamp, increment } from "firebase/firestore";
+import { collection, onSnapshot, doc, updateDoc, addDoc, serverTimestamp, increment, query, orderBy, limit } from "firebase/firestore";
 import { useAuth } from "@/context/AuthContext";
 import withAuth from "@/components/auth/withAuth";
 
@@ -60,11 +70,12 @@ function POS() {
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [showReceipt, setShowReceipt] = useState(false);
   const [loadingProducts, setLoadingProducts] = useState(true);
+  const [recentSales, setRecentSales] = useState<any[]>([]);
   const [lastTransaction, setLastTransaction] = useState<{
     id: string;
-    items: CartItem[];
+    items: any[];
     total: number;
-    mode: PaymentMode;
+    mode: string;
     date: string;
     customerName: string;
   } | null>(null);
@@ -72,6 +83,7 @@ function POS() {
   const { toast } = useToast();
   const { user } = useAuth();
 
+  // Fetch Products
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, "products"), (snapshot) => {
       const productsData = snapshot.docs.map(doc => ({
@@ -80,6 +92,20 @@ function POS() {
       })) as Product[];
       setProducts(productsData);
       setLoadingProducts(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Fetch Recent Sales for History
+  useEffect(() => {
+    const q = query(collection(db, "sales"), orderBy("createdAt", "desc"), limit(10));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const sales = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        formattedDate: doc.data().createdAt?.toDate ? doc.data().createdAt.toDate().toLocaleString('fr-FR') : "Date inconnue"
+      }));
+      setRecentSales(sales);
     });
     return () => unsubscribe();
   }, []);
@@ -138,11 +164,12 @@ function POS() {
     const finalCustomerName = customerName.trim() || "Client Comptoir";
     
     try {
-        const saleRef = await addDoc(collection(db, "sales"), {
+        const saleData = {
             userId: user?.uid,
             customerName: finalCustomerName,
             items: cart.map(item => ({
                 productId: item.id,
+                name: item.name, // Important to save name for reprinting
                 quantity: item.quantity,
                 price: item.price || item.sellingPrice || 0
             })),
@@ -150,7 +177,9 @@ function POS() {
             paymentMode: paymentMode,
             createdAt: serverTimestamp(),
             status: 'Payé'
-        });
+        };
+
+        const saleRef = await addDoc(collection(db, "sales"), saleData);
 
         await Promise.all(cart.map(item => {
             const productRef = doc(db, "products", item.id);
@@ -184,6 +213,18 @@ function POS() {
     } finally {
         setIsProcessing(false);
     }
+  };
+
+  const reprintReceipt = (sale: any) => {
+    setLastTransaction({
+        id: sale.id,
+        items: sale.items,
+        total: sale.totalAmount,
+        mode: sale.paymentMode,
+        date: sale.formattedDate,
+        customerName: sale.customerName
+    });
+    setShowReceipt(true);
   };
 
   const filteredProducts = products.filter(p => 
@@ -223,19 +264,66 @@ function POS() {
         <div className="lg:col-span-2 flex flex-col gap-6">
           <div className="flex items-center gap-4">
             <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
                 <Input 
-                placeholder="Rechercher des produits ou catégories..." 
-                className="pl-10 h-14 bg-card/40 border-white/10 rounded-2xl"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Rechercher des produits ou catégories..." 
+                  className="pl-12 h-14 bg-card/40 border-white/10 rounded-2xl focus:border-accent transition-all"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
                 />
             </div>
+            
+            <Sheet>
+                <SheetTrigger asChild>
+                    <Button variant="outline" className="h-14 w-14 rounded-2xl border-white/10 hover:bg-accent/10 hover:text-accent p-0">
+                        <History size={24} />
+                    </Button>
+                </SheetTrigger>
+                <SheetContent className="bg-card/95 backdrop-blur-3xl border-white/10 w-full sm:max-w-md">
+                    <SheetHeader className="mb-6">
+                        <SheetTitle className="text-xl font-black uppercase italic flex items-center gap-3">
+                            <Clock className="text-accent" /> Historique Ventes
+                        </SheetTitle>
+                    </SheetHeader>
+                    <div className="space-y-4 overflow-y-auto max-h-[85vh] pr-2 custom-scrollbar">
+                        {recentSales.map(sale => (
+                            <div key={sale.id} className="p-4 rounded-2xl bg-white/5 border border-white/5 space-y-3 hover:border-accent/20 transition-all group">
+                                <div className="flex justify-between items-start">
+                                    <div>
+                                        <p className="font-bold text-sm uppercase italic">#{sale.id.substring(0, 8)}</p>
+                                        <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest">{sale.formattedDate}</p>
+                                    </div>
+                                    <Badge className="bg-accent/10 text-accent font-black uppercase text-[10px] border-none">
+                                        {sale.paymentMode?.replace('_', ' ')}
+                                    </Badge>
+                                </div>
+                                <div className="flex justify-between items-end">
+                                    <div>
+                                        <p className="text-xs text-white/60">Client: {sale.customerName}</p>
+                                        <p className="text-lg font-black text-white">${sale.totalAmount.toFixed(2)}</p>
+                                    </div>
+                                    <Button 
+                                        variant="ghost" 
+                                        size="sm" 
+                                        className="h-9 gap-2 font-black uppercase italic text-[10px] bg-white/5 hover:bg-accent hover:text-black rounded-xl"
+                                        onClick={() => reprintReceipt(sale)}
+                                    >
+                                        <Printer size={14} /> Reçu
+                                    </Button>
+                                </div>
+                            </div>
+                        ))}
+                        {recentSales.length === 0 && (
+                            <div className="text-center py-20 opacity-20 italic">Aucune vente récente</div>
+                        )}
+                    </div>
+                </SheetContent>
+            </Sheet>
           </div>
           
           {loadingProducts ? (
               <div className="flex-1 flex items-center justify-center opacity-50">
-                  <Loader2 className="animate-spin h-10 w-10" />
+                  <Loader2 className="animate-spin h-10 w-10 text-accent" />
               </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4 overflow-y-auto max-h-[calc(100vh-250px)] pb-10 scrollbar-hide">
@@ -438,11 +526,11 @@ function POS() {
                 <span>Total</span>
               </div>
               {lastTransaction?.items.map((item, idx) => {
-                const unitPrice = item.sellingPrice || item.price || 0;
+                const unitPrice = item.price || item.sellingPrice || 0;
                 return (
                   <div key={idx} className="flex justify-between items-start">
                     <div className="flex-1 pr-2">
-                      <div className="font-bold">{item.name.toUpperCase()}</div>
+                      <div className="font-bold">{(item.name || "Produit").toUpperCase()}</div>
                       <div className="text-[8px] opacity-60">
                         {item.quantity}x @${unitPrice.toFixed(2)}
                       </div>
@@ -502,7 +590,7 @@ function POS() {
                 variant="outline" 
                 onClick={() => setShowReceipt(false)}
             >
-              <ArrowLeft size={18} /> Nouvelle Vente
+              <ArrowLeft size={18} /> Retour
             </Button>
           </div>
         </DialogContent>
