@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from 'react';
@@ -9,24 +10,24 @@ import { useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, where, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 
 export default function OrdersPage() {
   const { user, isLoading: authLoading } = useAuth();
 
   const ordersQuery = useMemoFirebase(() => {
-    // Crucial: n'exécuter la requête que si l'utilisateur est authentifié et son UID disponible
+    // Ne pas exécuter la requête tant que l'utilisateur n'est pas chargé
     if (authLoading || !user?.uid) return null;
     
     const isStaff = user.role === 'Admin' || user.role === 'Seller' || user.role === 'Cashier';
     const baseRef = collection(db, "orders");
     
     if (isStaff) {
-      // Pour le staff, on voit tout
+      // Pour le staff, on affiche tout par ordre chronologique
       return query(baseRef, orderBy("createdAt", "desc"));
     }
     
-    // Pour les clients, filtrage STRICT par userId pour correspondre aux règles Firestore
+    // Pour les clients, on filtre OBLIGATOIREMENT par userId pour respecter les règles de sécurité
     return query(
       baseRef, 
       where("userId", "==", user.uid), 
@@ -37,13 +38,17 @@ export default function OrdersPage() {
   const { data: orders, isLoading: collectionLoading, error } = useCollection(ordersQuery);
 
   const getStatusBadge = (status: string) => {
-    switch (status) {
+    const s = status?.toLowerCase();
+    switch (s) {
       case 'completed':
-      case 'Payé':
+      case 'payé':
+      case 'terminé':
         return <Badge className="bg-green-500/10 text-green-400 border-none uppercase text-[10px] font-black px-3 py-1 flex items-center gap-1"><CheckCircle size={12} /> Confirmé</Badge>;
       case 'pending_payment':
+      case 'en attente':
         return <Badge className="bg-orange-500/10 text-orange-400 border-none uppercase text-[10px] font-black px-3 py-1 flex items-center gap-1"><Clock size={12} /> Attente Cash</Badge>;
       case 'cancelled':
+      case 'annulé':
         return <Badge className="bg-destructive/10 text-destructive border-none uppercase text-[10px] font-black px-3 py-1 flex items-center gap-1"><XCircle size={12} /> Annulé</Badge>;
       default:
         return <Badge className="bg-blue-500/10 text-blue-400 border-none uppercase text-[10px] font-black px-3 py-1 flex items-center gap-1"><Clock size={12} /> En cours</Badge>;
@@ -74,10 +79,14 @@ export default function OrdersPage() {
                     <Loader2 className="animate-spin h-12 w-12 text-accent" />
                 </div>
             ) : error ? (
-                <div className="text-center py-20 bg-destructive/10 rounded-[2rem] border border-destructive/20">
+                <div className="text-center py-20 bg-destructive/10 rounded-[2rem] border border-destructive/20 max-w-2xl mx-auto">
                      <XCircle className="mx-auto mb-4 text-destructive" size={48} />
-                     <h2 className="text-xl font-black uppercase italic">Erreur de Permission</h2>
-                     <p className="text-muted-foreground mt-2">Impossible de charger vos commandes. Veuillez réinitialiser vos permissions sur la page de Login.</p>
+                     <h2 className="text-xl font-black uppercase italic">Accès Refusé</h2>
+                     <p className="text-muted-foreground mt-2 text-sm px-8">
+                        Vous n'avez pas les permissions nécessaires pour voir ces données ou une erreur de filtrage est survenue. 
+                        Veuillez vous reconnecter pour rafraîchir vos droits.
+                     </p>
+                     <Button className="mt-6 rounded-xl font-bold uppercase text-[10px]" variant="outline" onClick={() => window.location.reload()}>Réessayer</Button>
                 </div>
             ) : orders && orders.length > 0 ? (
                 <div className="grid grid-cols-1 gap-4">

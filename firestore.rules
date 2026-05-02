@@ -13,16 +13,20 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
+    // Récupère les données de l'utilisateur actuel pour vérifier son rôle
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
     function isAdmin() {
-      return isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+      return isSignedIn() && getUserData().role == 'Admin';
     }
 
     function isStaff() {
-      // Vérification simplifiée pour éviter les erreurs de lecture infinie
       return isSignedIn() && (
-        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
-        exists(/databases/$(database)/documents/sellers/$(request.auth.uid)) ||
-        exists(/databases/$(database)/documents/cashiers/$(request.auth.uid))
+        getUserData().role == 'Admin' || 
+        getUserData().role == 'Seller' || 
+        getUserData().role == 'Cashier'
       );
     }
 
@@ -30,25 +34,10 @@ service cloud.firestore {
 
     match /users/{userId} {
       allow get: if isSignedIn();
-      allow list: if isSignedIn(); // Autoriser le listage pour les recherches clients/staff
+      allow list: if isSignedIn() && isStaff(); // Seul le staff peut lister tous les utilisateurs
       allow create: if isSignedIn(); 
       allow update: if isOwner(userId) || isStaff();
       allow delete: if isAdmin();
-    }
-
-    match /admins/{adminId} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
-    }
-
-    match /sellers/{sellerId} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
-    }
-
-    match /cashiers/{cashierId} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
     }
 
     match /products/{productId} {
@@ -57,11 +46,12 @@ service cloud.firestore {
     }
 
     match /orders/{orderId} {
-      // Règle simplifiée pour le Dashboard Client
-      // Autorise la lecture si l'utilisateur est le propriétaire ou fait partie du staff
+      // Un client peut créer une commande
       allow create: if isSignedIn();
-      allow read: if isSignedIn();
-      allow list: if isSignedIn(); 
+      // Un utilisateur peut lire sa propre commande, ou le staff peut tout lire
+      allow get: if isSignedIn() && (isStaff() || resource.data.userId == request.auth.uid);
+      // Pour lister, le client doit obligatoirement filtrer par son propre userId
+      allow list: if isSignedIn() && (isStaff() || (request.query.limit <= 100 && request.auth.uid == request.query.filters.userId));
     }
 
     match /sales/{saleId} {
@@ -78,5 +68,10 @@ service cloud.firestore {
       allow read: if true;
       allow write: if isStaff();
     }
+
+    // Compatibilité avec les anciennes collections de rôles si nécessaire
+    match /admins/{id} { allow read: if isSignedIn(); }
+    match /sellers/{id} { allow read: if isSignedIn(); }
+    match /cashiers/{id} { allow read: if isSignedIn(); }
   }
 }
