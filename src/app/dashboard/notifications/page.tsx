@@ -4,9 +4,9 @@
 import { Navbar } from "@/components/layout/Navbar";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Bell, Check, Trash2, ArrowLeft, Loader2, Info, CheckCircle2, AlertTriangle, AlertCircle } from "lucide-react";
+import { Bell, Check, Trash2, ArrowLeft, Loader2, Info, CheckCircle2, AlertTriangle, AlertCircle, ArrowRight } from "lucide-react";
 import { db } from '@/lib/firebase';
-import { collection, query, where, orderBy, updateDoc, doc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, orderBy, updateDoc, doc, deleteDoc } from 'firebase/firestore';
 import withAuth from '@/components/auth/withAuth';
 import Link from 'next/link';
 import { useCollection, useMemoFirebase } from '@/firebase';
@@ -20,12 +20,25 @@ function NotificationsPage() {
 
   const notificationsQuery = useMemoFirebase(() => {
     if (!user?.uid) return null;
+    
+    // Check role to fetch appropriate notifications
+    const role = user.role?.toLowerCase();
+    const isStaff = role === 'admin' || role === 'seller' || role === 'cashier';
+    
+    if (isStaff) {
+        return query(
+            collection(db, "notifications"),
+            where("userId", "in", [user.uid, 'staff']),
+            orderBy("createdAt", "desc")
+        );
+    }
+    
     return query(
       collection(db, "notifications"),
-      where("userId", "in", [user.uid, 'staff']),
+      where("userId", "==", user.uid),
       orderBy("createdAt", "desc")
     );
-  }, [user?.uid]);
+  }, [user?.uid, user?.role]);
 
   const { data: notifications, isLoading } = useCollection(notificationsQuery);
 

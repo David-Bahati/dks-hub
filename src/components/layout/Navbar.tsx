@@ -1,10 +1,9 @@
 
 "use client";
 
-import { LogOut, LayoutDashboard, ShoppingCart, Users, Package, Home, Trash2, User, Sparkles, ArrowRight, Loader2, Plus, Minus, Bell, Check } from 'lucide-react';
+import { LogOut, LayoutDashboard, ShoppingCart, Users, Home, Trash2, User, Sparkles, ArrowRight, Loader2, Plus, Minus, Bell, Check } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { useAuth } from '@/context/AuthContext';
 import { useCart } from '@/context/CartContext';
@@ -14,7 +13,6 @@ import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/co
 import { PI_CONVERSION_RATE } from '@/lib/constants';
 import { Badge } from '@/components/ui/badge';
 import { Logo } from '@/components/ui/Logo';
-import { cn } from '@/lib/utils';
 import { useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, where, orderBy, limit, doc, updateDoc } from 'firebase/firestore';
 
@@ -33,19 +31,31 @@ export function Navbar() {
         }
     };
 
-    const isStaff = user?.role === 'Admin' || user?.role === 'Seller' || user?.role === 'Cashier' || user?.role === 'admin' || user?.role === 'seller' || user?.role === 'cashier';
+    const role = user?.role?.toLowerCase();
+    const isStaff = role === 'admin' || role === 'seller' || role === 'cashier';
 
     // Fetch Unread Notifications
     const notificationsQuery = useMemoFirebase(() => {
         if (!user?.uid) return null;
+        
+        if (isStaff) {
+            return query(
+                collection(db, "notifications"),
+                where("userId", "in", [user.uid, 'staff']),
+                where("isRead", "==", false),
+                orderBy("createdAt", "desc"),
+                limit(5)
+            );
+        }
+        
         return query(
             collection(db, "notifications"),
-            where("userId", "in", [user.uid, 'staff']),
+            where("userId", "==", user.uid),
             where("isRead", "==", false),
             orderBy("createdAt", "desc"),
             limit(5)
         );
-    }, [user?.uid]);
+    }, [user?.uid, isStaff]);
 
     const { data: notifications } = useCollection(notificationsQuery);
     const unreadCount = notifications?.length || 0;
@@ -60,8 +70,8 @@ export function Navbar() {
 
     const navItems = [
         { label: 'Dashboard', href: '/dashboard', show: isStaff, icon: LayoutDashboard },
-        { label: 'Caisse', href: '/pos', show: user?.role === 'Admin' || user?.role === 'Cashier' || user?.role === 'admin' || user?.role === 'cashier', icon: ShoppingCart },
-        { label: 'Équipe', href: '/dashboard/users', show: user?.role === 'Admin' || user?.role === 'admin', icon: Users },
+        { label: 'Caisse', href: '/pos', show: role === 'admin' || role === 'cashier', icon: ShoppingCart },
+        { label: 'Équipe', href: '/dashboard/users', show: role === 'admin', icon: Users },
         { label: 'Mon Hub', href: '/dashboard', show: !isStaff && !!user, icon: User },
         { label: 'Boutique', href: '/', show: pathname !== '/', icon: Home },
     ];

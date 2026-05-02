@@ -9,22 +9,27 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    // Helper to get user profile data safely
     function getUserData() {
       let path = /databases/$(database)/documents/users/$(request.auth.uid);
       return exists(path) ? get(path).data : null;
     }
 
-    function isAdmin() {
-      let data = getUserData();
-      return isSignedIn() && data != null && (data.role == 'Admin' || data.role == 'admin');
-    }
-
+    // Check if the current user has an administrative/staff role
     function isStaff() {
       let data = getUserData();
       return isSignedIn() && data != null && (
         data.role == 'Admin' || data.role == 'admin' || 
         data.role == 'Seller' || data.role == 'seller' || 
         data.role == 'Cashier' || data.role == 'cashier'
+      );
+    }
+
+    // Check if the current user is an admin
+    function isAdmin() {
+      let data = getUserData();
+      return isSignedIn() && data != null && (
+        data.role == 'Admin' || data.role == 'admin'
       );
     }
 
@@ -50,21 +55,23 @@ service cloud.firestore {
 
     match /orders/{orderId} {
       allow create: if isSignedIn();
-      allow get: if isSignedIn() && (isStaff() || resource.data.userId == request.auth.uid);
-      allow list: if isSignedIn() && (isStaff() || (resource.data.userId == request.auth.uid));
+      // Allow if staff or if the order belongs to the user
+      allow get, list: if isSignedIn() && (
+        isStaff() || 
+        resource.data.userId == request.auth.uid
+      );
     }
 
     match /notifications/{notifId} {
-      // Un utilisateur peut lire ses propres notifications ou celles destinées au staff s'il est staff
+      // Robust read rule
       allow read: if isSignedIn() && (
-        resource.data.userId == request.auth.uid || 
-        resource.data.userId == 'staff' ||
-        isStaff()
+        isStaff() || 
+        resource.data.userId == request.auth.uid
       );
+      
       allow create: if isSignedIn();
       allow update: if isSignedIn() && (
         resource.data.userId == request.auth.uid || 
-        resource.data.userId == 'staff' ||
         isStaff()
       );
       allow delete: if isStaff();
