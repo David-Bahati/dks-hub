@@ -8,14 +8,29 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Users, Mail, Phone, Loader2, UserPlus, ArrowLeft } from "lucide-react";
 import { db } from '@/lib/firebase';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, addDoc, serverTimestamp, doc, updateDoc } from 'firebase/firestore';
 import withAuth from '@/components/auth/withAuth';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogFooter 
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
+import { useToast } from '@/hooks/use-toast';
 
 function CustomersPage() {
   const [customers, setCustomers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     // On récupère les utilisateurs qui ont le rôle 'customer'
@@ -25,13 +40,48 @@ function CustomersPage() {
       const custs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setCustomers(custs);
       setLoading(false);
-    }, (error) => {
-      console.error("Error fetching customers:", error);
+    }, (error: any) => {
+      errorEmitter.emit('permission-error', new FirestorePermissionError({
+        path: 'users',
+        operation: 'list'
+      }));
       setLoading(false);
     });
     
     return () => unsubscribe();
   }, []);
+
+  const handleSaveCustomer = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    const formData = new FormData(e.currentTarget);
+    const customerData = {
+      displayName: formData.get('name') as string,
+      name: formData.get('name') as string,
+      email: formData.get('email') as string,
+      phoneNumber: formData.get('phone') as string,
+      role: 'customer',
+      updatedAt: serverTimestamp()
+    };
+
+    const colRef = collection(db, "users");
+    addDoc(colRef, {
+      ...customerData,
+      createdAt: serverTimestamp()
+    })
+    .then(() => {
+      toast({ title: "Client ajouté", description: "Le nouveau client a été enregistré." });
+      setIsModalOpen(false);
+    })
+    .catch(async (error) => {
+      errorEmitter.emit('permission-error', new FirestorePermissionError({
+        path: colRef.path,
+        operation: 'create',
+        requestResourceData: customerData
+      }));
+    })
+    .finally(() => setIsSubmitting(false));
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -49,7 +99,7 @@ function CustomersPage() {
                 <p className="text-muted-foreground">Gérez vos relations clients et l'historique de fidélité.</p>
              </div>
           </div>
-          <Button className="bg-accent text-accent-foreground hover:bg-accent/90 gap-2 font-bold rounded-xl h-12 px-6 uppercase italic">
+          <Button onClick={() => setIsModalOpen(true)} className="bg-accent text-accent-foreground hover:bg-accent/90 gap-2 font-bold rounded-xl h-12 px-6 uppercase italic">
              <UserPlus size={18} /> Nouveau Client
           </Button>
         </div>
@@ -81,7 +131,7 @@ function CustomersPage() {
                         <div className="flex items-center gap-3">
                             <Avatar className="h-10 w-10 border border-white/10 bg-primary/20">
                             <AvatarFallback className="text-accent font-black">
-                                {(customer.firstName || customer.displayName || "C").substring(0, 1)}
+                                {(customer.displayName || customer.firstName || "C").substring(0, 1)}
                             </AvatarFallback>
                             </Avatar>
                             <div>
@@ -112,6 +162,36 @@ function CustomersPage() {
           </CardContent>
         </Card>
       </main>
+
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent className="glossy-card border-none rounded-[2rem]">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-black uppercase italic">Enregistrer un Nouveau Client</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSaveCustomer}>
+            <div className="grid gap-6 py-4">
+               <div className="space-y-2">
+                <Label htmlFor="name" className="text-[10px] font-black uppercase tracking-widest opacity-60">Nom complet</Label>
+                <Input id="name" name="name" required className="h-12 bg-background/50 border-white/10 rounded-xl" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="email" className="text-[10px] font-black uppercase tracking-widest opacity-60">Adresse e-mail</Label>
+                <Input id="email" name="email" type="email" required className="h-12 bg-background/50 border-white/10 rounded-xl" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="phone" className="text-[10px] font-black uppercase tracking-widest opacity-60">Numéro de téléphone</Label>
+                <Input id="phone" name="phone" className="h-12 bg-background/50 border-white/10 rounded-xl" placeholder="+243..." />
+              </div>
+            </div>
+            <DialogFooter className="gap-2">
+              <Button type="button" variant="ghost" onClick={() => setIsModalOpen(false)} className="font-bold uppercase text-[10px]">Annuler</Button>
+              <Button type="submit" disabled={isSubmitting} className="bg-accent text-accent-foreground font-black uppercase italic rounded-xl px-8 h-12">
+                {isSubmitting ? <Loader2 className="animate-spin" /> : "Créer le compte client"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -20,10 +20,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot, query, where, doc, updateDoc, deleteDoc, addDoc } from 'firebase/firestore';
+import { collection, onSnapshot, doc, updateDoc, deleteDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { User } from '@/lib/types';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
+import { useToast } from '@/hooks/use-toast';
 
 const getRoleBadge = (role: string) => {
   switch (role) {
@@ -42,10 +45,12 @@ const getRoleBadge = (role: string) => {
 function UsersPage() {
   const { user: currentUser } = useAuth();
   const router = useRouter();
-  const [users, setUsers] = useState<User[]>([]);
+  const { toast } = useToast();
+  const [users, setUsers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [editingUser, setEditingUser] = useState<any | null>(null);
   const [role, setRole] = useState("Seller");
 
   useEffect(() => {
@@ -57,20 +62,26 @@ function UsersPage() {
     const q = collection(db, "users");
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const usersData: User[] = [];
+      const usersData: any[] = [];
       snapshot.forEach(doc => {
         const data = doc.data();
+        // Filtrer pour ne montrer que le staff (pas les clients)
         if (data.role && data.role !== 'customer') {
-          usersData.push({ id: doc.id, ...data } as User);
+          usersData.push({ id: doc.id, ...data });
         }
       });
       setUsers(usersData);
       setIsLoading(false);
+    }, (error: any) => {
+      errorEmitter.emit('permission-error', new FirestorePermissionError({
+        path: 'users',
+        operation: 'list'
+      }));
     });
     return () => unsubscribe();
   }, [currentUser, router]);
 
-  const openModal = (user: User | null = null) => {
+  const openModal = (user: any | null = null) => {
     setEditingUser(user);
     setRole(user ? user.role : "Seller");
     setIsModalOpen(true);
@@ -81,32 +92,64 @@ function UsersPage() {
     setIsModalOpen(false);
   };
 
-  const handleSave = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSave = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setIsSubmitting(true);
     const formData = new FormData(e.currentTarget);
     const userData = {
       displayName: formData.get('displayName') as string,
+      name: formData.get('displayName') as string,
       email: formData.get('email') as string,
-      role: role
+      role: role,
+      updatedAt: serverTimestamp()
     };
 
-    try {
-        if (editingUser) {
-          const userRef = doc(db, "users", editingUser.id);
-          await updateDoc(userRef, userData);
-        } else {
-          await addDoc(collection(db, "users"), userData);
-        }
+    if (editingUser) {
+      const userRef = doc(db, "users", editingUser.id);
+      updateDoc(userRef, userData)
+        .then(() => {
+          toast({ title: "Membre mis à jour" });
+          closeModal();
+        })
+        .catch(async (error) => {
+          errorEmitter.emit('permission-error', new FirestorePermissionError({
+            path: userRef.path,
+            operation: 'update',
+            requestResourceData: userData
+          }));
+        })
+        .finally(() => setIsSubmitting(false));
+    } else {
+      const colRef = collection(db, "users");
+      addDoc(colRef, {
+        ...userData,
+        createdAt: serverTimestamp()
+      })
+      .then(() => {
+        toast({ title: "Nouveau membre ajouté" });
         closeModal();
-    } catch (error) {
-        console.error("Error saving user:", error);
+      })
+      .catch(async (error) => {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
+          path: colRef.path,
+          operation: 'create',
+          requestResourceData: userData
+        }));
+      })
+      .finally(() => setIsSubmitting(false));
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (window.confirm("Êtes-vous sûr de vouloir supprimer ce membre du personnel ?")) {
+  const handleDelete = (id: string) => {
+    if (window.confirm("Supprimer ce membre du personnel ?")) {
       const userRef = doc(db, "users", id);
-      await deleteDoc(userRef);
+      deleteDoc(userRef).catch(async (error) => {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
+          path: userRef.path,
+          operation: 'delete'
+        }));
+      });
+      toast({ title: "Membre supprimé", variant: "destructive" });
     }
   };
 
@@ -198,7 +241,9 @@ function UsersPage() {
             </div>
             <DialogFooter className="gap-2">
               <Button type="button" variant="ghost" onClick={closeModal} className="font-bold uppercase text-[10px]">Annuler</Button>
-              <Button type="submit" className="bg-accent text-accent-foreground font-black uppercase italic rounded-xl px-8 h-12">Sauvegarder</Button>
+              <Button type="submit" disabled={isSubmitting} className="bg-accent text-accent-foreground font-black uppercase italic rounded-xl px-8 h-12">
+                {isSubmitting ? <Loader2 className="animate-spin" /> : "Sauvegarder"}
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>
