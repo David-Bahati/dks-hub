@@ -213,6 +213,9 @@ function POS() {
             left: 0;
             top: 0;
             width: 100%;
+            background: white !important;
+            color: black !important;
+            padding: 20px !important;
           }
           .no-print {
             display: none !important;
@@ -405,10 +408,11 @@ function POS() {
         </DialogContent>
       </Dialog>
 
-      {/* Receipt Dialog */}
+      {/* Receipt Dialog - FIX: Added internal scrolling */}
       <Dialog open={showReceipt} onOpenChange={setShowReceipt}>
-        <DialogContent className="bg-white text-black p-0 overflow-hidden sm:max-w-[420px] rounded-3xl shadow-2xl border-none">
-          <div className="p-10 font-mono text-[11px] leading-relaxed receipt-to-print">
+        <DialogContent className="bg-white text-black p-0 overflow-hidden sm:max-w-[420px] rounded-3xl shadow-2xl border-none flex flex-col max-h-[90vh]">
+          {/* Scrollable container for receipt content */}
+          <div className="flex-1 overflow-y-auto p-10 font-mono text-[11px] leading-relaxed receipt-to-print custom-scrollbar">
             <div className="text-center mb-8 border-b-2 border-dashed border-gray-300 pb-8">
               <div className="flex justify-center mb-4">
                  <div className="bg-black text-white px-4 py-1 font-black text-xl italic tracking-tighter">DKS SHOP</div>
@@ -483,7 +487,9 @@ function POS() {
               <p className="text-[8px] font-bold opacity-40 uppercase tracking-widest">À bientôt chez Double King Shop</p>
             </div>
           </div>
-          <div className="bg-gray-100 p-6 flex gap-3 no-print">
+
+          {/* Fixed footer for buttons */}
+          <div className="bg-gray-100 p-6 flex gap-3 no-print border-t border-gray-200">
             <Button className="flex-1 gap-2 bg-black text-white hover:bg-black/90 rounded-xl font-bold uppercase text-[10px]" onClick={handlePrint}>
               <Printer size={16} /> Imprimer Reçu
             </Button>
