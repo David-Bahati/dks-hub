@@ -34,11 +34,10 @@ export function Navbar() {
     const role = user?.role?.toLowerCase();
     const isStaff = role === 'admin' || role === 'seller' || role === 'cashier' || role === 'vendeur' || role === 'caissier';
 
-    // Requête simplifiée pour éviter les erreurs de permission pendant les tests
+    // Requête désactivée temporairement pour éviter tout crash au démarrage pendant les tests
+    /*
     const notificationsQuery = useMemoFirebase(() => {
         if (!user?.uid) return null;
-        
-        // En mode test, on récupère simplement les notifications de l'utilisateur
         return query(
             collection(db, "notifications"),
             where("userId", "==", user.uid),
@@ -47,9 +46,11 @@ export function Navbar() {
             limit(5)
         );
     }, [user?.uid]);
-
     const { data: notifications } = useCollection(notificationsQuery);
-    const unreadCount = notifications?.length || 0;
+    */
+    
+    const notifications: any[] = [];
+    const unreadCount = 0;
 
     const markAsRead = async (id: string) => {
         try {
