@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { 
   Plus, 
   Minus, 
@@ -26,7 +27,9 @@ import {
   Coins,
   QrCode,
   Loader2,
-  Printer
+  Printer,
+  User as UserIcon,
+  ArrowLeft
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -51,6 +54,7 @@ function POS() {
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [search, setSearch] = useState("");
+  const [customerName, setCustomerName] = useState("");
   const [paymentMode, setPaymentMode] = useState<PaymentMode>("CASH");
   const [isProcessing, setIsProcessing] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
@@ -62,12 +66,12 @@ function POS() {
     total: number;
     mode: PaymentMode;
     date: string;
+    customerName: string;
   } | null>(null);
 
   const { toast } = useToast();
   const { user } = useAuth();
 
-  // Charger les produits en temps réel
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, "products"), (snapshot) => {
       const productsData = snapshot.docs.map(doc => ({
@@ -111,7 +115,7 @@ function POS() {
       if (item.id === id) {
         const newQty = Math.max(1, item.quantity + delta);
         if (newQty > product.stockQuantity) {
-            toast({ title: "Stock insuffisant", description: "Vous ne pouvez pas vendre plus que le stock disponible.", variant: "destructive" });
+            toast({ title: "Stock insuffisant", description: "Stock limité.", variant: "destructive" });
             return item;
         }
         return { ...item, quantity: newQty };
@@ -131,11 +135,12 @@ function POS() {
 
   const confirmPayment = async () => {
     setIsProcessing(true);
+    const finalCustomerName = customerName.trim() || "Client Comptoir";
     
     try {
-        // 1. Enregistrer la vente dans Firestore
         const saleRef = await addDoc(collection(db, "sales"), {
             userId: user?.uid,
+            customerName: finalCustomerName,
             items: cart.map(item => ({
                 productId: item.id,
                 quantity: item.quantity,
@@ -147,7 +152,6 @@ function POS() {
             status: 'Payé'
         });
 
-        // 2. Mettre à jour les stocks de chaque produit
         await Promise.all(cart.map(item => {
             const productRef = doc(db, "products", item.id);
             return updateDoc(productRef, {
@@ -161,15 +165,17 @@ function POS() {
             items: [...cart],
             total: total,
             mode: paymentMode,
-            date: now
+            date: now,
+            customerName: finalCustomerName
         });
 
         toast({
             title: "Vente Terminée",
-            description: `Reçu généré pour la transaction #${saleRef.id.substring(0, 8)}`,
+            description: `Reçu généré pour ${finalCustomerName}`,
         });
 
         setCart([]);
+        setCustomerName("");
         setShowConfirmation(false);
         setShowReceipt(true);
     } catch (error) {
@@ -185,19 +191,47 @@ function POS() {
     p.category.toLowerCase().includes(search.toLowerCase())
   );
 
+  const handlePrint = () => {
+    window.print();
+  };
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <Navbar />
+      
+      {/* Styles pour l'impression */}
+      <style jsx global>{`
+        @media print {
+          body * {
+            visibility: hidden;
+          }
+          .receipt-to-print, .receipt-to-print * {
+            visibility: visible;
+          }
+          .receipt-to-print {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+          }
+          .no-print {
+            display: none !important;
+          }
+        }
+      `}</style>
+
       <main className="flex-1 max-w-[1600px] mx-auto w-full px-4 py-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 flex flex-col gap-6">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <Input 
-              placeholder="Rechercher des produits ou catégories..." 
-              className="pl-10 h-14 bg-card/40 border-white/10 rounded-2xl"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
+          <div className="flex items-center gap-4">
+            <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <Input 
+                placeholder="Rechercher des produits ou catégories..." 
+                className="pl-10 h-14 bg-card/40 border-white/10 rounded-2xl"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                />
+            </div>
           </div>
           
           {loadingProducts ? (
@@ -331,11 +365,24 @@ function POS() {
           <DialogHeader>
             <DialogTitle className="text-2xl font-black italic uppercase text-center">Finaliser le Paiement</DialogTitle>
           </DialogHeader>
-          <div className="py-8 flex flex-col items-center gap-8">
-            <div className="text-center">
+          <div className="py-6 flex flex-col gap-6">
+            <div className="space-y-4">
+                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 flex items-center gap-2">
+                    <UserIcon size={12} className="text-accent" /> Nom du Client (Optionnel)
+                </Label>
+                <Input 
+                    placeholder="Ex: John Doe" 
+                    className="h-14 bg-background/50 border-white/10 rounded-xl font-bold"
+                    value={customerName}
+                    onChange={(e) => setCustomerName(e.target.value)}
+                />
+            </div>
+
+            <div className="text-center pt-4">
               <p className="text-xs text-muted-foreground uppercase font-black tracking-[0.2em] mb-2">Montant à encaisser</p>
               <h2 className="text-5xl font-black text-accent">${total.toFixed(2)}</h2>
             </div>
+            
             <div className="w-full p-6 rounded-3xl bg-white/5 border border-white/10 flex flex-col gap-6">
               <div className="flex justify-between items-center">
                 <span className="font-bold uppercase text-xs">Mode de paiement sélectionné</span>
@@ -343,13 +390,8 @@ function POS() {
               </div>
               {paymentMode === "PI_NETWORK" && (
                 <div className="flex flex-col items-center p-6 bg-black/40 rounded-2xl border border-dashed border-white/20">
-                  <QrCode size={160} className="text-white" />
+                  <QrCode size={120} className="text-white" />
                   <p className="text-[10px] mt-4 font-black uppercase tracking-widest text-muted-foreground">Scanner via Pi Browser</p>
-                </div>
-              )}
-              {paymentMode === "MOBILE_MONEY" && (
-                <div className="text-center p-6 bg-black/40 rounded-2xl border border-dashed border-white/20">
-                   <p className="text-sm font-bold">Veuillez composer le code USSD sur le téléphone du client.</p>
                 </div>
               )}
             </div>
@@ -366,7 +408,7 @@ function POS() {
       {/* Receipt Dialog */}
       <Dialog open={showReceipt} onOpenChange={setShowReceipt}>
         <DialogContent className="bg-white text-black p-0 overflow-hidden sm:max-w-[420px] rounded-3xl shadow-2xl border-none">
-          <div className="p-10 font-mono text-[11px] leading-relaxed">
+          <div className="p-10 font-mono text-[11px] leading-relaxed receipt-to-print">
             <div className="text-center mb-8 border-b-2 border-dashed border-gray-300 pb-8">
               <div className="flex justify-center mb-4">
                  <div className="bg-black text-white px-4 py-1 font-black text-xl italic tracking-tighter">DKS SHOP</div>
@@ -377,8 +419,17 @@ function POS() {
                 <p>Bunia, Ituri, RDC</p>
                 <p>Tél: +243 823 038 945 | contact@dks.com</p>
               </div>
-              <div className="mt-6 p-2 bg-gray-100 rounded-md inline-block">
-                <p className="text-[9px] font-black">TRANS ID: #{lastTransaction?.id.toUpperCase().substring(0, 12)}</p>
+
+              <div className="mt-6 flex flex-col items-center gap-2">
+                <div className="w-24 h-24 p-2 border-2 border-black rounded-lg">
+                    <QrCode size={80} />
+                </div>
+                <p className="text-[8px] font-black uppercase tracking-widest opacity-40">Vérifier la Transaction</p>
+              </div>
+
+              <div className="mt-6 p-2 bg-gray-100 rounded-md inline-block w-full">
+                <p className="text-[9px] font-black">ID: #{lastTransaction?.id.toUpperCase().substring(0, 12)}</p>
+                <p className="text-[9px] font-black mt-1">CLIENT: {lastTransaction?.customerName.toUpperCase()}</p>
               </div>
               <p className="text-[8px] mt-2 opacity-40 font-black">{lastTransaction?.date}</p>
             </div>
@@ -432,12 +483,12 @@ function POS() {
               <p className="text-[8px] font-bold opacity-40 uppercase tracking-widest">À bientôt chez Double King Shop</p>
             </div>
           </div>
-          <div className="bg-gray-100 p-6 flex gap-3">
-            <Button className="flex-1 gap-2 bg-black text-white hover:bg-black/90 rounded-xl font-bold uppercase text-[10px]" onClick={() => window.print()}>
+          <div className="bg-gray-100 p-6 flex gap-3 no-print">
+            <Button className="flex-1 gap-2 bg-black text-white hover:bg-black/90 rounded-xl font-bold uppercase text-[10px]" onClick={handlePrint}>
               <Printer size={16} /> Imprimer Reçu
             </Button>
             <Button className="flex-1 gap-2 border-gray-300 rounded-xl font-bold uppercase text-[10px]" variant="outline" onClick={() => setShowReceipt(false)}>
-              Fermer
+              <ArrowLeft size={16} className="mr-1" /> Retour
             </Button>
           </div>
         </DialogContent>
