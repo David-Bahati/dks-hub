@@ -102,15 +102,13 @@ export default function CheckoutPage() {
     };
 
     const handlePlaceOrder = async () => {
-        // Déterminer si on doit traiter l'utilisateur comme un invité
-        // Un utilisateur est un invité s'il n'est pas connecté OU s'il n'a pas de rôle staff et pas de nom
-        const wasGuest = !user || auth.currentUser?.isAnonymous;
+        const isGuestSession = !user || auth.currentUser?.isAnonymous;
         
-        let currentUserId = user?.uid;
-        let finalName = user?.name || guestName;
-        let finalEmail = user?.email || guestEmail;
+        // Priorité absolue au nom saisi dans le formulaire pour éviter les erreurs de cache (maki maki)
+        let finalName = guestName.trim() || user?.name || "Client DKS";
+        let finalEmail = guestEmail.trim() || user?.email || "";
 
-        if (wasGuest) {
+        if (isGuestSession) {
             if (!guestName.trim() || !guestEmail.trim()) {
                 toast({ title: "Infos requises", description: "Veuillez entrer votre nom et email pour le reçu.", variant: "destructive" });
                 return;
@@ -127,10 +125,17 @@ export default function CheckoutPage() {
         setIsProcessing(true);
 
         try {
-            if (wasGuest) {
-                const userCred = await signInAnonymously(auth);
-                currentUserId = userCred.user.uid;
-                await updateProfile(userCred.user, { displayName: guestName });
+            let currentUserId = user?.uid;
+
+            if (isGuestSession) {
+                // Si session anonyme, on s'assure qu'elle existe
+                if (!currentUserId) {
+                    const userCred = await signInAnonymously(auth);
+                    currentUserId = userCred.user.uid;
+                }
+                
+                // On met à jour le profil auth et le document Firestore avec le BON nom
+                await updateProfile(auth.currentUser!, { displayName: finalName });
                 
                 await setDoc(doc(db, "users", currentUserId), {
                     id: currentUserId,
@@ -138,9 +143,9 @@ export default function CheckoutPage() {
                     displayName: finalName,
                     name: finalName,
                     role: 'customer',
-                    createdAt: serverTimestamp(),
-                    updatedAt: serverTimestamp()
-                });
+                    updatedAt: serverTimestamp(),
+                    createdAt: serverTimestamp() // On garde la date si c'est une nouvelle session
+                }, { merge: true });
             }
 
             const orderData = {
@@ -165,10 +170,9 @@ export default function CheckoutPage() {
 
             const orderRef = await addDoc(collection(db, "orders"), orderData);
             
-            // On prépare la vue de succès AVANT de changer l'état global
             setConfirmedOrderId(orderRef.id);
             setOrderSnapshot(orderData);
-            if (wasGuest) setShowFinishAccount(true);
+            if (isGuestSession) setShowFinishAccount(true);
 
             // Notifications Staff
             await addDoc(collection(db, "notifications"), {
@@ -183,12 +187,11 @@ export default function CheckoutPage() {
 
             clearCart();
             setOrderConfirmed(true);
-            
             toast({ title: "Commande validée !", description: "Merci de votre confiance." });
 
         } catch (error) {
             console.error("Order error:", error);
-            toast({ title: "Erreur", description: "Échec de l'enregistrement de la commande.", variant: "destructive" });
+            toast({ title: "Erreur", description: "Échec de l'enregistrement.", variant: "destructive" });
         } finally {
             setIsProcessing(false);
         }
@@ -203,15 +206,20 @@ export default function CheckoutPage() {
         try {
             const currentUser = auth.currentUser;
             if (currentUser) {
-                // On essaie de lier l'email et le mot de passe
+                // On transforme le compte anonyme en permanent
                 await updateEmail(currentUser, guestEmail);
                 await updatePassword(currentUser, password);
+                
                 toast({ title: "Compte activé !", description: "Bienvenue dans l'univers Premium DKS." });
-                router.push('/dashboard');
+                
+                // Redirection forcée vers le dashboard
+                setTimeout(() => {
+                    router.push('/dashboard');
+                }, 800);
             }
         } catch (err: any) {
-            console.error(err);
-            toast({ title: "Erreur", description: err.message, variant: "destructive" });
+            console.error("Activation Error:", err);
+            toast({ title: "Erreur d'activation", description: err.message, variant: "destructive" });
         } finally {
             setIsFinishingAccount(false);
         }
@@ -235,24 +243,21 @@ export default function CheckoutPage() {
             });
             pdf.addImage(imgData, 'PNG', 0, 0, canvas.width / 2, canvas.height / 2);
             pdf.save(`BON_DKS_${confirmedOrderId.substring(0, 8).toUpperCase()}.pdf`);
-            toast({ title: "Téléchargement réussi", description: "Votre bon est dans vos fichiers." });
+            toast({ title: "Téléchargement réussi" });
         } catch (error) {
-            console.error("PDF Error:", error);
-            toast({ title: "Erreur", description: "Échec de la génération du PDF.", variant: "destructive" });
+            toast({ title: "Erreur PDF", variant: "destructive" });
         } finally {
             setIsDownloading(false);
         }
     };
 
-    // VUE DE SUCCÈS (APPRÈS CONFIRMATION)
+    // VUE DE SUCCÈS
     if (orderConfirmed) {
         return (
             <div className="min-h-screen bg-background text-foreground flex flex-col items-center py-12 px-6">
                 <style jsx global>{`
                     @media print {
                         .no-print { display: none !important; }
-                        .print-only { display: block !important; }
-                        body { background: white !important; color: black !important; }
                         .order-slip { border: none !important; box-shadow: none !important; padding: 0 !important; margin: 0 !important; width: 100% !important; max-width: none !important; }
                     }
                 `}</style>
@@ -262,7 +267,7 @@ export default function CheckoutPage() {
                         <div className="w-20 h-20 bg-green-500/10 rounded-[2rem] flex items-center justify-center mx-auto text-green-500 border border-green-500/20 shadow-[0_0_50px_rgba(34,197,94,0.2)] mb-6">
                             <CheckCircle2 size={40} />
                         </div>
-                        <h1 className="text-4xl font-black uppercase italic tracking-tighter">COMMANDE <span className="text-accent">RÉUSSIE</span></h1>
+                        <h1 className="text-4xl font-black uppercase italic tracking-tighter text-white">COMMANDE <span className="text-accent">RÉUSSIE</span></h1>
                         <p className="text-muted-foreground font-medium uppercase tracking-widest text-[10px] mt-2">Votre reçu numérique est prêt</p>
                     </div>
 
@@ -324,15 +329,7 @@ export default function CheckoutPage() {
                             </CardContent>
 
                             <CardFooter className="p-10 bg-gray-50/50 flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                    <div className="p-2 bg-white border border-gray-200 rounded-lg">
-                                        <QrCode size={40} className="text-black" />
-                                    </div>
-                                    <div className="space-y-0.5">
-                                        <p className="text-[8px] font-black uppercase text-gray-400">Validation Interne</p>
-                                        <p className="text-[7px] font-bold text-gray-300">SCAN_CODE_VERIFY_DKS</p>
-                                    </div>
-                                </div>
+                                <QrCode size={40} className="text-black" />
                                 <p className="text-[9px] font-bold italic text-gray-400 max-w-[180px] text-right">
                                     Présentez ce bon à la caisse pour finaliser le retrait.
                                 </p>
@@ -341,166 +338,83 @@ export default function CheckoutPage() {
                     </div>
 
                     <div className="flex flex-col sm:flex-row gap-4 no-print">
-                        <Button 
-                            className="flex-1 h-14 bg-white text-black hover:bg-white/90 font-black uppercase italic rounded-2xl gap-3 shadow-xl"
-                            onClick={() => window.print()}
-                        >
-                            <Printer size={20} /> Imprimer
-                        </Button>
-                        <Button 
-                            className="flex-1 h-14 bg-accent text-black hover:bg-accent/90 font-black uppercase italic rounded-2xl gap-3 shadow-xl"
-                            onClick={handleDownloadPDF}
-                            disabled={isDownloading}
-                        >
-                            {isDownloading ? <Loader2 className="animate-spin" /> : <><Download size={20} /> Télécharger (PDF)</>}
-                        </Button>
+                        <Button className="flex-1 h-14 bg-white text-black hover:bg-white/90 font-black uppercase italic rounded-2xl gap-3" onClick={() => window.print()}><Printer size={20} /> Imprimer</Button>
+                        <Button className="flex-1 h-14 bg-accent text-black hover:bg-accent/90 font-black uppercase italic rounded-2xl gap-3" onClick={handleDownloadPDF} disabled={isDownloading}>{isDownloading ? <Loader2 className="animate-spin" /> : <><Download size={20} /> Télécharger PDF</>}</Button>
                     </div>
 
-                    {/* CRÉATION DE COMPTE SILENCIEUSE (SI NOUVEAU CLIENT) */}
                     {showFinishAccount && (
-                        <Card className="glossy-card border-none rounded-[2.5rem] p-8 space-y-6 relative overflow-hidden no-print animate-in slide-in-from-bottom-4 delay-500 duration-1000">
+                        <Card className="glossy-card border-none rounded-[2.5rem] p-8 space-y-6 relative overflow-hidden no-print animate-in slide-in-from-bottom-4 duration-1000">
                             <div className="absolute -top-10 -right-10 w-32 h-32 bg-accent/10 rounded-full blur-2xl" />
                             <div className="space-y-2 relative z-10">
-                                <Badge className="bg-accent/20 text-accent border-none uppercase text-[10px] font-black px-3 py-1 mb-2">
-                                    <Star size={10} className="mr-1 fill-accent" /> Offre Membre
-                                </Badge>
-                                <h2 className="text-xl font-black uppercase italic tracking-tight leading-none">ACTIVER VOTRE ESPACE PREMIUM ?</h2>
-                                <p className="text-[11px] text-muted-foreground leading-relaxed font-light">
-                                    Définissez un mot de passe pour suivre votre colis, gérer vos garanties et bénéficier de remises exclusives.
-                                </p>
+                                <Badge className="bg-accent/20 text-accent border-none uppercase text-[10px] font-black px-3 py-1 mb-2"><Star size={10} className="mr-1 fill-accent" /> Offre Membre</Badge>
+                                <h2 className="text-xl font-black uppercase italic tracking-tight text-white">ACTIVER VOTRE ESPACE PREMIUM ?</h2>
+                                <p className="text-[11px] text-muted-foreground leading-relaxed">Définissez un mot de passe pour suivre vos achats et gérer vos garanties.</p>
                             </div>
                             <div className="space-y-4 relative z-10">
                                 <div className="space-y-2">
                                     <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Votre nouveau mot de passe</Label>
                                     <div className="relative">
                                         <KeyRound className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
-                                        <Input 
-                                            type="password" 
-                                            value={password}
-                                            onChange={(e) => setPassword(e.target.value)}
-                                            placeholder="••••••••" 
-                                            className="h-14 pl-12 bg-background/50 border-white/5 rounded-2xl focus:border-accent transition-all"
-                                        />
+                                        <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" className="h-14 pl-12 bg-background/50 border-white/5 rounded-2xl focus:border-accent" />
                                     </div>
                                 </div>
-                                <Button 
-                                    className="w-full h-14 bg-accent text-black font-black uppercase italic rounded-2xl gap-2 group shadow-xl shadow-accent/10"
-                                    onClick={handleFinishAccount}
-                                    disabled={isFinishingAccount}
-                                >
-                                    {isFinishingAccount ? <Loader2 className="animate-spin" /> : (
-                                        <>ACTIVER MON ESPACE <ArrowRight className="group-hover:translate-x-1 transition-transform" /></>
-                                    )}
+                                <Button className="w-full h-14 bg-accent text-black font-black uppercase italic rounded-2xl gap-2 shadow-xl" onClick={handleFinishAccount} disabled={isFinishingAccount}>
+                                    {isFinishingAccount ? <Loader2 className="animate-spin" /> : <>ACTIVER MON ESPACE <ArrowRight /></>}
                                 </Button>
                             </div>
                         </Card>
                     )}
 
                     <div className="text-center no-print">
-                        <Button variant="ghost" className="uppercase font-black italic text-xs opacity-40 hover:opacity-100" onClick={() => router.push('/')}>
-                            Retour à la boutique
-                        </Button>
+                        <Button variant="ghost" className="uppercase font-black italic text-xs opacity-40 hover:opacity-100 text-white" onClick={() => router.push('/')}>Retour à la boutique</Button>
                     </div>
                 </div>
             </div>
         );
     }
 
-    // VUE DU FORMULAIRE DE PAIEMENT
+    // FORMULAIRE DE PAIEMENT
     return (
         <div className="min-h-screen bg-background text-foreground">
             <Navbar />
             <main className="max-w-6xl mx-auto px-6 py-12">
                 <div className="mb-10 flex items-center justify-between">
-                    <Button 
-                        variant="ghost" 
-                        onClick={() => router.back()}
-                        className="rounded-xl gap-2 font-black uppercase italic text-[10px] tracking-widest text-muted-foreground hover:text-white"
-                    >
-                        <ArrowLeft size={16} /> Retour
-                    </Button>
-                    <div className="flex items-center gap-2 text-accent">
-                        <Lock size={14} className="opacity-50" />
-                        <span className="text-[10px] font-black uppercase tracking-widest opacity-50">Transaction sécurisée SSL</span>
-                    </div>
+                    <Button variant="ghost" onClick={() => router.back()} className="rounded-xl gap-2 font-black uppercase italic text-[10px] tracking-widest text-muted-foreground hover:text-white"><ArrowLeft size={16} /> Retour</Button>
+                    <div className="flex items-center gap-2 text-accent opacity-50"><Lock size={14} /><span className="text-[10px] font-black uppercase tracking-widest">Transaction sécurisée SSL</span></div>
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
-                    
                     <div className="lg:col-span-2 space-y-10">
-                        <div className="space-y-2">
-                            <h1 className="text-5xl font-black uppercase italic tracking-tighter leading-none">
-                                FINALISER LA <span className="text-accent">COMMANDE</span>
-                            </h1>
-                            <p className="text-muted-foreground font-light uppercase tracking-widest text-xs opacity-60">Validation de votre sélection premium</p>
-                        </div>
+                        <h1 className="text-5xl font-black uppercase italic tracking-tighter text-white">FINALISER LA <span className="text-accent">COMMANDE</span></h1>
 
-                        {/* RENSEIGNEMENTS CLIENT - VISIBLES SI PAS DE COMPTE PERMANENT */}
                         {(!user || auth.currentUser?.isAnonymous) && (
-                            <Card className="p-8 rounded-[2.5rem] bg-white/5 border border-white/5 space-y-6 animate-in fade-in slide-in-from-top-4">
-                                <div className="flex items-center gap-3">
-                                    <Sparkles className="text-accent" size={20} />
-                                    <h2 className="text-sm font-black uppercase tracking-widest italic">Informations Client</h2>
-                                </div>
+                            <Card className="p-8 rounded-[2.5rem] bg-white/5 border border-white/5 space-y-6">
+                                <div className="flex items-center gap-3"><Sparkles className="text-accent" size={20} /><h2 className="text-sm font-black uppercase tracking-widest italic text-white">Informations Client</h2></div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div className="space-y-2">
                                         <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Nom complet</Label>
-                                        <div className="relative">
-                                            <User className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
-                                            <Input 
-                                                value={guestName}
-                                                onChange={(e) => setGuestName(e.target.value)}
-                                                placeholder="Ex: John Doe" 
-                                                className="h-12 pl-12 bg-background/50 border-white/5 rounded-xl focus:border-accent"
-                                            />
-                                        </div>
+                                        <div className="relative"><User className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} /><Input value={guestName} onChange={(e) => setGuestName(e.target.value)} placeholder="Ex: Maki Maki" className="h-12 pl-12 bg-background/50 border-white/5 rounded-xl focus:border-accent" /></div>
                                     </div>
                                     <div className="space-y-2">
                                         <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Email pour le reçu</Label>
-                                        <div className="relative">
-                                            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
-                                            <Input 
-                                                type="email"
-                                                value={guestEmail}
-                                                onChange={(e) => setGuestEmail(e.target.value)}
-                                                placeholder="john@example.com" 
-                                                className="h-12 pl-12 bg-background/50 border-white/5 rounded-xl focus:border-accent"
-                                            />
-                                        </div>
+                                        <div className="relative"><Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} /><Input type="email" value={guestEmail} onChange={(e) => setGuestEmail(e.target.value)} placeholder="maki@example.com" className="h-12 pl-12 bg-background/50 border-white/5 rounded-xl focus:border-accent" /></div>
                                     </div>
                                 </div>
                             </Card>
                         )}
 
                         <div className="space-y-6">
-                            <div className="flex items-center gap-3">
-                                <ShieldCheck size={20} className="text-accent" />
-                                <h2 className="text-sm font-black uppercase tracking-widest italic">Mode de paiement</h2>
-                            </div>
-                            
+                            <div className="flex items-center gap-3"><ShieldCheck size={20} className="text-accent" /><h2 className="text-sm font-black uppercase tracking-widest italic text-white">Mode de paiement</h2></div>
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                 {[
                                     { id: "PI_NETWORK", label: "Pi Network (GCV)", icon: Coins },
                                     { id: "MOBILE_MONEY", label: "Mobile Money", icon: Smartphone },
                                     { id: "CASH", label: "Cash au Bureau", icon: Banknote }
                                 ].map((method) => (
-                                    <button 
-                                        key={method.id}
-                                        onClick={() => setPaymentMethod(method.id as PaymentMethod)}
-                                        className={cn(
-                                            "relative h-28 flex flex-col items-center justify-center gap-3 rounded-[1.5rem] border transition-all duration-300",
-                                            paymentMethod === method.id 
-                                                ? "bg-accent/10 border-accent" 
-                                                : "bg-white/5 border-white/5 hover:bg-white/10"
-                                        )}
-                                    >
+                                    <button key={method.id} onClick={() => setPaymentMethod(method.id as PaymentMethod)} className={cn("relative h-28 flex flex-col items-center justify-center gap-3 rounded-[1.5rem] border transition-all duration-300", paymentMethod === method.id ? "bg-accent/10 border-accent" : "bg-white/5 border-white/5 hover:bg-white/10")}>
                                         <method.icon size={28} className={cn(paymentMethod === method.id ? "text-accent" : "text-muted-foreground")} />
-                                        <span className={cn("font-black uppercase italic text-[10px] tracking-widest", paymentMethod === method.id ? "text-white" : "text-muted-foreground")}>
-                                            {method.label}
-                                        </span>
-                                        {paymentMethod === method.id && (
-                                            <CheckCircle2 size={16} className="absolute top-3 right-3 text-accent animate-in zoom-in" />
-                                        )}
+                                        <span className={cn("font-black uppercase italic text-[10px] tracking-widest", paymentMethod === method.id ? "text-white" : "text-muted-foreground")}>{method.label}</span>
+                                        {paymentMethod === method.id && <CheckCircle2 size={16} className="absolute top-3 right-3 text-accent" />}
                                     </button>
                                 ))}
                             </div>
@@ -508,53 +422,30 @@ export default function CheckoutPage() {
 
                         <div className="p-10 rounded-[2.5rem] bg-card/40 border border-white/5 backdrop-blur-3xl shadow-2xl">
                             {paymentMethod === "PI_NETWORK" && (
-                                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
-                                    <div className="flex items-center gap-4 text-accent">
-                                        <div className="w-12 h-12 rounded-2xl bg-accent/10 flex items-center justify-center"><Coins size={24} /></div>
-                                        <div>
-                                            <h3 className="font-black uppercase italic tracking-tighter">Paiement Pi Network</h3>
-                                            <p className="text-[10px] uppercase font-bold tracking-widest opacity-60">Consensus Global 1 π = $314,159</p>
-                                        </div>
-                                    </div>
-                                    <div className="bg-accent/5 border border-accent/20 p-5 rounded-xl flex justify-between items-center">
-                                        <span className="text-[10px] font-black uppercase text-accent">Total π :</span>
-                                        <span className="font-black text-2xl text-white">{(totalPrice / PI_CONVERSION_RATE).toFixed(8)} π</span>
-                                    </div>
+                                <div className="space-y-6 animate-in fade-in">
+                                    <div className="flex items-center gap-4 text-accent"><Coins size={24} /><div><h3 className="font-black uppercase italic tracking-tighter">Paiement Pi Network</h3><p className="text-[10px] uppercase font-bold tracking-widest opacity-60">Consensus Global 1 π = $314,159</p></div></div>
+                                    <div className="bg-accent/5 border border-accent/20 p-5 rounded-xl flex justify-between items-center"><span className="text-[10px] font-black uppercase text-accent">Total π :</span><span className="font-black text-2xl text-white">{(totalPrice / PI_CONVERSION_RATE).toFixed(8)} π</span></div>
                                 </div>
                             )}
 
                             {paymentMethod === "MOBILE_MONEY" && (
-                                <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
-                                    <div className="flex items-center gap-4 text-accent">
-                                        <div className="w-12 h-12 rounded-2xl bg-accent/10 flex items-center justify-center"><Smartphone size={24} /></div>
-                                        <div><h3 className="font-black uppercase italic tracking-tighter">Mobile Money</h3><p className="text-[10px] uppercase font-bold opacity-60">M-Pesa, Airtel, Orange, Africell</p></div>
-                                    </div>
+                                <div className="space-y-8 animate-in fade-in">
+                                    <div className="flex items-center gap-4 text-accent"><Smartphone size={24} /><div><h3 className="font-black uppercase italic tracking-tighter">Mobile Money</h3><p className="text-[10px] uppercase font-bold opacity-60">M-Pesa, Airtel, Orange, Africell</p></div></div>
                                     <div className="space-y-4">
-                                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-40">Opérateur</Label>
                                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                                             {Object.entries(NETWORK_CONFIG).map(([id, config]) => (
-                                                <button key={id} onClick={() => setMobileNetwork(id as MobileNetwork)} className={cn("p-4 rounded-xl border text-[10px] font-black uppercase transition-all flex flex-col items-center gap-2", mobileNetwork === id ? "bg-white text-black border-white shadow-xl scale-105" : "bg-white/5 border-white/5 text-muted-foreground hover:bg-white/10")}>
-                                                    <div className={cn("w-3 h-3 rounded-full", config.color)} />{config.label}
-                                                </button>
+                                                <button key={id} onClick={() => setMobileNetwork(id as MobileNetwork)} className={cn("p-4 rounded-xl border text-[10px] font-black uppercase transition-all flex flex-col items-center gap-2", mobileNetwork === id ? "bg-white text-black border-white shadow-xl" : "bg-white/5 border-white/5 text-muted-foreground hover:bg-white/10")}><div className={cn("w-3 h-3 rounded-full", config.color)} />{config.label}</button>
                                             ))}
                                         </div>
-                                        <div className="relative group">
-                                            <Phone className="absolute left-5 top-1/2 -translate-y-1/2 text-muted-foreground" size={20} />
-                                            <Input type="tel" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value.replace(/\D/g, '').slice(0, 10))} placeholder="Numéro de téléphone" className="h-16 pl-14 rounded-2xl bg-background/50 border-white/5" />
-                                        </div>
+                                        <div className="relative"><Phone className="absolute left-5 top-1/2 -translate-y-1/2 text-muted-foreground" size={20} /><Input type="tel" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value.replace(/\D/g, '').slice(0, 10))} placeholder="0820000000" className="h-16 pl-14 rounded-2xl bg-background/50 border-white/5" /></div>
                                     </div>
                                 </div>
                             )}
 
                             {paymentMethod === "CASH" && (
-                                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
-                                    <div className="flex items-center gap-4 text-orange-400">
-                                        <div className="w-12 h-12 rounded-2xl bg-orange-400/10 flex items-center justify-center"><MapPin size={24} /></div>
-                                        <div><h3 className="font-black uppercase italic tracking-tighter">Paiement au Bureau</h3><p className="text-[10px] uppercase font-bold opacity-60">Immeuble Bahati, Bunia</p></div>
-                                    </div>
-                                    <div className="p-6 rounded-xl bg-orange-500/5 border border-orange-500/10 text-orange-200 text-xs">
-                                        Veuillez vous présenter sous 24h avec votre ID de commande pour finaliser le retrait.
-                                    </div>
+                                <div className="space-y-6 animate-in fade-in">
+                                    <div className="flex items-center gap-4 text-orange-400"><MapPin size={24} /><div><h3 className="font-black uppercase italic tracking-tighter">Paiement au Bureau</h3><p className="text-[10px] uppercase font-bold opacity-60">Immeuble Bahati, Bunia</p></div></div>
+                                    <div className="p-6 rounded-xl bg-orange-500/5 border border-orange-500/10 text-orange-200 text-xs">Veuillez vous présenter sous 24h avec votre ID de commande pour finaliser le retrait.</div>
                                 </div>
                             )}
                         </div>
@@ -562,40 +453,25 @@ export default function CheckoutPage() {
 
                     <div className="space-y-8">
                         <Card className="glossy-card border-none rounded-[2.5rem] overflow-hidden sticky top-28">
-                            <CardHeader className="bg-white/5 p-8 border-b border-white/5">
-                                <CardTitle className="text-lg font-black uppercase italic tracking-tighter">Résumé</CardTitle>
-                            </CardHeader>
+                            <CardHeader className="bg-white/5 p-8 border-b border-white/5"><CardTitle className="text-lg font-black uppercase italic tracking-tighter text-white">Résumé</CardTitle></CardHeader>
                             <CardContent className="p-8 space-y-4">
                                 {cartItems.map(item => (
-                                    <div key={item.id} className="flex justify-between items-center text-xs">
-                                        <span className="font-bold text-white/80">{item.name} x{item.quantity}</span>
-                                        <span className="font-black text-white">${((item.price || 0) * item.quantity).toFixed(2)}</span>
-                                    </div>
+                                    <div key={item.id} className="flex justify-between items-center text-xs"><span className="font-bold text-white/80">{item.name} x{item.quantity}</span><span className="font-black text-white">${((item.price || 0) * item.quantity).toFixed(2)}</span></div>
                                 ))}
                                 <div className="pt-6 mt-6 border-t border-white/5 space-y-2">
-                                    <div className="flex justify-between items-end">
-                                        <span className="text-[10px] font-black uppercase text-muted-foreground">TOTAL</span>
-                                        <div className="text-right">
-                                            <p className="text-4xl font-black text-accent tracking-tighter leading-none">${totalPrice.toFixed(2)}</p>
-                                            <p className="text-[10px] font-bold text-muted-foreground uppercase mt-1">≈ {(totalPrice * exchangeRate).toLocaleString()} FC</p>
-                                        </div>
-                                    </div>
+                                    <div className="flex justify-between items-end"><span className="text-[10px] font-black uppercase text-muted-foreground">TOTAL</span><div className="text-right"><p className="text-4xl font-black text-accent tracking-tighter leading-none">${totalPrice.toFixed(2)}</p><p className="text-[10px] font-bold text-muted-foreground uppercase mt-1">≈ {(totalPrice * exchangeRate).toLocaleString()} FC</p></div></div>
                                 </div>
                             </CardContent>
                             <CardFooter className="p-8 bg-white/5">
-                                <Button 
-                                    className="w-full h-20 bg-accent text-black hover:bg-accent/90 rounded-2xl font-black uppercase italic text-xl gap-3 shadow-xl disabled:opacity-30 transition-all"
-                                    onClick={handlePlaceOrder}
-                                    disabled={isProcessing || cartItems.length === 0}
-                                >
+                                <Button className="w-full h-20 bg-accent text-black hover:bg-accent/90 rounded-2xl font-black uppercase italic text-xl gap-3 shadow-xl disabled:opacity-30 transition-all" onClick={handlePlaceOrder} disabled={isProcessing || cartItems.length === 0}>
                                     {isProcessing ? <Loader2 className="animate-spin" /> : <><ShoppingBag size={24} /> CONFIRMER</>}
                                 </Button>
                             </CardFooter>
                         </Card>
                     </div>
-
                 </div>
             </main>
         </div>
     );
 }
+
