@@ -12,6 +12,8 @@
         "lastName": { "type": "string" },
         "displayName": { "type": "string" },
         "role": { "type": "string", "enum": ["Admin", "Seller", "Cashier", "customer"] },
+        "loyaltyLevel": { "type": "string", "enum": ["Bronze", "Silver", "Gold"] },
+        "points": { "type": "number" },
         "createdAt": { "type": "string", "format": "date-time" },
         "updatedAt": { "type": "string", "format": "date-time" }
       },
@@ -84,13 +86,29 @@
       },
       "required": ["userId", "brand", "model"]
     },
+    "ServiceBooking": {
+      "title": "ServiceBooking",
+      "description": "Réservation d'une formation ou d'une intervention technique.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "customerName": { "type": "string" },
+        "serviceTitle": { "type": "string" },
+        "category": { "type": "string" },
+        "status": { "type": "string" },
+        "scheduledDate": { "type": "string" },
+        "location": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
     "Notification": {
       "title": "Notification",
       "description": "System or user alerts.",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
-        "userId": { "type": "string", "description": "Recipient ID (or 'staff' for all employees)" },
+        "userId": { "type": "string" },
         "title": { "type": "string" },
         "message": { "type": "string" },
         "type": { "type": "string", "enum": ["info", "success", "warning", "error"] },
@@ -125,6 +143,10 @@
       "schema": "HardwareAsset",
       "description": "Client hardware park for maintenance tracking."
     },
+    "/serviceBookings/{bookingId}": {
+      "schema": "ServiceBooking",
+      "description": "Service and training reservations."
+    },
     "/notifications/{notifId}": {
       "schema": "Notification",
       "description": "System notifications."
@@ -136,10 +158,6 @@
     "/system/{docId}": {
       "schema": "object",
       "description": "Global shop configuration."
-    },
-    "/serviceBookings/{bookingId}": {
-      "schema": "object",
-      "description": "Service and training reservations."
     }
   }
 }
