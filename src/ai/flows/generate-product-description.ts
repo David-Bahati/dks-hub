@@ -33,7 +33,18 @@ La description doit être :
 Ne commence pas par "Voici une description", va droit au but.`,
 });
 
+const generateProductDescriptionFlow = ai.defineFlow(
+  {
+    name: 'generateProductDescriptionFlow',
+    inputSchema: GenerateDescriptionInputSchema,
+    outputSchema: z.string(),
+  },
+  async (input) => {
+    const { output } = await prompt(input);
+    return output || "Description non générée.";
+  }
+);
+
 export async function generateProductDescription(input: GenerateDescriptionInput): Promise<string> {
-  const { output } = await prompt(input);
-  return output || "Description non générée.";
+  return generateProductDescriptionFlow(input);
 }

@@ -1,7 +1,8 @@
+
 "use client";
 
-import { useState } from 'react';
-import withAuth from '@/components/auth/withAuth';
+import { useState, useRef } from 'react';
+import组件 withAuth from '@/components/auth/withAuth';
 import { Navbar } from "@/components/layout/Navbar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -49,6 +50,9 @@ function ProductsPage() {
   const [isGeneratingImg, setIsGeneratingImg] = useState(false);
   const [aiDescription, setAiDescription] = useState("");
   const [imageUrl, setImageUrl] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("");
+  
+  const nameRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   const productsQuery = useMemoFirebase(() => collection(db, "products"), []);
@@ -62,6 +66,7 @@ function ProductsPage() {
     setIsPublished(product ? product.isPublished : true);
     setAiDescription(product ? product.description : "");
     setImageUrl(product ? product.imageUrl : "");
+    setSelectedCategory(product ? product.category : "");
     setIsModalOpen(true);
   };
 
@@ -69,25 +74,23 @@ function ProductsPage() {
     setEditingProduct(null);
     setAiDescription("");
     setImageUrl("");
+    setSelectedCategory("");
     setIsModalOpen(false);
   };
 
   const handleAiGenerateDesc = async () => {
-    const nameInput = document.getElementById('prod-name') as HTMLInputElement;
-    const categoryInput = document.getElementById('prod-category') as any;
-    const productName = nameInput?.value;
-    const category = categoryInput?.innerText || "";
-
+    const productName = nameRef.current?.value;
     if (!productName) {
         toast({ title: "Nom requis", description: "Entrez un nom de produit pour générer la description.", variant: "destructive" });
         return;
     }
     setIsGeneratingDesc(true);
     try {
-        const desc = await generateProductDescription({ productName, category });
+        const desc = await generateProductDescription({ productName, category: selectedCategory });
         setAiDescription(desc);
         toast({ title: "IA: Description prête !" });
     } catch (error) {
+        console.error(error);
         toast({ title: "Erreur IA", description: "Impossible de générer le texte.", variant: "destructive" });
     } finally {
         setIsGeneratingDesc(false);
@@ -95,22 +98,19 @@ function ProductsPage() {
   };
 
   const handleAiGenerateImage = async () => {
-    const nameInput = document.getElementById('prod-name') as HTMLInputElement;
-    const categoryInput = document.getElementById('prod-category') as any;
-    const productName = nameInput?.value;
-    const category = categoryInput?.innerText || "";
-
+    const productName = nameRef.current?.value;
     if (!productName) {
         toast({ title: "Nom requis", description: "Entrez un nom de produit pour générer l'image.", variant: "destructive" });
         return;
     }
     setIsGeneratingImg(true);
     try {
-        const url = await generateProductImage({ productName, category });
+        const url = await generateProductImage({ productName, category: selectedCategory });
         setImageUrl(url);
         toast({ title: "IA: Photo générée !", description: "Une image de studio a été créée." });
     } catch (error) {
-        toast({ title: "Erreur IA Image", description: "Vérifiez vos quotas d'IA ou réessayez.", variant: "destructive" });
+        console.error(error);
+        toast({ title: "Erreur IA Image", description: "Échec de la génération par l'IA.", variant: "destructive" });
     } finally {
         setIsGeneratingImg(false);
     }
@@ -136,7 +136,7 @@ function ProductsPage() {
     const productData = {
       name: formData.get('name') as string,
       description: aiDescription,
-      category: formData.get('category') as string,
+      category: selectedCategory,
       sellingPrice,
       price: sellingPrice,
       purchasePrice,
@@ -271,12 +271,12 @@ function ProductsPage() {
                     <div className="space-y-6">
                         <div className="space-y-2">
                             <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Nom commercial</Label>
-                            <Input id="prod-name" name="name" defaultValue={editingProduct?.name} className="h-12 bg-background/50 border-white/10 rounded-xl" required />
+                            <Input ref={nameRef} name="name" defaultValue={editingProduct?.name} className="h-12 bg-background/50 border-white/10 rounded-xl" required />
                         </div>
                         <div className="space-y-2">
                             <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Catégorie technique</Label>
-                            <Select name="category" defaultValue={editingProduct?.category}>
-                                <SelectTrigger id="prod-category" className="h-12 bg-background/50 border-white/10 rounded-xl">
+                            <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                                <SelectTrigger className="h-12 bg-background/50 border-white/10 rounded-xl">
                                     <SelectValue placeholder="Choisir une catégorie" />
                                 </SelectTrigger>
                                 <SelectContent className="bg-card border-white/10">
