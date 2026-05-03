@@ -1,10 +1,6 @@
-
 'use server';
 /**
  * @fileOverview Flow Genkit pour générer des descriptions de produits informatiques.
- * 
- * - generateProductDescription - Fonction principale
- * - GenerateDescriptionInput - Type d'entrée
  */
 
 import { ai } from '@/ai/genkit';
@@ -17,8 +13,8 @@ const GenerateDescriptionInputSchema = z.object({
 
 export type GenerateDescriptionInput = z.infer<typeof GenerateDescriptionInputSchema>;
 
-const prompt = ai.definePrompt({
-  name: 'generateProductDescriptionPrompt',
+const productDescriptionPrompt = ai.definePrompt({
+  name: 'productDescriptionPrompt',
   input: { schema: GenerateDescriptionInputSchema },
   output: { schema: z.string() },
   prompt: `Tu es un expert en marketing hardware pour la boutique de luxe "Double King Shop" à Bunia.
@@ -40,7 +36,7 @@ const generateProductDescriptionFlow = ai.defineFlow(
     outputSchema: z.string(),
   },
   async (input) => {
-    const { output } = await prompt(input);
+    const { output } = await productDescriptionPrompt(input);
     return output || "Description non générée.";
   }
 );
