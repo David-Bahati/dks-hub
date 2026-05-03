@@ -34,7 +34,7 @@ import { Switch } from "@/components/ui/switch";
 import { db } from '@/lib/firebase';
 import { collection, doc, serverTimestamp, setDoc, addDoc, deleteDoc } from 'firebase/firestore';
 import { Product } from '@/lib/types';
-import { PlusCircle, Edit, Trash2, Eye, EyeOff, Loader2, ArrowLeft, Sparkles, Image as ImageIcon } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, Eye, EyeOff, Loader2, ArrowLeft, Sparkles, Image as ImageIcon, Upload } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
 import Link from 'next/link';
@@ -52,6 +52,7 @@ function ProductsPage() {
   const [selectedCategory, setSelectedCategory] = useState("");
   
   const nameRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   const productsQuery = useMemoFirebase(() => collection(db, "products"), []);
@@ -75,6 +76,23 @@ function ProductsPage() {
     setImageUrl("");
     setSelectedCategory("");
     setIsModalOpen(false);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast({ title: "Fichier trop lourd", description: "La taille maximale est de 2Mo.", variant: "destructive" });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setImageUrl(reader.result as string);
+      toast({ title: "Image chargée", description: "Votre fichier est prêt." });
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleAiGenerateDesc = async () => {
@@ -344,15 +362,26 @@ function ProductsPage() {
                                 </Button>
                             </div>
                             
-                            <div className="aspect-square w-full max-w-[320px] mx-auto rounded-3xl bg-white/5 border-2 border-dashed border-white/10 overflow-hidden relative group shrink-0">
+                            <div 
+                                onClick={() => !isGeneratingImg && fileInputRef.current?.click()}
+                                className="aspect-square w-full max-w-[320px] mx-auto rounded-3xl bg-white/5 border-2 border-dashed border-white/10 overflow-hidden relative group shrink-0 cursor-pointer hover:border-accent/40 transition-colors"
+                            >
                                 {imageUrl ? (
-                                    <img src={imageUrl} alt="Preview" className="w-full h-full object-cover" />
+                                    <>
+                                        <img src={imageUrl} alt="Preview" className="w-full h-full object-cover" />
+                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center transition-opacity">
+                                            <Upload className="text-white mb-2" size={24} />
+                                            <span className="text-[8px] font-black uppercase text-white tracking-widest">Changer l'image</span>
+                                        </div>
+                                    </>
                                 ) : (
                                     <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground opacity-40">
-                                        <ImageIcon size={48} className="mb-3" />
-                                        <span className="text-[10px] font-bold uppercase tracking-widest">Aucun visuel</span>
+                                        <Upload size={48} className="mb-3 group-hover:text-accent transition-colors" />
+                                        <span className="text-[10px] font-bold uppercase tracking-widest">Choisir un fichier</span>
+                                        <span className="text-[8px] mt-1">(Photo locale)</span>
                                     </div>
                                 )}
+
                                 {isGeneratingImg && (
                                     <div className="absolute inset-0 bg-black/80 backdrop-blur-md flex flex-col items-center justify-center gap-4">
                                         <div className="relative">
@@ -364,11 +393,19 @@ function ProductsPage() {
                                 )}
                             </div>
                             
+                            <input 
+                                type="file" 
+                                ref={fileInputRef} 
+                                className="hidden" 
+                                accept="image/*" 
+                                onChange={handleFileChange} 
+                            />
+                            
                             <div className="space-y-2">
                                 <Label className="text-[8px] font-black uppercase tracking-widest opacity-40">URL de l'image (Optionnel)</Label>
                                 <Input 
                                     name="imageUrl" 
-                                    value={imageUrl} 
+                                    value={imageUrl.startsWith('data:') ? '' : imageUrl} 
                                     onChange={(e) => setImageUrl(e.target.value)} 
                                     placeholder="https://..." 
                                     className="h-11 bg-background/50 border-white/10 rounded-xl text-[10px]" 
