@@ -28,7 +28,6 @@ export const metadata: Metadata = {
     "application-name": "DKS Shop",
     "apple-mobile-web-app-title": "DKS Shop",
     "msapplication-starturl": "/",
-    "viewport": "width=device-width, initial-scale=1, shrink-to-fit=no"
   }
 };
 
@@ -60,7 +59,7 @@ export default function RootLayout({
           {`
             if (window.Pi) {
               window.Pi.init({ version: "2.0", sandbox: true });
-              console.log("[Pi SDK] Initialisé en mode Sandbox - URL de production configurée");
+              console.log("[Pi SDK] Initialisé en mode Sandbox pour DKS Shop");
             }
           `}
         </Script>

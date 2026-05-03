@@ -1,23 +1,22 @@
 {
-  "name": "Double King Shop - DKS",
+  "name": "Double King Shop",
   "short_name": "DKS Shop",
-  "description": "Boutique hardware premium à Bunia. Paiements Pi Network, Mobile Money et Cash.",
+  "description": "Boutique de luxe Double King Shop à Bunia - Hardware Premium",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0f172a",
   "theme_color": "#0f172a",
   "icons": [
     {
-      "src": "https://picsum.photos/seed/dks-logo/192/192",
+      "src": "https://picsum.photos/seed/dks192/192/192",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "https://picsum.photos/seed/dks-logo/512/512",
+      "src": "https://picsum.photos/seed/dks512/512/512",
       "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
+      "type": "image/png"
     }
   ]
 }
