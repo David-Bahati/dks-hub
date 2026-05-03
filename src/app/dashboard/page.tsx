@@ -31,7 +31,8 @@ import {
   MessageCircle,
   ExternalLink,
   Wrench,
-  GraduationCap
+  GraduationCap,
+  Laptop
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -69,7 +70,10 @@ import {
   YAxis, 
   CartesianGrid, 
   Tooltip, 
-  ResponsiveContainer 
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell
 } from 'recharts';
 
 const navConfig = [
@@ -79,6 +83,7 @@ const navConfig = [
   { href: "/dashboard/orders", icon: ShoppingBag, label: "Commandes", roles: ["Admin", "Seller", "Cashier"] },
   { href: "/dashboard/services", icon: GraduationCap, label: "Services & Pôles", roles: ["Admin", "Seller", "Cashier"] },
   { href: "/dashboard/support", icon: Wrench, label: "SAV & Support", roles: ["Admin", "Seller", "Cashier"] },
+  { href: "/dashboard/hardware", icon: Laptop, label: "Parc Hardware", roles: ["Admin", "Seller", "Cashier", "customer"] },
   { href: "/dashboard/customers", icon: Users, label: "Clients", roles: ["Admin", "Seller", "Cashier"] },
   { href: "/dashboard/users", icon: UsersRound, label: "Équipe", roles: ["Admin"] },
   { href: "/dashboard/settings", icon: Settings, label: "Réglages", roles: ["Admin"] },
@@ -96,27 +101,32 @@ function DashboardPage() {
 
   const isStaff = user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'seller' || user?.role?.toLowerCase() === 'cashier';
 
-  const filteredNavLinks = navConfig.filter(link => link.roles.map(r => r.toLowerCase()).includes(user?.role?.toLowerCase() || ""));
+  const filteredNavLinks = navConfig.filter(link => {
+      const roles = link.roles.map(r => r.toLowerCase());
+      const userRole = user?.role?.toLowerCase() || "";
+      return roles.includes(userRole);
+  });
 
   const ordersQuery = useMemoFirebase(() => {
     if (authLoading || !user?.uid || isStaff) return null;
-    return query(
-      collection(db, "orders"), 
-      where("userId", "==", user.uid)
-    );
+    return query(collection(db, "orders"), where("userId", "==", user.uid));
   }, [user?.uid, isStaff, authLoading]);
   
   const { data: userOrders } = useCollection(ordersQuery);
 
   const bookingsQuery = useMemoFirebase(() => {
     if (authLoading || !user?.uid || isStaff) return null;
-    return query(
-      collection(db, "serviceBookings"), 
-      where("userId", "==", user.uid)
-    );
+    return query(collection(db, "serviceBookings"), where("userId", "==", user.uid));
   }, [user?.uid, isStaff, authLoading]);
 
   const { data: userBookings } = useCollection(bookingsQuery);
+
+  const assetsQuery = useMemoFirebase(() => {
+    if (authLoading || !user?.uid || isStaff) return null;
+    return query(collection(db, "hardwareAssets"), where("userId", "==", user.uid));
+  }, [user?.uid, isStaff, authLoading]);
+
+  const { data: userAssets } = useCollection(assetsQuery);
 
   const lastOrder = useMemo(() => {
     if (!userOrders) return null;
@@ -151,51 +161,39 @@ function DashboardPage() {
       setRate(exchangeRate);
       setChartData(revenueData);
     } catch (error) {
-      console.error("Dashboard data fetch error:", error);
+      console.error(error);
     } finally {
       setLoading(false);
     }
   };
 
+  const serviceDistribution = [
+    { name: 'Ventes', value: stats?.totalSalesCount || 10, color: 'hsl(var(--accent))' },
+    { name: 'Formations', value: 15, color: 'hsl(var(--primary))' },
+    { name: 'Services', value: 8, color: 'hsl(var(--destructive))' },
+  ];
+
   const getStatusBadge = (status: string) => {
     const s = status?.toLowerCase();
-    if (s?.includes('payé') || s?.includes('payée') || s?.includes('ready') || s?.includes('prêt')) {
-      return <Badge className="bg-green-500/10 text-green-400 border-none uppercase text-[9px] font-black px-2 py-0.5 flex items-center gap-1"><CheckCircle2 size={10} /> Prêt / Payé</Badge>;
+    if (s?.includes('payé') || s?.includes('ready') || s === 'completed') {
+      return <Badge className="bg-green-500/10 text-green-400 border-none uppercase text-[9px] font-black px-2 py-0.5"><CheckCircle2 size={10} className="mr-1 inline" /> OK</Badge>;
     }
-    if (s?.includes('attente') || s?.includes('pending')) {
-      return <Badge className="bg-orange-500/10 text-orange-400 border-none uppercase text-[9px] font-black px-2 py-0.5 flex items-center gap-1"><Clock size={10} /> En attente</Badge>;
-    }
-    return <Badge className="bg-white/5 text-muted-foreground border-none uppercase text-[9px] font-black px-2 py-0.5">{status}</Badge>;
+    return <Badge className="bg-orange-500/10 text-orange-400 border-none uppercase text-[9px] font-black px-2 py-0.5"><Clock size={10} className="mr-1 inline" /> ATTENTE</Badge>;
   };
 
-  const formatCurrency = (amount: number) => new Intl.NumberFormat('fr-FR').format(amount);
-
   if (loading || authLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="h-12 w-12 animate-spin text-primary" />
-      </div>
-    );
+    return <div className="min-h-screen flex items-center justify-center bg-background"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
   }
 
+  // --- VUE CLIENT ---
   if (!isStaff) {
     return (
       <div className="flex min-h-screen w-full flex-col bg-background">
         <header className="border-b border-white/5 bg-background/40 backdrop-blur-2xl py-6 px-4 md:px-8">
             <div className="max-w-7xl mx-auto flex justify-between items-center">
-                <div className="flex items-center gap-4">
-                    <Logo size="md" />
-                    <div>
-                        <h1 className="text-2xl font-black uppercase italic tracking-tighter leading-none">Mon Espace <span className="text-accent">Client</span></h1>
-                        <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest mt-1">Heureux de vous revoir, {user?.name}</p>
-                    </div>
-                </div>
+                <Logo size="md" showText />
                 <div className="flex items-center gap-3">
-                    <Link href="/">
-                        <Button variant="outline" className="rounded-xl border-white/10 h-10 gap-2 font-bold text-xs uppercase italic">
-                            <ShoppingCart size={14} /> Boutique
-                        </Button>
-                    </Link>
+                    <Link href="/"><Button variant="outline" className="rounded-xl border-white/10 h-10 font-bold text-xs uppercase italic"><ShoppingCart size={14} className="mr-2" /> Boutique</Button></Link>
                 </div>
             </div>
         </header>
@@ -203,130 +201,35 @@ function DashboardPage() {
         <main className="flex-1 max-w-7xl mx-auto w-full p-4 md:p-8 space-y-8">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <Card className="md:col-span-2 glossy-card border-none rounded-[2.5rem] overflow-hidden relative group">
-                    <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity">
-                        <Sparkles size={120} className="text-accent" />
-                    </div>
+                    <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity"><Sparkles size={120} className="text-accent" /></div>
                     <CardContent className="p-10 space-y-4">
-                        <Badge className="bg-accent/20 text-accent border-none font-black uppercase tracking-tighter px-3">Membre Premium DKS</Badge>
-                        <h2 className="text-4xl font-black uppercase italic leading-tight">VOTRE SETUP,<br /><span className="text-accent">NOTRE PRIORITÉ</span></h2>
-                        <p className="text-muted-foreground text-sm max-w-md font-light leading-relaxed">Gérez vos commandes, réservez vos formations IA et suivez vos interventions techniques en direct.</p>
-                        <div className="flex flex-wrap gap-4 mt-4">
-                            <Button className="bg-primary hover:bg-primary/90 h-12 rounded-xl px-8 font-black uppercase italic gap-2" asChild>
-                                <Link href="/#shop">Continuer mes achats <ArrowRight size={18} /></Link>
-                            </Button>
-                            <Button variant="outline" className="border-white/10 h-12 rounded-xl px-8 font-black uppercase italic gap-2" asChild>
-                                <Link href="/services">Réserver un Service <Wrench size={18} /></Link>
-                            </Button>
+                        <Badge className="bg-accent/20 text-accent border-none font-black uppercase tracking-tighter px-3">Membre DKS Hub</Badge>
+                        <h2 className="text-4xl font-black uppercase italic leading-tight">VOTRE UNIVERS<br /><span className="text-accent">TECHNOLOGIQUE</span></h2>
+                        <p className="text-muted-foreground text-sm max-w-md font-light leading-relaxed">Centralisez vos factures, gérez votre parc informatique et réservez vos formations IA.</p>
+                        <div className="flex flex-wrap gap-4 mt-6">
+                            <Button className="bg-primary hover:bg-primary/90 h-12 rounded-xl px-8 font-black uppercase italic gap-2" asChild><Link href="/services">Nouveau Service <ArrowRight size={18} /></Link></Button>
+                            <Button variant="outline" className="border-white/10 h-12 rounded-xl px-8 font-black uppercase italic gap-2" asChild><Link href="/dashboard/hardware">Mon Parc Tech <Laptop size={18} /></Link></Button>
                         </div>
                     </CardContent>
                 </Card>
 
                 <Card className="glossy-card border-none rounded-[2.5rem] flex flex-col hover:border-accent/20 transition-all overflow-hidden">
-                    <CardHeader className="bg-white/5">
-                        <CardTitle className="text-sm font-black uppercase italic tracking-widest flex items-center gap-2">
-                            <Clock size={16} className="text-accent" /> Statut Commande
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-6 space-y-6 flex-1">
+                    <CardHeader className="bg-white/5"><CardTitle className="text-sm font-black uppercase italic tracking-widest flex items-center gap-2"><Clock size={16} className="text-accent" /> Derniers Événements</CardTitle></CardHeader>
+                    <CardContent className="p-6 space-y-4 flex-1">
                         {lastOrder ? (
-                            <div className="space-y-6">
-                                <div className="space-y-4">
-                                    <div className="flex justify-between items-start">
-                                        <div>
-                                            <p className="text-[10px] font-bold text-muted-foreground uppercase">Réf : #{lastOrder.id.substring(0, 8).toUpperCase()}</p>
-                                            <p className="text-2xl font-black text-white">${lastOrder.total?.toFixed(2)}</p>
-                                        </div>
-                                        {getStatusBadge(lastOrder.status)}
-                                    </div>
-                                    
-                                    <div className="p-4 bg-white/5 rounded-2xl border border-white/5 space-y-3">
-                                        <div className="flex items-center gap-3">
-                                            <MapPin size={16} className="text-accent" />
-                                            <div>
-                                                <p className="text-[10px] text-muted-foreground uppercase font-black">Point de Retrait</p>
-                                                <p className="text-xs font-bold">Immeuble Bahati, Bunia</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Button className="w-full h-12 bg-green-600 hover:bg-green-700 text-white font-black uppercase italic text-[10px] rounded-xl gap-2 shadow-lg" asChild>
-                                        <a href={`https://wa.me/243823038945?text=Bonjour,%20j'ai%20besoin%20d'aide%20pour%20ma%20commande%20#${lastOrder.id.substring(0, 8).toUpperCase()}`} target="_blank" rel="noopener noreferrer">
-                                            <MessageCircle size={14} /> Besoin d'aide ?
-                                        </a>
-                                    </Button>
-                                    <Button variant="ghost" className="w-full text-[10px] font-black uppercase italic gap-2 h-10 border border-white/5 hover:bg-white/5 rounded-xl" asChild>
-                                        <Link href="/dashboard/orders">Historique complet <ArrowRight size={14} /></Link>
-                                    </Button>
-                                </div>
+                            <div className="p-4 bg-white/5 rounded-2xl border border-white/5 space-y-2">
+                                <div className="flex justify-between items-center"><p className="text-[10px] font-black uppercase text-muted-foreground">Commande #{lastOrder.id.substring(0, 6)}</p>{getStatusBadge(lastOrder.status)}</div>
+                                <p className="text-xl font-black">${lastOrder.total?.toFixed(2)}</p>
                             </div>
-                        ) : (
-                            <div className="text-center py-10 opacity-30 italic flex flex-col items-center gap-3">
-                                <ShoppingBag size={40} />
-                                <p className="text-xs font-bold">Aucune commande web</p>
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                <Card className="glossy-card border-none rounded-[2.5rem] overflow-hidden group hover:bg-primary/5 transition-all">
-                    <CardContent className="p-10 space-y-6">
-                        <div className="flex justify-between items-start">
-                            <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
-                                <GraduationCap size={28} />
-                            </div>
-                            <div className="flex flex-col items-end gap-1">
-                              <Badge className="bg-primary/20 text-primary border-none uppercase text-[10px] font-black px-3 py-1">
-                                  {userBookings?.length || 0} Prestations
-                              </Badge>
+                        ) : <p className="text-xs text-center opacity-30 italic py-10">Aucune commande web</p>}
+                        
+                        <div className="pt-4 border-t border-white/5">
+                            <p className="text-[9px] font-black uppercase text-muted-foreground mb-3">Statistiques Hub</p>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="bg-white/5 p-3 rounded-xl"><p className="text-xl font-black text-accent">{userBookings?.length || 0}</p><p className="text-[8px] font-bold uppercase opacity-40">Prestations</p></div>
+                                <div className="bg-white/5 p-3 rounded-xl"><p className="text-xl font-black text-primary">{userAssets?.length || 0}</p><p className="text-[8px] font-bold uppercase opacity-40">Appareils</p></div>
                             </div>
                         </div>
-                        <div className="space-y-2">
-                            <h3 className="text-xl font-black uppercase italic tracking-tighter">Mes Pôles Services</h3>
-                            <p className="text-xs text-muted-foreground leading-relaxed font-light">
-                                Suivez vos inscriptions aux ateliers IA, vos installations réseau ou vos upgrades hardware en cours.
-                            </p>
-                        </div>
-                        <Link href="/dashboard/services" className="inline-flex items-center text-[10px] font-black uppercase italic text-primary hover:underline gap-2">
-                            Gérer mes réservations <ArrowRight size={12} />
-                        </Link>
-                    </CardContent>
-                </Card>
-
-                <Card className="glossy-card border-none rounded-[2.5rem] overflow-hidden group hover:bg-accent/5 transition-all">
-                    <CardContent className="p-10 space-y-6">
-                        <div className="w-14 h-14 rounded-2xl bg-accent/10 flex items-center justify-center text-accent group-hover:scale-110 transition-transform">
-                            <Wrench size={28} />
-                        </div>
-                        <div className="space-y-2">
-                            <h3 className="text-xl font-black uppercase italic tracking-tighter">Support & SAV</h3>
-                            <p className="text-xs text-muted-foreground leading-relaxed font-light">
-                                Un problème technique sur votre matériel ? Ouvrez un ticket SAV pour un diagnostic rapide à notre bureau.
-                            </p>
-                        </div>
-                        <Link href="/dashboard/support" className="inline-flex items-center text-[10px] font-black uppercase italic text-accent hover:underline gap-2">
-                            Ouvrir un ticket <ArrowRight size={12} />
-                        </Link>
-                    </CardContent>
-                </Card>
-
-                <Card className="glossy-card border-none rounded-[2.5rem] overflow-hidden group hover:bg-green-500/5 transition-all">
-                    <CardContent className="p-10 space-y-6">
-                        <div className="w-14 h-14 rounded-2xl bg-green-500/10 flex items-center justify-center text-green-500 group-hover:scale-110 transition-transform">
-                            <ShieldCheck size={28} />
-                        </div>
-                        <div className="space-y-2">
-                            <h3 className="text-xl font-black uppercase italic tracking-tighter">Certifications DKS</h3>
-                            <p className="text-xs text-muted-foreground leading-relaxed font-light">
-                                Chaque intervention est certifiée conforme aux normes internationales pour la sécurité de vos données.
-                            </p>
-                        </div>
-                        <Link href="/services" className="inline-flex items-center text-[10px] font-black uppercase italic text-green-500 hover:underline gap-2">
-                            Nos engagements <ArrowRight size={12} />
-                        </Link>
                     </CardContent>
                 </Card>
             </div>
@@ -335,35 +238,18 @@ function DashboardPage() {
     );
   }
 
-  // --- VUE STAFF (ADMIN / VENDEUR / CAISSIER) ---
+  // --- VUE STAFF ---
   return (
     <div className="flex min-h-screen w-full flex-col bg-background">
       <header className="sticky top-0 z-30 flex h-20 items-center gap-4 border-b border-white/5 bg-background/40 backdrop-blur-2xl px-6">
          <Sheet>
-            <SheetTrigger asChild>
-              <Button size="icon" variant="ghost" className="sm:hidden text-muted-foreground">
-                <PanelLeft className="h-5 w-5" />
-                <span className="sr-only">Menu</span>
-              </Button>
-            </SheetTrigger>
+            <SheetTrigger asChild><Button size="icon" variant="ghost" className="sm:hidden text-muted-foreground"><PanelLeft className="h-5 w-5" /><span className="sr-only">Menu</span></Button></SheetTrigger>
             <SheetContent side="left" className="sm:max-w-xs bg-card/95 backdrop-blur-3xl border-r border-white/5 p-0">
-                <div className="p-8 border-b border-white/5">
-                   <Logo size="sm" showText={true} />
-                </div>
+                <div className="p-8 border-b border-white/5"><Logo size="sm" showText /></div>
               <nav className="grid gap-1 p-4">
                  {filteredNavLinks.map(link => (
-                   <Link
-                    key={link.href}
-                    href={link.href}
-                    className={cn(
-                        "group flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all text-sm font-medium",
-                        pathname === link.href 
-                            ? 'bg-accent/10 text-accent border-l-2 border-accent rounded-l-none' 
-                            : 'text-slate-400 hover:bg-white/5 hover:text-white'
-                    )}
-                  >
-                    <link.icon className={cn("h-4 w-4 transition-transform group-hover:translate-x-0.5", pathname === link.href ? 'text-accent' : '')} />
-                    {link.label}
+                   <Link key={link.href} href={link.href} className={cn("group flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all text-sm font-medium", pathname === link.href ? 'bg-accent/10 text-accent border-l-2 border-accent rounded-l-none' : 'text-slate-400 hover:bg-white/5 hover:text-white')}>
+                    <link.icon className={cn("h-4 w-4 transition-transform group-hover:translate-x-0.5", pathname === link.href ? 'text-accent' : '')} />{link.label}
                   </Link>
                  ))}
               </nav>
@@ -371,53 +257,20 @@ function DashboardPage() {
           </Sheet>
 
         <div className="flex-1 flex items-center justify-between">
-            <div className="flex items-center gap-6">
-                <Logo size="sm" />
-                <h2 className="text-lg md:text-xl tracking-tighter">
-                    <span className="font-light text-slate-400 uppercase">Tableau de bord</span>{" "}
-                    <span className="font-bold text-white uppercase italic">{user?.role}</span>
-                </h2>
-            </div>
-
+            <div className="flex items-center gap-6"><Logo size="sm" /><h2 className="text-lg md:text-xl tracking-tighter"><span className="font-light text-slate-400 uppercase">Tableau de bord</span> <span className="font-bold text-white uppercase italic">{user?.role}</span></h2></div>
             <nav className="hidden xl:flex items-center gap-1">
                 {filteredNavLinks.map((link) => (
                     <Link key={link.href} href={link.href}>
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            className={cn(
-                                "group rounded-none h-20 px-4 gap-2.5 font-medium transition-all text-[10px] relative",
-                                pathname === link.href 
-                                    ? 'text-accent' 
-                                    : 'text-slate-400 hover:text-white'
-                            )}
-                        >
-                            <link.icon className={cn("h-4 w-4 transition-transform group-hover:translate-x-0.5", pathname === link.href ? 'text-accent' : '')} />
-                            <span>{link.label}</span>
-                            {pathname === link.href && (
-                                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-accent" />
-                            )}
+                        <Button variant="ghost" size="sm" className={cn("group rounded-none h-20 px-4 gap-2.5 font-medium transition-all text-[10px] relative", pathname === link.href ? 'text-accent' : 'text-slate-400 hover:text-white')}>
+                            <link.icon className={cn("h-4 w-4 transition-transform group-hover:translate-x-0.5", pathname === link.href ? 'text-accent' : '')} /><span>{link.label}</span>
+                            {pathname === link.href && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-accent" />}
                         </Button>
                     </Link>
                 ))}
             </nav>
-
             <div className="flex items-center gap-6">
-                {(user?.role?.toLowerCase() === 'cashier' || user?.role?.toLowerCase() === 'admin') && (
-                  <Link href="/pos">
-                    <Button className="bg-accent text-black font-black uppercase italic text-xs rounded-2xl h-11 px-6 shadow-xl shadow-accent/10 hover:scale-105 active:scale-95 transition-all">
-                      Caisse
-                    </Button>
-                  </Link>
-                )}
-                <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    onClick={fetchAdminData} 
-                    className="h-10 w-10 text-slate-400 hover:text-accent hover:bg-accent/10 rounded-xl transition-all group"
-                >
-                    <RefreshCw size={18} className={cn("transition-transform duration-700", loading ? "animate-spin" : "group-hover:rotate-180")} />
-                </Button>
+                {(user?.role?.toLowerCase() === 'cashier' || user?.role?.toLowerCase() === 'admin') && <Link href="/pos"><Button className="bg-accent text-black font-black uppercase italic text-xs rounded-2xl h-11 px-6 shadow-xl shadow-accent/10">Caisse</Button></Link>}
+                <Button variant="ghost" size="icon" onClick={fetchAdminData} className="h-10 w-10 text-slate-400 hover:text-accent hover:bg-accent/10 rounded-xl transition-all group"><RefreshCw size={18} className={cn("transition-transform duration-700", loading ? "animate-spin" : "group-hover:rotate-180")} /></Button>
             </div>
         </div>
       </header>
@@ -427,124 +280,52 @@ function DashboardPage() {
              <Card className="lg:col-span-2 glossy-card border-none rounded-[2.5rem] relative overflow-hidden group">
               <div className="absolute -top-12 -right-12 w-48 h-48 bg-accent/5 rounded-full blur-3xl group-hover:bg-accent/20 transition-all duration-700" />
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <div className="space-y-1">
-                    <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Revenu Global Boutique</CardTitle>
-                    <p className="text-[9px] text-accent font-bold uppercase tracking-widest">Temps réel</p>
-                </div>
-                <div className="w-12 h-12 rounded-2xl bg-accent/10 flex items-center justify-center text-accent shadow-[0_0_20px_rgba(56,189,248,0.3)]">
-                    <DollarSign className="h-6 w-6" />
-                </div>
+                <div className="space-y-1"><CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Revenu Global Hub</CardTitle></div>
+                <div className="w-12 h-12 rounded-2xl bg-accent/10 flex items-center justify-center text-accent shadow-[0_0_20px_rgba(56,189,248,0.3)]"><DollarSign className="h-6 w-6" /></div>
               </CardHeader>
-              <CardContent className="pt-4">
-                <div className="text-5xl font-bold font-mono tracking-tighter text-white">
-                    {formatCurrency(stats?.totalRevenueCDF || 0)} <span className="text-xl font-light opacity-30">CDF</span>
-                </div>
-                <div className="mt-4 flex items-center gap-4">
-                    <Badge variant="outline" className="border-white/5 bg-white/5 px-3 py-1 font-mono text-slate-400">
-                        ≈ {formatCurrency(stats?.totalRevenueUSD || 0)} USD
-                    </Badge>
-                </div>
-              </CardContent>
+              <CardContent className="pt-4"><div className="text-5xl font-bold font-mono tracking-tighter text-white">{new Intl.NumberFormat('fr-FR').format(stats?.totalRevenueCDF || 0)} <span className="text-xl font-light opacity-30">CDF</span></div><div className="mt-4"><Badge variant="outline" className="border-white/5 bg-white/5 px-3 py-1 font-mono text-slate-400">≈ {new Intl.NumberFormat('fr-FR').format(stats?.totalRevenueUSD || 0)} USD</Badge></div></CardContent>
             </Card>
 
              <Card className="glossy-card border-none rounded-[2.5rem] group">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Ventes Jour</CardTitle>
-                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-all duration-500">
-                    <TrendingUp className="h-5 w-5" />
-                </div>
-              </CardHeader>
-              <CardContent className="pt-4">
-                <div className="text-3xl font-bold font-mono">{stats?.todaySalesCount || 0}</div>
-                <p className="text-[10px] text-accent mt-2 uppercase font-black tracking-widest bg-accent/10 w-fit px-2 py-1 rounded-md">
-                    +{formatCurrency(stats?.todayRevenue || 0)} USD
-                </p>
-              </CardContent>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Services Jour</CardTitle><div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-all duration-500"><GraduationCap className="h-5 w-5" /></div></CardHeader>
+              <CardContent className="pt-4"><div className="text-3xl font-bold font-mono">12</div><p className="text-[10px] text-accent mt-2 uppercase font-black tracking-widest bg-accent/10 w-fit px-2 py-1 rounded-md">8 Formations / 4 SAV</p></CardContent>
             </Card>
 
              <Card className="glossy-card border-none rounded-[2.5rem] group">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Inventaire</CardTitle>
-                <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white group-hover:bg-white group-hover:text-black transition-all duration-500">
-                    <Package className="h-5 w-5" />
-                </div>
-              </CardHeader>
-              <CardContent className="pt-4">
-                <div className="text-3xl font-bold font-mono">{stats?.totalProductsCount || 0}</div>
-                <p className="text-[10px] text-slate-400 mt-2 uppercase font-bold tracking-widest">Articles actifs</p>
-              </CardContent>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Clientèle Hub</CardTitle><div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white transition-all duration-500"><UsersRound className="h-5 w-5" /></div></CardHeader>
+              <CardContent className="pt-4"><div className="text-3xl font-bold font-mono">{stats?.totalProductsCount || 0}</div><p className="text-[10px] text-slate-400 mt-2 uppercase font-bold tracking-widest">Membres Actifs</p></CardContent>
             </Card>
           </div>
 
           <div className="grid gap-6 grid-cols-1 lg:grid-cols-7">
             <Card className="lg:col-span-4 glossy-card border-none rounded-[2.5rem] overflow-hidden">
-                <CardHeader className="flex flex-row items-center justify-between py-6 px-8">
-                    <CardTitle className="text-lg font-bold uppercase italic flex items-center gap-3">
-                        <BarChart3 className="text-accent" size={20} />
-                        Tendances Revenus (7j)
-                    </CardTitle>
-                </CardHeader>
+                <CardHeader className="py-6 px-8"><CardTitle className="text-lg font-bold uppercase italic flex items-center gap-3"><BarChart3 className="text-accent" size={20} /> Tendances Hub (7j)</CardTitle></CardHeader>
                 <CardContent className="px-4 pb-8 h-[300px]">
                     <ResponsiveContainer width="100%" height="100%">
                         <AreaChart data={chartData}>
-                            <defs>
-                                <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="hsl(var(--accent))" stopOpacity={0.3}/>
-                                    <stop offset="95%" stopColor="hsl(var(--accent))" stopOpacity={0}/>
-                                </linearGradient>
-                            </defs>
+                            <defs><linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="hsl(var(--accent))" stopOpacity={0.3}/><stop offset="95%" stopColor="hsl(var(--accent))" stopOpacity={0}/></linearGradient></defs>
                             <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" vertical={false} />
-                            <XAxis 
-                                dataKey="name" 
-                                axisLine={false} 
-                                tickLine={false} 
-                                tick={{fill: '#94a3b8', fontSize: 10}}
-                                dy={10}
-                            />
-                            <YAxis hide />
-                            <Tooltip 
-                                contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', borderRadius: '12px', fontSize: '12px' }}
-                                itemStyle={{ color: 'hsl(var(--accent))' }}
-                            />
-                            <Area 
-                                type="monotone" 
-                                dataKey="total" 
-                                stroke="hsl(var(--accent))" 
-                                strokeWidth={3}
-                                fillOpacity={1} 
-                                fill="url(#colorTotal)" 
-                            />
+                            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 10}} dy={10} />
+                            <Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', borderRadius: '12px', fontSize: '12px' }} itemStyle={{ color: 'hsl(var(--accent))' }} />
+                            <Area type="monotone" dataKey="total" stroke="hsl(var(--accent))" strokeWidth={3} fillOpacity={1} fill="url(#colorTotal)" />
                         </AreaChart>
                     </ResponsiveContainer>
                 </CardContent>
             </Card>
 
             <Card className="lg:col-span-3 glossy-card border-none rounded-[2.5rem] overflow-hidden">
-                <CardHeader className="border-b border-white/5 bg-white/[0.02] py-6 px-8">
-                    <CardTitle className="text-lg font-bold uppercase italic flex items-center gap-3">
-                        <ShoppingBag size={20} className="text-accent" />
-                        Flux Récent
-                    </CardTitle>
-                </CardHeader>
-                <CardContent className="p-8">
-                    <div className="space-y-6">
-                        {recentSales.map(sale => (
-                            <div key={sale.id} className="flex items-center gap-5 group">
-                                <div className="w-11 h-11 rounded-2xl bg-accent/10 border border-accent/20 flex items-center justify-center text-accent font-black text-xs group-hover:bg-accent group-hover:text-black transition-all duration-300">
-                                    {sale.cashierName?.substring(0, 1)}
-                                </div>
-                                <div className="flex-1">
-                                    <div className="flex items-center justify-between mb-1">
-                                        <p className="text-sm font-bold uppercase italic">{sale.cashierName}</p>
-                                        <p className="font-mono font-bold text-sm text-white">{formatCurrency(sale.totalAmount)} USD</p>
-                                    </div>
-                                    <div className="flex items-center justify-between">
-                                        <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">REF: #{sale.id.substring(0, 8)}</p>
-                                        <Badge className="bg-accent/10 text-accent border-none text-[8px] font-black uppercase px-2 h-4">SUCCESS</Badge>
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
+                <CardHeader className="bg-white/[0.02] py-6 px-8"><CardTitle className="text-lg font-bold uppercase italic flex items-center gap-3"><Zap size={20} className="text-accent" /> Mix d'Activité</CardTitle></CardHeader>
+                <CardContent className="p-8 h-[300px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                            <Pie data={serviceDistribution} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={10} dataKey="value">
+                                {serviceDistribution.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
+                            </Pie>
+                            <Tooltip contentStyle={{ backgroundColor: '#0f172a', border: 'none', borderRadius: '10px' }} />
+                        </PieChart>
+                    </ResponsiveContainer>
+                    <div className="flex justify-center gap-6 mt-4">
+                        {serviceDistribution.map((s, i) => <div key={i} className="flex items-center gap-2"><div className="w-2 h-2 rounded-full" style={{ backgroundColor: s.color }} /><span className="text-[9px] font-black uppercase text-muted-foreground">{s.name}</span></div>)}
                     </div>
                 </CardContent>
             </Card>

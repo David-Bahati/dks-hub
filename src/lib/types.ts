@@ -60,14 +60,16 @@ export type SupportTicket = {
   updatedAt: any;
 };
 
-export type AppService = {
-  id: string;
-  title: string;
-  description: string;
-  category: 'formation' | 'infrastructure' | 'digitalisation' | 'upgrade';
-  price: number;
-  duration?: string;
-  icon: string;
+export type HardwareAsset = {
+    id: string;
+    userId: string;
+    brand: string;
+    model: string;
+    serialNumber?: string;
+    specs?: string;
+    status: 'excellent' | 'good' | 'warning' | 'repair_needed';
+    lastMaintenance: any;
+    createdAt: any;
 };
 
 export type ServiceBooking = {
@@ -80,8 +82,9 @@ export type ServiceBooking = {
   category: string;
   status: 'pending' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled';
   scheduledDate: any;
-  location: string; // 'shop' or 'client_site'
+  location: string;
   technicianId?: string;
+  technicianName?: string;
   notes?: string;
   createdAt: any;
 };
@@ -96,17 +99,4 @@ export type Sale = {
   createdAt: any;
 };
 
-export type AppNotification = {
-  id: string;
-  userId: string;
-  title: string;
-  message: string;
-  type: 'info' | 'success' | 'warning' | 'error';
-  isRead: boolean;
-  createdAt: any;
-  link?: string;
-};
-
 export type PaymentMode = "CASH" | "MOBILE_MONEY" | "PI_NETWORK";
-
-export type Category = 'keyboard' | 'mouse' | 'screen' | 'headset' | 'other';

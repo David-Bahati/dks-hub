@@ -68,6 +68,22 @@
       },
       "required": ["userId", "productName", "issueDescription", "status", "createdAt"]
     },
+    "HardwareAsset": {
+      "title": "HardwareAsset",
+      "description": "Un appareil appartenant à un client enregistré dans le Hub pour suivi.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "brand": { "type": "string" },
+        "model": { "type": "string" },
+        "serialNumber": { "type": "string" },
+        "specs": { "type": "string" },
+        "status": { "type": "string", "enum": ["excellent", "good", "warning", "repair_needed"] },
+        "lastMaintenance": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "brand", "model"]
+    },
     "Notification": {
       "title": "Notification",
       "description": "System or user alerts.",
@@ -103,7 +119,11 @@
     },
     "/supportTickets/{ticketId}": {
       "schema": "SupportTicket",
-      "description": "Technical support tickets and warranty claims."
+      "description": "Technical support tickets."
+    },
+    "/hardwareAssets/{assetId}": {
+      "schema": "HardwareAsset",
+      "description": "Client hardware park for maintenance tracking."
     },
     "/notifications/{notifId}": {
       "schema": "Notification",
@@ -115,7 +135,11 @@
     },
     "/system/{docId}": {
       "schema": "object",
-      "description": "Global shop configuration (exchange rates, etc.)"
+      "description": "Global shop configuration."
+    },
+    "/serviceBookings/{bookingId}": {
+      "schema": "object",
+      "description": "Service and training reservations."
     }
   }
 }

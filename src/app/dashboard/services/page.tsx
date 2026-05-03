@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Navbar } from "@/components/layout/Navbar";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -19,10 +19,12 @@ import {
     Globe,
     Cpu,
     Filter,
-    Plus
+    Plus,
+    UserCheck,
+    Smartphone
 } from "lucide-react";
 import { db } from '@/lib/firebase';
-import { collection, query, orderBy, updateDoc, doc, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, orderBy, updateDoc, doc, addDoc, serverTimestamp, onSnapshot, where } from 'firebase/firestore';
 import withAuth from '@/components/auth/withAuth';
 import Link from 'next/link';
 import { useCollection, useMemoFirebase } from '@/firebase';
@@ -38,6 +40,15 @@ function ServiceManagementPage() {
     const { toast } = useToast();
     const [search, setSearch] = useState("");
     const [statusFilter, setStatusFilter] = useState("all");
+    const [staffMembers, setStaffMembers] = useState<any[]>([]);
+
+    useEffect(() => {
+        const q = query(collection(db, "users"), where("role", "in", ["admin", "Admin", "seller", "Seller", "cashier", "Cashier"]));
+        const unsub = onSnapshot(q, (snap) => {
+            setStaffMembers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        });
+        return () => unsub();
+    }, []);
 
     const bookingsQuery = useMemoFirebase(() => {
         return query(collection(db, "serviceBookings"), orderBy("createdAt", "desc"));
@@ -57,7 +68,7 @@ function ServiceManagementPage() {
             await addDoc(collection(db, "notifications"), {
                 userId: clientUserId,
                 title: "Statut de votre Service",
-                message: `Le statut de votre réservation technique est passé à : ${newStatus.toUpperCase()}.`,
+                message: `Le statut de votre prestation "${newStatus.toUpperCase()}" a été mis à jour.`,
                 type: 'info',
                 isRead: false,
                 createdAt: serverTimestamp(),
@@ -70,9 +81,20 @@ function ServiceManagementPage() {
         }
     };
 
+    const assignTechnician = async (bookingId: string, techId: string, techName: string) => {
+        try {
+            await updateDoc(doc(db, "serviceBookings", bookingId), {
+                technicianId: techId,
+                technicianName: techName,
+                updatedAt: serverTimestamp()
+            });
+            toast({ title: "Technicien assigné", description: `${techName} prend en charge ce dossier.` });
+        } catch (e) { toast({ title: "Erreur assignation", variant: "destructive" }); }
+    };
+
     const getStatusBadge = (status: string) => {
         switch (status) {
-            case 'pending': return <Badge className="bg-orange-500/10 text-orange-400 border-none uppercase text-[9px] font-black">En attente</Badge>;
+            case 'pending': return <Badge className="bg-orange-500/10 text-orange-400 border-none uppercase text-[9px] font-black">Attente</Badge>;
             case 'confirmed': return <Badge className="bg-blue-500/10 text-blue-400 border-none uppercase text-[9px] font-black">Confirmé</Badge>;
             case 'in_progress': return <Badge className="bg-purple-500/10 text-purple-400 border-none uppercase text-[9px] font-black">En cours</Badge>;
             case 'completed': return <Badge className="bg-green-500/10 text-green-400 border-none uppercase text-[9px] font-black">Terminé</Badge>;
@@ -91,8 +113,7 @@ function ServiceManagementPage() {
     };
 
     const filteredBookings = bookings?.filter(b => {
-        const matchesSearch = b.customerName?.toLowerCase().includes(search.toLowerCase()) || 
-                             b.serviceTitle?.toLowerCase().includes(search.toLowerCase());
+        const matchesSearch = b.customerName?.toLowerCase().includes(search.toLowerCase()) || b.serviceTitle?.toLowerCase().includes(search.toLowerCase());
         const matchesStatus = statusFilter === "all" || b.status === statusFilter;
         const matchesUser = isStaff || b.userId === user?.uid;
         return matchesSearch && matchesStatus && matchesUser;
@@ -104,41 +125,22 @@ function ServiceManagementPage() {
             <main className="max-w-7xl mx-auto px-4 py-12">
                 <div className="flex flex-col md:flex-row justify-between items-start gap-8 mb-12">
                     <div className="flex items-start gap-5">
-                        <Link href="/dashboard">
-                            <Button variant="outline" className="h-14 w-14 rounded-2xl border-white/10 hover:bg-accent/10 hover:text-accent p-0">
-                                <ArrowLeft size={24} />
-                            </Button>
-                        </Link>
+                        <Link href="/dashboard"><Button variant="outline" className="h-14 w-14 rounded-2xl border-white/10 hover:bg-accent/10 hover:text-accent p-0"><ArrowLeft size={24} /></Button></Link>
                         <div>
-                            <h1 className="text-4xl font-black uppercase italic tracking-tighter">Pôle de <span className="text-accent">Services</span></h1>
-                            <p className="text-muted-foreground font-light mt-1">Interventions, formations et digitalisation à Bunia.</p>
+                            <h1 className="text-4xl font-black uppercase italic tracking-tighter">Pôle <span className="text-accent">Services Hub</span></h1>
+                            <p className="text-muted-foreground font-light mt-1">Interventions techniques et formations professionnelles à Bunia.</p>
                         </div>
                     </div>
-
-                    {!isStaff && (
-                        <Link href="/services">
-                            <Button className="bg-primary hover:bg-primary/90 h-14 px-8 rounded-2xl font-black uppercase italic gap-3 shadow-xl">
-                                <Plus size={20} /> Réserver un nouveau service
-                            </Button>
-                        </Link>
-                    )}
+                    {!isStaff && <Link href="/services"><Button className="bg-primary hover:bg-primary/90 h-14 px-8 rounded-2xl font-black uppercase italic gap-3 shadow-xl"><Plus size={20} /> Nouvelle demande</Button></Link>}
                 </div>
 
                 <div className="flex flex-col md:flex-row gap-4 mb-10">
                     <div className="relative flex-1">
                         <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-muted-foreground" size={20} />
-                        <Input 
-                            placeholder="Rechercher par client ou service..." 
-                            className="h-16 pl-14 bg-white/5 border-white/10 rounded-2xl focus:border-accent"
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                        />
+                        <Input placeholder="Rechercher par client ou service..." className="h-16 pl-14 bg-white/5 border-white/10 rounded-2xl focus:border-accent" value={search} onChange={(e) => setSearch(e.target.value)} />
                     </div>
                     <Select value={statusFilter} onValueChange={setStatusFilter}>
-                        <SelectTrigger className="h-16 w-full md:w-[200px] bg-white/5 border-white/10 rounded-2xl font-black uppercase italic text-[10px]">
-                            <Filter className="mr-2 h-4 w-4" />
-                            <SelectValue placeholder="Filtrer" />
-                        </SelectTrigger>
+                        <SelectTrigger className="h-16 w-full md:w-[200px] bg-white/5 border-white/10 rounded-2xl font-black uppercase italic text-[10px]"><Filter className="mr-2 h-4 w-4" /><SelectValue placeholder="Filtrer" /></SelectTrigger>
                         <SelectContent className="bg-card border-white/10">
                             <SelectItem value="all">Tous les statuts</SelectItem>
                             <SelectItem value="pending">En attente</SelectItem>
@@ -150,38 +152,42 @@ function ServiceManagementPage() {
                 </div>
 
                 <div className="grid grid-cols-1 gap-6">
-                    {isLoading ? (
-                        <div className="py-20 flex justify-center"><Loader2 className="animate-spin text-accent h-12 w-12" /></div>
-                    ) : filteredBookings && filteredBookings.length > 0 ? (
+                    {isLoading ? <div className="py-20 flex justify-center"><Loader2 className="animate-spin text-accent h-12 w-12" /></div> : filteredBookings && filteredBookings.length > 0 ? (
                         filteredBookings.map((booking) => (
                             <Card key={booking.id} className="glossy-card border-none rounded-[2.5rem] overflow-hidden group">
-                                <CardContent className="p-8 flex flex-col md:flex-row items-center gap-8">
-                                    <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center shrink-0">
-                                        {getCategoryIcon(booking.category)}
-                                    </div>
+                                <CardContent className="p-8 flex flex-col lg:flex-row items-center gap-8">
+                                    <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center shrink-0">{getCategoryIcon(booking.category)}</div>
                                     
                                     <div className="flex-1 space-y-2 text-center md:text-left">
                                         <div className="flex flex-wrap justify-center md:justify-start items-center gap-3">
                                             <h3 className="text-xl font-black uppercase italic tracking-tight">{booking.serviceTitle}</h3>
                                             {getStatusBadge(booking.status)}
-                                            <Badge variant="outline" className="border-white/10 text-[9px] uppercase font-bold opacity-40">#{booking.id.substring(0, 8)}</Badge>
                                         </div>
-                                        
-                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-y-2 gap-x-6 text-[10px] font-black uppercase italic text-muted-foreground/60">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-y-2 gap-x-6 text-[10px] font-black uppercase italic text-muted-foreground/60">
                                             <div className="flex items-center gap-2"><User size={12} className="text-accent"/> {booking.customerName}</div>
-                                            <div className="flex items-center gap-2"><Calendar size={12} className="text-accent"/> {booking.scheduledDate?.toDate ? booking.scheduledDate.toDate().toLocaleDateString() : 'Date à fixer'}</div>
-                                            <div className="flex items-center gap-2"><MapPin size={12} className="text-accent"/> {booking.location === 'shop' ? 'Double King Shop' : booking.address || 'Lieu client'}</div>
+                                            <div className="flex items-center gap-2"><Calendar size={12} className="text-accent"/> {booking.scheduledDate || 'Date à fixer'}</div>
+                                            <div className="flex items-center gap-2"><MapPin size={12} className="text-accent"/> {booking.location === 'shop' ? 'Boutique' : 'Sur site'}</div>
+                                            <div className="flex items-center gap-2"><UserCheck size={12} className="text-primary"/> {booking.technicianName || 'Expert non assigné'}</div>
                                         </div>
                                     </div>
 
-                                    <div className="flex flex-col gap-3 shrink-0 min-w-[200px]">
+                                    <div className="flex flex-col gap-3 shrink-0 min-w-[220px]">
                                         {isStaff ? (
-                                            <div className="space-y-2">
-                                                <p className="text-[9px] font-black uppercase text-center opacity-40">Action Staff</p>
-                                                <Select value={booking.status} onValueChange={(val) => updateBookingStatus(booking.id, val, booking.userId)}>
-                                                    <SelectTrigger className="h-12 bg-white/5 border-white/10 rounded-xl font-black uppercase italic text-[10px]">
-                                                        <SelectValue placeholder="Changer statut" />
+                                            <div className="space-y-3">
+                                                <Select value={booking.technicianId || ""} onValueChange={(val) => {
+                                                    const tech = staffMembers.find(s => s.id === val);
+                                                    assignTechnician(booking.id, val, tech?.displayName || tech?.name);
+                                                }}>
+                                                    <SelectTrigger className="h-10 bg-primary/10 border-primary/20 rounded-xl font-bold uppercase text-[9px]">
+                                                        <UserCheck className="mr-2 h-3 w-3" />
+                                                        <SelectValue placeholder="Assigner Expert" />
                                                     </SelectTrigger>
+                                                    <SelectContent className="bg-card border-white/10">
+                                                        {staffMembers.map(m => <SelectItem key={m.id} value={m.id}>{m.displayName || m.name}</SelectItem>)}
+                                                    </SelectContent>
+                                                </Select>
+                                                <Select value={booking.status} onValueChange={(val) => updateBookingStatus(booking.id, val, booking.userId)}>
+                                                    <SelectTrigger className="h-10 bg-white/5 border-white/10 rounded-xl font-black uppercase italic text-[9px]"><SelectValue placeholder="Statut" /></SelectTrigger>
                                                     <SelectContent className="bg-card border-white/10">
                                                         <SelectItem value="pending">En attente</SelectItem>
                                                         <SelectItem value="confirmed">Confirmer</SelectItem>
@@ -193,8 +199,8 @@ function ServiceManagementPage() {
                                             </div>
                                         ) : (
                                             <Button variant="outline" className="rounded-xl border-accent/20 text-accent hover:bg-accent/10 gap-2 h-12 font-black uppercase italic text-[10px]" asChild>
-                                                <a href={`https://wa.me/243823038945?text=Bonjour,%20je%20souhaite%20modifier%20ma%20réservation%20de%20service%20#${booking.id.substring(0, 8).toUpperCase()}`}>
-                                                    Modifier via WhatsApp
+                                                <a href={`https://wa.me/243823038945?text=Bonjour,%20je%20vous%20contacte%20pour%20ma%20réservation%20#${booking.id.substring(0, 8)}`} target="_blank" rel="noopener noreferrer">
+                                                    <Smartphone size={14} /> WhatsApp Support
                                                 </a>
                                             </Button>
                                         )}
@@ -204,11 +210,7 @@ function ServiceManagementPage() {
                         ))
                     ) : (
                         <div className="py-32 text-center bg-white/5 rounded-[3rem] border border-dashed border-white/10 opacity-30 flex flex-col items-center gap-6">
-                            <Calendar size={80} strokeWidth={1} />
-                            <p className="text-xl font-black uppercase italic tracking-tighter">Aucune prestation prévue</p>
-                            <Link href="/services">
-                                <Button variant="link" className="text-accent underline">Découvrir nos pôles technologiques</Button>
-                            </Link>
+                            <Calendar size={80} strokeWidth={1} /><p className="text-xl font-black uppercase italic tracking-tighter">Aucune activité prévue</p>
                         </div>
                     )}
                 </div>
