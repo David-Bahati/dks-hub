@@ -65,6 +65,7 @@ function POS() {
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [search, setSearch] = useState("");
+  const [orderSearch, setOrderSearch] = useState(""); // Recherche spécifique pour les commandes web
   const [customerName, setCustomerName] = useState("");
   const [paymentMode, setPaymentMode] = useState<PaymentMode>("CASH");
   const [isProcessing, setIsProcessing] = useState(false);
@@ -123,10 +124,8 @@ function POS() {
     return () => unsubscribe();
   }, []);
 
-  // Fetch Pending Web Orders (REPAIRED QUERY)
+  // Fetch Pending Web Orders
   useEffect(() => {
-    // On enlève le orderBy temporairement pour éviter les erreurs d'index manquants
-    // et on élargit les statuts pour capturer toutes les commandes non traitées.
     const q = query(
       collection(db, "orders"), 
       where("status", "in", ["pending", "pending_payment", "en attente", "En attente", "attente", "attente_paiement"])
@@ -137,17 +136,13 @@ function POS() {
         id: doc.id,
         ...doc.data()
       }))
-      // Tri manuel côté client pour plus de robustesse
       .sort((a: any, b: any) => {
         const dateA = a.createdAt?.toDate?.() || new Date(0);
         const dateB = b.createdAt?.toDate?.() || new Date(0);
         return dateB - dateA;
       });
 
-      console.log(`[POS] ${orders.length} commandes web détectées.`);
       setPendingOrders(orders);
-    }, (err) => {
-      console.error("[POS] Erreur lors de la récupération des commandes:", err);
     });
     
     return () => unsubscribe();
@@ -222,6 +217,23 @@ function POS() {
     return cart.reduce((acc, item) => acc + ((item.price || item.sellingPrice || 0) * item.quantity), 0);
   }, [cart]);
 
+  const filteredProducts = useMemo(() => {
+    const term = search.toLowerCase();
+    return products.filter(p => 
+      p.name.toLowerCase().includes(term) ||
+      p.category.toLowerCase().includes(term)
+    );
+  }, [products, search]);
+
+  const filteredPendingOrders = useMemo(() => {
+    if (!orderSearch.trim()) return pendingOrders;
+    const term = orderSearch.toLowerCase();
+    return pendingOrders.filter(o => 
+      o.customerName?.toLowerCase().includes(term) ||
+      o.id.toLowerCase().includes(term)
+    );
+  }, [pendingOrders, orderSearch]);
+
   const handleCheckout = () => {
     if (cart.length === 0) return;
     setShowConfirmation(true);
@@ -251,7 +263,6 @@ function POS() {
 
         const saleRef = await addDoc(collection(db, "sales"), saleData);
 
-        // Update Stock
         await Promise.all(cart.map(item => {
             const productRef = doc(db, "products", item.id);
             return updateDoc(productRef, {
@@ -259,14 +270,12 @@ function POS() {
             });
         }));
 
-        // Update Source Order if exists
         if (activeOrderId) {
             await updateDoc(doc(db, "orders", activeOrderId), {
                 status: 'payée',
                 updatedAt: serverTimestamp()
             });
 
-            // Notify staff
             await addDoc(collection(db, "notifications"), {
                 userId: 'staff',
                 title: "Commande Payée (Caisse)",
@@ -316,11 +325,6 @@ function POS() {
     });
     setShowReceipt(true);
   };
-
-  const filteredProducts = products.filter(p => 
-    p.name.toLowerCase().includes(search.toLowerCase()) ||
-    p.category.toLowerCase().includes(search.toLowerCase())
-  );
 
   const formatCurrency = (amount: number) => new Intl.NumberFormat('fr-FR').format(amount);
 
@@ -379,17 +383,25 @@ function POS() {
                     <SheetContent className="bg-card/95 backdrop-blur-3xl border-white/10 w-full sm:max-w-md flex flex-col">
                         <SheetHeader className="mb-6">
                             <SheetTitle className="text-xl font-black uppercase italic flex items-center gap-3">
-                                <ShoppingBag className="text-accent" /> Commandes en Attente
+                                <ShoppingBag className="text-accent" /> Commandes Web
                             </SheetTitle>
+                            <div className="relative mt-4">
+                              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={14} />
+                              <Input 
+                                placeholder="Rechercher par nom ou #ID..." 
+                                className="h-10 pl-10 bg-white/5 border-white/10 rounded-xl text-xs"
+                                value={orderSearch}
+                                onChange={(e) => setOrderSearch(e.target.value)}
+                              />
+                            </div>
                         </SheetHeader>
                         <div className="flex-1 space-y-4 overflow-y-auto pr-2 custom-scrollbar">
-                            {pendingOrders.length === 0 ? (
+                            {filteredPendingOrders.length === 0 ? (
                                 <div className="text-center py-20 opacity-20 italic">
                                     <ShoppingBag size={48} className="mx-auto mb-4" />
-                                    <p>Aucune commande web en attente</p>
-                                    <p className="text-[10px] mt-2 font-black uppercase">Vérifiez les statuts dans le dashboard</p>
+                                    <p>Aucune commande correspondante</p>
                                 </div>
-                            ) : pendingOrders.map(order => (
+                            ) : filteredPendingOrders.map(order => (
                                 <div key={order.id} className="p-5 rounded-2xl bg-white/5 border border-white/5 space-y-4 hover:border-accent/20 transition-all group">
                                     <div className="flex justify-between items-start">
                                         <div>
@@ -398,19 +410,13 @@ function POS() {
                                         </div>
                                         <Badge className="bg-orange-500/10 text-orange-400 border-none uppercase text-[9px] font-black">{order.status}</Badge>
                                     </div>
-                                    <div className="space-y-1">
-                                        {order.items?.slice(0, 2).map((it: any, idx: number) => (
-                                            <p key={idx} className="text-[10px] text-white/60 truncate">{it.quantity}x {it.name}</p>
-                                        ))}
-                                        {order.items?.length > 2 && <p className="text-[9px] text-accent font-black">+ {order.items.length - 2} autres articles</p>}
-                                    </div>
                                     <div className="flex justify-between items-end pt-2 border-t border-white/5">
                                         <div>
                                             <p className="text-[9px] text-muted-foreground uppercase font-black">Total</p>
                                             <p className="text-xl font-black text-white">${order.total?.toFixed(2)}</p>
                                         </div>
                                         <Button 
-                                            className="bg-accent text-black font-black uppercase italic text-[10px] h-10 px-4 rounded-xl gap-2 shadow-lg group-hover:scale-105 transition-transform"
+                                            className="bg-accent text-black font-black uppercase italic text-[10px] h-10 px-4 rounded-xl gap-2 shadow-lg"
                                             onClick={() => loadOrderInPOS(order)}
                                         >
                                             <ExternalLink size={14} /> Charger

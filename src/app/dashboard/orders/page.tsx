@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { 
@@ -15,7 +15,9 @@ import {
   Check,
   MessageCircle,
   MapPin,
-  ExternalLink
+  ExternalLink,
+  Search,
+  Filter
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useCollection, useMemoFirebase } from '@/firebase';
@@ -24,11 +26,15 @@ import { db } from '@/lib/firebase';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
+import { Input } from '@/components/ui/input';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export default function OrdersPage() {
   const { user, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
 
   const ordersQuery = useMemoFirebase(() => {
     if (authLoading || !user?.uid) return null;
@@ -49,11 +55,39 @@ export default function OrdersPage() {
 
   const { data: rawOrders, isLoading: collectionLoading, error } = useCollection(ordersQuery);
 
-  const orders = rawOrders ? [...rawOrders].sort((a, b) => {
-    const dateA = a.createdAt?.toDate?.() || new Date(0);
-    const dateB = b.createdAt?.toDate?.() || new Date(0);
-    return dateB - dateA;
-  }) : null;
+  const filteredOrders = useMemo(() => {
+    if (!rawOrders) return [];
+    
+    let result = [...rawOrders];
+
+    // 1. Filtrage par statut
+    if (statusFilter !== "all") {
+      result = result.filter(order => {
+        const s = order.status?.toLowerCase();
+        if (statusFilter === "pending") return s?.includes("attente") || s === "pending";
+        if (statusFilter === "paid") return s?.includes("payé") || s?.includes("payée") || s === "completed";
+        if (statusFilter === "cancelled") return s?.includes("annulé") || s === "cancelled";
+        return true;
+      });
+    }
+
+    // 2. Recherche par Nom ou ID
+    if (search.trim()) {
+      const term = search.toLowerCase();
+      result = result.filter(order => 
+        order.customerName?.toLowerCase().includes(term) ||
+        order.id.toLowerCase().includes(term) ||
+        order.customerEmail?.toLowerCase().includes(term)
+      );
+    }
+
+    // 3. Tri par date
+    return result.sort((a, b) => {
+      const dateA = a.createdAt?.toDate?.() || new Date(0);
+      const dateB = b.createdAt?.toDate?.() || new Date(0);
+      return dateB - dateA;
+    });
+  }, [rawOrders, search, statusFilter]);
 
   const updateOrderStatus = async (orderId: string, newStatus: string, userId: string) => {
     setUpdatingId(orderId);
@@ -123,7 +157,32 @@ export default function OrdersPage() {
             </div>
         </header>
 
-        <main className="max-w-7xl mx-auto px-4 py-16">
+        <main className="max-w-7xl mx-auto px-4 py-8">
+            {/* Outils de recherche et filtrage pour le Staff */}
+            {isStaff && (
+              <div className="mb-10 space-y-6">
+                <div className="flex flex-col md:flex-row gap-4">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
+                    <Input 
+                      placeholder="Chercher par nom, email ou #ID..." 
+                      className="h-14 pl-12 bg-white/5 border-white/10 rounded-2xl focus:border-accent"
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                    />
+                  </div>
+                  <Tabs value={statusFilter} onValueChange={setStatusFilter} className="w-fit">
+                    <TabsList className="bg-white/5 border border-white/5 h-14 p-1 rounded-2xl">
+                      <TabsTrigger value="all" className="rounded-xl font-bold uppercase text-[10px] px-6">Toutes</TabsTrigger>
+                      <TabsTrigger value="pending" className="rounded-xl font-bold uppercase text-[10px] px-6">En attente</TabsTrigger>
+                      <TabsTrigger value="paid" className="rounded-xl font-bold uppercase text-[10px] px-6">Payées</TabsTrigger>
+                      <TabsTrigger value="cancelled" className="rounded-xl font-bold uppercase text-[10px] px-6">Annulées</TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+                </div>
+              </div>
+            )}
+
             {isLoading ? (
                 <div className="flex justify-center py-20">
                     <Loader2 className="animate-spin h-12 w-12 text-accent" />
@@ -134,9 +193,9 @@ export default function OrdersPage() {
                      <h2 className="text-xl font-black uppercase italic">Erreur d'accès</h2>
                      <p className="text-muted-foreground mt-2 text-sm px-8">Vérifiez vos permissions Firestore.</p>
                 </div>
-            ) : orders && orders.length > 0 ? (
+            ) : filteredOrders.length > 0 ? (
                 <div className="grid grid-cols-1 gap-4">
-                    {orders.map((order: any) => (
+                    {filteredOrders.map((order: any) => (
                         <Card key={order.id} className="glossy-card border-none rounded-[2rem] overflow-hidden">
                             <div className="p-8">
                                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-8">
@@ -181,7 +240,7 @@ export default function OrdersPage() {
                                         </div>
 
                                         <div className="flex flex-col gap-2">
-                                            {isStaff && order.status !== 'payée' && order.status !== 'terminé' && (
+                                            {isStaff && !["payée", "payé", "terminé", "completed", "cancelled", "annulé"].includes(order.status?.toLowerCase()) && (
                                                 <Button 
                                                     size="sm" 
                                                     className="bg-green-500 hover:bg-green-600 text-white rounded-xl h-11 px-4 gap-2 font-black uppercase text-[9px]"
@@ -217,8 +276,17 @@ export default function OrdersPage() {
                     <div className="w-24 h-24 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-8">
                         <Package size={48} className="text-primary opacity-50" />
                     </div>
-                    <h2 className="text-4xl font-black uppercase italic mb-4">Aucune Commande</h2>
-                    <p className="text-muted-foreground max-w-md">Le registre est actuellement vide.</p>
+                    <h2 className="text-4xl font-black uppercase italic mb-4">
+                      {search || statusFilter !== "all" ? "Aucun résultat" : "Aucune Commande"}
+                    </h2>
+                    <p className="text-muted-foreground max-w-md">
+                      {search || statusFilter !== "all" ? "Réessayez avec d'autres critères." : "Le registre est actuellement vide."}
+                    </p>
+                    {(search || statusFilter !== "all") && (
+                      <Button variant="link" className="text-accent uppercase font-black text-[10px] mt-4" onClick={() => {setSearch(""); setStatusFilter("all")}}>
+                        Réinitialiser les filtres
+                      </Button>
+                    )}
                 </div>
             )}
         </main>
