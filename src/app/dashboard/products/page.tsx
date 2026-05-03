@@ -35,18 +35,21 @@ import { Switch } from "@/components/ui/switch";
 import { db } from '@/lib/firebase';
 import { collection, doc, serverTimestamp, setDoc, addDoc, deleteDoc } from 'firebase/firestore';
 import { Product } from '@/lib/types';
-import { PlusCircle, Edit, Trash2, Eye, EyeOff, Loader2, ArrowLeft, Sparkles } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, Eye, EyeOff, Loader2, ArrowLeft, Sparkles, Image as ImageIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
 import Link from 'next/link';
 import { generateProductDescription } from '@/ai/flows/generate-product-description';
+import { generateProductImage } from '@/ai/flows/generate-product-image';
 
 function ProductsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [isPublished, setIsPublished] = useState(true);
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [isGeneratingDesc, setIsGeneratingDesc] = useState(false);
+  const [isGeneratingImg, setIsGeneratingImg] = useState(false);
   const [aiDescription, setAiDescription] = useState("");
+  const [imageUrl, setImageUrl] = useState("");
   const { toast } = useToast();
 
   const productsQuery = useMemoFirebase(() => collection(db, "products"), []);
@@ -59,29 +62,58 @@ function ProductsPage() {
     setEditingProduct(product);
     setIsPublished(product ? product.isPublished : true);
     setAiDescription(product ? product.description : "");
+    setImageUrl(product ? product.imageUrl : "");
     setIsModalOpen(true);
   };
 
   const closeModal = () => {
     setEditingProduct(null);
     setAiDescription("");
+    setImageUrl("");
     setIsModalOpen(false);
   };
 
-  const handleAiGenerate = async (productName: string, category: string) => {
+  const handleAiGenerateDesc = async () => {
+    const nameInput = document.getElementById('prod-name') as HTMLInputElement;
+    const categoryInput = document.getElementById('prod-category') as any;
+    const productName = nameInput?.value;
+    const category = categoryInput?.innerText || "";
+
     if (!productName) {
         toast({ title: "Nom requis", description: "Entrez un nom de produit pour générer la description.", variant: "destructive" });
         return;
     }
-    setIsGenerating(true);
+    setIsGeneratingDesc(true);
     try {
         const desc = await generateProductDescription({ productName, category });
         setAiDescription(desc);
-        toast({ title: "IA: Description générée !", description: "Relisez-la avant d'enregistrer." });
+        toast({ title: "IA: Description prête !" });
     } catch (error) {
         toast({ title: "Erreur IA", description: "Impossible de générer le texte.", variant: "destructive" });
     } finally {
-        setIsGenerating(false);
+        setIsGeneratingDesc(false);
+    }
+  };
+
+  const handleAiGenerateImage = async () => {
+    const nameInput = document.getElementById('prod-name') as HTMLInputElement;
+    const categoryInput = document.getElementById('prod-category') as any;
+    const productName = nameInput?.value;
+    const category = categoryInput?.innerText || "";
+
+    if (!productName) {
+        toast({ title: "Nom requis", description: "Entrez un nom de produit pour générer l'image.", variant: "destructive" });
+        return;
+    }
+    setIsGeneratingImg(true);
+    try {
+        const url = await generateProductImage({ productName, category });
+        setImageUrl(url);
+        toast({ title: "IA: Photo générée !", description: "Une image de studio a été créée." });
+    } catch (error) {
+        toast({ title: "Erreur IA Image", description: "Vérifiez vos quotas d'IA ou réessayez.", variant: "destructive" });
+    } finally {
+        setIsGeneratingImg(false);
     }
   };
 
@@ -110,7 +142,7 @@ function ProductsPage() {
       price: sellingPrice,
       purchasePrice,
       stockQuantity,
-      imageUrl: formData.get('imageUrl') as string || (editingProduct?.imageUrl || `https://picsum.photos/seed/${Math.floor(Math.random() * 1000)}/600/400`),
+      imageUrl: imageUrl || `https://picsum.photos/seed/${Math.floor(Math.random() * 1000)}/600/400`,
       isPublished: isPublished,
       updatedAt: serverTimestamp()
     };
@@ -125,7 +157,7 @@ function ProductsPage() {
             requestResourceData: productData
           }));
         });
-      toast({ title: "Produit mis à jour", description: "Les modifications sont appliquées." });
+      toast({ title: "Produit mis à jour" });
     } else {
       const colRef = collection(db, "products");
       addDoc(colRef, {
@@ -138,20 +170,15 @@ function ProductsPage() {
           requestResourceData: productData
         }));
       });
-      toast({ title: "Produit créé", description: "Le nouvel article a été ajouté au catalogue." });
+      toast({ title: "Produit créé" });
     }
     closeModal();
   };
 
   const handleDelete = (id: string) => {
-    if(window.confirm("Êtes-vous sûr de vouloir supprimer ce produit ?")){
+    if(window.confirm("Supprimer cet article ?")){
         const docRef = doc(db, "products", id);
-        deleteDoc(docRef).catch(async (error) => {
-          errorEmitter.emit('permission-error', new FirestorePermissionError({
-            path: docRef.path,
-            operation: 'delete'
-          }));
-        });
+        deleteDoc(docRef);
         toast({ title: "Produit supprimé", variant: "destructive" });
     }
   };
@@ -232,7 +259,7 @@ function ProductsPage() {
       </main>
 
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="glossy-card border-none rounded-[2.5rem] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="glossy-card border-none rounded-[2.5rem] sm:max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-2xl font-black uppercase italic tracking-tighter">
                 {editingProduct ? 'Modifier le Produit' : 'Nouveau Produit Hardware'}
@@ -274,13 +301,7 @@ function ProductsPage() {
                     <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Stock Initial</Label>
                     <Input name="stockQuantity" type="number" defaultValue={editingProduct?.stockQuantity} className="h-12 bg-background/50 border-white/10 rounded-xl" required />
                 </div>
-              </div>
 
-              <div className="space-y-4">
-                <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Image URL (Optionnel)</Label>
-                    <Input name="imageUrl" placeholder="Laissez vide pour une image aléatoire" defaultValue={editingProduct?.imageUrl} className="h-12 bg-background/50 border-white/10 rounded-xl" />
-                </div>
                 <div className="space-y-2 relative">
                     <div className="flex justify-between items-end mb-1">
                         <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Description technique</Label>
@@ -289,15 +310,11 @@ function ProductsPage() {
                             size="sm" 
                             variant="ghost" 
                             className="h-7 px-2 text-[8px] font-black uppercase italic gap-1.5 border border-accent/20 bg-accent/5 text-accent hover:bg-accent hover:text-black transition-all"
-                            disabled={isGenerating}
-                            onClick={() => {
-                                const nameInput = document.getElementById('prod-name') as HTMLInputElement;
-                                const categoryInput = document.getElementById('prod-category') as any;
-                                handleAiGenerate(nameInput.value, categoryInput.innerText || "");
-                            }}
+                            disabled={isGeneratingDesc}
+                            onClick={handleAiGenerateDesc}
                         >
-                            {isGenerating ? <Loader2 size={10} className="animate-spin" /> : <Sparkles size={10} />}
-                            Magie IA
+                            {isGeneratingDesc ? <Loader2 size={10} className="animate-spin" /> : <Sparkles size={10} />}
+                            Générer texte
                         </Button>
                     </div>
                     <Textarea 
@@ -308,6 +325,53 @@ function ProductsPage() {
                       required 
                     />
                 </div>
+              </div>
+
+              <div className="space-y-6">
+                <div className="space-y-2">
+                    <div className="flex justify-between items-end mb-2">
+                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Visuel du produit</Label>
+                        <Button 
+                            type="button" 
+                            size="sm" 
+                            variant="ghost" 
+                            className="h-7 px-2 text-[8px] font-black uppercase italic gap-1.5 border border-primary/20 bg-primary/5 text-primary hover:bg-primary hover:text-white transition-all"
+                            disabled={isGeneratingImg}
+                            onClick={handleAiGenerateImage}
+                        >
+                            {isGeneratingImg ? <Loader2 size={10} className="animate-spin" /> : <ImageIcon size={10} />}
+                            Générer photo IA
+                        </Button>
+                    </div>
+                    
+                    <div className="aspect-video rounded-2xl bg-white/5 border-2 border-dashed border-white/10 overflow-hidden relative group">
+                        {imageUrl ? (
+                            <img src={imageUrl} alt="Preview" className="w-full h-full object-cover" />
+                        ) : (
+                            <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground opacity-40">
+                                <ImageIcon size={40} className="mb-2" />
+                                <span className="text-[10px] font-bold uppercase">Aucun visuel</span>
+                            </div>
+                        )}
+                        {isGeneratingImg && (
+                            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex flex-col items-center justify-center gap-3">
+                                <Loader2 className="animate-spin text-primary h-8 w-8" />
+                                <p className="text-[10px] font-black uppercase italic tracking-widest animate-pulse">L'IA crée la photo...</p>
+                            </div>
+                        )}
+                    </div>
+                    <div className="mt-3">
+                        <Label className="text-[8px] font-black uppercase tracking-widest opacity-40 mb-1 block">Lien de l'image (ou base64)</Label>
+                        <Input 
+                            name="imageUrl" 
+                            value={imageUrl} 
+                            onChange={(e) => setImageUrl(e.target.value)} 
+                            placeholder="URL de l'image" 
+                            className="h-10 bg-background/50 border-white/10 rounded-xl text-[10px]" 
+                        />
+                    </div>
+                </div>
+
                 <div className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/10">
                     <div className="flex flex-col gap-1">
                         <span className="text-xs font-bold uppercase italic">Visibilité publique</span>
@@ -321,10 +385,10 @@ function ProductsPage() {
               </div>
             </div>
 
-            <DialogFooter className="gap-3">
+            <DialogFooter className="gap-3 pt-6 border-t border-white/5">
               <Button type="button" variant="ghost" onClick={closeModal} className="rounded-xl font-bold uppercase text-[10px]">Annuler</Button>
-              <Button type="submit" className="bg-accent text-accent-foreground font-black uppercase italic rounded-xl px-10 h-12">
-                Sauvegarder l'article
+              <Button type="submit" className="bg-accent text-accent-foreground font-black uppercase italic rounded-xl px-10 h-12 shadow-xl shadow-accent/10">
+                Enregistrer le produit
               </Button>
             </DialogFooter>
           </form>
