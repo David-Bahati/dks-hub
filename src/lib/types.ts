@@ -48,6 +48,18 @@ export type Order = {
   updatedAt: any;
 };
 
+export type SupportTicket = {
+  id: string;
+  userId: string;
+  customerName: string;
+  productName: string;
+  issueDescription: string;
+  status: 'pending' | 'diagnosing' | 'repairing' | 'ready' | 'completed';
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  createdAt: any;
+  updatedAt: any;
+};
+
 export type Sale = {
   id: string;
   userId: string;

@@ -29,7 +29,8 @@ import {
   BarChart3,
   MapPin,
   MessageCircle,
-  ExternalLink
+  ExternalLink,
+  Wrench
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -75,6 +76,7 @@ const navConfig = [
   { href: "/dashboard/products", icon: Package, label: "Produits", roles: ["Admin", "Seller"] },
   { href: "/dashboard/categories", icon: Tags, label: "Catégories", roles: ["Admin", "Seller"] },
   { href: "/dashboard/orders", icon: ShoppingBag, label: "Commandes", roles: ["Admin", "Seller", "Cashier"] },
+  { href: "/dashboard/support", icon: Wrench, label: "SAV & Support", roles: ["Admin", "Seller", "Cashier"] },
   { href: "/dashboard/customers", icon: Users, label: "Clients", roles: ["Admin", "Seller", "Cashier"] },
   { href: "/dashboard/users", icon: UsersRound, label: "Équipe", roles: ["Admin"] },
   { href: "/dashboard/settings", icon: Settings, label: "Réglages", roles: ["Admin"] },
@@ -104,6 +106,16 @@ function DashboardPage() {
   
   const { data: userOrders } = useCollection(ordersQuery);
 
+  const ticketsQuery = useMemoFirebase(() => {
+    if (authLoading || !user?.uid || isStaff) return null;
+    return query(
+      collection(db, "supportTickets"), 
+      where("userId", "==", user.uid)
+    );
+  }, [user?.uid, isStaff, authLoading]);
+
+  const { data: userTickets } = useCollection(ticketsQuery);
+
   const lastOrder = useMemo(() => {
     if (!userOrders) return null;
     return [...userOrders].sort((a, b) => {
@@ -113,7 +125,6 @@ function DashboardPage() {
     })[0];
   }, [userOrders]);
 
-  // Calcul des articles protégés (payés)
   const protectedItemsCount = useMemo(() => {
     if (!userOrders) return 0;
     return userOrders
@@ -121,7 +132,6 @@ function DashboardPage() {
       .reduce((acc, order) => acc + (order.items?.length || 0), 0);
   }, [userOrders]);
 
-  // Calcul des articles en attente d'activation (commandés mais pas encore payés)
   const pendingWarrantyCount = useMemo(() => {
     if (!userOrders) return 0;
     return userOrders
@@ -292,16 +302,16 @@ function DashboardPage() {
                             </div>
                         </div>
                         <div className="space-y-2">
-                            <h3 className="text-xl font-black uppercase italic tracking-tighter">Mes Garanties</h3>
+                            <h3 className="text-xl font-black uppercase italic tracking-tighter">Mes Garanties & SAV</h3>
                             <p className="text-xs text-muted-foreground leading-relaxed font-light">
                                 {protectedItemsCount > 0 
-                                  ? "Tous vos articles DKS bénéficient d'un support local. Présentez-vous à l'Immeuble Bahati pour toute assistance technique."
+                                  ? "Tous vos articles DKS bénéficient d'un support local. Suivez vos réparations et tickets support ici."
                                   : "Faites votre premier achat pour activer vos garanties locales à Bunia. Nous protégeons chaque composant hardware."
                                 }
                             </p>
                         </div>
-                        <Link href="#" className="inline-flex items-center text-[10px] font-black uppercase italic text-primary hover:underline gap-2">
-                            Voir mes certificats <ArrowRight size={12} />
+                        <Link href="/dashboard/support" className="inline-flex items-center text-[10px] font-black uppercase italic text-primary hover:underline gap-2">
+                            Gérer mes tickets SAV {userTickets && userTickets.length > 0 && <Badge className="bg-primary text-white h-4 px-1 rounded-full text-[8px]">{userTickets.length}</Badge>} <ArrowRight size={12} />
                         </Link>
                     </CardContent>
                 </Card>

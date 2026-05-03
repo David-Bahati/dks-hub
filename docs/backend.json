@@ -51,6 +51,23 @@
       },
       "required": ["id", "name", "sellingPrice", "stockQuantity"]
     },
+    "SupportTicket": {
+      "title": "SupportTicket",
+      "description": "Represents a technical support or warranty claim.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "customerName": { "type": "string" },
+        "productName": { "type": "string" },
+        "issueDescription": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "diagnosing", "repairing", "ready", "completed"] },
+        "priority": { "type": "string", "enum": ["low", "medium", "high", "urgent"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "productName", "issueDescription", "status", "createdAt"]
+    },
     "Notification": {
       "title": "Notification",
       "description": "System or user alerts.",
@@ -83,6 +100,10 @@
     "/orders/{orderId}": {
       "schema": "Order",
       "description": "Customer orders."
+    },
+    "/supportTickets/{ticketId}": {
+      "schema": "SupportTicket",
+      "description": "Technical support tickets and warranty claims."
     },
     "/notifications/{notifId}": {
       "schema": "Notification",
