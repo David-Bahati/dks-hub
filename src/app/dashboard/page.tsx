@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -30,7 +29,8 @@ import {
   BarChart3,
   ShieldCheck,
   Zap,
-  Phone
+  Phone,
+  CheckCircle2
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -108,6 +108,19 @@ function DashboardPage() {
   const { data: lastOrders } = useCollection(lastOrderQuery);
   const lastOrder = lastOrders?.[0];
 
+  // Logic for Warranties Count (items in successful orders)
+  const completedOrdersQuery = useMemoFirebase(() => {
+    if (authLoading || !user?.uid || isStaff) return null;
+    return query(
+      collection(db, "orders"),
+      where("userId", "==", user.uid),
+      where("status", "in", ["payée", "payé", "terminé", "completed"])
+    );
+  }, [user?.uid, isStaff, authLoading]);
+
+  const { data: completedOrders } = useCollection(completedOrdersQuery);
+  const protectedItemsCount = completedOrders?.reduce((acc, order) => acc + (order.items?.length || 0), 0) || 0;
+
   useEffect(() => {
     if (isStaff) {
       fetchAdminData();
@@ -136,6 +149,17 @@ function DashboardPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const getStatusBadge = (status: string) => {
+    const s = status?.toLowerCase();
+    if (s?.includes('payé') || s?.includes('payée') || s?.includes('ready') || s?.includes('prêt')) {
+      return <Badge className="bg-green-500/10 text-green-400 border-none uppercase text-[9px] font-black px-2 py-0.5 flex items-center gap-1"><CheckCircle2 size={10} /> Prêt / Payé</Badge>;
+    }
+    if (s?.includes('attente') || s?.includes('pending')) {
+      return <Badge className="bg-orange-500/10 text-orange-400 border-none uppercase text-[9px] font-black px-2 py-0.5 flex items-center gap-1"><Clock size={10} /> En attente</Badge>;
+    }
+    return <Badge className="bg-white/5 text-muted-foreground border-none uppercase text-[9px] font-black px-2 py-0.5">{status}</Badge>;
   };
 
   const formatCurrency = (amount: number) => new Intl.NumberFormat('fr-FR').format(amount);
@@ -189,7 +213,7 @@ function DashboardPage() {
                 </Card>
 
                 {/* TUILE 1 : DERNIÈRE COMMANDE */}
-                <Card className="glossy-card border-none rounded-[2.5rem] flex flex-col">
+                <Card className="glossy-card border-none rounded-[2.5rem] flex flex-col hover:border-accent/20 transition-all">
                     <CardHeader>
                         <CardTitle className="text-sm font-black uppercase italic tracking-widest flex items-center gap-2">
                             <Clock size={16} className="text-accent" /> Statut Commande
@@ -203,7 +227,7 @@ function DashboardPage() {
                                         <p className="text-[10px] font-bold text-muted-foreground uppercase">Réf : #{lastOrder.id.substring(0, 8).toUpperCase()}</p>
                                         <p className="text-2xl font-black text-white">${lastOrder.total?.toFixed(2)}</p>
                                     </div>
-                                    <Badge className="bg-orange-500/10 text-orange-400 border-none uppercase text-[10px] font-black">{lastOrder.status}</Badge>
+                                    {getStatusBadge(lastOrder.status)}
                                 </div>
                                 <div className="p-3 bg-white/5 rounded-xl border border-white/5 space-y-1">
                                     <p className="text-[10px] text-muted-foreground uppercase font-black">Mode de paiement</p>
@@ -232,8 +256,13 @@ function DashboardPage() {
                 {/* TUILE 2 : MES GARANTIES */}
                 <Card className="glossy-card border-none rounded-[2.5rem] overflow-hidden group hover:bg-primary/5 transition-all">
                     <CardContent className="p-10 space-y-6">
-                        <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
-                            <ShieldCheck size={28} />
+                        <div className="flex justify-between items-start">
+                            <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
+                                <ShieldCheck size={28} />
+                            </div>
+                            <Badge className="bg-primary/20 text-primary border-none uppercase text-[10px] font-black px-3 py-1">
+                                {protectedItemsCount} {protectedItemsCount > 1 ? 'Articles protégés' : 'Article protégé'}
+                            </Badge>
                         </div>
                         <div className="space-y-2">
                             <h3 className="text-xl font-black uppercase italic tracking-tighter">Mes Garanties</h3>

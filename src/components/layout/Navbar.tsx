@@ -6,12 +6,14 @@ import Link from 'next/link';
 import { Button } from "@/components/ui/button";
 import { useAuth } from '@/context/AuthContext';
 import { useCart } from '@/context/CartContext';
-import { auth } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import { signOut } from 'firebase/auth';
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { PI_CONVERSION_RATE } from '@/lib/constants';
 import { Badge } from '@/components/ui/badge';
 import { Logo } from '@/components/ui/Logo';
+import { useCollection, useMemoFirebase } from '@/firebase';
+import { collection, query, where } from 'firebase/firestore';
 
 export function Navbar() {
     const { user, isLoading: authLoading } = useAuth();
@@ -31,8 +33,18 @@ export function Navbar() {
     const role = user?.role?.toLowerCase();
     const isStaff = role === 'admin' || role === 'seller' || role === 'cashier' || role === 'vendeur' || role === 'caissier';
 
-    // Les notifications sont gérées via un badge simple pour le moment pour éviter les erreurs de permission list
-    const unreadCount = 0;
+    // Fetch notifications unread count for badge
+    const notificationsQuery = useMemoFirebase(() => {
+        if (!user?.uid) return null;
+        return query(
+            collection(db, "notifications"),
+            where("userId", "in", [user.uid, isStaff ? 'staff' : '']),
+            where("isRead", "==", false)
+        );
+    }, [user?.uid, isStaff]);
+
+    const { data: unreadNotifications } = useCollection(notificationsQuery);
+    const unreadCount = unreadNotifications?.length || 0;
 
     const navItems = [
         { label: 'Dashboard', href: '/dashboard', show: isStaff, icon: LayoutDashboard },
@@ -62,13 +74,13 @@ export function Navbar() {
                 </nav>
 
                 <div className="flex items-center gap-4">
-                    {/* Notifications (Toujours visible pour les connectés) */}
+                    {/* Notifications */}
                     {user && (
                         <Link href="/dashboard/notifications">
                             <Button variant="ghost" size="icon" className="relative h-10 w-10 text-muted-foreground hover:text-accent transition-colors">
                                 <Bell size={20} />
                                 {unreadCount > 0 && (
-                                    <Badge className="absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full bg-destructive text-white flex items-center justify-center text-[9px] font-black p-0 border border-background animate-pulse">
+                                    <Badge className="absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full bg-destructive text-white flex items-center justify-center text-[9px] font-black p-0 border border-background animate-pulse shadow-[0_0_10px_rgba(239,68,68,0.5)]">
                                         {unreadCount}
                                     </Badge>
                                 )}
@@ -76,7 +88,7 @@ export function Navbar() {
                         </Link>
                     )}
 
-                    {/* PANIER (Désormais visible par tout le monde) */}
+                    {/* PANIER */}
                     <Sheet>
                         <SheetTrigger asChild>
                             <Button variant="ghost" size="icon" className="relative h-10 w-10 text-muted-foreground hover:text-accent transition-colors">
