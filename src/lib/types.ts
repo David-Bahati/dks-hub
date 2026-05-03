@@ -63,6 +63,18 @@ export type SupportTicket = {
   updatedAt: any;
 };
 
+export type RemoteSupportSession = {
+  id: string;
+  userId: string;
+  customerName: string;
+  software: 'anydesk' | 'teamviewer';
+  remoteId: string;
+  issueDescription: string;
+  status: 'pending' | 'active' | 'completed' | 'cancelled';
+  createdAt: any;
+  updatedAt: any;
+};
+
 export type HardwareAsset = {
     id: string;
     userId: string;

@@ -70,6 +70,22 @@
       },
       "required": ["userId", "productName", "issueDescription", "status", "createdAt"]
     },
+    "RemoteSupportSession": {
+      "title": "RemoteSupportSession",
+      "description": "Demande de prise en main à distance via AnyDesk ou TeamViewer.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "customerName": { "type": "string" },
+        "software": { "type": "string", "enum": ["anydesk", "teamviewer"] },
+        "remoteId": { "type": "string" },
+        "issueDescription": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "active", "completed", "cancelled"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    },
     "HardwareAsset": {
       "title": "HardwareAsset",
       "description": "Un appareil appartenant à un client enregistré dans le Hub pour suivi.",
@@ -83,8 +99,7 @@
         "specs": { "type": "string" },
         "status": { "type": "string", "enum": ["excellent", "good", "warning", "repair_needed"] },
         "lastMaintenance": { "type": "string", "format": "date-time" }
-      },
-      "required": ["userId", "brand", "model"]
+      }
     },
     "ServiceBooking": {
       "title": "ServiceBooking",
@@ -115,8 +130,7 @@
         "isRead": { "type": "boolean" },
         "createdAt": { "type": "string", "format": "date-time" },
         "link": { "type": "string" }
-      },
-      "required": ["userId", "title", "message", "isRead", "createdAt"]
+      }
     }
   },
   "auth": {
@@ -139,9 +153,13 @@
       "schema": "SupportTicket",
       "description": "Technical support tickets."
     },
+    "/remoteSessions/{sessionId}": {
+      "schema": "RemoteSupportSession",
+      "description": "Remote desktop support requests."
+    },
     "/hardwareAssets/{assetId}": {
       "schema": "HardwareAsset",
-      "description": "Client hardware park for maintenance tracking."
+      "description": "Client hardware park."
     },
     "/serviceBookings/{bookingId}": {
       "schema": "ServiceBooking",

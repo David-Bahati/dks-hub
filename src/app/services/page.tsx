@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from 'react';
@@ -15,7 +16,8 @@ import {
     Calendar,
     Sparkles,
     Smartphone,
-    HardDrive
+    HardDrive,
+    MonitorSmartphone
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -42,6 +44,15 @@ const SERVICES = [
         features: ["Pratique sur PC DKS", "Supports de cours offerts", "Accès groupe WhatsApp Pro"]
     },
     {
+        id: "remote-fix",
+        category: "support",
+        title: "Dépannage à Distance",
+        description: "Assistance logicielle immédiate via AnyDesk. Résolution de bugs, installation de drivers ou nettoyage système.",
+        price: 15,
+        icon: <MonitorSmartphone className="text-accent" size={40} />,
+        features: ["Intervention en moins de 30min", "Sécurisé & Transparent", "Paiement après résultat"]
+    },
+    {
         id: "network-install",
         category: "infrastructure",
         title: "Installation Réseau & Wi-Fi",
@@ -58,15 +69,6 @@ const SERVICES = [
         price: 25,
         icon: <Cpu className="text-purple-400" size={40} />,
         features: ["Installation Windows 11 incluse", "Nettoyage interne offert", "Transfert de données safe"]
-    },
-    {
-        id: "data-recovery",
-        category: "digitalisation",
-        title: "Récupération de Données",
-        description: "Service critique pour récupérer vos fichiers sur clés USB, disques durs ou cartes SD endommagés.",
-        price: 80,
-        icon: <HardDrive className="text-red-400" size={40} />,
-        features: ["Diagnostic gratuit", "Paiement au succès uniquement", "Confidentialité totale"]
     }
 ];
 
@@ -79,6 +81,11 @@ export default function ServicesCataloguePage() {
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     const handleOpenBooking = (service: any) => {
+        if (service.id === 'remote-fix') {
+            router.push('/dashboard/remote');
+            return;
+        }
+        
         if (!user) {
             toast({ title: "Identification requise", description: "Veuillez vous connecter pour réserver un service." });
             router.push('/login');
@@ -186,7 +193,7 @@ export default function ServicesCataloguePage() {
                                         onClick={() => handleOpenBooking(service)}
                                         className="bg-white text-black font-black uppercase italic rounded-xl px-6 h-12 shadow-xl hover:bg-accent hover:text-black transition-all"
                                     >
-                                        Réserver <ArrowRight size={16} className="ml-2" />
+                                        {service.id === 'remote-fix' ? 'Démarrer' : 'Réserver'} <ArrowRight size={16} className="ml-2" />
                                     </Button>
                                 </div>
                             </CardFooter>
