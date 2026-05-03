@@ -1,7 +1,6 @@
-
 "use client";
 
-import { LogOut, LayoutDashboard, ShoppingCart, Home, Trash2, User, Sparkles, Loader2, GraduationCap, Wrench, Laptop } from 'lucide-react';
+import { LogOut, LayoutDashboard, ShoppingCart, Home, Trash2, User, Sparkles, Loader2, GraduationCap, Wrench, Laptop, Layout } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from "@/components/ui/button";
@@ -33,7 +32,8 @@ export function Navbar() {
 
     const navItems = [
         { label: 'Boutique', href: '/', show: true, icon: Home },
-        { label: 'Services & Formations', href: '/services', show: true, icon: GraduationCap },
+        { label: 'Services', href: '/services', show: true, icon: GraduationCap },
+        { label: 'Portfolio', href: '/portfolio', show: true, icon: Layout },
         { label: 'Dashboard', href: '/dashboard', show: isStaff, icon: LayoutDashboard },
         { label: 'Mon Compte', href: '/dashboard', show: !isStaff && !!user, icon: User },
     ];
@@ -45,10 +45,10 @@ export function Navbar() {
                     <Logo showText={true} size="md" />
                 </Link>
                 
-                <nav className="hidden lg:flex items-center gap-6">
+                <nav className="hidden lg:flex items-center gap-8">
                     {navItems.filter(i => i.show).map((item) => (
                         <Link key={item.href} href={item.href}>
-                           <div className={`text-[10px] font-black uppercase italic tracking-widest flex items-center gap-2 transition-colors hover:text-accent ${pathname === item.href ? 'text-accent' : 'text-muted-foreground'}`}>
+                           <div className={`text-[10px] font-black uppercase italic tracking-widest flex items-center gap-2 transition-all hover:text-accent ${pathname === item.href ? 'text-accent border-b-2 border-accent pb-1' : 'text-muted-foreground'}`}>
                              <item.icon size={14} />
                              {item.label}
                            </div>
@@ -59,20 +59,20 @@ export function Navbar() {
                 <div className="flex items-center gap-4">
                     <Sheet>
                         <SheetTrigger asChild>
-                            <Button variant="ghost" size="icon" className="relative h-12 w-12 rounded-2xl hover:bg-white/5">
+                            <Button variant="ghost" size="icon" className="relative h-12 w-12 rounded-2xl hover:bg-white/5 transition-all">
                                 <ShoppingCart size={22} />
                                 {cartCount > 0 && (
-                                    <Badge className="absolute -top-1 -right-1 h-5 min-w-5 p-0 flex items-center justify-center bg-accent text-black text-[10px] font-black rounded-full">{cartCount}</Badge>
+                                    <Badge className="absolute -top-1 -right-1 h-5 min-w-5 p-0 flex items-center justify-center bg-accent text-black text-[10px] font-black rounded-full animate-pulse">{cartCount}</Badge>
                                 )}
                             </Button>
                         </SheetTrigger>
                         <SheetContent className="bg-card border-white/10">
-                            <SheetHeader><SheetTitle className="uppercase font-black italic tracking-tighter">Votre Panier Boutique</SheetTitle></SheetHeader>
+                            <SheetHeader><SheetTitle className="uppercase font-black italic tracking-tighter">Panier Boutique</SheetTitle></SheetHeader>
                             <div className="mt-8 space-y-4 max-h-[60vh] overflow-y-auto custom-scrollbar pr-2">
                                 {cartItems.length === 0 ? <p className="text-center opacity-30 italic py-10">Panier vide</p> : (
                                     cartItems.map(item => (
                                         <div key={item.id} className="flex justify-between items-center bg-white/5 p-4 rounded-xl border border-white/5">
-                                            <div className="flex-1"><p className="font-bold text-xs">{item.name}</p><p className="text-[10px] text-accent font-black">${item.price?.toFixed(2)}</p></div>
+                                            <div className="flex-1"><p className="font-bold text-xs">{item.name}</p><p className="text-[10px] text-accent font-black">${(item.price || 0).toFixed(2)}</p></div>
                                             <Button variant="ghost" size="icon" onClick={() => removeFromCart(item.id)} className="h-8 w-8 text-destructive"><Trash2 size={14}/></Button>
                                         </div>
                                     ))
@@ -89,7 +89,7 @@ export function Navbar() {
 
                     {authLoading ? <Loader2 className="animate-spin h-5 w-5 text-accent" /> : user ? (
                         <div className="flex items-center gap-2">
-                             <Link href="/dashboard" className="hidden sm:block">
+                             <Link href="/dashboard">
                                 <Button variant="ghost" className="h-10 rounded-xl border border-white/5 text-[10px] font-black uppercase italic">Hub</Button>
                              </Link>
                              <Button variant="ghost" onClick={handleLogout} className="text-muted-foreground hover:text-destructive h-10 w-10 p-0"><LogOut size={18} /></Button>

@@ -3,3 +3,4 @@
 import './flows/generate-product-description';
 import './flows/generate-product-image';
 import './flows/customer-assistant';
+import './flows/hardware-advisor';
