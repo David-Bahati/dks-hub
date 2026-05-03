@@ -27,7 +27,10 @@ import {
   Tags,
   Search,
   Plus,
-  BarChart3
+  BarChart3,
+  ShieldCheck,
+  Zap,
+  Phone
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -76,14 +79,6 @@ const navConfig = [
   { href: "/dashboard/customers", icon: Users, label: "Clients", roles: ["Admin", "Seller", "Cashier"] },
   { href: "/dashboard/users", icon: UsersRound, label: "Équipe", roles: ["Admin"] },
   { href: "/dashboard/settings", icon: Settings, label: "Réglages", roles: ["Admin"] },
-];
-
-const customerNavLinks = [
-  { href: "/dashboard", icon: LayoutDashboard, label: "Mon Hub", description: "Vue d'ensemble de mon compte" },
-  { href: "/dashboard/orders", icon: ShoppingBag, label: "Mes Commandes", description: "Suivi et historique d'achats" },
-  { href: "/cart", icon: ShoppingCart, label: "Mon Panier", description: "Articles en attente" },
-  { href: "/dashboard/settings", icon: User, label: "Mon Profil", description: "Gérer mes informations" },
-  { href: "#", icon: Headset, label: "Support Client", description: "Aide et assistance technique" },
 ];
 
 function DashboardPage() {
@@ -153,6 +148,7 @@ function DashboardPage() {
     );
   }
 
+  // --- VUE CLIENT PREMIUM ---
   if (!isStaff) {
     return (
       <div className="flex min-h-screen w-full flex-col bg-background">
@@ -176,6 +172,7 @@ function DashboardPage() {
         </header>
 
         <main className="flex-1 max-w-7xl mx-auto w-full p-4 md:p-8 space-y-8">
+            {/* Bannière Bienvenue */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <Card className="md:col-span-2 glossy-card border-none rounded-[2.5rem] overflow-hidden relative group">
                     <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity">
@@ -184,28 +181,29 @@ function DashboardPage() {
                     <CardContent className="p-10 space-y-4">
                         <Badge className="bg-accent/20 text-accent border-none font-black uppercase tracking-tighter px-3">Membre Premium DKS</Badge>
                         <h2 className="text-4xl font-black uppercase italic leading-tight">VOTRE SETUP,<br /><span className="text-accent">NOTRE PRIORITÉ</span></h2>
-                        <p className="text-muted-foreground text-sm max-w-md font-light leading-relaxed">Découvrez vos dernières transactions et gérez vos préférences en toute sécurité sur notre plateforme ultra-sécurisée.</p>
+                        <p className="text-muted-foreground text-sm max-w-md font-light leading-relaxed">Gérez vos commandes, activez vos garanties et profitez de l'expertise Double King Shop Bunia.</p>
                         <Button className="bg-primary hover:bg-primary/90 h-12 rounded-xl px-8 font-black uppercase italic gap-2 mt-4" asChild>
                             <Link href="/#shop">Continuer mes achats <ArrowRight size={18} /></Link>
                         </Button>
                     </CardContent>
                 </Card>
 
-                <Card className="glossy-card border-none rounded-[2.5rem]">
+                {/* TUILE 1 : DERNIÈRE COMMANDE */}
+                <Card className="glossy-card border-none rounded-[2.5rem] flex flex-col">
                     <CardHeader>
                         <CardTitle className="text-sm font-black uppercase italic tracking-widest flex items-center gap-2">
-                            <Clock size={16} className="text-accent" /> Dernière Commande
+                            <Clock size={16} className="text-accent" /> Statut Commande
                         </CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-4">
+                    <CardContent className="space-y-4 flex-1">
                         {lastOrder ? (
                             <div className="space-y-4">
                                 <div className="flex justify-between items-start">
                                     <div>
-                                        <p className="text-xs font-bold text-muted-foreground uppercase">ID: #{lastOrder.id.substring(0, 8)}</p>
-                                        <p className="text-xl font-black text-white">${lastOrder.total?.toFixed(2)}</p>
+                                        <p className="text-[10px] font-bold text-muted-foreground uppercase">Réf : #{lastOrder.id.substring(0, 8).toUpperCase()}</p>
+                                        <p className="text-2xl font-black text-white">${lastOrder.total?.toFixed(2)}</p>
                                     </div>
-                                    <Badge className="bg-green-500/10 text-green-400 border-none uppercase text-[10px] font-black">{lastOrder.status}</Badge>
+                                    <Badge className="bg-orange-500/10 text-orange-400 border-none uppercase text-[10px] font-black">{lastOrder.status}</Badge>
                                 </div>
                                 <div className="p-3 bg-white/5 rounded-xl border border-white/5 space-y-1">
                                     <p className="text-[10px] text-muted-foreground uppercase font-black">Mode de paiement</p>
@@ -214,45 +212,102 @@ function DashboardPage() {
                                         {lastOrder.paymentMethod?.replace('_', ' ')}
                                     </p>
                                 </div>
-                                <Button variant="ghost" className="w-full text-xs font-black uppercase italic gap-2 h-10" asChild>
-                                    <Link href="/dashboard/orders">Voir le détail <ArrowRight size={14} /></Link>
+                                <Button variant="ghost" className="w-full text-xs font-black uppercase italic gap-2 h-10 border border-white/5 hover:bg-white/5" asChild>
+                                    <Link href="/dashboard/orders">Historique complet <ArrowRight size={14} /></Link>
                                 </Button>
                             </div>
                         ) : (
                             <div className="text-center py-10 opacity-30 italic flex flex-col items-center gap-3">
                                 <ShoppingBag size={40} />
-                                <p className="text-xs font-bold">Aucune commande récente</p>
+                                <p className="text-xs font-bold">Aucune commande web</p>
                             </div>
                         )}
                     </CardContent>
                 </Card>
             </div>
 
-            <div className="space-y-6">
-                <h3 className="text-xs font-black uppercase tracking-[0.3em] text-muted-foreground ml-2">Mon Hub Personnel</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {customerNavLinks.slice(1).map((link, idx) => (
-                        <Link key={idx} href={link.href}>
-                            <Card className="glossy-card border-none rounded-[2rem] hover:border-accent/30 transition-all group overflow-hidden h-full">
-                                <CardContent className="p-6 flex items-start gap-4">
-                                    <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center group-hover:bg-accent group-hover:text-accent-foreground transition-all">
-                                        <link.icon size={24} />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <h4 className="font-black uppercase italic text-sm">{link.label}</h4>
-                                        <p className="text-[10px] text-muted-foreground font-bold">{link.description}</p>
-                                    </div>
-                                </CardContent>
-                            </Card>
+            {/* GRILLE DE TUILES ACTIONS RAPIDES */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                
+                {/* TUILE 2 : MES GARANTIES */}
+                <Card className="glossy-card border-none rounded-[2.5rem] overflow-hidden group hover:bg-primary/5 transition-all">
+                    <CardContent className="p-10 space-y-6">
+                        <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
+                            <ShieldCheck size={28} />
+                        </div>
+                        <div className="space-y-2">
+                            <h3 className="text-xl font-black uppercase italic tracking-tighter">Mes Garanties</h3>
+                            <p className="text-xs text-muted-foreground leading-relaxed font-light">
+                                Tous vos articles DKS bénéficient d'un support local. Présentez-vous à l'Immeuble Bahati pour toute assistance technique.
+                            </p>
+                        </div>
+                        <Link href="#" className="inline-flex items-center text-[10px] font-black uppercase italic text-primary hover:underline gap-2">
+                            Voir mes certificats <ArrowRight size={12} />
                         </Link>
-                    ))}
-                </div>
+                    </CardContent>
+                </Card>
+
+                {/* TUILE 3 : MON PROFIL */}
+                <Card className="glossy-card border-none rounded-[2.5rem] overflow-hidden group hover:bg-accent/5 transition-all">
+                    <CardContent className="p-10 space-y-6">
+                        <div className="w-14 h-14 rounded-2xl bg-accent/10 flex items-center justify-center text-accent group-hover:scale-110 transition-transform">
+                            <User size={28} />
+                        </div>
+                        <div className="space-y-2">
+                            <h3 className="text-xl font-black uppercase italic tracking-tighter">Mon Profil</h3>
+                            <p className="text-xs text-muted-foreground leading-relaxed font-light">
+                                Modifiez vos coordonnées pour faciliter vos livraisons et vos transactions M-Pesa ou Airtel Money.
+                            </p>
+                        </div>
+                        <Link href="/dashboard/settings" className="inline-flex items-center text-[10px] font-black uppercase italic text-accent hover:underline gap-2">
+                            Mettre à jour <ArrowRight size={12} />
+                        </Link>
+                    </CardContent>
+                </Card>
+
+                {/* TUILE 4 : SUPPORT CLIENT */}
+                <Card className="glossy-card border-none rounded-[2.5rem] overflow-hidden group hover:bg-green-500/5 transition-all">
+                    <CardContent className="p-10 space-y-6">
+                        <div className="w-14 h-14 rounded-2xl bg-green-500/10 flex items-center justify-center text-green-500 group-hover:scale-110 transition-transform">
+                            <Headset size={28} />
+                        </div>
+                        <div className="space-y-2">
+                            <h3 className="text-xl font-black uppercase italic tracking-tighter">Besoin d'aide ?</h3>
+                            <p className="text-xs text-muted-foreground leading-relaxed font-light">
+                                Une question sur un processeur ou une RTX ? Nos experts de Bunia vous répondent en direct sur WhatsApp.
+                            </p>
+                        </div>
+                        <Link href="https://wa.me/243823038945" target="_blank" className="inline-flex items-center text-[10px] font-black uppercase italic text-green-500 hover:underline gap-2">
+                            Lancer le chat <ArrowRight size={12} />
+                        </Link>
+                    </CardContent>
+                </Card>
+
+            </div>
+
+            {/* SECTION RAPPEL SHOP */}
+            <div className="pt-10">
+                <Card className="bg-white/5 border border-white/5 rounded-[2.5rem] p-8 flex flex-col md:flex-row items-center justify-between gap-6">
+                    <div className="flex items-center gap-6">
+                        <div className="w-12 h-12 rounded-full bg-accent/20 flex items-center justify-center text-accent">
+                            <Zap size={20} className="fill-accent" />
+                        </div>
+                        <div>
+                            <h4 className="font-black uppercase italic text-sm">NOUVEAUX ARRIVAGES CE MATIN</h4>
+                            <p className="text-xs text-muted-foreground">Découvrez les dernières cartes graphiques reçues en stock.</p>
+                        </div>
+                    </div>
+                    <Button variant="outline" className="rounded-xl font-black uppercase italic text-xs h-12 px-8 border-white/10" asChild>
+                        <Link href="/#shop">Voir la collection</Link>
+                    </Button>
+                </Card>
             </div>
         </main>
       </div>
     );
   }
 
+  // --- VUE STAFF (ADMIN / VENDEUR / CAISSIER) ---
   return (
     <div className="flex min-h-screen w-full flex-col bg-background">
       <header className="sticky top-0 z-30 flex h-20 items-center gap-4 border-b border-white/5 bg-background/40 backdrop-blur-2xl px-6">
