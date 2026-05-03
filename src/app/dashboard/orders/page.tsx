@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { 
@@ -17,17 +17,24 @@ import {
   MapPin,
   ExternalLink,
   Search,
-  Filter
+  Download,
+  Printer,
+  FileText,
+  QrCode
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, where, doc, updateDoc, serverTimestamp, addDoc } from 'firebase/firestore';
+import { collection, query, where, doc, updateDoc, serverTimestamp, addDoc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Badge } from '@/components/ui/badge';
-import { Card } from '@/components/ui/card';
+import { Card, CardHeader, CardContent, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
+import { Logo } from '@/components/ui/Logo';
 
 export default function OrdersPage() {
   const { user, isLoading: authLoading } = useAuth();
@@ -35,6 +42,22 @@ export default function OrdersPage() {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [exchangeRate, setExchangeRate] = useState(2500);
+  
+  // PDF Generation States
+  const [selectedOrderForPDF, setSelectedOrderForPDF] = useState<any | null>(null);
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const invoiceRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const fetchRate = async () => {
+        try {
+            const snap = await getDoc(doc(db, "system", "config"));
+            if (snap.exists()) setExchangeRate(snap.data().exchangeRate || 2500);
+        } catch (e) { console.error(e); }
+    };
+    fetchRate();
+  }, []);
 
   const ordersQuery = useMemoFirebase(() => {
     if (authLoading || !user?.uid) return null;
@@ -60,7 +83,6 @@ export default function OrdersPage() {
     
     let result = [...rawOrders];
 
-    // 1. Filtrage par statut
     if (statusFilter !== "all") {
       result = result.filter(order => {
         const s = order.status?.toLowerCase();
@@ -71,7 +93,6 @@ export default function OrdersPage() {
       });
     }
 
-    // 2. Recherche par Nom ou ID
     if (search.trim()) {
       const term = search.toLowerCase();
       result = result.filter(order => 
@@ -81,7 +102,6 @@ export default function OrdersPage() {
       );
     }
 
-    // 3. Tri par date
     return result.sort((a, b) => {
       const dateA = a.createdAt?.toDate?.() || new Date(0);
       const dateB = b.createdAt?.toDate?.() || new Date(0);
@@ -112,11 +132,32 @@ export default function OrdersPage() {
             description: `La commande est désormais : ${newStatus}`,
         });
     } catch (err) {
-        console.error(err);
         toast({ title: "Erreur", description: "Impossible de modifier le statut.", variant: "destructive" });
     } finally {
         setUpdatingId(null);
     }
+  };
+
+  const handleDownloadInvoice = async (order: any) => {
+    setSelectedOrderForPDF(order);
+    // On attend que le state soit mis à jour et le DOM rendu
+    setTimeout(async () => {
+        if (!invoiceRef.current) return;
+        setIsGeneratingPDF(true);
+        try {
+            const canvas = await html2canvas(invoiceRef.current, { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
+            const imgData = canvas.toDataURL('image/png');
+            const pdf = new jsPDF({ orientation: 'portrait', unit: 'px', format: [canvas.width / 2, canvas.height / 2] });
+            pdf.addImage(imgData, 'PNG', 0, 0, canvas.width / 2, canvas.height / 2);
+            pdf.save(`FACTURE_DKS_${order.id.substring(0, 8).toUpperCase()}.pdf`);
+            toast({ title: "Facture générée", description: "Le PDF a été téléchargé." });
+        } catch (error) {
+            toast({ title: "Erreur PDF", variant: "destructive" });
+        } finally {
+            setIsGeneratingPDF(false);
+            setSelectedOrderForPDF(null);
+        }
+    }, 500);
   };
 
   const getStatusBadge = (status: string) => {
@@ -158,7 +199,6 @@ export default function OrdersPage() {
         </header>
 
         <main className="max-w-7xl mx-auto px-4 py-8">
-            {/* Outils de recherche et filtrage pour le Staff */}
             {isStaff && (
               <div className="mb-10 space-y-6">
                 <div className="flex flex-col md:flex-row gap-4">
@@ -186,12 +226,6 @@ export default function OrdersPage() {
             {isLoading ? (
                 <div className="flex justify-center py-20">
                     <Loader2 className="animate-spin h-12 w-12 text-accent" />
-                </div>
-            ) : error ? (
-                <div className="text-center py-20 bg-destructive/10 rounded-[2rem] border border-destructive/20 max-w-2xl mx-auto">
-                     <XCircle className="mx-auto mb-4 text-destructive" size={48} />
-                     <h2 className="text-xl font-black uppercase italic">Erreur d'accès</h2>
-                     <p className="text-muted-foreground mt-2 text-sm px-8">Vérifiez vos permissions Firestore.</p>
                 </div>
             ) : filteredOrders.length > 0 ? (
                 <div className="grid grid-cols-1 gap-4">
@@ -224,11 +258,6 @@ export default function OrdersPage() {
                                                     <p className="text-[9px] font-black uppercase text-muted-foreground">Point de Retrait</p>
                                                     <p className="text-[10px] font-bold">Immeuble Bahati, Bunia</p>
                                                 </div>
-                                                <Button variant="ghost" size="icon" className="h-8 w-8 text-accent hover:bg-accent/10 rounded-lg" asChild>
-                                                    <a href="https://www.google.com/maps/search/?api=1&query=Immeuble+Bahati+Bunia+Ituri" target="_blank" rel="noopener noreferrer">
-                                                        <ExternalLink size={14} />
-                                                    </a>
-                                                </Button>
                                             </div>
                                         )}
                                     </div>
@@ -240,6 +269,16 @@ export default function OrdersPage() {
                                         </div>
 
                                         <div className="flex flex-col gap-2">
+                                            <Button 
+                                                variant="outline"
+                                                size="sm"
+                                                className="border-white/10 hover:bg-white/5 text-[9px] font-black uppercase italic rounded-xl h-11 px-4 gap-2"
+                                                onClick={() => handleDownloadInvoice(order)}
+                                                disabled={isGeneratingPDF}
+                                            >
+                                                <FileText size={14} /> Facture PDF
+                                            </Button>
+
                                             {isStaff && !["payée", "payé", "terminé", "completed", "cancelled", "annulé"].includes(order.status?.toLowerCase()) && (
                                                 <Button 
                                                     size="sm" 
@@ -249,19 +288,6 @@ export default function OrdersPage() {
                                                 >
                                                     {updatingId === order.id ? <Loader2 className="animate-spin h-3 w-3" /> : <Check size={14} />}
                                                     Encaisser
-                                                </Button>
-                                            )}
-
-                                            {!isStaff && (
-                                                <Button 
-                                                    variant="outline" 
-                                                    size="sm" 
-                                                    className="border-green-500/20 text-green-500 hover:bg-green-500/10 rounded-xl h-11 px-4 gap-2 font-black uppercase text-[9px]"
-                                                    asChild
-                                                >
-                                                    <a href={`https://wa.me/243823038945?text=Bonjour,%20j'ai%20besoin%20d'aide%20pour%20ma%20commande%20#${order.id.substring(0, 8).toUpperCase()}`} target="_blank" rel="noopener noreferrer">
-                                                        <MessageCircle size={14} /> Aide WhatsApp
-                                                    </a>
                                                 </Button>
                                             )}
                                         </div>
@@ -276,20 +302,126 @@ export default function OrdersPage() {
                     <div className="w-24 h-24 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-8">
                         <Package size={48} className="text-primary opacity-50" />
                     </div>
-                    <h2 className="text-4xl font-black uppercase italic mb-4">
-                      {search || statusFilter !== "all" ? "Aucun résultat" : "Aucune Commande"}
-                    </h2>
-                    <p className="text-muted-foreground max-w-md">
-                      {search || statusFilter !== "all" ? "Réessayez avec d'autres critères." : "Le registre est actuellement vide."}
-                    </p>
-                    {(search || statusFilter !== "all") && (
-                      <Button variant="link" className="text-accent uppercase font-black text-[10px] mt-4" onClick={() => {setSearch(""); setStatusFilter("all")}}>
-                        Réinitialiser les filtres
-                      </Button>
-                    )}
+                    <h2 className="text-4xl font-black uppercase italic mb-4">Aucune Commande</h2>
+                    <p className="text-muted-foreground max-w-md">Le registre est actuellement vide.</p>
                 </div>
             )}
         </main>
+
+        {/* FACTURE PDF CACHÉE (Générée lors du téléchargement) */}
+        <div style={{ position: 'absolute', left: '-9999px', top: 0 }}>
+            {selectedOrderForPDF && (
+                <div ref={invoiceRef} className="bg-white text-black p-16 w-[800px] font-sans">
+                    <header className="flex justify-between items-start border-b-4 border-black pb-10 mb-12">
+                        <div className="space-y-4">
+                            <div className="bg-black text-white px-6 py-2 inline-block font-black text-3xl italic tracking-tighter">DKS SHOP</div>
+                            <div className="text-sm font-bold uppercase tracking-widest text-gray-500">Excellence Informatique</div>
+                            <div className="text-[11px] leading-relaxed mt-4 font-medium">
+                                <p>Immeuble Bahati, Boulevard de la Libération</p>
+                                <p>Bunia, Province de l'Ituri, RDC</p>
+                                <p>Tél: +243 823 038 945</p>
+                                <p>Email: contact@dks-shop.com</p>
+                            </div>
+                        </div>
+                        <div className="text-right">
+                            <h2 className="text-5xl font-black uppercase italic tracking-tighter mb-2">FACTURE</h2>
+                            <p className="text-xs font-bold text-gray-400 uppercase tracking-[0.2em]">Réf: #{selectedOrderForPDF.id.substring(0, 12).toUpperCase()}</p>
+                            <div className="mt-8">
+                                <p className="text-[10px] font-black uppercase text-gray-400">Date d'émission</p>
+                                <p className="text-lg font-bold">{new Date().toLocaleDateString('fr-FR')}</p>
+                            </div>
+                        </div>
+                    </header>
+
+                    <div className="grid grid-cols-2 gap-20 mb-12">
+                        <div className="space-y-4">
+                            <h3 className="text-[10px] font-black uppercase text-gray-400 border-b pb-2 tracking-widest">Facturé à</h3>
+                            <div className="space-y-1">
+                                <p className="text-xl font-black uppercase italic">{selectedOrderForPDF.customerName}</p>
+                                <p className="text-sm text-gray-600">{selectedOrderForPDF.customerEmail}</p>
+                                <p className="text-xs font-medium text-gray-400 mt-2">Client ID: {selectedOrderForPDF.userId?.substring(0, 8)}</p>
+                            </div>
+                        </div>
+                        <div className="space-y-4">
+                            <h3 className="text-[10px] font-black uppercase text-gray-400 border-b pb-2 tracking-widest">Paiement</h3>
+                            <div className="space-y-1">
+                                <p className="text-sm font-bold">Mode : <span className="uppercase">{selectedOrderForPDF.paymentMethod?.replace('_', ' ')}</span></p>
+                                <p className="text-sm font-bold">Statut : <span className="uppercase text-green-600">{selectedOrderForPDF.status}</span></p>
+                                {selectedOrderForPDF.piValue && (
+                                    <p className="text-xs font-medium text-orange-600 mt-2">Transaction Pi validée blockchain</p>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    <table className="w-full mb-12">
+                        <thead>
+                            <tr className="bg-gray-100 text-[10px] font-black uppercase tracking-widest">
+                                <th className="text-left p-4">Description de l'article</th>
+                                <th className="text-center p-4">Qté</th>
+                                <th className="text-right p-4">Prix Unitaire</th>
+                                <th className="text-right p-4">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody className="text-sm">
+                            {selectedOrderForPDF.items?.map((item: any, idx: number) => (
+                                <tr key={idx} className="border-b border-gray-100">
+                                    <td className="p-4">
+                                        <p className="font-bold uppercase italic">{item.name}</p>
+                                        <p className="text-[10px] text-gray-400 uppercase mt-1">Garantie DKS incluse</p>
+                                    </td>
+                                    <td className="p-4 text-center font-bold">{item.quantity}</td>
+                                    <td className="p-4 text-right font-medium">${item.price?.toFixed(2)}</td>
+                                    <td className="p-4 text-right font-black">${(item.price * item.quantity).toFixed(2)}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+
+                    <div className="flex justify-end">
+                        <div className="w-80 space-y-4">
+                            <div className="flex justify-between text-sm font-bold text-gray-500">
+                                <span>SOUS-TOTAL</span>
+                                <span>${selectedOrderForPDF.total?.toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between text-sm font-bold text-gray-500 border-b pb-4">
+                                <span>TAXES (0%)</span>
+                                <span>$0.00</span>
+                            </div>
+                            <div className="space-y-1">
+                                <div className="flex justify-between items-end">
+                                    <span className="text-lg font-black uppercase italic">TOTAL À PAYER</span>
+                                    <span className="text-4xl font-black tracking-tighter">${selectedOrderForPDF.total?.toFixed(2)}</span>
+                                </div>
+                                <p className="text-right text-sm font-bold text-gray-400 uppercase">
+                                    ≈ {(selectedOrderForPDF.total * exchangeRate).toLocaleString()} CDF
+                                </p>
+                            </div>
+                            {selectedOrderForPDF.piValue && (
+                                <div className="bg-orange-50 p-4 rounded-xl flex justify-between items-center border border-orange-100">
+                                    <span className="text-[10px] font-black text-orange-800 uppercase">Valeur Pi (GCV)</span>
+                                    <span className="text-sm font-black text-orange-800">{selectedOrderForPDF.piValue.toFixed(8)} π</span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <footer className="mt-20 pt-10 border-t border-gray-100 flex justify-between items-center">
+                        <div className="flex items-center gap-6">
+                            <QrCode size={60} className="opacity-20" />
+                            <p className="text-[9px] font-bold text-gray-400 uppercase leading-relaxed max-w-[250px]">
+                                Cette facture est un document officiel de Double King Shop. <br />
+                                Les articles hardware ne sont ni repris ni échangés après sortie du magasin, sauf application de la garantie.
+                            </p>
+                        </div>
+                        <div className="text-right space-y-1">
+                            <p className="text-[10px] font-black uppercase italic">Merci de votre confiance</p>
+                            <p className="text-[8px] font-bold text-gray-300 uppercase tracking-widest">DKS ShopManager Supreme v3.0</p>
+                        </div>
+                    </footer>
+                </div>
+            )}
+        </div>
     </div>
   );
 }
