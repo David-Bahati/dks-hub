@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import Link from "next/link";
 import { usePathname } from 'next/navigation';
 import {
@@ -104,15 +104,30 @@ function DashboardPage() {
   
   const { data: userOrders } = useCollection(ordersQuery);
 
-  const lastOrder = userOrders ? [...userOrders].sort((a, b) => {
-    const dateA = a.createdAt?.toDate?.() || new Date(0);
-    const dateB = b.createdAt?.toDate?.() || new Date(0);
-    return dateB - dateA;
-  })[0] : null;
+  const lastOrder = useMemo(() => {
+    if (!userOrders) return null;
+    return [...userOrders].sort((a, b) => {
+      const dateA = a.createdAt?.toDate?.() || new Date(0);
+      const dateB = b.createdAt?.toDate?.() || new Date(0);
+      return dateB - dateA;
+    })[0];
+  }, [userOrders]);
 
-  const protectedItemsCount = userOrders?.filter(o => 
-    ["payée", "payé", "terminé", "completed"].includes(o.status?.toLowerCase())
-  ).reduce((acc, order) => acc + (order.items?.length || 0), 0) || 0;
+  // Calcul des articles protégés (payés)
+  const protectedItemsCount = useMemo(() => {
+    if (!userOrders) return 0;
+    return userOrders
+      .filter(o => ["payée", "payé", "terminé", "completed"].includes(o.status?.toLowerCase()))
+      .reduce((acc, order) => acc + (order.items?.length || 0), 0);
+  }, [userOrders]);
+
+  // Calcul des articles en attente d'activation (commandés mais pas encore payés)
+  const pendingWarrantyCount = useMemo(() => {
+    if (!userOrders) return 0;
+    return userOrders
+      .filter(o => !["payée", "payé", "terminé", "completed", "annulé", "cancelled"].includes(o.status?.toLowerCase()))
+      .reduce((acc, order) => acc + (order.items?.length || 0), 0);
+  }, [userOrders]);
 
   useEffect(() => {
     if (isStaff) {
@@ -265,14 +280,24 @@ function DashboardPage() {
                             <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
                                 <ShieldCheck size={28} />
                             </div>
-                            <Badge className="bg-primary/20 text-primary border-none uppercase text-[10px] font-black px-3 py-1">
-                                {protectedItemsCount} {protectedItemsCount > 1 ? 'Articles protégés' : 'Article protégé'}
-                            </Badge>
+                            <div className="flex flex-col items-end gap-1">
+                              <Badge className="bg-primary/20 text-primary border-none uppercase text-[10px] font-black px-3 py-1">
+                                  {protectedItemsCount} {protectedItemsCount > 1 ? 'Articles protégés' : 'Article protégé'}
+                              </Badge>
+                              {pendingWarrantyCount > 0 && (
+                                <Badge className="bg-orange-500/10 text-orange-400 border-none uppercase text-[8px] font-bold px-2 py-0.5">
+                                  +{pendingWarrantyCount} en attente
+                                </Badge>
+                              )}
+                            </div>
                         </div>
                         <div className="space-y-2">
                             <h3 className="text-xl font-black uppercase italic tracking-tighter">Mes Garanties</h3>
                             <p className="text-xs text-muted-foreground leading-relaxed font-light">
-                                Tous vos articles DKS bénéficient d'un support local. Présentez-vous à l'Immeuble Bahati pour toute assistance technique.
+                                {protectedItemsCount > 0 
+                                  ? "Tous vos articles DKS bénéficient d'un support local. Présentez-vous à l'Immeuble Bahati pour toute assistance technique."
+                                  : "Faites votre premier achat pour activer vos garanties locales à Bunia. Nous protégeons chaque composant hardware."
+                                }
                             </p>
                         </div>
                         <Link href="#" className="inline-flex items-center text-[10px] font-black uppercase italic text-primary hover:underline gap-2">
