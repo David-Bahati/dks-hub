@@ -16,7 +16,6 @@ import {
   Coins, 
   Smartphone, 
   Banknote, 
-  Info, 
   Loader2,
   MapPin,
   ArrowRight,
@@ -29,7 +28,8 @@ import {
   Mail,
   Sparkles,
   KeyRound,
-  ShoppingBag
+  ShoppingBag,
+  Star
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -41,10 +41,10 @@ type PaymentMethod = "PI_NETWORK" | "MOBILE_MONEY" | "CASH";
 type MobileNetwork = "VODACOM" | "AIRTEL" | "ORANGE" | "AFRICELL";
 
 const NETWORK_CONFIG = {
-  VODACOM: { label: "Vodacom", color: "bg-red-600", prefixes: ["081", "082", "083"], hint: "081, 082 ou 083" },
-  AIRTEL: { label: "Airtel", color: "bg-red-700", prefixes: ["097", "098", "099"], hint: "097, 098 ou 099" },
-  ORANGE: { label: "Orange", color: "bg-orange-500", prefixes: ["084", "085", "089"], hint: "084, 085 ou 089" },
-  AFRICELL: { label: "Africell", color: "bg-purple-600", prefixes: ["090", "091"], hint: "090 ou 091" }
+  VODACOM: { label: "Vodacom", color: "bg-red-600", prefixes: ["081", "082", "083"] },
+  AIRTEL: { label: "Airtel", color: "bg-red-700", prefixes: ["097", "098", "099"] },
+  ORANGE: { label: "Orange", color: "bg-orange-500", prefixes: ["084", "085", "089"] },
+  AFRICELL: { label: "Africell", color: "bg-purple-600", prefixes: ["090", "091"] }
 };
 
 export default function CheckoutPage() {
@@ -58,11 +58,12 @@ export default function CheckoutPage() {
     const [customerPhone, setCustomerPhone] = useState("");
     const [isProcessing, setIsProcessing] = useState(false);
     
-    // Guest States for Silent Account Creation
+    // Guest States
     const [guestName, setGuestName] = useState("");
     const [guestEmail, setGuestEmail] = useState("");
     const [orderConfirmed, setOrderConfirmed] = useState(false);
     const [confirmedOrderId, setConfirmedOrderId] = useState("");
+    const [showFinishAccount, setShowFinishAccount] = useState(false);
     
     // Account Finishing States
     const [password, setPassword] = useState("");
@@ -85,20 +86,11 @@ export default function CheckoutPage() {
         let currentUserId = user?.uid;
         let finalName = user?.name || guestName;
         let finalEmail = user?.email || guestEmail;
+        let wasGuest = !user;
 
-        if (!user) {
+        if (wasGuest) {
             if (!guestName || !guestEmail) {
                 toast({ title: "Infos requises", description: "Veuillez entrer votre nom et email.", variant: "destructive" });
-                return;
-            }
-            setIsProcessing(true);
-            try {
-                const userCred = await signInAnonymously(auth);
-                currentUserId = userCred.user.uid;
-                await updateProfile(userCred.user, { displayName: guestName });
-            } catch (err) {
-                toast({ title: "Erreur session", description: "Impossible de créer une session invité.", variant: "destructive" });
-                setIsProcessing(false);
                 return;
             }
         }
@@ -106,7 +98,6 @@ export default function CheckoutPage() {
         if (paymentMethod === 'MOBILE_MONEY') {
             if (!customerPhone || !validatePhoneNumber(customerPhone, mobileNetwork)) {
                 toast({ title: "Numéro invalide", description: "Vérifiez votre numéro de téléphone.", variant: "destructive" });
-                setIsProcessing(false);
                 return;
             }
         }
@@ -114,6 +105,23 @@ export default function CheckoutPage() {
         setIsProcessing(true);
 
         try {
+            if (wasGuest) {
+                const userCred = await signInAnonymously(auth);
+                currentUserId = userCred.user.uid;
+                await updateProfile(userCred.user, { displayName: guestName });
+                
+                // Créer un document utilisateur temporaire
+                await setDoc(doc(db, "users", currentUserId), {
+                    id: currentUserId,
+                    email: finalEmail,
+                    displayName: finalName,
+                    name: finalName,
+                    role: 'customer',
+                    createdAt: serverTimestamp(),
+                    updatedAt: serverTimestamp()
+                });
+            }
+
             const orderData = {
                 userId: currentUserId,
                 customerEmail: finalEmail,
@@ -137,7 +145,7 @@ export default function CheckoutPage() {
             const orderRef = await addDoc(collection(db, "orders"), orderData);
             setConfirmedOrderId(orderRef.id);
 
-            // Notifications
+            // Notifications Staff
             await addDoc(collection(db, "notifications"), {
                 userId: 'staff',
                 title: "Nouvelle Commande !",
@@ -148,21 +156,10 @@ export default function CheckoutPage() {
                 link: '/dashboard/orders'
             });
 
-            if (!user) {
-                // Créer un document utilisateur temporaire
-                await setDoc(doc(db, "users", currentUserId!), {
-                    id: currentUserId,
-                    email: finalEmail,
-                    displayName: finalName,
-                    name: finalName,
-                    role: 'customer',
-                    createdAt: serverTimestamp(),
-                    updatedAt: serverTimestamp()
-                });
-            }
-
             clearCart();
             setOrderConfirmed(true);
+            if (wasGuest) setShowFinishAccount(true);
+            
             toast({ title: "Commande validée !", description: "Merci de votre confiance." });
 
         } catch (error) {
@@ -184,8 +181,8 @@ export default function CheckoutPage() {
             if (currentUser) {
                 await updateEmail(currentUser, guestEmail);
                 await updatePassword(currentUser, password);
-                toast({ title: "Compte créé !", description: "Votre espace Premium est prêt." });
-                router.push('/dashboard/orders');
+                toast({ title: "Compte activé !", description: "Bienvenue dans l'univers Premium DKS." });
+                router.push('/dashboard');
             }
         } catch (err: any) {
             console.error(err);
@@ -208,19 +205,25 @@ export default function CheckoutPage() {
                     </div>
                     
                     <div className="space-y-2">
-                        <h1 className="text-4xl font-black uppercase italic tracking-tighter">COMMANDE <span className="text-accent">ENREGISTRÉE</span></h1>
-                        <p className="text-muted-foreground font-medium">Référence : #{confirmedOrderId.substring(0, 8).toUpperCase()}</p>
+                        <h1 className="text-4xl font-black uppercase italic tracking-tighter">COMMANDE <span className="text-accent">RÉUSSIE</span></h1>
+                        <p className="text-muted-foreground font-medium uppercase tracking-widest text-xs">Référence : #{confirmedOrderId.substring(0, 8).toUpperCase()}</p>
                     </div>
 
-                    {!user && (
-                        <Card className="glossy-card border-none rounded-[2.5rem] p-8 text-left space-y-6">
-                            <div className="space-y-2">
-                                <Badge className="bg-accent/10 text-accent border-none uppercase text-[10px] font-black px-3 py-1">Offre Exclusive</Badge>
-                                <h2 className="text-xl font-black uppercase italic tracking-tight leading-none">Voulez-vous suivre votre setup ?</h2>
-                                <p className="text-xs text-muted-foreground leading-relaxed">Définissez un mot de passe pour activer votre espace client, suivre vos garanties et vos futurs achats.</p>
+                    {showFinishAccount ? (
+                        <Card className="glossy-card border-none rounded-[2.5rem] p-8 text-left space-y-6 relative overflow-hidden">
+                            <div className="absolute -top-10 -right-10 w-32 h-32 bg-accent/10 rounded-full blur-2xl" />
+                            
+                            <div className="space-y-2 relative z-10">
+                                <Badge className="bg-accent/20 text-accent border-none uppercase text-[10px] font-black px-3 py-1 mb-2">
+                                    <Star size={10} className="mr-1 fill-accent" /> Offre Membre
+                                </Badge>
+                                <h2 className="text-xl font-black uppercase italic tracking-tight leading-none">ACTIVER VOTRE ESPACE PREMIUM ?</h2>
+                                <p className="text-[11px] text-muted-foreground leading-relaxed font-light">
+                                    Définissez un mot de passe pour suivre votre colis, gérer vos garanties et bénéficier de remises exclusives sur vos futurs achats.
+                                </p>
                             </div>
 
-                            <div className="space-y-4">
+                            <div className="space-y-4 relative z-10">
                                 <div className="space-y-2">
                                     <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Votre nouveau mot de passe</Label>
                                     <div className="relative">
@@ -230,12 +233,12 @@ export default function CheckoutPage() {
                                             value={password}
                                             onChange={(e) => setPassword(e.target.value)}
                                             placeholder="••••••••" 
-                                            className="h-14 pl-12 bg-background/50 border-white/5 rounded-2xl focus:border-accent"
+                                            className="h-14 pl-12 bg-background/50 border-white/5 rounded-2xl focus:border-accent transition-all"
                                         />
                                     </div>
                                 </div>
                                 <Button 
-                                    className="w-full h-14 bg-accent text-black font-black uppercase italic rounded-2xl gap-2 group"
+                                    className="w-full h-14 bg-accent text-black font-black uppercase italic rounded-2xl gap-2 group shadow-xl shadow-accent/10"
                                     onClick={handleFinishAccount}
                                     disabled={isFinishingAccount}
                                 >
@@ -245,10 +248,17 @@ export default function CheckoutPage() {
                                 </Button>
                             </div>
                         </Card>
+                    ) : (
+                        <Card className="p-8 rounded-[2.5rem] bg-white/5 border border-white/5 text-center space-y-4">
+                            <p className="text-sm text-muted-foreground italic">Vous allez recevoir un e-mail de confirmation avec le détail de votre commande.</p>
+                            <Button className="w-full h-14 bg-primary text-white font-black uppercase italic rounded-2xl" onClick={() => router.push('/dashboard')}>
+                                Accéder à mon Dashboard
+                            </Button>
+                        </Card>
                     )}
 
-                    <div className="pt-8">
-                        <Button variant="ghost" onClick={() => router.push('/')} className="text-xs font-black uppercase italic opacity-40 hover:opacity-100">
+                    <div className="pt-4">
+                        <Button variant="ghost" onClick={() => router.push('/')} className="text-xs font-black uppercase italic opacity-40 hover:opacity-100 hover:text-accent transition-all">
                            Retour à la boutique
                         </Button>
                     </div>
@@ -286,7 +296,7 @@ export default function CheckoutPage() {
                         </div>
 
                         {!user && (
-                            <Card className="p-8 rounded-[2.5rem] bg-white/5 border border-white/5 space-y-6">
+                            <Card className="p-8 rounded-[2.5rem] bg-white/5 border border-white/5 space-y-6 animate-in fade-in slide-in-from-top-4">
                                 <div className="flex items-center gap-3">
                                     <Sparkles className="text-accent" size={20} />
                                     <h2 className="text-sm font-black uppercase tracking-widest italic">Informations Client</h2>
@@ -300,7 +310,7 @@ export default function CheckoutPage() {
                                                 value={guestName}
                                                 onChange={(e) => setGuestName(e.target.value)}
                                                 placeholder="Ex: John Doe" 
-                                                className="h-12 pl-12 bg-background/50 border-white/5 rounded-xl"
+                                                className="h-12 pl-12 bg-background/50 border-white/5 rounded-xl focus:border-accent"
                                             />
                                         </div>
                                     </div>
@@ -313,7 +323,7 @@ export default function CheckoutPage() {
                                                 value={guestEmail}
                                                 onChange={(e) => setGuestEmail(e.target.value)}
                                                 placeholder="john@example.com" 
-                                                className="h-12 pl-12 bg-background/50 border-white/5 rounded-xl"
+                                                className="h-12 pl-12 bg-background/50 border-white/5 rounded-xl focus:border-accent"
                                             />
                                         </div>
                                     </div>
@@ -389,7 +399,7 @@ export default function CheckoutPage() {
                                         </div>
                                         <div className="relative group">
                                             <Phone className="absolute left-5 top-1/2 -translate-y-1/2 text-muted-foreground" size={20} />
-                                            <Input type="tel" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value.replace(/\D/g, '').slice(0, 10))} placeholder="Numéro 10 chiffres" className="h-16 pl-14 rounded-2xl bg-background/50 border-white/5" />
+                                            <Input type="tel" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value.replace(/\D/g, '').slice(0, 10))} placeholder="Numéro de téléphone" className="h-16 pl-14 rounded-2xl bg-background/50 border-white/5" />
                                         </div>
                                     </div>
                                 </div>
@@ -433,7 +443,7 @@ export default function CheckoutPage() {
                             </CardContent>
                             <CardFooter className="p-8 bg-white/5">
                                 <Button 
-                                    className="w-full h-20 bg-accent text-black hover:bg-accent/90 rounded-2xl font-black uppercase italic text-xl gap-3 shadow-xl disabled:opacity-30"
+                                    className="w-full h-20 bg-accent text-black hover:bg-accent/90 rounded-2xl font-black uppercase italic text-xl gap-3 shadow-xl disabled:opacity-30 transition-all"
                                     onClick={handlePlaceOrder}
                                     disabled={isProcessing || cartItems.length === 0}
                                 >
