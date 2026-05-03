@@ -1,8 +1,7 @@
-
 "use client";
 
 import { useState, useRef } from 'react';
-import组件 withAuth from '@/components/auth/withAuth';
+import withAuth from '@/components/auth/withAuth';
 import { Navbar } from "@/components/layout/Navbar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
