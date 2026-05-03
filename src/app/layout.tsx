@@ -28,17 +28,19 @@ export default function RootLayout({
   return (
     <html lang="fr" suppressHydrationWarning>
       <head>
+        {/* Chargement du SDK Pi Network avant l'interactivité */}
         <Script 
           src="https://sdk.minepi.com/pi-sdk.js" 
           strategy="beforeInteractive"
         />
       </head>
       <body className={cn("min-h-screen bg-background font-sans antialiased", fontSans.variable)}>
-        {/* Initialisation du SDK Pi */}
+        {/* Initialisation du SDK Pi en mode SANDBOX pour les tests */}
         <Script id="pi-init" strategy="afterInteractive">
           {`
             if (window.Pi) {
               window.Pi.init({ version: "2.0", sandbox: true });
+              console.log("[Pi SDK] Initialisé en mode Sandbox");
             }
           `}
         </Script>

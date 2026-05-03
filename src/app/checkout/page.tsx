@@ -40,7 +40,8 @@ import {
   Star,
   Printer,
   QrCode,
-  Download
+  Download,
+  AlertTriangle
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -132,10 +133,21 @@ export default function CheckoutPage() {
         try {
             let currentUserId = user?.uid;
 
-            // 1. GESTION DU FLUX PI NETWORK (Si sélectionné)
+            // 1. GESTION DU FLUX PI NETWORK
             if (paymentMethod === "PI_NETWORK") {
+                // Vérifier si nous sommes dans le Pi Browser
+                if (typeof window === 'undefined' || !(window as any).Pi) {
+                    toast({ 
+                        title: "Pi Browser requis", 
+                        description: "Veuillez ouvrir cette page dans l'application Pi Browser pour payer en Pi.", 
+                        variant: "destructive" 
+                    });
+                    setIsProcessing(false);
+                    return;
+                }
+
                 try {
-                    toast({ title: "Connexion au Pi Browser", description: "Authentification en cours..." });
+                    toast({ title: "Connexion Pi", description: "Veuillez autoriser l'accès dans la fenêtre Pi..." });
                     const piUser = await authenticateWithPi();
                     
                     const piAmount = totalPrice / PI_CONVERSION_RATE;
@@ -147,32 +159,38 @@ export default function CheckoutPage() {
                         metadata: { customerName: finalName, orderTotal: totalPrice }
                     }, {
                         onReadyForServerApproval: async (paymentId: string) => {
+                            console.log("[Checkout] Paiement prêt pour approbation:", paymentId);
                             await fetch('/api/pi/approve', {
                                 method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ paymentId })
                             });
                         },
                         onReadyForServerCompletion: async (paymentId: string, txid: string) => {
+                            console.log("[Checkout] Paiement prêt pour complétion:", paymentId, txid);
                             await fetch('/api/pi/complete', {
                                 method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ paymentId, txid })
                             });
                             // On continue vers l'enregistrement Firestore après succès Pi
                             finalizeFirestoreOrder(currentUserId, finalName, finalEmail, 'paid_pi');
                         },
-                        onCancel: () => {
-                            toast({ title: "Paiement annulé", description: "Vous avez annulé la transaction Pi." });
+                        onCancel: (paymentId: string) => {
+                            toast({ title: "Paiement annulé", description: "La transaction Pi a été annulée." });
                             setIsProcessing(false);
                         },
-                        onError: (error: any) => {
-                            console.error(error);
-                            toast({ title: "Erreur Pi", description: "Échec du paiement Pi.", variant: "destructive" });
+                        onError: (error: any, payment?: any) => {
+                            console.error("[Checkout] Erreur Pi SDK:", error);
+                            toast({ title: "Erreur Pi Network", description: "Impossible de finaliser la transaction blockchain.", variant: "destructive" });
                             setIsProcessing(false);
                         }
                     });
                     
                     return; // Le reste se passe dans le callback completion
-                } catch (e) {
+                } catch (e: any) {
+                    console.error("[Checkout] Erreur authentification Pi:", e);
+                    toast({ title: "Authentification Échouée", description: e.message, variant: "destructive" });
                     setIsProcessing(false);
                     return;
                 }
@@ -462,6 +480,15 @@ export default function CheckoutPage() {
                             {paymentMethod === "PI_NETWORK" && (
                                 <div className="space-y-6 animate-in fade-in">
                                     <div className="flex items-center gap-4 text-accent"><Coins size={24} /><div><h3 className="font-black uppercase italic tracking-tighter">Paiement Pi Network</h3><p className="text-[10px] uppercase font-bold tracking-widest opacity-60">Consensus Global 1 π = $314,159</p></div></div>
+                                    
+                                    <div className="p-4 rounded-xl bg-accent/5 border border-dashed border-accent/20 flex items-start gap-4">
+                                        <AlertTriangle className="text-accent shrink-0" size={18} />
+                                        <div className="space-y-1">
+                                            <p className="text-[10px] font-black uppercase text-accent">Mode Test Sandbox Activé</p>
+                                            <p className="text-[9px] text-muted-foreground leading-tight">Vérifiez que vous utilisez le Pi Browser sur le réseau de test (Testnet).</p>
+                                        </div>
+                                    </div>
+
                                     <div className="bg-accent/5 border border-accent/20 p-5 rounded-xl flex justify-between items-center"><span className="text-[10px] font-black uppercase text-accent">Total π :</span><span className="font-black text-2xl text-white">{(totalPrice / PI_CONVERSION_RATE).toFixed(8)} π</span></div>
                                 </div>
                             )}
