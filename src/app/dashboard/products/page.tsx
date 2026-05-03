@@ -285,6 +285,7 @@ function ProductsPage() {
           <form onSubmit={handleSave} className="flex-1 flex flex-col overflow-hidden">
             <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                    {/* Colonne Gauche : Données */}
                     <div className="space-y-6">
                         <div className="space-y-2">
                             <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Nom commercial</Label>
@@ -335,16 +336,19 @@ function ProductsPage() {
                                     Générer texte
                                 </Button>
                             </div>
-                            <Textarea 
-                                name="description" 
-                                value={aiDescription} 
-                                onChange={(e) => setAiDescription(e.target.value)}
-                                className="min-h-[160px] bg-background/50 border-white/10 rounded-xl resize-none text-xs leading-relaxed" 
-                                required 
-                            />
+                            <div className="min-h-[160px] relative">
+                                <Textarea 
+                                    name="description" 
+                                    value={aiDescription} 
+                                    onChange={(e) => setAiDescription(e.target.value)}
+                                    className="min-h-[160px] bg-background/50 border-white/10 rounded-xl resize-none text-xs leading-relaxed" 
+                                    required 
+                                />
+                            </div>
                         </div>
                     </div>
 
+                    {/* Colonne Droite : Visuel */}
                     <div className="space-y-8">
                         <div className="space-y-4">
                             <div className="flex justify-between items-end">
@@ -362,6 +366,7 @@ function ProductsPage() {
                                 </Button>
                             </div>
                             
+                            {/* Cadre Image Fixe pour éviter les sauts */}
                             <div 
                                 onClick={() => !isGeneratingImg && fileInputRef.current?.click()}
                                 className="aspect-square w-full max-w-[320px] mx-auto rounded-3xl bg-white/5 border-2 border-dashed border-white/10 overflow-hidden relative group shrink-0 cursor-pointer hover:border-accent/40 transition-colors"
@@ -382,6 +387,7 @@ function ProductsPage() {
                                     </div>
                                 )}
 
+                                {/* Overlay de chargement IA stable */}
                                 {isGeneratingImg && (
                                     <div className="absolute inset-0 bg-black/80 backdrop-blur-md flex flex-col items-center justify-center gap-4">
                                         <div className="relative">
@@ -429,6 +435,7 @@ function ProductsPage() {
                 </div>
             </div>
 
+            {/* Pied de page fixe */}
             <DialogFooter className="p-8 pt-6 border-t border-white/5 bg-background/40 backdrop-blur-xl shrink-0">
               <div className="flex gap-4 w-full">
                 <Button type="button" variant="ghost" onClick={closeModal} className="flex-1 rounded-2xl font-bold uppercase text-[10px] h-14 border border-white/5">Annuler</Button>
