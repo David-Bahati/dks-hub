@@ -46,6 +46,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               role: userData.role || 'customer',
               createdAt: userData.createdAt || null,
               photoURL: userData.photoURL || null,
+              whatsapp: userData.whatsapp || userData.phoneNumber || '',
+              address: userData.address || '',
+              loyaltyLevel: userData.loyaltyLevel || 'Bronze',
+              language: userData.language || 'fr',
             });
           } else {
             setUser({

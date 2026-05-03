@@ -6,6 +6,11 @@ export type AppUser = {
   role: 'admin' | 'seller' | 'cashier' | 'customer' | 'Admin' | 'Seller' | 'Cashier';
   createdAt?: any;
   photoURL?: string;
+  phoneNumber?: string;
+  whatsapp?: string;
+  address?: string;
+  loyaltyLevel?: 'Bronze' | 'Silver' | 'Gold';
+  language?: 'fr' | 'en';
 };
 
 export type Product = {
