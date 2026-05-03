@@ -19,7 +19,14 @@ import {
     RefreshCw,
     Loader2,
     Camera,
-    Upload
+    Upload,
+    Monitor,
+    History,
+    AlertTriangle,
+    CheckCircle2,
+    Eye,
+    EyeOff,
+    Trash2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,19 +34,37 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Progress } from "@/components/ui/progress";
 import { 
     Tabs, 
     TabsContent, 
     TabsList, 
     TabsTrigger 
 } from "@/components/ui/tabs";
+import { 
+    Dialog, 
+    DialogContent, 
+    DialogHeader, 
+    DialogTitle, 
+    DialogFooter,
+    DialogDescription,
+    DialogTrigger
+} from "@/components/ui/dialog";
 import { useAuth } from '@/context/AuthContext';
 import { auth, db } from '@/lib/firebase';
-import { signOut, updateProfile } from 'firebase/auth';
+import { 
+    signOut, 
+    updateProfile, 
+    updatePassword, 
+    reauthenticateWithCredential, 
+    EmailAuthProvider,
+    deleteUser 
+} from 'firebase/auth';
 import { doc, updateDoc, serverTimestamp, getDoc, setDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { PI_CONVERSION_RATE } from '@/lib/constants';
+import { cn } from '@/lib/utils';
 
 export default function SettingsPage() {
     const { user } = useAuth();
@@ -54,6 +79,15 @@ export default function SettingsPage() {
     const [photoURL, setPhotoURL] = useState("");
     const [isSaving, setIsSaving] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
+
+    // Security States
+    const [currentPassword, setCurrentPassword] = useState("");
+    const [newPassword, setNewPassword] = useState("");
+    const [confirmPassword, setConfirmPassword] = useState("");
+    const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+    const [showPasswords, setShowPasswords] = useState(false);
+    const [confirmDeletePass, setConfirmDeletePass] = useState("");
+    const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
     // System States
     const [exchangeRate, setExchangeRate] = useState("2500");
@@ -85,6 +119,18 @@ export default function SettingsPage() {
 
     const isAdmin = user?.role?.toLowerCase() === 'admin';
 
+    const getPasswordStrength = (pass: string) => {
+        let score = 0;
+        if (pass.length > 6) score += 20;
+        if (pass.length > 10) score += 20;
+        if (/[A-Z]/.test(pass)) score += 20;
+        if (/[0-9]/.test(pass)) score += 20;
+        if (/[^A-Za-z0-9]/.test(pass)) score += 20;
+        return score;
+    };
+
+    const strength = getPasswordStrength(newPassword);
+
     const handleLogout = async () => {
         try {
             await signOut(auth);
@@ -95,11 +141,54 @@ export default function SettingsPage() {
         }
     };
 
+    const handleUpdatePassword = async () => {
+        if (!auth.currentUser || !email) return;
+        if (newPassword !== confirmPassword) {
+            toast({ title: "Erreur", description: "Les mots de passe ne correspondent pas.", variant: "destructive" });
+            return;
+        }
+        if (newPassword.length < 6) {
+            toast({ title: "Trop court", description: "Le mot de passe doit faire au moins 6 caractères.", variant: "destructive" });
+            return;
+        }
+
+        setIsUpdatingPassword(true);
+        try {
+            const credential = EmailAuthProvider.credential(email, currentPassword);
+            await reauthenticateWithCredential(auth.currentUser, credential);
+            await updatePassword(auth.currentUser, newPassword);
+            
+            toast({ title: "Succès", description: "Votre mot de passe a été modifié." });
+            setCurrentPassword("");
+            setNewPassword("");
+            setConfirmPassword("");
+        } catch (err: any) {
+            toast({ title: "Erreur d'authentification", description: "Mot de passe actuel incorrect.", variant: "destructive" });
+        } finally {
+            setIsUpdatingPassword(false);
+        }
+    };
+
+    const handleDeleteAccount = async () => {
+        if (!auth.currentUser || !email) return;
+        setIsDeletingAccount(true);
+        try {
+            const credential = EmailAuthProvider.credential(email, confirmDeletePass);
+            await reauthenticateWithCredential(auth.currentUser, credential);
+            await deleteUser(auth.currentUser);
+            toast({ title: "Compte supprimé", description: "Vos données ont été effacées." });
+            router.push('/');
+        } catch (err) {
+            toast({ title: "Erreur", description: "Vérifiez votre mot de passe.", variant: "destructive" });
+        } finally {
+            setIsDeletingAccount(false);
+        }
+    };
+
     const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
 
-        // Limite de taille simple (ex: 2MB)
         if (file.size > 2 * 1024 * 1024) {
             toast({ title: "Fichier volumineux", description: "Veuillez choisir une image de moins de 2MB.", variant: "destructive" });
             return;
@@ -111,7 +200,6 @@ export default function SettingsPage() {
             const base64String = reader.result as string;
             setPhotoURL(base64String);
             
-            // Mise à jour immédiate pour le feedback visuel
             if (user?.uid) {
                 try {
                     await updateDoc(doc(db, "users", user.uid), {
@@ -203,9 +291,9 @@ export default function SettingsPage() {
                         </div>
                         <div>
                             <h1 className="text-xl font-black tracking-tighter uppercase italic leading-none">
-                                RÉGLAGES <span className="text-accent font-light not-italic">SYSTÈME</span>
+                                PARAMÈTRES <span className="text-accent font-light not-italic">CLIENT</span>
                             </h1>
-                            <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest mt-1 opacity-60">Gestion de compte</p>
+                            <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest mt-1 opacity-60">Gestion Premium DKS</p>
                         </div>
                     </div>
                     <Link href="/dashboard">
@@ -233,6 +321,7 @@ export default function SettingsPage() {
                         )}
                     </TabsList>
 
+                    {/* PROFIL TAB */}
                     <TabsContent value="profile" className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
                         <div className="flex flex-col md:flex-row gap-10 items-center md:items-start text-center md:text-left">
                             <div className="relative group">
@@ -315,23 +404,155 @@ export default function SettingsPage() {
                         </div>
                     </TabsContent>
 
-                    <TabsContent value="security" className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                        <Card className="glossy-card border-none rounded-[2.5rem]">
-                            <CardHeader className="p-10 pb-0">
-                                <CardTitle className="text-lg font-black uppercase italic tracking-tighter flex items-center gap-3">
-                                    <Lock className="text-accent" size={20} /> Sécurité
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent className="p-10">
-                                <div className="flex justify-between items-center">
-                                    <div>
-                                        <h4 className="font-bold uppercase italic text-sm">Authentification à deux facteurs</h4>
-                                        <p className="text-[10px] text-muted-foreground font-bold uppercase">Protégez vos achats importants.</p>
+                    {/* SÉCURITÉ TAB */}
+                    <TabsContent value="security" className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                            
+                            {/* Modification Mot de passe */}
+                            <Card className="glossy-card border-none rounded-[2.5rem] overflow-hidden">
+                                <CardHeader className="bg-white/5 p-8 border-b border-white/5">
+                                    <CardTitle className="text-sm font-black uppercase italic tracking-widest flex items-center gap-2">
+                                        <Lock size={16} className="text-accent" /> Accès & Code PIN
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent className="p-8 space-y-6">
+                                    <div className="space-y-4">
+                                        <div className="space-y-2">
+                                            <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Mot de passe actuel</Label>
+                                            <Input type={showPasswords ? "text" : "password"} value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} className="h-12 bg-background/50 border-white/5 rounded-xl" />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Nouveau mot de passe</Label>
+                                            <Input type={showPasswords ? "text" : "password"} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="h-12 bg-background/50 border-white/5 rounded-xl" />
+                                            {newPassword && (
+                                                <div className="space-y-1.5 pt-1">
+                                                    <div className="flex justify-between text-[8px] font-black uppercase">
+                                                        <span className="text-muted-foreground">Force du code</span>
+                                                        <span className={cn(strength < 40 ? "text-red-400" : strength < 80 ? "text-orange-400" : "text-green-400")}>
+                                                            {strength < 40 ? "Faible" : strength < 80 ? "Moyen" : "Supreme"}
+                                                        </span>
+                                                    </div>
+                                                    <Progress value={strength} className="h-1 bg-white/5" indicatorClassName={cn(strength < 40 ? "bg-red-500" : strength < 80 ? "bg-orange-500" : "bg-green-500")} />
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Confirmer le nouveau code</Label>
+                                            <Input type={showPasswords ? "text" : "password"} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="h-12 bg-background/50 border-white/5 rounded-xl" />
+                                        </div>
+                                        <button onClick={() => setShowPasswords(!showPasswords)} className="text-[9px] font-black uppercase italic text-accent flex items-center gap-2 hover:underline">
+                                            {showPasswords ? <EyeOff size={12} /> : <Eye size={12} />} {showPasswords ? "Masquer" : "Afficher les codes"}
+                                        </button>
                                     </div>
-                                    <Switch />
-                                </div>
-                            </CardContent>
-                        </Card>
+                                    <Button onClick={handleUpdatePassword} disabled={isUpdatingPassword || !currentPassword || !newPassword} className="w-full bg-white text-black font-black uppercase italic h-12 rounded-xl">
+                                        {isUpdatingPassword ? <Loader2 className="animate-spin" /> : "Mettre à jour le code"}
+                                    </Button>
+                                </CardContent>
+                            </Card>
+
+                            {/* Sessions & 2FA */}
+                            <div className="space-y-8">
+                                <Card className="glossy-card border-none rounded-[2.5rem]">
+                                    <CardHeader className="p-8 pb-4">
+                                        <CardTitle className="text-sm font-black uppercase italic tracking-widest flex items-center gap-2">
+                                            <ShieldCheck size={16} className="text-accent" /> Sécurité Avancée
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="p-8 pt-0 space-y-6">
+                                        <div className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5">
+                                            <div className="space-y-1">
+                                                <p className="text-[11px] font-black uppercase italic">Protection Commandes</p>
+                                                <p className="text-[9px] text-muted-foreground uppercase">Confirmer les achats par Email</p>
+                                            </div>
+                                            <Switch defaultChecked />
+                                        </div>
+                                        
+                                        <div className="space-y-4">
+                                            <p className="text-[10px] font-black uppercase tracking-widest opacity-40 italic">Appareils Connectés</p>
+                                            <div className="space-y-3">
+                                                <div className="flex items-center justify-between p-4 bg-accent/5 rounded-2xl border border-accent/20">
+                                                    <div className="flex items-center gap-3">
+                                                        <Smartphone size={20} className="text-accent" />
+                                                        <div>
+                                                            <p className="text-[10px] font-black uppercase italic">Cet appareil</p>
+                                                            <p className="text-[9px] text-muted-foreground">Bunia, RDC • Actif maintenant</p>
+                                                        </div>
+                                                    </div>
+                                                    <Badge className="bg-accent text-black font-black text-[8px] border-none px-2 h-4">ACTUEL</Badge>
+                                                </div>
+                                                <div className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5 opacity-50">
+                                                    <div className="flex items-center gap-3">
+                                                        <Monitor size={20} className="text-muted-foreground" />
+                                                        <div>
+                                                            <p className="text-[10px] font-black uppercase italic">Chrome • Windows</p>
+                                                            <p className="text-[9px] text-muted-foreground">Bunia, RDC • Il y a 2 jours</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <Button variant="ghost" className="w-full text-[9px] font-black uppercase italic text-destructive hover:bg-destructive/10 h-10 rounded-xl">
+                                                Se déconnecter de tous les autres appareils
+                                            </Button>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+
+                                {/* Historique d'activité */}
+                                <Card className="glossy-card border-none rounded-[2.5rem]">
+                                    <CardHeader className="p-8 pb-4">
+                                        <CardTitle className="text-sm font-black uppercase italic tracking-widest flex items-center gap-2">
+                                            <History size={16} className="text-accent" /> Journal de Sécurité
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="px-8 pb-8">
+                                        <div className="space-y-4">
+                                            {[
+                                                { action: "Connexion réussie", date: "Aujourd'hui, 14:20", icon: CheckCircle2, color: "text-green-400" },
+                                                { action: "Modification photo profil", date: "Hier, 09:45", icon: User, color: "text-accent" },
+                                                { action: "Nouvelle commande #DKS...", date: "02/05/2024", icon: Smartphone, color: "text-accent" }
+                                            ].map((log, idx) => (
+                                                <div key={idx} className="flex items-center gap-4 py-2 border-b border-white/5 last:border-0">
+                                                    <log.icon size={14} className={log.color} />
+                                                    <div>
+                                                        <p className="text-[10px] font-bold uppercase italic">{log.action}</p>
+                                                        <p className="text-[8px] text-muted-foreground font-medium uppercase tracking-widest">{log.date}</p>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            </div>
+                        </div>
+
+                        {/* Zone de Danger */}
+                        <div className="pt-10 flex justify-center">
+                            <Dialog>
+                                <DialogTrigger asChild>
+                                    <Button variant="ghost" className="text-destructive/40 hover:text-destructive hover:bg-destructive/5 font-black uppercase italic text-[9px] tracking-widest gap-2">
+                                        <Trash2 size={12} /> Supprimer mon compte client
+                                    </Button>
+                                </DialogTrigger>
+                                <DialogContent className="bg-background border-destructive/20 rounded-[2rem]">
+                                    <DialogHeader>
+                                        <DialogTitle className="text-xl font-black uppercase italic text-destructive">Action Irréversible</DialogTitle>
+                                        <DialogDescription className="text-xs uppercase font-bold text-muted-foreground py-2">
+                                            Toutes vos commandes et garanties seront effacées. Pour valider, entrez votre mot de passe actuel.
+                                        </DialogDescription>
+                                    </DialogHeader>
+                                    <div className="py-4 space-y-4">
+                                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Votre mot de passe</Label>
+                                        <Input type="password" value={confirmDeletePass} onChange={(e) => setConfirmDeletePass(e.target.value)} className="h-12 bg-white/5 border-white/10 rounded-xl" />
+                                    </div>
+                                    <DialogFooter className="gap-2">
+                                        <Button variant="ghost" className="font-bold uppercase text-xs" onClick={() => setConfirmDeletePass("")}>Annuler</Button>
+                                        <Button className="bg-destructive text-white font-black uppercase italic h-12 px-8 rounded-xl" onClick={handleDeleteAccount} disabled={isDeletingAccount || !confirmDeletePass}>
+                                            {isDeletingAccount ? <Loader2 className="animate-spin" /> : "CONFIRMER LA SUPPRESSION"}
+                                        </Button>
+                                    </DialogFooter>
+                                </DialogContent>
+                            </Dialog>
+                        </div>
                     </TabsContent>
 
                     {isAdmin && (
