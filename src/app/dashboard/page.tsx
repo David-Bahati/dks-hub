@@ -35,7 +35,8 @@ import {
   Laptop,
   Trophy,
   Crown,
-  Star
+  Star,
+  FileText
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -62,7 +63,7 @@ import { Product } from '@/lib/types';
 import withAuth from '@/components/auth/withAuth';
 import { useAuth } from '@/context/AuthContext';
 import { useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, where } from 'firebase/firestore';
+import { collection, query, where, orderBy, limit } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/ui/Logo";
@@ -80,16 +81,16 @@ import {
 } from 'recharts';
 
 const navConfig = [
-  { href: "/dashboard", icon: LineChart, label: "Aperçu", roles: ["Admin", "Seller", "Cashier"] },
+  { href: "/dashboard", icon: LineChart, label: "Aperçu", roles: ["Admin", "Seller", "Cashier", "customer"] },
   { href: "/dashboard/products", icon: Package, label: "Produits", roles: ["Admin", "Seller"] },
   { href: "/dashboard/categories", icon: Tags, label: "Catégories", roles: ["Admin", "Seller"] },
-  { href: "/dashboard/orders", icon: ShoppingBag, label: "Commandes", roles: ["Admin", "Seller", "Cashier"] },
-  { href: "/dashboard/services", icon: GraduationCap, label: "Services & Pôles", roles: ["Admin", "Seller", "Cashier"] },
-  { href: "/dashboard/support", icon: Wrench, label: "SAV & Support", roles: ["Admin", "Seller", "Cashier"] },
+  { href: "/dashboard/orders", icon: ShoppingBag, label: "Commandes", roles: ["Admin", "Seller", "Cashier", "customer"] },
+  { href: "/dashboard/services", icon: GraduationCap, label: "Services & Pôles", roles: ["Admin", "Seller", "Cashier", "customer"] },
+  { href: "/dashboard/support", icon: Wrench, label: "SAV & Support", roles: ["Admin", "Seller", "Cashier", "customer"] },
   { href: "/dashboard/hardware", icon: Laptop, label: "Parc Hardware", roles: ["Admin", "Seller", "Cashier", "customer"] },
   { href: "/dashboard/customers", icon: Users, label: "Clients", roles: ["Admin", "Seller", "Cashier"] },
   { href: "/dashboard/users", icon: UsersRound, label: "Équipe", roles: ["Admin"] },
-  { href: "/dashboard/settings", icon: Settings, label: "Réglages", roles: ["Admin"] },
+  { href: "/dashboard/settings", icon: Settings, label: "Réglages", roles: ["Admin", "customer"] },
 ];
 
 function DashboardPage() {
@@ -111,34 +112,25 @@ function DashboardPage() {
   });
 
   const ordersQuery = useMemoFirebase(() => {
-    if (authLoading || !user?.uid || isStaff) return null;
-    return query(collection(db, "orders"), where("userId", "==", user.uid));
-  }, [user?.uid, isStaff, authLoading]);
+    if (authLoading || !user?.uid) return null;
+    return query(collection(db, "orders"), where("userId", "==", user.uid), orderBy("createdAt", "desc"), limit(5));
+  }, [user?.uid, authLoading]);
   
   const { data: userOrders } = useCollection(ordersQuery);
 
   const bookingsQuery = useMemoFirebase(() => {
-    if (authLoading || !user?.uid || isStaff) return null;
-    return query(collection(db, "serviceBookings"), where("userId", "==", user.uid));
-  }, [user?.uid, isStaff, authLoading]);
+    if (authLoading || !user?.uid) return null;
+    return query(collection(db, "serviceBookings"), where("userId", "==", user.uid), orderBy("createdAt", "desc"), limit(3));
+  }, [user?.uid, authLoading]);
 
   const { data: userBookings } = useCollection(bookingsQuery);
 
   const assetsQuery = useMemoFirebase(() => {
-    if (authLoading || !user?.uid || isStaff) return null;
+    if (authLoading || !user?.uid) return null;
     return query(collection(db, "hardwareAssets"), where("userId", "==", user.uid));
-  }, [user?.uid, isStaff, authLoading]);
+  }, [user?.uid, authLoading]);
 
   const { data: userAssets } = useCollection(assetsQuery);
-
-  const lastOrder = useMemo(() => {
-    if (!userOrders) return null;
-    return [...userOrders].sort((a, b) => {
-      const dateA = a.createdAt?.toDate?.() || new Date(0);
-      const dateB = b.createdAt?.toDate?.() || new Date(0);
-      return dateB - dateA;
-    })[0];
-  }, [userOrders]);
 
   useEffect(() => {
     if (isStaff) {
@@ -170,18 +162,12 @@ function DashboardPage() {
     }
   };
 
-  const serviceDistribution = [
-    { name: 'Ventes', value: stats?.totalSalesCount || 10, color: 'hsl(var(--accent))' },
-    { name: 'Formations', value: 15, color: 'hsl(var(--primary))' },
-    { name: 'Services', value: 8, color: 'hsl(var(--destructive))' },
-  ];
-
   const getStatusBadge = (status: string) => {
     const s = status?.toLowerCase();
     if (s?.includes('payé') || s?.includes('ready') || s === 'completed') {
-      return <Badge className="bg-green-500/10 text-green-400 border-none uppercase text-[9px] font-black px-2 py-0.5"><CheckCircle2 size={10} className="mr-1 inline" /> OK</Badge>;
+      return <Badge className="bg-green-500/10 text-green-400 border-none uppercase text-[9px] font-black px-2 py-0.5">OK</Badge>;
     }
-    return <Badge className="bg-orange-500/10 text-orange-400 border-none uppercase text-[9px] font-black px-2 py-0.5"><Clock size={10} className="mr-1 inline" /> ATTENTE</Badge>;
+    return <Badge className="bg-orange-500/10 text-orange-400 border-none uppercase text-[9px] font-black px-2 py-0.5">ATTENTE</Badge>;
   };
 
   const LoyaltyIcon = () => {
@@ -200,50 +186,187 @@ function DashboardPage() {
       <div className="flex min-h-screen w-full flex-col bg-background">
         <header className="border-b border-white/5 bg-background/40 backdrop-blur-2xl py-6 px-4 md:px-8">
             <div className="max-w-7xl mx-auto flex justify-between items-center">
-                <Logo size="md" showText />
+                <div className="flex items-center gap-6">
+                    <Logo size="md" showText />
+                    <nav className="hidden md:flex items-center gap-2">
+                        {filteredNavLinks.map(link => (
+                            <Link key={link.href} href={link.href}>
+                                <Button variant="ghost" className={cn("h-10 rounded-xl font-black uppercase italic text-[10px] tracking-widest", pathname === link.href ? "text-accent bg-accent/10" : "text-muted-foreground")}>
+                                    <link.icon size={14} className="mr-2" /> {link.label}
+                                </Button>
+                            </Link>
+                        ))}
+                    </nav>
+                </div>
                 <div className="flex items-center gap-3">
                     <Link href="/"><Button variant="outline" className="rounded-xl border-white/10 h-10 font-bold text-xs uppercase italic"><ShoppingCart size={14} className="mr-2" /> Boutique</Button></Link>
                 </div>
             </div>
         </header>
 
-        <main className="flex-1 max-w-7xl mx-auto w-full p-4 md:p-8 space-y-8">
+        <main className="flex-1 max-w-7xl mx-auto w-full p-4 md:p-8 space-y-8 pb-20">
+            {/* HERO MIXTE (SERVICE + BOUTIQUE) */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <Card className="md:col-span-2 glossy-card border-none rounded-[2.5rem] overflow-hidden relative group">
+                <Card className="md:col-span-2 glossy-card border-none rounded-[2.5rem] overflow-hidden relative group bg-gradient-to-br from-primary/20 to-accent/10">
                     <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity"><Sparkles size={120} className="text-accent" /></div>
-                    <CardContent className="p-10 space-y-4">
+                    <CardContent className="p-10 space-y-6">
                         <div className="flex items-center gap-3">
                             <Badge className="bg-accent/20 text-accent border-none font-black uppercase tracking-tighter px-3 py-1">Membre {user?.loyaltyLevel || 'Bronze'}</Badge>
                             <LoyaltyIcon />
                         </div>
-                        <h2 className="text-4xl font-black uppercase italic leading-tight">VOTRE UNIVERS<br /><span className="text-accent">TECHNOLOGIQUE</span></h2>
-                        <p className="text-muted-foreground text-sm max-w-md font-light leading-relaxed">Centralisez vos factures, gérez votre parc informatique et réservez vos formations IA.</p>
+                        <h2 className="text-4xl md:text-5xl font-black uppercase italic leading-none tracking-tighter">VOTRE UNIVERS<br /><span className="text-accent">DKS SUPREME</span></h2>
+                        <p className="text-muted-foreground text-sm max-w-md font-light leading-relaxed">
+                            Gérez vos achats informatiques, suivez votre parc matériel et accédez à nos services d'experts à Bunia.
+                        </p>
                         <div className="flex flex-wrap gap-4 mt-6">
-                            <Button className="bg-primary hover:bg-primary/90 h-12 rounded-xl px-8 font-black uppercase italic gap-2" asChild><Link href="/services">Nouveau Service <ArrowRight size={18} /></Link></Button>
-                            <Button variant="outline" className="border-white/10 h-12 rounded-xl px-8 font-black uppercase italic gap-2" asChild><Link href="/dashboard/referrals">Programme Ambassadeur <Users size={18} /></Link></Button>
+                            <Button className="bg-primary hover:bg-primary/90 h-14 rounded-xl px-8 font-black uppercase italic gap-2 shadow-xl" asChild>
+                                <Link href="/#shop">Acheter du Hardware <ArrowRight size={18} /></Link>
+                            </Button>
+                            <Button variant="outline" className="border-white/10 h-14 rounded-xl px-8 font-black uppercase italic gap-2 bg-white/5 backdrop-blur-xl" asChild>
+                                <Link href="/services">Réserver un Service <Wrench size={18} /></Link>
+                            </Button>
                         </div>
                     </CardContent>
                 </Card>
 
-                <Card className="glossy-card border-none rounded-[2.5rem] flex flex-col hover:border-accent/20 transition-all overflow-hidden">
-                    <CardHeader className="bg-white/5"><CardTitle className="text-sm font-black uppercase italic tracking-widest flex items-center gap-2"><Clock size={16} className="text-accent" /> Derniers Événements</CardTitle></CardHeader>
-                    <CardContent className="p-6 space-y-4 flex-1">
-                        {lastOrder ? (
-                            <div className="p-4 bg-white/5 rounded-2xl border border-white/5 space-y-2">
-                                <div className="flex justify-between items-center"><p className="text-[10px] font-black uppercase text-muted-foreground">Commande #{lastOrder.id.substring(0, 6)}</p>{getStatusBadge(lastOrder.status)}</div>
-                                <p className="text-xl font-black">${lastOrder.total?.toFixed(2)}</p>
+                <Card className="glossy-card border-none rounded-[2.5rem] flex flex-col hover:border-accent/20 transition-all overflow-hidden bg-card/40">
+                    <CardHeader className="bg-white/5"><CardTitle className="text-xs font-black uppercase italic tracking-widest flex items-center gap-2 text-accent"><TrendingUp size={16} /> Statistiques Hub</CardTitle></CardHeader>
+                    <CardContent className="p-8 space-y-6 flex-1 flex flex-col justify-center">
+                        <div className="grid grid-cols-2 gap-6">
+                            <div className="space-y-1">
+                                <p className="text-3xl font-black text-white">{userOrders?.length || 0}</p>
+                                <p className="text-[9px] font-bold uppercase text-muted-foreground tracking-widest">Achats</p>
                             </div>
-                        ) : <p className="text-xs text-center opacity-30 italic py-10">Aucune commande web</p>}
-                        
-                        <div className="pt-4 border-t border-white/5">
-                            <p className="text-[9px] font-black uppercase text-muted-foreground mb-3">Statistiques Hub</p>
-                            <div className="grid grid-cols-2 gap-3">
-                                <div className="bg-white/5 p-3 rounded-xl"><p className="text-xl font-black text-accent">{userBookings?.length || 0}</p><p className="text-[8px] font-bold uppercase opacity-40">Prestations</p></div>
-                                <div className="bg-white/5 p-3 rounded-xl"><p className="text-xl font-black text-primary">{userAssets?.length || 0}</p><p className="text-[8px] font-bold uppercase opacity-40">Appareils</p></div>
+                            <div className="space-y-1">
+                                <p className="text-3xl font-black text-accent">{userBookings?.length || 0}</p>
+                                <p className="text-[9px] font-bold uppercase text-muted-foreground tracking-widest">Services</p>
+                            </div>
+                            <div className="space-y-1">
+                                <p className="text-3xl font-black text-primary">{userAssets?.length || 0}</p>
+                                <p className="text-[9px] font-bold uppercase text-muted-foreground tracking-widest">Appareils</p>
+                            </div>
+                            <div className="space-y-1">
+                                <p className="text-3xl font-black text-orange-400">{user?.points || 0}</p>
+                                <p className="text-[9px] font-bold uppercase text-muted-foreground tracking-widest">Points DKS</p>
                             </div>
                         </div>
+                        <Link href="/dashboard/referrals" className="block pt-4">
+                            <Button variant="ghost" className="w-full justify-between h-12 bg-white/5 rounded-xl text-[9px] font-black uppercase italic">
+                                Programme Ambassadeur <ArrowRight size={14} />
+                            </Button>
+                        </Link>
                     </CardContent>
                 </Card>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                {/* SECTION BOUTIQUE : DERNIÈRES COMMANDES */}
+                <div className="lg:col-span-2 space-y-6">
+                    <div className="flex items-center justify-between">
+                        <h3 className="text-xl font-black uppercase italic tracking-tight flex items-center gap-3">
+                            <ShoppingBag className="text-accent" /> Historique <span className="text-accent">Achats</span>
+                        </h3>
+                        <Link href="/dashboard/orders">
+                            <Button variant="link" className="text-[10px] font-black uppercase italic text-muted-foreground hover:text-accent">Tout voir</Button>
+                        </Link>
+                    </div>
+
+                    <div className="space-y-4">
+                        {userOrders && userOrders.length > 0 ? userOrders.map((order) => (
+                            <Card key={order.id} className="bg-white/5 border border-white/5 rounded-[1.5rem] overflow-hidden group hover:border-accent/30 transition-all">
+                                <CardContent className="p-6 flex items-center justify-between gap-6">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-12 h-12 rounded-xl bg-accent/10 flex items-center justify-center text-accent">
+                                            <Package size={20} />
+                                        </div>
+                                        <div>
+                                            <p className="text-xs font-black uppercase italic">Commande #{order.id.substring(0, 8)}</p>
+                                            <p className="text-[9px] text-muted-foreground font-bold uppercase">{order.createdAt?.toDate ? order.createdAt.toDate().toLocaleDateString() : 'Récemment'}</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex-1 hidden md:block">
+                                        <div className="flex gap-2">
+                                            {order.items?.slice(0, 2).map((item: any, idx: number) => (
+                                                <Badge key={idx} variant="outline" className="bg-white/5 border-none text-[8px] font-bold uppercase">{item.name}</Badge>
+                                            ))}
+                                            {order.items?.length > 2 && <span className="text-[8px] text-muted-foreground">+{order.items.length - 2} articles</span>}
+                                        </div>
+                                    </div>
+                                    <div className="text-right flex items-center gap-6">
+                                        <div>
+                                            <p className="text-lg font-black text-white">${order.total?.toFixed(2)}</p>
+                                            {getStatusBadge(order.status)}
+                                        </div>
+                                        <Link href="/dashboard/orders">
+                                            <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl bg-white/5 hover:bg-accent hover:text-black">
+                                                <FileText size={18} />
+                                            </Button>
+                                        </Link>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        )) : (
+                            <div className="py-20 text-center bg-white/5 rounded-[2rem] border border-dashed border-white/10 opacity-30 italic text-sm">
+                                Aucun achat enregistré sur cette plateforme.
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* SECTION HUB : SERVICES & MAINTENANCE */}
+                <div className="space-y-6">
+                    <div className="flex items-center justify-between">
+                        <h3 className="text-xl font-black uppercase italic tracking-tight flex items-center gap-3">
+                            <GraduationCap className="text-primary" /> Prestations <span className="text-primary">Hub</span>
+                        </h3>
+                    </div>
+                    
+                    <div className="space-y-4">
+                        {userBookings && userBookings.length > 0 ? userBookings.map((booking) => (
+                            <Card key={booking.id} className="bg-white/5 border border-white/5 rounded-2xl hover:border-primary/30 transition-all overflow-hidden">
+                                <CardContent className="p-5 flex items-start gap-4">
+                                    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                                        <Wrench size={18} />
+                                    </div>
+                                    <div className="flex-1 space-y-1">
+                                        <h4 className="text-xs font-black uppercase italic line-clamp-1">{booking.serviceTitle}</h4>
+                                        <div className="flex justify-between items-center">
+                                            <p className="text-[9px] text-muted-foreground font-bold uppercase">{booking.scheduledDate || 'Date à fixer'}</p>
+                                            <Badge className="bg-white/5 text-[8px] font-black uppercase border-none">{booking.status}</Badge>
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        )) : (
+                            <div className="p-10 text-center bg-white/5 rounded-2xl border border-dashed border-white/10 opacity-30 italic text-[10px]">
+                                Aucune réservation de service.
+                            </div>
+                        )}
+                        <Button className="w-full h-12 bg-white/5 hover:bg-primary/20 border border-white/10 rounded-xl font-black uppercase italic text-[10px] gap-2" asChild>
+                            <Link href="/dashboard/services">Gérer mes interventions <ArrowRight size={14} /></Link>
+                        </Button>
+                    </div>
+
+                    {/* SECTION PARC HARDWARE (Petit widget) */}
+                    <div className="pt-6">
+                         <h3 className="text-sm font-black uppercase italic tracking-widest text-muted-foreground mb-4">Mon Parc Hardware</h3>
+                         <div className="p-6 bg-black/40 rounded-[2rem] border border-white/5 space-y-4">
+                            {userAssets && userAssets.length > 0 ? (
+                                <div className="space-y-3">
+                                    {userAssets.slice(0, 2).map((asset) => (
+                                        <div key={asset.id} className="flex items-center gap-3">
+                                            <Laptop size={14} className="text-accent" />
+                                            <span className="text-[10px] font-bold uppercase truncate">{asset.brand} {asset.model}</span>
+                                        </div>
+                                    ))}
+                                    <Link href="/dashboard/hardware" className="block pt-2 text-[9px] font-black uppercase italic text-accent hover:underline">Accéder au parc complet</Link>
+                                </div>
+                            ) : (
+                                <p className="text-[10px] text-muted-foreground italic">Enregistrez vos appareils pour un suivi expert.</p>
+                            )}
+                         </div>
+                    </div>
+                </div>
             </div>
         </main>
       </div>
@@ -281,7 +404,7 @@ function DashboardPage() {
                 ))}
             </nav>
             <div className="flex items-center gap-6">
-                {(user?.role?.toLowerCase() === 'cashier' || user?.role?.toLowerCase() === 'admin') && <Link href="/pos"><Button className="bg-accent text-black font-black uppercase italic text-xs rounded-2xl h-11 px-6 shadow-xl shadow-accent/10">Caisse</Button></Link>}
+                {(user?.role?.toLowerCase() === 'cashier' || user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'caissier') && <Link href="/pos"><Button className="bg-accent text-black font-black uppercase italic text-xs rounded-2xl h-11 px-6 shadow-xl shadow-accent/10">Caisse</Button></Link>}
                 <Button variant="ghost" size="icon" onClick={fetchAdminData} className="h-10 w-10 text-slate-400 hover:text-accent hover:bg-accent/10 rounded-xl transition-all group"><RefreshCw size={18} className={cn("transition-transform duration-700", loading ? "animate-spin" : "group-hover:rotate-180")} /></Button>
             </div>
         </div>
@@ -330,14 +453,26 @@ function DashboardPage() {
                 <CardContent className="p-8 h-[300px]">
                     <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
-                            <Pie data={serviceDistribution} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={10} dataKey="value">
-                                {serviceDistribution.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
+                            <Pie data={[
+                                { name: 'Ventes', value: stats?.totalSalesCount || 10, color: 'hsl(var(--accent))' },
+                                { name: 'Formations', value: 15, color: 'hsl(var(--primary))' },
+                                { name: 'Services', value: 8, color: 'hsl(var(--destructive))' },
+                            ]} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={10} dataKey="value">
+                                {[
+                                    { name: 'Ventes', value: stats?.totalSalesCount || 10, color: 'hsl(var(--accent))' },
+                                    { name: 'Formations', value: 15, color: 'hsl(var(--primary))' },
+                                    { name: 'Services', value: 8, color: 'hsl(var(--destructive))' },
+                                ].map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
                             </Pie>
                             <Tooltip contentStyle={{ backgroundColor: '#0f172a', border: 'none', borderRadius: '10px' }} />
                         </PieChart>
                     </ResponsiveContainer>
                     <div className="flex justify-center gap-6 mt-4">
-                        {serviceDistribution.map((s, i) => <div key={i} className="flex items-center gap-2"><div className="w-2 h-2 rounded-full" style={{ backgroundColor: s.color }} /><span className="text-[9px] font-black uppercase text-muted-foreground">{s.name}</span></div>)}
+                        {[
+                            { name: 'Ventes', color: 'hsl(var(--accent))' },
+                            { name: 'Formations', color: 'hsl(var(--primary))' },
+                            { name: 'Services', color: 'hsl(var(--destructive))' },
+                        ].map((s, i) => <div key={i} className="flex items-center gap-2"><div className="w-2 h-2 rounded-full" style={{ backgroundColor: s.color }} /><span className="text-[9px] font-black uppercase text-muted-foreground">{s.name}</span></div>)}
                     </div>
                 </CardContent>
             </Card>
