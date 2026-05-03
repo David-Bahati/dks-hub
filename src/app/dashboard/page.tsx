@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -24,12 +25,8 @@ import {
   Clock,
   Sparkles,
   Tags,
-  Search,
-  Plus,
-  BarChart3,
-  ShieldCheck,
   Zap,
-  Phone,
+  ShieldCheck,
   CheckCircle2
 } from "lucide-react";
 
@@ -57,7 +54,7 @@ import { Product } from '@/lib/types';
 import withAuth from '@/components/auth/withAuth';
 import { useAuth } from '@/context/AuthContext';
 import { useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, where, orderBy, limit } from 'firebase/firestore';
+import { collection, query, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/ui/Logo";
@@ -95,31 +92,28 @@ function DashboardPage() {
 
   const filteredNavLinks = navConfig.filter(link => link.roles.map(r => r.toLowerCase()).includes(user?.role?.toLowerCase() || ""));
 
-  const lastOrderQuery = useMemoFirebase(() => {
+  // Fetch all user orders without complex orderBy to avoid composite index requirement
+  const ordersQuery = useMemoFirebase(() => {
     if (authLoading || !user?.uid || isStaff) return null;
     return query(
       collection(db, "orders"), 
-      where("userId", "==", user.uid), 
-      orderBy("createdAt", "desc"), 
-      limit(1)
+      where("userId", "==", user.uid)
     );
   }, [user?.uid, isStaff, authLoading]);
   
-  const { data: lastOrders } = useCollection(lastOrderQuery);
-  const lastOrder = lastOrders?.[0];
+  const { data: userOrders } = useCollection(ordersQuery);
+
+  // Client-side sorting for "Last Order"
+  const lastOrder = userOrders ? [...userOrders].sort((a, b) => {
+    const dateA = a.createdAt?.toDate?.() || new Date(0);
+    const dateB = b.createdAt?.toDate?.() || new Date(0);
+    return dateB - dateA;
+  })[0] : null;
 
   // Logic for Warranties Count (items in successful orders)
-  const completedOrdersQuery = useMemoFirebase(() => {
-    if (authLoading || !user?.uid || isStaff) return null;
-    return query(
-      collection(db, "orders"),
-      where("userId", "==", user.uid),
-      where("status", "in", ["payée", "payé", "terminé", "completed"])
-    );
-  }, [user?.uid, isStaff, authLoading]);
-
-  const { data: completedOrders } = useCollection(completedOrdersQuery);
-  const protectedItemsCount = completedOrders?.reduce((acc, order) => acc + (order.items?.length || 0), 0) || 0;
+  const protectedItemsCount = userOrders?.filter(o => 
+    ["payée", "payé", "terminé", "completed"].includes(o.status?.toLowerCase())
+  ).reduce((acc, order) => acc + (order.items?.length || 0), 0) || 0;
 
   useEffect(() => {
     if (isStaff) {
@@ -196,7 +190,6 @@ function DashboardPage() {
         </header>
 
         <main className="flex-1 max-w-7xl mx-auto w-full p-4 md:p-8 space-y-8">
-            {/* Bannière Bienvenue */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <Card className="md:col-span-2 glossy-card border-none rounded-[2.5rem] overflow-hidden relative group">
                     <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity">
@@ -212,7 +205,6 @@ function DashboardPage() {
                     </CardContent>
                 </Card>
 
-                {/* TUILE 1 : DERNIÈRE COMMANDE */}
                 <Card className="glossy-card border-none rounded-[2.5rem] flex flex-col hover:border-accent/20 transition-all">
                     <CardHeader>
                         <CardTitle className="text-sm font-black uppercase italic tracking-widest flex items-center gap-2">
@@ -250,10 +242,7 @@ function DashboardPage() {
                 </Card>
             </div>
 
-            {/* GRILLE DE TUILES ACTIONS RAPIDES */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                
-                {/* TUILE 2 : MES GARANTIES */}
                 <Card className="glossy-card border-none rounded-[2.5rem] overflow-hidden group hover:bg-primary/5 transition-all">
                     <CardContent className="p-10 space-y-6">
                         <div className="flex justify-between items-start">
@@ -276,7 +265,6 @@ function DashboardPage() {
                     </CardContent>
                 </Card>
 
-                {/* TUILE 3 : MON PROFIL */}
                 <Card className="glossy-card border-none rounded-[2.5rem] overflow-hidden group hover:bg-accent/5 transition-all">
                     <CardContent className="p-10 space-y-6">
                         <div className="w-14 h-14 rounded-2xl bg-accent/10 flex items-center justify-center text-accent group-hover:scale-110 transition-transform">
@@ -294,7 +282,6 @@ function DashboardPage() {
                     </CardContent>
                 </Card>
 
-                {/* TUILE 4 : SUPPORT CLIENT */}
                 <Card className="glossy-card border-none rounded-[2.5rem] overflow-hidden group hover:bg-green-500/5 transition-all">
                     <CardContent className="p-10 space-y-6">
                         <div className="w-14 h-14 rounded-2xl bg-green-500/10 flex items-center justify-center text-green-500 group-hover:scale-110 transition-transform">
@@ -311,10 +298,8 @@ function DashboardPage() {
                         </Link>
                     </CardContent>
                 </Card>
-
             </div>
 
-            {/* SECTION RAPPEL SHOP */}
             <div className="pt-10">
                 <Card className="bg-white/5 border border-white/5 rounded-[2.5rem] p-8 flex flex-col md:flex-row items-center justify-between gap-6">
                     <div className="flex items-center gap-6">
@@ -479,7 +464,6 @@ function DashboardPage() {
           </div>
 
           <div className="grid gap-6 grid-cols-1 lg:grid-cols-7">
-            {/* Chart Section */}
             <Card className="lg:col-span-4 glossy-card border-none rounded-[2.5rem] overflow-hidden">
                 <CardHeader className="flex flex-row items-center justify-between py-6 px-8">
                     <CardTitle className="text-lg font-bold uppercase italic flex items-center gap-3">

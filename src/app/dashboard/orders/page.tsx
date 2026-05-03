@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from 'react';
@@ -11,13 +12,11 @@ import {
   Clock, 
   CheckCircle, 
   XCircle,
-  CreditCard,
-  Truck,
   Check
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, where, orderBy, doc, updateDoc, serverTimestamp, addDoc } from 'firebase/firestore';
+import { collection, query, where, doc, updateDoc, serverTimestamp, addDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
@@ -28,6 +27,7 @@ export default function OrdersPage() {
   const { toast } = useToast();
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
+  // Simplified query to avoid composite index requirements
   const ordersQuery = useMemoFirebase(() => {
     if (authLoading || !user?.uid) return null;
     
@@ -36,17 +36,23 @@ export default function OrdersPage() {
     const baseRef = collection(db, "orders");
     
     if (isStaff) {
-      return query(baseRef, orderBy("createdAt", "desc"));
+      return query(baseRef);
     }
     
     return query(
       baseRef, 
-      where("userId", "==", user.uid), 
-      orderBy("createdAt", "desc")
+      where("userId", "==", user.uid)
     );
   }, [user?.uid, user?.role, authLoading]);
 
-  const { data: orders, isLoading: collectionLoading, error } = useCollection(ordersQuery);
+  const { data: rawOrders, isLoading: collectionLoading, error } = useCollection(ordersQuery);
+
+  // Client-side sorting for better reliability
+  const orders = rawOrders ? [...rawOrders].sort((a, b) => {
+    const dateA = a.createdAt?.toDate?.() || new Date(0);
+    const dateB = b.createdAt?.toDate?.() || new Date(0);
+    return dateB - dateA;
+  }) : null;
 
   const updateOrderStatus = async (orderId: string, newStatus: string, userId: string) => {
     setUpdatingId(orderId);
@@ -56,7 +62,6 @@ export default function OrdersPage() {
             updatedAt: serverTimestamp()
         });
 
-        // Notifier le client du changement
         await addDoc(collection(db, "notifications"), {
             userId: userId,
             title: "Statut Commande Mis à Jour",
