@@ -32,7 +32,10 @@ import {
   ExternalLink,
   Wrench,
   GraduationCap,
-  Laptop
+  Laptop,
+  Trophy,
+  Crown,
+  Star
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -181,6 +184,12 @@ function DashboardPage() {
     return <Badge className="bg-orange-500/10 text-orange-400 border-none uppercase text-[9px] font-black px-2 py-0.5"><Clock size={10} className="mr-1 inline" /> ATTENTE</Badge>;
   };
 
+  const LoyaltyIcon = () => {
+    if (user?.loyaltyLevel === 'Gold') return <Crown className="text-yellow-400" size={24} />;
+    if (user?.loyaltyLevel === 'Silver') return <Star className="text-slate-300" size={24} />;
+    return <Trophy className="text-orange-400" size={24} />;
+  };
+
   if (loading || authLoading) {
     return <div className="min-h-screen flex items-center justify-center bg-background"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
   }
@@ -203,12 +212,15 @@ function DashboardPage() {
                 <Card className="md:col-span-2 glossy-card border-none rounded-[2.5rem] overflow-hidden relative group">
                     <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity"><Sparkles size={120} className="text-accent" /></div>
                     <CardContent className="p-10 space-y-4">
-                        <Badge className="bg-accent/20 text-accent border-none font-black uppercase tracking-tighter px-3">Membre DKS Hub</Badge>
+                        <div className="flex items-center gap-3">
+                            <Badge className="bg-accent/20 text-accent border-none font-black uppercase tracking-tighter px-3 py-1">Membre {user?.loyaltyLevel || 'Bronze'}</Badge>
+                            <LoyaltyIcon />
+                        </div>
                         <h2 className="text-4xl font-black uppercase italic leading-tight">VOTRE UNIVERS<br /><span className="text-accent">TECHNOLOGIQUE</span></h2>
                         <p className="text-muted-foreground text-sm max-w-md font-light leading-relaxed">Centralisez vos factures, gérez votre parc informatique et réservez vos formations IA.</p>
                         <div className="flex flex-wrap gap-4 mt-6">
                             <Button className="bg-primary hover:bg-primary/90 h-12 rounded-xl px-8 font-black uppercase italic gap-2" asChild><Link href="/services">Nouveau Service <ArrowRight size={18} /></Link></Button>
-                            <Button variant="outline" className="border-white/10 h-12 rounded-xl px-8 font-black uppercase italic gap-2" asChild><Link href="/dashboard/hardware">Mon Parc Tech <Laptop size={18} /></Link></Button>
+                            <Button variant="outline" className="border-white/10 h-12 rounded-xl px-8 font-black uppercase italic gap-2" asChild><Link href="/dashboard/referrals">Programme Ambassadeur <Users size={18} /></Link></Button>
                         </div>
                     </CardContent>
                 </Card>

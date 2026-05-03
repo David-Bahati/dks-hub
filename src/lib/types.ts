@@ -11,6 +11,9 @@ export type AppUser = {
   address?: string;
   loyaltyLevel?: 'Bronze' | 'Silver' | 'Gold';
   language?: 'fr' | 'en';
+  referralCode?: string;
+  referralCount?: number;
+  points?: number;
 };
 
 export type Product = {
