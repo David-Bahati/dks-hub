@@ -36,7 +36,8 @@ import {
   Trophy,
   Crown,
   Star,
-  FileText
+  FileText,
+  AlertTriangle
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -82,14 +83,14 @@ import {
 
 const navConfig = [
   { href: "/dashboard", icon: LineChart, label: "Aperçu", roles: ["Admin", "Seller", "Cashier", "customer"] },
-  { href: "/dashboard/products", icon: Package, label: "Produits", roles: ["Admin", "Seller"] },
+  { href: "/dashboard/products", icon: Package, label: "Produits / Stock", roles: ["Admin", "Seller"] },
   { href: "/dashboard/categories", icon: Tags, label: "Catégories", roles: ["Admin", "Seller"] },
-  { href: "/dashboard/orders", icon: ShoppingBag, label: "Commandes", roles: ["Admin", "Seller", "Cashier", "customer"] },
-  { href: "/dashboard/services", icon: GraduationCap, label: "Services & Pôles", roles: ["Admin", "Seller", "Cashier", "customer"] },
+  { href: "/dashboard/orders", icon: ShoppingBag, label: "Commandes / Factures", roles: ["Admin", "Seller", "Cashier", "customer"] },
+  { href: "/dashboard/services", icon: GraduationCap, label: "Services Hub", roles: ["Admin", "Seller", "Cashier", "customer"] },
   { href: "/dashboard/support", icon: Wrench, label: "SAV & Support", roles: ["Admin", "Seller", "Cashier", "customer"] },
   { href: "/dashboard/hardware", icon: Laptop, label: "Parc Hardware", roles: ["Admin", "Seller", "Cashier", "customer"] },
-  { href: "/dashboard/customers", icon: Users, label: "Clients", roles: ["Admin", "Seller", "Cashier"] },
-  { href: "/dashboard/users", icon: UsersRound, label: "Équipe", roles: ["Admin"] },
+  { href: "/dashboard/customers", icon: Users, label: "Base Clients", roles: ["Admin", "Seller", "Cashier"] },
+  { href: "/dashboard/users", icon: UsersRound, label: "Équipe DKS", roles: ["Admin"] },
   { href: "/dashboard/settings", icon: Settings, label: "Réglages", roles: ["Admin", "customer"] },
 ];
 
@@ -103,44 +104,46 @@ function DashboardPage() {
   const [chartData, setChartData] = useState<any[]>([]);
   const [rate, setRate] = useState(2500);
 
-  const isStaff = user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'seller' || user?.role?.toLowerCase() === 'cashier';
+  const isStaff = user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'seller' || user?.role?.toLowerCase() === 'cashier' || user?.role?.toLowerCase() === 'vendeur' || user?.role?.toLowerCase() === 'caissier';
 
   const filteredNavLinks = navConfig.filter(link => {
       const roles = link.roles.map(r => r.toLowerCase());
       const userRole = user?.role?.toLowerCase() || "";
-      return roles.includes(userRole);
+      // Handle French roles mapping if needed
+      const normalizedUserRole = userRole === 'vendeur' ? 'seller' : userRole === 'caissier' ? 'cashier' : userRole;
+      return roles.includes(normalizedUserRole);
   });
 
+  // Queries for the views
   const ordersQuery = useMemoFirebase(() => {
     if (authLoading || !user?.uid) return null;
+    if (isStaff) return query(collection(db, "orders"), orderBy("createdAt", "desc"), limit(10));
     return query(collection(db, "orders"), where("userId", "==", user.uid), orderBy("createdAt", "desc"), limit(5));
-  }, [user?.uid, authLoading]);
+  }, [user?.uid, authLoading, isStaff]);
   
-  const { data: userOrders } = useCollection(ordersQuery);
+  const { data: orders } = useCollection(ordersQuery);
 
   const bookingsQuery = useMemoFirebase(() => {
     if (authLoading || !user?.uid) return null;
+    if (isStaff) return query(collection(db, "serviceBookings"), orderBy("createdAt", "desc"), limit(10));
     return query(collection(db, "serviceBookings"), where("userId", "==", user.uid), orderBy("createdAt", "desc"), limit(3));
-  }, [user?.uid, authLoading]);
+  }, [user?.uid, authLoading, isStaff]);
 
-  const { data: userBookings } = useCollection(bookingsQuery);
+  const { data: bookings } = useCollection(bookingsQuery);
 
   const assetsQuery = useMemoFirebase(() => {
     if (authLoading || !user?.uid) return null;
+    if (isStaff) return query(collection(db, "hardwareAssets"), limit(20));
     return query(collection(db, "hardwareAssets"), where("userId", "==", user.uid));
-  }, [user?.uid, authLoading]);
+  }, [user?.uid, authLoading, isStaff]);
 
-  const { data: userAssets } = useCollection(assetsQuery);
+  const { data: assets } = useCollection(assetsQuery);
 
   useEffect(() => {
-    if (isStaff) {
-      fetchAdminData();
-    } else if (!authLoading) {
-      setLoading(false);
-    }
+    fetchGlobalData();
   }, [isStaff, authLoading]);
 
-  const fetchAdminData = async () => {
+  const fetchGlobalData = async () => {
     setLoading(true);
     try {
       const [dashboardStats, lowStockItems, recent, exchangeRate, revenueData] = await Promise.all([
@@ -156,7 +159,7 @@ function DashboardPage() {
       setRate(exchangeRate);
       setChartData(revenueData);
     } catch (error) {
-      console.error(error);
+      console.error("Dashboard Data Fetch Error:", error);
     } finally {
       setLoading(false);
     }
@@ -164,7 +167,7 @@ function DashboardPage() {
 
   const getStatusBadge = (status: string) => {
     const s = status?.toLowerCase();
-    if (s?.includes('payé') || s?.includes('ready') || s === 'completed') {
+    if (s?.includes('payé') || s?.includes('ready') || s === 'completed' || s === 'payée') {
       return <Badge className="bg-green-500/10 text-green-400 border-none uppercase text-[9px] font-black px-2 py-0.5">OK</Badge>;
     }
     return <Badge className="bg-orange-500/10 text-orange-400 border-none uppercase text-[9px] font-black px-2 py-0.5">ATTENTE</Badge>;
@@ -177,8 +180,28 @@ function DashboardPage() {
   };
 
   if (loading || authLoading) {
-    return <div className="min-h-screen flex items-center justify-center bg-background"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-background gap-4">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground animate-pulse">Initialisation du Hub Suprême...</p>
+      </div>
+    );
   }
+
+  // --- RENDU PARTAGÉ (Sidebar mobile + Header) ---
+  const SidebarContent = () => (
+    <nav className="grid gap-1 p-6">
+      <div className="mb-8 px-4"><Logo size="sm" showText /></div>
+      {filteredNavLinks.map(link => (
+        <Link key={link.href} href={link.href} className={cn("group flex items-center gap-3 px-4 py-3 rounded-2xl transition-all text-sm font-bold", pathname === link.href ? 'bg-accent/10 text-accent' : 'text-slate-400 hover:bg-white/5 hover:text-white')}>
+          <link.icon className={cn("h-4 w-4", pathname === link.href ? 'text-accent' : '')} />{link.label}
+        </Link>
+      ))}
+      <div className="mt-10 pt-10 border-t border-white/5 px-4">
+        <Link href="/"><Button variant="outline" className="w-full justify-start rounded-xl border-white/5 gap-3 h-12 text-xs font-black uppercase italic"><Home size={16} /> Retour Boutique</Button></Link>
+      </div>
+    </nav>
+  );
 
   // --- VUE CLIENT ---
   if (!isStaff) {
@@ -188,10 +211,10 @@ function DashboardPage() {
             <div className="max-w-7xl mx-auto flex justify-between items-center">
                 <div className="flex items-center gap-6">
                     <Logo size="md" showText />
-                    <nav className="hidden md:flex items-center gap-2">
+                    <nav className="hidden xl:flex items-center gap-1">
                         {filteredNavLinks.map(link => (
                             <Link key={link.href} href={link.href}>
-                                <Button variant="ghost" className={cn("h-10 rounded-xl font-black uppercase italic text-[10px] tracking-widest", pathname === link.href ? "text-accent bg-accent/10" : "text-muted-foreground")}>
+                                <Button variant="ghost" className={cn("h-10 rounded-xl font-black uppercase italic text-[10px] tracking-widest px-4", pathname === link.href ? "text-accent bg-accent/10" : "text-muted-foreground")}>
                                     <link.icon size={14} className="mr-2" /> {link.label}
                                 </Button>
                             </Link>
@@ -199,6 +222,7 @@ function DashboardPage() {
                     </nav>
                 </div>
                 <div className="flex items-center gap-3">
+                    <Sheet><SheetTrigger asChild><Button size="icon" variant="ghost" className="xl:hidden text-muted-foreground"><PanelLeft className="h-5 w-5" /></Button></SheetTrigger><SheetContent side="left" className="p-0 bg-card/95 border-r border-white/5 w-72"><SidebarContent /></SheetContent></Sheet>
                     <Link href="/"><Button variant="outline" className="rounded-xl border-white/10 h-10 font-bold text-xs uppercase italic"><ShoppingCart size={14} className="mr-2" /> Boutique</Button></Link>
                 </div>
             </div>
@@ -234,15 +258,15 @@ function DashboardPage() {
                     <CardContent className="p-8 space-y-6 flex-1 flex flex-col justify-center">
                         <div className="grid grid-cols-2 gap-6">
                             <div className="space-y-1">
-                                <p className="text-3xl font-black text-white">{userOrders?.length || 0}</p>
+                                <p className="text-3xl font-black text-white">{orders?.length || 0}</p>
                                 <p className="text-[9px] font-bold uppercase text-muted-foreground tracking-widest">Achats</p>
                             </div>
                             <div className="space-y-1">
-                                <p className="text-3xl font-black text-accent">{userBookings?.length || 0}</p>
+                                <p className="text-3xl font-black text-accent">{bookings?.length || 0}</p>
                                 <p className="text-[9px] font-bold uppercase text-muted-foreground tracking-widest">Services</p>
                             </div>
                             <div className="space-y-1">
-                                <p className="text-3xl font-black text-primary">{userAssets?.length || 0}</p>
+                                <p className="text-3xl font-black text-primary">{assets?.length || 0}</p>
                                 <p className="text-[9px] font-bold uppercase text-muted-foreground tracking-widest">Appareils</p>
                             </div>
                             <div className="space-y-1">
@@ -272,7 +296,7 @@ function DashboardPage() {
                     </div>
 
                     <div className="space-y-4">
-                        {userOrders && userOrders.length > 0 ? userOrders.map((order) => (
+                        {orders && orders.length > 0 ? orders.map((order) => (
                             <Card key={order.id} className="bg-white/5 border border-white/5 rounded-[1.5rem] overflow-hidden group hover:border-accent/30 transition-all">
                                 <CardContent className="p-6 flex items-center justify-between gap-6">
                                     <div className="flex items-center gap-4">
@@ -322,7 +346,7 @@ function DashboardPage() {
                     </div>
                     
                     <div className="space-y-4">
-                        {userBookings && userBookings.length > 0 ? userBookings.map((booking) => (
+                        {bookings && bookings.length > 0 ? bookings.map((booking) => (
                             <Card key={booking.id} className="bg-white/5 border border-white/5 rounded-2xl hover:border-primary/30 transition-all overflow-hidden">
                                 <CardContent className="p-5 flex items-start gap-4">
                                     <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0">
@@ -351,9 +375,9 @@ function DashboardPage() {
                     <div className="pt-6">
                          <h3 className="text-sm font-black uppercase italic tracking-widest text-muted-foreground mb-4">Mon Parc Hardware</h3>
                          <div className="p-6 bg-black/40 rounded-[2rem] border border-white/5 space-y-4">
-                            {userAssets && userAssets.length > 0 ? (
+                            {assets && assets.length > 0 ? (
                                 <div className="space-y-3">
-                                    {userAssets.slice(0, 2).map((asset) => (
+                                    {assets.slice(0, 2).map((asset) => (
                                         <div key={asset.id} className="flex items-center gap-3">
                                             <Laptop size={14} className="text-accent" />
                                             <span className="text-[10px] font-bold uppercase truncate">{asset.brand} {asset.model}</span>
@@ -373,21 +397,14 @@ function DashboardPage() {
     );
   }
 
-  // --- VUE STAFF ---
+  // --- VUE STAFF (Gestion Boutique + Hub) ---
   return (
     <div className="flex min-h-screen w-full flex-col bg-background">
       <header className="sticky top-0 z-30 flex h-20 items-center gap-4 border-b border-white/5 bg-background/40 backdrop-blur-2xl px-6">
          <Sheet>
-            <SheetTrigger asChild><Button size="icon" variant="ghost" className="sm:hidden text-muted-foreground"><PanelLeft className="h-5 w-5" /><span className="sr-only">Menu</span></Button></SheetTrigger>
+            <SheetTrigger asChild><Button size="icon" variant="ghost" className="xl:hidden text-muted-foreground"><PanelLeft className="h-5 w-5" /></Button></SheetTrigger>
             <SheetContent side="left" className="sm:max-w-xs bg-card/95 backdrop-blur-3xl border-r border-white/5 p-0">
-                <div className="p-8 border-b border-white/5"><Logo size="sm" showText /></div>
-              <nav className="grid gap-1 p-4">
-                 {filteredNavLinks.map(link => (
-                   <Link key={link.href} href={link.href} className={cn("group flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all text-sm font-medium", pathname === link.href ? 'bg-accent/10 text-accent border-l-2 border-accent rounded-l-none' : 'text-slate-400 hover:bg-white/5 hover:text-white')}>
-                    <link.icon className={cn("h-4 w-4 transition-transform group-hover:translate-x-0.5", pathname === link.href ? 'text-accent' : '')} />{link.label}
-                  </Link>
-                 ))}
-              </nav>
+                <SidebarContent />
             </SheetContent>
           </Sheet>
 
@@ -405,34 +422,49 @@ function DashboardPage() {
             </nav>
             <div className="flex items-center gap-6">
                 {(user?.role?.toLowerCase() === 'cashier' || user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'caissier') && <Link href="/pos"><Button className="bg-accent text-black font-black uppercase italic text-xs rounded-2xl h-11 px-6 shadow-xl shadow-accent/10">Caisse</Button></Link>}
-                <Button variant="ghost" size="icon" onClick={fetchAdminData} className="h-10 w-10 text-slate-400 hover:text-accent hover:bg-accent/10 rounded-xl transition-all group"><RefreshCw size={18} className={cn("transition-transform duration-700", loading ? "animate-spin" : "group-hover:rotate-180")} /></Button>
+                <Button variant="ghost" size="icon" onClick={fetchGlobalData} className="h-10 w-10 text-slate-400 hover:text-accent hover:bg-accent/10 rounded-xl transition-all group"><RefreshCw size={18} className={cn("transition-transform duration-700", loading ? "animate-spin" : "group-hover:rotate-180")} /></Button>
             </div>
         </div>
       </header>
 
-      <main className="flex-1 p-4 md:p-8 space-y-8">
+      <main className="flex-1 p-4 md:p-8 space-y-8 pb-24">
+          {/* STATS FINANCIÈRES (BOUTIQUE & HUB) */}
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
              <Card className="lg:col-span-2 glossy-card border-none rounded-[2.5rem] relative overflow-hidden group">
               <div className="absolute -top-12 -right-12 w-48 h-48 bg-accent/5 rounded-full blur-3xl group-hover:bg-accent/20 transition-all duration-700" />
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <div className="space-y-1"><CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Revenu Global Hub</CardTitle></div>
+                <div className="space-y-1"><CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Revenu Global (Mixte)</CardTitle></div>
                 <div className="w-12 h-12 rounded-2xl bg-accent/10 flex items-center justify-center text-accent shadow-[0_0_20px_rgba(56,189,248,0.3)]"><DollarSign className="h-6 w-6" /></div>
               </CardHeader>
-              <CardContent className="pt-4"><div className="text-5xl font-bold font-mono tracking-tighter text-white">{new Intl.NumberFormat('fr-FR').format(stats?.totalRevenueCDF || 0)} <span className="text-xl font-light opacity-30">CDF</span></div><div className="mt-4"><Badge variant="outline" className="border-white/5 bg-white/5 px-3 py-1 font-mono text-slate-400">≈ {new Intl.NumberFormat('fr-FR').format(stats?.totalRevenueUSD || 0)} USD</Badge></div></CardContent>
+              <CardContent className="pt-4">
+                <div className="text-5xl font-bold font-mono tracking-tighter text-white">
+                  {new Intl.NumberFormat('fr-FR').format(stats?.totalRevenueCDF || 0)} 
+                  <span className="text-xl font-light opacity-30 ml-2">CDF</span>
+                </div>
+                <div className="mt-4 flex items-center gap-4">
+                  <Badge variant="outline" className="border-white/5 bg-white/5 px-3 py-1 font-mono text-slate-400">
+                    ≈ {new Intl.NumberFormat('fr-FR').format(stats?.totalRevenueUSD || 0)} USD
+                  </Badge>
+                  <span className="text-[10px] text-green-400 font-black uppercase tracking-widest flex items-center gap-1">
+                    <TrendingUp size={12} /> +12% cette semaine
+                  </span>
+                </div>
+              </CardContent>
             </Card>
 
              <Card className="glossy-card border-none rounded-[2.5rem] group">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Services Jour</CardTitle><div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-all duration-500"><GraduationCap className="h-5 w-5" /></div></CardHeader>
-              <CardContent className="pt-4"><div className="text-3xl font-bold font-mono">12</div><p className="text-[10px] text-accent mt-2 uppercase font-black tracking-widest bg-accent/10 w-fit px-2 py-1 rounded-md">8 Formations / 4 SAV</p></CardContent>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Ventes Boutique</CardTitle><div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-accent"><ShoppingCart className="h-5 w-5" /></div></CardHeader>
+              <CardContent className="pt-4"><div className="text-3xl font-bold font-mono">{stats?.totalSalesCount || 0}</div><p className="text-[10px] text-slate-400 mt-2 uppercase font-black">Transactions terminées</p></CardContent>
             </Card>
 
              <Card className="glossy-card border-none rounded-[2.5rem] group">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Clientèle Hub</CardTitle><div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white transition-all duration-500"><UsersRound className="h-5 w-5" /></div></CardHeader>
-              <CardContent className="pt-4"><div className="text-3xl font-bold font-mono">{stats?.totalProductsCount || 0}</div><p className="text-[10px] text-slate-400 mt-2 uppercase font-bold tracking-widest">Membres Actifs</p></CardContent>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Pôle Services</CardTitle><div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary"><GraduationCap className="h-5 w-5" /></div></CardHeader>
+              <CardContent className="pt-4"><div className="text-3xl font-bold font-mono">{bookings?.length || 0}</div><p className="text-[10px] text-primary mt-2 uppercase font-black">Réservations Hub</p></CardContent>
             </Card>
           </div>
 
           <div className="grid gap-6 grid-cols-1 lg:grid-cols-7">
+            {/* GRAPHIQUE DES TENDANCES */}
             <Card className="lg:col-span-4 glossy-card border-none rounded-[2.5rem] overflow-hidden">
                 <CardHeader className="py-6 px-8"><CardTitle className="text-lg font-bold uppercase italic flex items-center gap-3"><BarChart3 className="text-accent" size={20} /> Tendances Hub (7j)</CardTitle></CardHeader>
                 <CardContent className="px-4 pb-8 h-[300px]">
@@ -448,34 +480,89 @@ function DashboardPage() {
                 </CardContent>
             </Card>
 
+            {/* ALERTES STOCK (BOUTIQUE) */}
             <Card className="lg:col-span-3 glossy-card border-none rounded-[2.5rem] overflow-hidden">
-                <CardHeader className="bg-white/[0.02] py-6 px-8"><CardTitle className="text-lg font-bold uppercase italic flex items-center gap-3"><Zap size={20} className="text-accent" /> Mix d'Activité</CardTitle></CardHeader>
-                <CardContent className="p-8 h-[300px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                            <Pie data={[
-                                { name: 'Ventes', value: stats?.totalSalesCount || 10, color: 'hsl(var(--accent))' },
-                                { name: 'Formations', value: 15, color: 'hsl(var(--primary))' },
-                                { name: 'Services', value: 8, color: 'hsl(var(--destructive))' },
-                            ]} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={10} dataKey="value">
-                                {[
-                                    { name: 'Ventes', value: stats?.totalSalesCount || 10, color: 'hsl(var(--accent))' },
-                                    { name: 'Formations', value: 15, color: 'hsl(var(--primary))' },
-                                    { name: 'Services', value: 8, color: 'hsl(var(--destructive))' },
-                                ].map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
-                            </Pie>
-                            <Tooltip contentStyle={{ backgroundColor: '#0f172a', border: 'none', borderRadius: '10px' }} />
-                        </PieChart>
-                    </ResponsiveContainer>
-                    <div className="flex justify-center gap-6 mt-4">
-                        {[
-                            { name: 'Ventes', color: 'hsl(var(--accent))' },
-                            { name: 'Formations', color: 'hsl(var(--primary))' },
-                            { name: 'Services', color: 'hsl(var(--destructive))' },
-                        ].map((s, i) => <div key={i} className="flex items-center gap-2"><div className="w-2 h-2 rounded-full" style={{ backgroundColor: s.color }} /><span className="text-[9px] font-black uppercase text-muted-foreground">{s.name}</span></div>)}
+                <CardHeader className="bg-white/[0.02] py-6 px-8 flex flex-row items-center justify-between">
+                    <CardTitle className="text-lg font-bold uppercase italic flex items-center gap-3"><Package size={20} className="text-orange-400" /> Stock Critique</CardTitle>
+                    <Badge variant="outline" className="border-orange-400/20 text-orange-400 text-[8px]">{lowStock.length} ALERTES</Badge>
+                </CardHeader>
+                <CardContent className="p-0">
+                    <div className="divide-y divide-white/5">
+                        {lowStock.length > 0 ? lowStock.map((item) => (
+                            <div key={item.id} className="p-4 flex items-center justify-between hover:bg-white/[0.02] transition-colors">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-xl bg-white/5 overflow-hidden"><img src={item.imageUrl} className="object-cover w-full h-full opacity-50" /></div>
+                                    <div><p className="text-xs font-bold truncate max-w-[150px]">{item.name}</p><p className="text-[9px] text-muted-foreground uppercase">{item.category}</p></div>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-xs font-black text-orange-400">{item.stockQuantity} RESTANTS</p>
+                                    <Link href="/dashboard/products"><Button variant="link" className="h-6 p-0 text-[8px] font-black uppercase text-accent">Réapprovisionner</Button></Link>
+                                </div>
+                            </div>
+                        )) : (
+                            <div className="p-10 text-center opacity-30 italic text-xs">Tout est en stock !</div>
+                        )}
                     </div>
                 </CardContent>
             </Card>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                {/* DERNIÈRES VENTES BOUTIQUE */}
+                <div className="space-y-6">
+                    <div className="flex items-center justify-between px-2">
+                        <h3 className="text-xl font-black uppercase italic tracking-tight flex items-center gap-3"><ShoppingBag className="text-accent" /> Ventes <span className="text-accent">Boutique</span></h3>
+                        <Link href="/dashboard/orders"><Button variant="ghost" className="text-[10px] font-black uppercase italic text-muted-foreground hover:text-white">Registre complet</Button></Link>
+                    </div>
+                    <div className="space-y-4">
+                        {recentSales.map((sale) => (
+                            <Card key={sale.id} className="bg-white/5 border border-white/5 rounded-2xl group hover:border-accent/30 transition-all overflow-hidden">
+                                <CardContent className="p-6 flex items-center justify-between">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-muted-foreground group-hover:text-accent"><ShoppingBag size={18} /></div>
+                                        <div>
+                                            <p className="text-xs font-bold">{sale.customerName}</p>
+                                            <p className="text-[9px] text-muted-foreground uppercase">{sale.formattedDate} • {sale.paymentMode || 'CASH'}</p>
+                                        </div>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-lg font-black text-white">${sale.totalAmount?.toFixed(2)}</p>
+                                        <Badge className="bg-green-500/10 text-green-400 border-none text-[8px] font-black px-2">PAYÉ</Badge>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        ))}
+                    </div>
+                </div>
+
+                {/* RÉSERVATIONS HUB RÉCENTES */}
+                <div className="space-y-6">
+                    <div className="flex items-center justify-between px-2">
+                        <h3 className="text-xl font-black uppercase italic tracking-tight flex items-center gap-3"><GraduationCap className="text-primary" /> Activité <span className="text-primary">Services</span></h3>
+                        <Link href="/dashboard/services"><Button variant="ghost" className="text-[10px] font-black uppercase italic text-muted-foreground hover:text-white">Planning complet</Button></Link>
+                    </div>
+                    <div className="space-y-4">
+                        {bookings && bookings.length > 0 ? bookings.slice(0, 5).map((booking) => (
+                            <Card key={booking.id} className="bg-white/5 border border-white/5 rounded-2xl group hover:border-primary/30 transition-all overflow-hidden">
+                                <CardContent className="p-6 flex items-center justify-between">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary"><Clock size={18} /></div>
+                                        <div>
+                                            <p className="text-xs font-bold line-clamp-1">{booking.serviceTitle}</p>
+                                            <p className="text-[9px] text-muted-foreground uppercase">{booking.customerName} • {booking.scheduledDate || 'Date à fixer'}</p>
+                                        </div>
+                                    </div>
+                                    <div className="text-right">
+                                        <Badge className="bg-white/5 text-[8px] font-black uppercase border-none">{booking.status}</Badge>
+                                        <Link href="/dashboard/services"><Button variant="link" className="h-6 p-0 text-[8px] block mt-1 font-black uppercase italic text-primary">Détail</Button></Link>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        )) : (
+                            <div className="py-12 text-center bg-white/5 rounded-2xl border border-dashed border-white/10 opacity-30 italic text-xs">Aucune réservation récente.</div>
+                        )}
+                    </div>
+                </div>
           </div>
       </main>
     </div>
@@ -483,3 +570,4 @@ function DashboardPage() {
 }
 
 export default withAuth(DashboardPage);
+
