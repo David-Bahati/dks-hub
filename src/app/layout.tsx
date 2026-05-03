@@ -7,6 +7,7 @@ import { CartProvider } from "@/context/CartContext";
 import { AuthProvider } from "@/context/AuthContext";
 import { Toaster } from "@/components/ui/toaster";
 import { FirebaseClientProvider } from "@/firebase";
+import { AiAssistant } from "@/components/chat/AiAssistant";
 
 const fontSans = FontSans({
   subsets: ["latin"],
@@ -30,6 +31,7 @@ export default function RootLayout({
           <AuthProvider>
             <CartProvider>
               <main>{children}</main>
+              <AiAssistant />
               <Toaster />
             </CartProvider>
           </AuthProvider>
