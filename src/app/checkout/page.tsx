@@ -1,7 +1,6 @@
-
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/context/CartContext";
@@ -12,6 +11,8 @@ import { auth, db } from "@/lib/firebase";
 import { collection, addDoc, serverTimestamp, doc, setDoc, getDoc } from "firebase/firestore";
 import { signInAnonymously, updatePassword, updateProfile, updateEmail } from "firebase/auth";
 import { PI_CONVERSION_RATE } from "@/lib/constants";
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
 import { 
   Coins, 
   Smartphone, 
@@ -32,7 +33,8 @@ import {
   Star,
   Printer,
   FileText,
-  QrCode
+  QrCode,
+  Download
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -55,6 +57,7 @@ export default function CheckoutPage() {
     const { user } = useAuth();
     const router = useRouter();
     const { toast } = useToast();
+    const receiptRef = useRef<HTMLDivElement>(null);
     
     const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("PI_NETWORK");
     const [mobileNetwork, setMobileNetwork] = useState<MobileNetwork>("VODACOM");
@@ -73,6 +76,7 @@ export default function CheckoutPage() {
     // Account Finishing States
     const [password, setPassword] = useState("");
     const [isFinishingAccount, setIsFinishingAccount] = useState(false);
+    const [isDownloading, setIsDownloading] = useState(false);
 
     useEffect(() => {
         if (cartItems.length === 0 && !isProcessing && !orderConfirmed) {
@@ -203,6 +207,33 @@ export default function CheckoutPage() {
         }
     };
 
+    const handleDownloadPDF = async () => {
+        if (!receiptRef.current) return;
+        setIsDownloading(true);
+        try {
+            const canvas = await html2canvas(receiptRef.current, {
+                scale: 2,
+                useCORS: true,
+                backgroundColor: "#ffffff",
+                logging: false
+            });
+            const imgData = canvas.toDataURL('image/png');
+            const pdf = new jsPDF({
+                orientation: 'portrait',
+                unit: 'px',
+                format: [canvas.width / 2, canvas.height / 2]
+            });
+            pdf.addImage(imgData, 'PNG', 0, 0, canvas.width / 2, canvas.height / 2);
+            pdf.save(`BON_DKS_${confirmedOrderId.substring(0, 8).toUpperCase()}.pdf`);
+            toast({ title: "Téléchargement réussi", description: "Votre bon est dans vos fichiers." });
+        } catch (error) {
+            console.error("PDF Error:", error);
+            toast({ title: "Erreur", description: "Échec de la génération du PDF.", variant: "destructive" });
+        } finally {
+            setIsDownloading(false);
+        }
+    };
+
     if (orderConfirmed) {
         return (
             <div className="min-h-screen bg-background text-foreground flex flex-col items-center py-12 px-6">
@@ -229,91 +260,100 @@ export default function CheckoutPage() {
                     </div>
 
                     {/* BON DE COMMANDE */}
-                    <Card className="order-slip glossy-card border-none rounded-[2.5rem] overflow-hidden bg-white text-black shadow-2xl relative">
-                        <div className="absolute top-0 left-0 w-full h-2 bg-accent no-print" />
-                        <CardHeader className="p-10 border-b border-gray-100 flex flex-row justify-between items-start">
-                            <div className="space-y-1">
-                                <div className="bg-black text-white px-3 py-1 font-black text-lg italic tracking-tighter inline-block mb-2">DKS SHOP</div>
-                                <h2 className="text-xl font-black uppercase italic leading-none">Bon de Commande</h2>
-                                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Réf : #{confirmedOrderId.substring(0, 10).toUpperCase()}</p>
-                            </div>
-                            <div className="text-right space-y-1">
-                                <p className="text-[10px] font-black uppercase text-gray-400">Date</p>
-                                <p className="text-xs font-bold">{new Date().toLocaleDateString('fr-FR')}</p>
-                            </div>
-                        </CardHeader>
-                        
-                        <CardContent className="p-10 space-y-8">
-                            <div className="grid grid-cols-2 gap-8 text-[10px] uppercase font-bold tracking-wider">
-                                <div>
-                                    <p className="text-gray-400 mb-2">Client</p>
-                                    <p className="text-sm font-black">{orderSnapshot?.customerName}</p>
-                                    <p className="text-gray-500 font-medium lowercase">{orderSnapshot?.customerEmail}</p>
+                    <div ref={receiptRef}>
+                        <Card className="order-slip glossy-card border-none rounded-[2.5rem] overflow-hidden bg-white text-black shadow-2xl relative">
+                            <div className="absolute top-0 left-0 w-full h-2 bg-accent no-print" />
+                            <CardHeader className="p-10 border-b border-gray-100 flex flex-row justify-between items-start">
+                                <div className="space-y-1">
+                                    <div className="bg-black text-white px-3 py-1 font-black text-lg italic tracking-tighter inline-block mb-2">DKS SHOP</div>
+                                    <h2 className="text-xl font-black uppercase italic leading-none">Bon de Commande</h2>
+                                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Réf : #{confirmedOrderId.substring(0, 10).toUpperCase()}</p>
                                 </div>
-                                <div>
-                                    <p className="text-gray-400 mb-2">Point de Retrait</p>
-                                    <p className="text-sm font-black">Immeuble Bahati</p>
-                                    <p className="text-gray-500 font-medium">BUNIA, ITURI, RDC</p>
+                                <div className="text-right space-y-1">
+                                    <p className="text-[10px] font-black uppercase text-gray-400">Date</p>
+                                    <p className="text-xs font-bold">{new Date().toLocaleDateString('fr-FR')}</p>
                                 </div>
-                            </div>
+                            </CardHeader>
+                            
+                            <CardContent className="p-10 space-y-8">
+                                <div className="grid grid-cols-2 gap-8 text-[10px] uppercase font-bold tracking-wider">
+                                    <div>
+                                        <p className="text-gray-400 mb-2">Client</p>
+                                        <p className="text-sm font-black">{orderSnapshot?.customerName}</p>
+                                        <p className="text-gray-500 font-medium lowercase">{orderSnapshot?.customerEmail}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-gray-400 mb-2">Point de Retrait</p>
+                                        <p className="text-sm font-black">Immeuble Bahati</p>
+                                        <p className="text-gray-500 font-medium">BUNIA, ITURI, RDC</p>
+                                    </div>
+                                </div>
 
-                            <div className="space-y-4">
-                                <p className="text-[10px] font-black uppercase text-gray-400 border-b pb-2">Articles commandés</p>
-                                {orderSnapshot?.items.map((item: any, idx: number) => (
-                                    <div key={idx} className="flex justify-between items-center py-1">
-                                        <div className="flex-1">
-                                            <p className="text-sm font-bold uppercase italic">{item.name}</p>
-                                            <p className="text-[10px] text-gray-400">Quantité : {item.quantity}</p>
+                                <div className="space-y-4">
+                                    <p className="text-[10px] font-black uppercase text-gray-400 border-b pb-2">Articles commandés</p>
+                                    {orderSnapshot?.items.map((item: any, idx: number) => (
+                                        <div key={idx} className="flex justify-between items-center py-1">
+                                            <div className="flex-1">
+                                                <p className="text-sm font-bold uppercase italic">{item.name}</p>
+                                                <p className="text-[10px] text-gray-400">Quantité : {item.quantity}</p>
+                                            </div>
+                                            <p className="font-black text-sm">${(item.price * item.quantity).toFixed(2)}</p>
                                         </div>
-                                        <p className="font-black text-sm">${(item.price * item.quantity).toFixed(2)}</p>
-                                    </div>
-                                ))}
-                            </div>
+                                    ))}
+                                </div>
 
-                            <div className="bg-gray-50 rounded-2xl p-6 space-y-3">
-                                <div className="flex justify-between text-[10px] font-black uppercase text-gray-400">
-                                    <span>Mode de règlement</span>
-                                    <span className="text-black">{orderSnapshot?.paymentMethod?.replace('_', ' ')}</span>
-                                </div>
-                                <div className="flex justify-between items-end pt-2 border-t border-gray-200">
-                                    <span className="text-xs font-black uppercase">Total à payer</span>
-                                    <div className="text-right">
-                                        <p className="text-3xl font-black leading-none">${orderSnapshot?.total.toFixed(2)}</p>
-                                        <p className="text-[10px] font-bold text-gray-400 uppercase mt-1">≈ {(orderSnapshot?.total * exchangeRate).toLocaleString()} FC</p>
+                                <div className="bg-gray-50 rounded-2xl p-6 space-y-3">
+                                    <div className="flex justify-between text-[10px] font-black uppercase text-gray-400">
+                                        <span>Mode de règlement</span>
+                                        <span className="text-black">{orderSnapshot?.paymentMethod?.replace('_', ' ')}</span>
+                                    </div>
+                                    <div className="flex justify-between items-end pt-2 border-t border-gray-200">
+                                        <span className="text-xs font-black uppercase">Total à payer</span>
+                                        <div className="text-right">
+                                            <p className="text-3xl font-black leading-none">${orderSnapshot?.total.toFixed(2)}</p>
+                                            <p className="text-[10px] font-bold text-gray-400 uppercase mt-1">≈ {(orderSnapshot?.total * exchangeRate).toLocaleString()} FC</p>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        </CardContent>
+                            </CardContent>
 
-                        <CardFooter className="p-10 bg-gray-50/50 flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 bg-white border border-gray-200 rounded-lg">
-                                    <QrCode size={40} className="text-black" />
+                            <CardFooter className="p-10 bg-gray-50/50 flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-white border border-gray-200 rounded-lg">
+                                        <QrCode size={40} className="text-black" />
+                                    </div>
+                                    <div className="space-y-0.5">
+                                        <p className="text-[8px] font-black uppercase text-gray-400">Validation Interne</p>
+                                        <p className="text-[7px] font-bold text-gray-300">SCAN_CODE_VERIFY_DKS</p>
+                                    </div>
                                 </div>
-                                <div className="space-y-0.5">
-                                    <p className="text-[8px] font-black uppercase text-gray-400">Validation Interne</p>
-                                    <p className="text-[7px] font-bold text-gray-300">SCAN_CODE_VERIFY_DKS</p>
-                                </div>
-                            </div>
-                            <p className="text-[9px] font-bold italic text-gray-400 max-w-[180px] text-right">
-                                Présentez ce bon à la caisse pour finaliser le retrait.
-                            </p>
-                        </CardFooter>
-                    </Card>
+                                <p className="text-[9px] font-bold italic text-gray-400 max-w-[180px] text-right">
+                                    Présentez ce bon à la caisse pour finaliser le retrait.
+                                </p>
+                            </CardFooter>
+                        </Card>
+                    </div>
 
                     <div className="flex flex-col sm:flex-row gap-4 no-print">
                         <Button 
                             className="flex-1 h-14 bg-white text-black hover:bg-white/90 font-black uppercase italic rounded-2xl gap-3 shadow-xl"
                             onClick={() => window.print()}
                         >
-                            <Printer size={20} /> Imprimer le Bon
+                            <Printer size={20} /> Imprimer
+                        </Button>
+                        <Button 
+                            className="flex-1 h-14 bg-accent text-black hover:bg-accent/90 font-black uppercase italic rounded-2xl gap-3 shadow-xl"
+                            onClick={handleDownloadPDF}
+                            disabled={isDownloading}
+                        >
+                            {isDownloading ? <Loader2 className="animate-spin" /> : <><Download size={20} /> Télécharger (PDF)</>}
                         </Button>
                         <Button 
                             variant="outline"
                             className="flex-1 h-14 border-white/10 hover:bg-white/5 font-black uppercase italic rounded-2xl"
                             onClick={() => router.push('/')}
                         >
-                            Retour à la boutique
+                            Retour
                         </Button>
                     </div>
 
