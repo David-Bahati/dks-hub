@@ -40,6 +40,7 @@ import { useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError 
 import Link from 'next/link';
 import { generateProductDescription } from '@/ai/flows/generate-product-description';
 import { generateProductImage } from '@/ai/flows/generate-product-image';
+import { cn } from '@/lib/utils';
 
 function ProductsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -108,7 +109,7 @@ function ProductsPage() {
         toast({ title: "IA: Description prête !" });
     } catch (error) {
         console.error(error);
-        toast({ title: "Erreur IA", description: "Impossible de générer le texte.", variant: "destructive" });
+        toast({ title: "Erreur IA", description: "L'IA n'a pas pu répondre. Réessayez.", variant: "destructive" });
     } finally {
         setIsGeneratingDesc(false);
     }
@@ -127,7 +128,7 @@ function ProductsPage() {
         toast({ title: "IA: Photo générée !", description: "Une image de studio a été créée." });
     } catch (error) {
         console.error(error);
-        toast({ title: "Erreur IA Image", description: "Échec de la génération par l'IA.", variant: "destructive" });
+        toast({ title: "Erreur IA Image", description: "L'IA n'a pas pu générer l'image. Réessayez.", variant: "destructive" });
     } finally {
         setIsGeneratingImg(false);
     }
@@ -275,21 +276,23 @@ function ProductsPage() {
       </main>
 
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="glossy-card border-none rounded-[2.5rem] sm:max-w-4xl h-[90vh] flex flex-col p-0 overflow-hidden">
-          <DialogHeader className="p-8 pb-0 shrink-0">
+        {/* Structure verrouillée ici avec w-[95vw] et h-[85vh] */}
+        <DialogContent className="glossy-card border-none rounded-[2.5rem] w-[95vw] max-w-4xl h-[85vh] flex flex-col p-0 overflow-hidden shadow-[0_0_80px_rgba(0,0,0,0.5)]">
+          <DialogHeader className="p-8 pb-4 shrink-0 border-b border-white/5">
             <DialogTitle className="text-2xl font-black uppercase italic tracking-tighter">
                 {editingProduct ? 'Modifier le Produit' : 'Nouveau Produit Hardware'}
             </DialogTitle>
           </DialogHeader>
           
-          <form onSubmit={handleSave} className="flex-1 flex flex-col overflow-hidden">
+          <form onSubmit={handleSave} className="flex-1 flex flex-col min-h-0">
+            {/* Zone de contenu défilante stable */}
             <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                     {/* Colonne Gauche : Données */}
                     <div className="space-y-6">
                         <div className="space-y-2">
                             <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Nom commercial</Label>
-                            <Input ref={nameRef} name="name" defaultValue={editingProduct?.name} className="h-12 bg-background/50 border-white/10 rounded-xl" required />
+                            <Input ref={nameRef} name="name" defaultValue={editingProduct?.name} className="h-12 bg-background/50 border-white/10 rounded-xl focus:border-accent" required />
                         </div>
                         <div className="space-y-2">
                             <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Catégorie technique</Label>
@@ -321,7 +324,7 @@ function ProductsPage() {
                             <Input name="stockQuantity" type="number" defaultValue={editingProduct?.stockQuantity} className="h-12 bg-background/50 border-white/10 rounded-xl" required />
                         </div>
 
-                        <div className="space-y-2 relative">
+                        <div className="space-y-2">
                             <div className="flex justify-between items-end mb-1">
                                 <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Description technique</Label>
                                 <Button 
@@ -336,14 +339,20 @@ function ProductsPage() {
                                     Générer texte
                                 </Button>
                             </div>
-                            <div className="min-h-[160px] relative">
+                            {/* Hauteur minimale fixée pour éviter le saut lors du chargement */}
+                            <div className="min-h-[160px] relative bg-background/30 rounded-xl border border-white/5">
                                 <Textarea 
                                     name="description" 
                                     value={aiDescription} 
                                     onChange={(e) => setAiDescription(e.target.value)}
-                                    className="min-h-[160px] bg-background/50 border-white/10 rounded-xl resize-none text-xs leading-relaxed" 
+                                    className="min-h-[160px] bg-transparent border-none rounded-xl resize-none text-xs leading-relaxed focus-visible:ring-1 focus-visible:ring-accent" 
                                     required 
                                 />
+                                {isGeneratingDesc && (
+                                    <div className="absolute inset-0 bg-background/60 backdrop-blur-sm flex items-center justify-center rounded-xl">
+                                        <Loader2 className="animate-spin text-accent" />
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -366,30 +375,30 @@ function ProductsPage() {
                                 </Button>
                             </div>
                             
-                            {/* Cadre Image Fixe pour éviter les sauts */}
+                            {/* CADRE IMAGE TOTALEMENT FIXE : w-full max-w-[320px] aspect-square */}
                             <div 
                                 onClick={() => !isGeneratingImg && fileInputRef.current?.click()}
-                                className="aspect-square w-full max-w-[320px] mx-auto rounded-3xl bg-white/5 border-2 border-dashed border-white/10 overflow-hidden relative group shrink-0 cursor-pointer hover:border-accent/40 transition-colors"
+                                className="aspect-square w-full max-w-[320px] mx-auto rounded-3xl bg-white/5 border-2 border-dashed border-white/10 overflow-hidden relative group shrink-0 cursor-pointer hover:border-accent/40 transition-all shadow-inner"
                             >
                                 {imageUrl ? (
                                     <>
                                         <img src={imageUrl} alt="Preview" className="w-full h-full object-cover" />
-                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center transition-opacity">
+                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center transition-opacity backdrop-blur-sm">
                                             <Upload className="text-white mb-2" size={24} />
                                             <span className="text-[8px] font-black uppercase text-white tracking-widest">Changer l'image</span>
                                         </div>
                                     </>
                                 ) : (
-                                    <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground opacity-40">
+                                    <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground opacity-30">
                                         <Upload size={48} className="mb-3 group-hover:text-accent transition-colors" />
                                         <span className="text-[10px] font-bold uppercase tracking-widest">Choisir un fichier</span>
                                         <span className="text-[8px] mt-1">(Photo locale)</span>
                                     </div>
                                 )}
 
-                                {/* Overlay de chargement IA stable */}
+                                {/* Overlay de chargement stable qui ne change pas la taille du cadre */}
                                 {isGeneratingImg && (
-                                    <div className="absolute inset-0 bg-black/80 backdrop-blur-md flex flex-col items-center justify-center gap-4">
+                                    <div className="absolute inset-0 bg-black/80 backdrop-blur-md flex flex-col items-center justify-center gap-4 z-20">
                                         <div className="relative">
                                             <Loader2 className="animate-spin text-primary h-12 w-12" />
                                             <Sparkles className="absolute -top-2 -right-2 text-accent h-4 w-4 animate-pulse" />
@@ -414,7 +423,7 @@ function ProductsPage() {
                                     value={imageUrl.startsWith('data:') ? '' : imageUrl} 
                                     onChange={(e) => setImageUrl(e.target.value)} 
                                     placeholder="https://..." 
-                                    className="h-11 bg-background/50 border-white/10 rounded-xl text-[10px]" 
+                                    className="h-11 bg-background/50 border-white/10 rounded-xl text-[10px] focus:border-accent" 
                                 />
                             </div>
                         </div>
@@ -435,10 +444,10 @@ function ProductsPage() {
                 </div>
             </div>
 
-            {/* Pied de page fixe */}
-            <DialogFooter className="p-8 pt-6 border-t border-white/5 bg-background/40 backdrop-blur-xl shrink-0">
+            {/* Pied de page fixe ancré en bas pour la stabilité */}
+            <DialogFooter className="p-8 pt-6 border-t border-white/5 bg-background/80 backdrop-blur-xl shrink-0">
               <div className="flex gap-4 w-full">
-                <Button type="button" variant="ghost" onClick={closeModal} className="flex-1 rounded-2xl font-bold uppercase text-[10px] h-14 border border-white/5">Annuler</Button>
+                <Button type="button" variant="ghost" onClick={closeModal} className="flex-1 rounded-2xl font-bold uppercase text-[10px] h-14 border border-white/5 hover:bg-white/5">Annuler</Button>
                 <Button type="submit" className="flex-[2] bg-accent text-accent-foreground font-black uppercase italic rounded-2xl px-10 h-14 shadow-2xl shadow-accent/20 hover:scale-[1.02] active:scale-95 transition-all">
                   {editingProduct ? 'Mettre à jour le stock' : 'Enregistrer le nouveau produit'}
                 </Button>
