@@ -123,20 +123,33 @@ function POS() {
     return () => unsubscribe();
   }, []);
 
-  // Fetch Pending Web Orders
+  // Fetch Pending Web Orders (REPAIRED QUERY)
   useEffect(() => {
+    // On enlève le orderBy temporairement pour éviter les erreurs d'index manquants
+    // et on élargit les statuts pour capturer toutes les commandes non traitées.
     const q = query(
       collection(db, "orders"), 
-      where("status", "in", ["pending", "pending_payment"]),
-      orderBy("createdAt", "desc")
+      where("status", "in", ["pending", "pending_payment", "en attente", "En attente", "attente", "attente_paiement"])
     );
+    
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const orders = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
-      }));
+      }))
+      // Tri manuel côté client pour plus de robustesse
+      .sort((a: any, b: any) => {
+        const dateA = a.createdAt?.toDate?.() || new Date(0);
+        const dateB = b.createdAt?.toDate?.() || new Date(0);
+        return dateB - dateA;
+      });
+
+      console.log(`[POS] ${orders.length} commandes web détectées.`);
       setPendingOrders(orders);
+    }, (err) => {
+      console.error("[POS] Erreur lors de la récupération des commandes:", err);
     });
+    
     return () => unsubscribe();
   }, []);
 
@@ -253,9 +266,9 @@ function POS() {
                 updatedAt: serverTimestamp()
             });
 
-            // Notify customer
+            // Notify staff
             await addDoc(collection(db, "notifications"), {
-                userId: 'staff', // Log to staff too
+                userId: 'staff',
                 title: "Commande Payée (Caisse)",
                 message: `La commande #${activeOrderId.substring(0, 8)} de ${finalCustomerName} a été encaissée.`,
                 type: 'success',
@@ -363,20 +376,21 @@ function POS() {
                             )}
                         </Button>
                     </SheetTrigger>
-                    <SheetContent className="bg-card/95 backdrop-blur-3xl border-white/10 w-full sm:max-w-md">
+                    <SheetContent className="bg-card/95 backdrop-blur-3xl border-white/10 w-full sm:max-w-md flex flex-col">
                         <SheetHeader className="mb-6">
                             <SheetTitle className="text-xl font-black uppercase italic flex items-center gap-3">
                                 <ShoppingBag className="text-accent" /> Commandes en Attente
                             </SheetTitle>
                         </SheetHeader>
-                        <div className="space-y-4 overflow-y-auto max-h-[85vh] pr-2 custom-scrollbar">
+                        <div className="flex-1 space-y-4 overflow-y-auto pr-2 custom-scrollbar">
                             {pendingOrders.length === 0 ? (
                                 <div className="text-center py-20 opacity-20 italic">
                                     <ShoppingBag size={48} className="mx-auto mb-4" />
                                     <p>Aucune commande web en attente</p>
+                                    <p className="text-[10px] mt-2 font-black uppercase">Vérifiez les statuts dans le dashboard</p>
                                 </div>
                             ) : pendingOrders.map(order => (
-                                <div key={order.id} className="p-5 rounded-2xl bg-white/5 border border-white/5 space-y-4 hover:border-accent/20 transition-all">
+                                <div key={order.id} className="p-5 rounded-2xl bg-white/5 border border-white/5 space-y-4 hover:border-accent/20 transition-all group">
                                     <div className="flex justify-between items-start">
                                         <div>
                                             <p className="font-black text-sm uppercase italic">#{order.id.substring(0, 8)}</p>
@@ -385,10 +399,10 @@ function POS() {
                                         <Badge className="bg-orange-500/10 text-orange-400 border-none uppercase text-[9px] font-black">{order.status}</Badge>
                                     </div>
                                     <div className="space-y-1">
-                                        {order.items.slice(0, 2).map((it: any, idx: number) => (
+                                        {order.items?.slice(0, 2).map((it: any, idx: number) => (
                                             <p key={idx} className="text-[10px] text-white/60 truncate">{it.quantity}x {it.name}</p>
                                         ))}
-                                        {order.items.length > 2 && <p className="text-[9px] text-accent font-black">+ {order.items.length - 2} autres articles</p>}
+                                        {order.items?.length > 2 && <p className="text-[9px] text-accent font-black">+ {order.items.length - 2} autres articles</p>}
                                     </div>
                                     <div className="flex justify-between items-end pt-2 border-t border-white/5">
                                         <div>
@@ -396,10 +410,10 @@ function POS() {
                                             <p className="text-xl font-black text-white">${order.total?.toFixed(2)}</p>
                                         </div>
                                         <Button 
-                                            className="bg-accent text-black font-black uppercase italic text-[10px] h-10 px-4 rounded-xl gap-2"
+                                            className="bg-accent text-black font-black uppercase italic text-[10px] h-10 px-4 rounded-xl gap-2 shadow-lg group-hover:scale-105 transition-transform"
                                             onClick={() => loadOrderInPOS(order)}
                                         >
-                                            <ExternalLink size={14} /> Charger en Caisse
+                                            <ExternalLink size={14} /> Charger
                                         </Button>
                                     </div>
                                 </div>
