@@ -5,7 +5,6 @@ import { useEffect, useState } from 'react';
 import Link from "next/link";
 import { usePathname } from 'next/navigation';
 import {
-  AlertTriangle,
   DollarSign,
   Package,
   RefreshCw,
@@ -18,7 +17,6 @@ import {
   ShoppingBag,
   PanelLeft,
   Loader2,
-  LayoutDashboard,
   User,
   Headset,
   ArrowRight,
@@ -27,7 +25,11 @@ import {
   Tags,
   Zap,
   ShieldCheck,
-  CheckCircle2
+  CheckCircle2,
+  BarChart3,
+  MapPin,
+  MessageCircle,
+  ExternalLink
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -92,7 +94,6 @@ function DashboardPage() {
 
   const filteredNavLinks = navConfig.filter(link => link.roles.map(r => r.toLowerCase()).includes(user?.role?.toLowerCase() || ""));
 
-  // Fetch all user orders without complex orderBy to avoid composite index requirement
   const ordersQuery = useMemoFirebase(() => {
     if (authLoading || !user?.uid || isStaff) return null;
     return query(
@@ -103,14 +104,12 @@ function DashboardPage() {
   
   const { data: userOrders } = useCollection(ordersQuery);
 
-  // Client-side sorting for "Last Order"
   const lastOrder = userOrders ? [...userOrders].sort((a, b) => {
     const dateA = a.createdAt?.toDate?.() || new Date(0);
     const dateB = b.createdAt?.toDate?.() || new Date(0);
     return dateB - dateA;
   })[0] : null;
 
-  // Logic for Warranties Count (items in successful orders)
   const protectedItemsCount = userOrders?.filter(o => 
     ["payée", "payé", "terminé", "completed"].includes(o.status?.toLowerCase())
   ).reduce((acc, order) => acc + (order.items?.length || 0), 0) || 0;
@@ -166,7 +165,6 @@ function DashboardPage() {
     );
   }
 
-  // --- VUE CLIENT PREMIUM ---
   if (!isStaff) {
     return (
       <div className="flex min-h-screen w-full flex-col bg-background">
@@ -205,32 +203,50 @@ function DashboardPage() {
                     </CardContent>
                 </Card>
 
-                <Card className="glossy-card border-none rounded-[2.5rem] flex flex-col hover:border-accent/20 transition-all">
-                    <CardHeader>
+                <Card className="glossy-card border-none rounded-[2.5rem] flex flex-col hover:border-accent/20 transition-all overflow-hidden">
+                    <CardHeader className="bg-white/5">
                         <CardTitle className="text-sm font-black uppercase italic tracking-widest flex items-center gap-2">
                             <Clock size={16} className="text-accent" /> Statut Commande
                         </CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-4 flex-1">
+                    <CardContent className="p-6 space-y-6 flex-1">
                         {lastOrder ? (
-                            <div className="space-y-4">
-                                <div className="flex justify-between items-start">
-                                    <div>
-                                        <p className="text-[10px] font-bold text-muted-foreground uppercase">Réf : #{lastOrder.id.substring(0, 8).toUpperCase()}</p>
-                                        <p className="text-2xl font-black text-white">${lastOrder.total?.toFixed(2)}</p>
+                            <div className="space-y-6">
+                                <div className="space-y-4">
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            <p className="text-[10px] font-bold text-muted-foreground uppercase">Réf : #{lastOrder.id.substring(0, 8).toUpperCase()}</p>
+                                            <p className="text-2xl font-black text-white">${lastOrder.total?.toFixed(2)}</p>
+                                        </div>
+                                        {getStatusBadge(lastOrder.status)}
                                     </div>
-                                    {getStatusBadge(lastOrder.status)}
+                                    
+                                    <div className="p-4 bg-white/5 rounded-2xl border border-white/5 space-y-3">
+                                        <div className="flex items-center gap-3">
+                                            <MapPin size={16} className="text-accent" />
+                                            <div>
+                                                <p className="text-[10px] text-muted-foreground uppercase font-black">Point de Retrait</p>
+                                                <p className="text-xs font-bold">Immeuble Bahati, Bunia</p>
+                                            </div>
+                                        </div>
+                                        <Button variant="link" className="text-[9px] font-black uppercase italic text-accent h-auto p-0" asChild>
+                                            <a href="https://www.google.com/maps/search/?api=1&query=Immeuble+Bahati+Bunia+Ituri" target="_blank" rel="noopener noreferrer">
+                                                Voir itinéraire <ExternalLink size={10} className="ml-1" />
+                                            </a>
+                                        </Button>
+                                    </div>
                                 </div>
-                                <div className="p-3 bg-white/5 rounded-xl border border-white/5 space-y-1">
-                                    <p className="text-[10px] text-muted-foreground uppercase font-black">Mode de paiement</p>
-                                    <p className="text-xs font-bold flex items-center gap-2">
-                                        <ShoppingBag className="w-3 h-3 text-accent" />
-                                        {lastOrder.paymentMethod?.replace('_', ' ')}
-                                    </p>
+
+                                <div className="space-y-2">
+                                    <Button className="w-full h-12 bg-green-600 hover:bg-green-700 text-white font-black uppercase italic text-[10px] rounded-xl gap-2 shadow-lg" asChild>
+                                        <a href={`https://wa.me/243823038945?text=Bonjour,%20j'ai%20besoin%20d'aide%20pour%20ma%20commande%20#${lastOrder.id.substring(0, 8).toUpperCase()}`} target="_blank" rel="noopener noreferrer">
+                                            <MessageCircle size={14} /> Besoin d'aide sur cette commande ?
+                                        </a>
+                                    </Button>
+                                    <Button variant="ghost" className="w-full text-[10px] font-black uppercase italic gap-2 h-10 border border-white/5 hover:bg-white/5 rounded-xl" asChild>
+                                        <Link href="/dashboard/orders">Historique complet <ArrowRight size={14} /></Link>
+                                    </Button>
                                 </div>
-                                <Button variant="ghost" className="w-full text-xs font-black uppercase italic gap-2 h-10 border border-white/5 hover:bg-white/5" asChild>
-                                    <Link href="/dashboard/orders">Historique complet <ArrowRight size={14} /></Link>
-                                </Button>
                             </div>
                         ) : (
                             <div className="text-center py-10 opacity-30 italic flex flex-col items-center gap-3">
@@ -543,7 +559,7 @@ function DashboardPage() {
             <Card className="lg:col-span-7 glossy-card border-none rounded-[2.5rem] overflow-hidden">
               <CardHeader className="border-b border-white/5 bg-white/[0.02] flex flex-row items-center justify-between py-6 px-8">
                 <CardTitle className="text-lg font-bold uppercase italic flex items-center gap-3">
-                   <AlertTriangle className="text-destructive animate-pulse" size={20} />
+                   <Package className="text-accent" size={20} />
                    Alertes Stock
                 </CardTitle>
                 <Badge className="bg-destructive/10 text-destructive border-none font-black text-[10px] px-3">{lowStock.length} ALERTES</Badge>

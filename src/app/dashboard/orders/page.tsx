@@ -12,7 +12,10 @@ import {
   Clock, 
   CheckCircle, 
   XCircle,
-  Check
+  Check,
+  MessageCircle,
+  MapPin,
+  ExternalLink
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useCollection, useMemoFirebase } from '@/firebase';
@@ -27,7 +30,6 @@ export default function OrdersPage() {
   const { toast } = useToast();
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
-  // Simplified query to avoid composite index requirements
   const ordersQuery = useMemoFirebase(() => {
     if (authLoading || !user?.uid) return null;
     
@@ -47,7 +49,6 @@ export default function OrdersPage() {
 
   const { data: rawOrders, isLoading: collectionLoading, error } = useCollection(ordersQuery);
 
-  // Client-side sorting for better reliability
   const orders = rawOrders ? [...rawOrders].sort((a, b) => {
     const dateA = a.createdAt?.toDate?.() || new Date(0);
     const dateB = b.createdAt?.toDate?.() || new Date(0);
@@ -138,7 +139,7 @@ export default function OrdersPage() {
                     {orders.map((order: any) => (
                         <Card key={order.id} className="glossy-card border-none rounded-[2rem] overflow-hidden">
                             <div className="p-8">
-                                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-8">
                                     <div className="space-y-2">
                                         <div className="flex items-center gap-3">
                                             <span className="text-xs font-black uppercase text-muted-foreground">Commande #{order.id.substring(0, 8)}</span>
@@ -156,6 +157,21 @@ export default function OrdersPage() {
                                                 </Badge>
                                             ))}
                                         </div>
+                                        
+                                        {!isStaff && (
+                                            <div className="mt-4 flex items-center gap-4 p-3 bg-white/5 rounded-xl border border-white/5">
+                                                <MapPin size={14} className="text-accent" />
+                                                <div className="flex-1">
+                                                    <p className="text-[9px] font-black uppercase text-muted-foreground">Point de Retrait</p>
+                                                    <p className="text-[10px] font-bold">Immeuble Bahati, Bunia</p>
+                                                </div>
+                                                <Button variant="ghost" size="icon" className="h-8 w-8 text-accent hover:bg-accent/10 rounded-lg" asChild>
+                                                    <a href="https://www.google.com/maps/search/?api=1&query=Immeuble+Bahati+Bunia+Ituri" target="_blank" rel="noopener noreferrer">
+                                                        <ExternalLink size={14} />
+                                                    </a>
+                                                </Button>
+                                            </div>
+                                        )}
                                     </div>
 
                                     <div className="flex items-center gap-6">
@@ -164,19 +180,32 @@ export default function OrdersPage() {
                                             <p className="text-2xl font-black text-accent">${(order.total || 0).toFixed(2)}</p>
                                         </div>
 
-                                        {isStaff && order.status !== 'payée' && order.status !== 'terminé' && (
-                                            <div className="flex gap-2">
+                                        <div className="flex flex-col gap-2">
+                                            {isStaff && order.status !== 'payée' && order.status !== 'terminé' && (
                                                 <Button 
                                                     size="sm" 
-                                                    className="bg-green-500 hover:bg-green-600 text-white rounded-xl h-12 px-4 gap-2 font-black uppercase text-[9px]"
+                                                    className="bg-green-500 hover:bg-green-600 text-white rounded-xl h-11 px-4 gap-2 font-black uppercase text-[9px]"
                                                     onClick={() => updateOrderStatus(order.id, 'payée', order.userId)}
                                                     disabled={updatingId === order.id}
                                                 >
                                                     {updatingId === order.id ? <Loader2 className="animate-spin h-3 w-3" /> : <Check size={14} />}
-                                                    Confirmer Paiement
+                                                    Encaisser
                                                 </Button>
-                                            </div>
-                                        )}
+                                            )}
+
+                                            {!isStaff && (
+                                                <Button 
+                                                    variant="outline" 
+                                                    size="sm" 
+                                                    className="border-green-500/20 text-green-500 hover:bg-green-500/10 rounded-xl h-11 px-4 gap-2 font-black uppercase text-[9px]"
+                                                    asChild
+                                                >
+                                                    <a href={`https://wa.me/243823038945?text=Bonjour,%20j'ai%20besoin%20d'aide%20pour%20ma%20commande%20#${order.id.substring(0, 8).toUpperCase()}`} target="_blank" rel="noopener noreferrer">
+                                                        <MessageCircle size={14} /> Aide WhatsApp
+                                                    </a>
+                                                </Button>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
