@@ -2,8 +2,7 @@
 /**
  * @fileOverview Flow Genkit pour l'Assistant Client de Double King Shop.
  * 
- * Cet agent guide les clients, répond aux questions sur l'entreprise, 
- * les paiements (Pi Network, etc.) et peut recommander des produits.
+ * Cet agent guide les clients, répond aux questions sur l'entreprise et les produits.
  */
 
 import { ai } from '@/ai/genkit';
@@ -11,7 +10,6 @@ import { z } from 'genkit';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, query, where, limit } from 'firebase/firestore';
 
-// Schémas d'entrée/sortie
 const AssistantInputSchema = z.object({
   message: z.string(),
   history: z.array(z.object({
@@ -20,7 +18,6 @@ const AssistantInputSchema = z.object({
   })).optional(),
 });
 
-// Outil permettant à l'IA de consulter le catalogue
 const searchProducts = ai.defineTool(
   {
     name: 'searchProducts',
@@ -36,7 +33,7 @@ const searchProducts = ai.defineTool(
       const q = query(
         productsRef, 
         where("isPublished", "==", true),
-        limit(10)
+        limit(20)
       );
       const snapshot = await getDocs(q);
       const products = snapshot.docs.map(doc => ({
@@ -51,7 +48,7 @@ const searchProducts = ai.defineTool(
       return products.filter(p => 
         p.name.toLowerCase().includes(searchTerm) || 
         p.category.toLowerCase().includes(searchTerm) ||
-        p.description?.toLowerCase().includes(searchTerm)
+        (p.description && p.description.toLowerCase().includes(searchTerm))
       ).slice(0, 5);
     } catch (error) {
       console.error("Erreur tool searchProducts:", error);
@@ -67,30 +64,28 @@ const customerAssistantFlow = ai.defineFlow(
     outputSchema: z.string(),
   },
   async (input) => {
-    const response = await ai.generate({
-      model: 'googleai/gemini-1.5-flash',
-      system: `Tu es l'Expert Double King (DKS), l'assistant IA de la boutique de luxe Double King Shop à Bunia, RDC.
-      Ton but est de guider les clients, de les conseiller sur le matériel informatique et de répondre à leurs questions sur la boutique.
+    try {
+      const response = await ai.generate({
+        model: 'googleai/gemini-1.5-flash',
+        system: `Tu es l'Expert Double King (DKS), l'assistant IA de la boutique de luxe Double King Shop à Bunia, RDC.
+        Ton but est de guider les clients, de les conseiller sur le matériel informatique et de répondre à leurs questions.
 
-      INFOS CLÉS SUR L'ENTREPRISE :
-      - Localisation : Immeuble Bahati, Boulevard de la Libération, Bunia, Ituri, RDC.
-      - Spécialité : Hardware informatique haut de gamme (RTX, Processeurs, Laptops Pro, Gaming).
-      - Paiements acceptés : Pi Network (Valeur GCV : 1 Pi = $314,159), Mobile Money (M-Pesa, Airtel, Orange), et Cash au bureau.
-      - Engagement : 100% Original (Aucun reconditionné), Garantie locale, SAV ultra-réactif.
-      - Contact : WhatsApp +243 823 038 945.
+        INFOS CLÉS :
+        - Localisation : Immeuble Bahati, Boulevard de la Libération, Bunia, Ituri, RDC.
+        - Spécialité : Hardware informatique haut de gamme (RTX, Processeurs, Laptops Pro).
+        - Paiements : Pi Network (1 Pi = $314,159), Mobile Money (M-Pesa, Airtel, Orange), et Cash.
+        - Style : Professionnel, chaleureux et expert.
+        - IMPORTANT : Si on te demande un produit, utilise toujours l'outil searchProducts.`,
+        tools: [searchProducts],
+        prompt: input.message,
+        history: input.history,
+      });
 
-      TON STYLE :
-      - Professionnel, élégant, expert et enthousiaste.
-      - Tu parles en français.
-      - Sois concis mais chaleureux.
-      - Si un client cherche un produit, utilise l'outil searchProducts pour voir ce que nous avons.
-      - Rappelle souvent que nous sommes basés à Bunia pour rassurer sur la proximité.`,
-      tools: [searchProducts],
-      prompt: input.message,
-      history: input.history,
-    });
-
-    return response.text;
+      return response.text;
+    } catch (error: any) {
+      console.error("Genkit Flow Error:", error);
+      return "Désolé, je rencontre une difficulté technique pour accéder à mes services. Veuillez réessayer dans quelques instants.";
+    }
   }
 );
 

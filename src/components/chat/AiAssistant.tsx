@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useRef, useEffect } from 'react';
@@ -47,25 +46,32 @@ export function AiAssistant() {
 
         const userMsg = input.trim();
         setInput("");
-        setMessages(prev => [...prev, { role: 'user', text: userMsg }]);
+        
+        // Ajouter le message de l'utilisateur à l'interface
+        const newMessages: Message[] = [...messages, { role: 'user', text: userMsg }];
+        setMessages(newMessages);
         setIsLoading(true);
 
         try {
-            // Conversion de l'historique local pour le flow Genkit
-            const history = messages.map(m => ({
-                role: m.role,
-                content: [{ text: m.text }]
-            }));
+            // CRITIQUE : L'historique pour Gemini doit commencer par 'user'.
+            // On filtre le premier message de bienvenue s'il est de type 'model'.
+            const historyForAi = newMessages
+                .filter((_, index) => index > 0 || newMessages[0].role === 'user')
+                .slice(0, -1) // On enlève le dernier message car il est passé dans 'prompt'
+                .map(m => ({
+                    role: m.role,
+                    content: [{ text: m.text }]
+                }));
 
             const response = await askAssistant({ 
                 message: userMsg,
-                history 
+                history: historyForAi 
             });
 
             setMessages(prev => [...prev, { role: 'model', text: response }]);
         } catch (error) {
-            console.error(error);
-            setMessages(prev => [...prev, { role: 'model', text: "Désolé, j'ai rencontré une petite interférence technique. Pouvez-vous répéter ?" }]);
+            console.error("Chat Error:", error);
+            setMessages(prev => [...prev, { role: 'model', text: "Une erreur de communication est survenue. Vérifiez votre connexion ou réessayez plus tard." }]);
         } finally {
             setIsLoading(false);
         }
@@ -100,16 +106,12 @@ export function AiAssistant() {
                         {messages.map((m, i) => (
                             <div key={i} className={cn("flex flex-col", m.role === 'user' ? "items-end" : "items-start")}>
                                 <div className={cn(
-                                    "max-w-[85%] p-4 rounded-2xl text-sm leading-relaxed relative group",
+                                    "max-w-[85%] p-4 rounded-2xl text-sm leading-relaxed relative",
                                     m.role === 'user' 
                                         ? "bg-primary text-white rounded-tr-none" 
                                         : "bg-white/5 text-muted-foreground border border-white/5 rounded-tl-none"
                                 )}>
                                     {m.text}
-                                    <div className={cn(
-                                        "absolute top-0 w-2 h-2",
-                                        m.role === 'user' ? "-right-1 bg-primary" : "-left-1 bg-white/5 border-l border-t border-white/5"
-                                    )} style={{ clipPath: 'polygon(0 0, 100% 0, 100% 100%)' }} />
                                 </div>
                                 <span className="text-[8px] font-black uppercase opacity-20 mt-1 px-1 tracking-widest">
                                     {m.role === 'user' ? 'Vous' : 'DKS IA'}
@@ -117,14 +119,14 @@ export function AiAssistant() {
                             </div>
                         ))}
                         {isLoading && (
-                            <div className="flex items-start gap-3 animate-pulse">
+                            <div className="flex items-start gap-3">
                                 <div className="p-3 rounded-2xl bg-white/5 border border-white/5 rounded-tl-none">
                                     <Loader2 className="h-4 w-4 animate-spin text-accent" />
                                 </div>
                             </div>
                         )}
                         
-                        {/* Suggestions rapides (seulement au début) */}
+                        {/* Suggestions rapides */}
                         {messages.length === 1 && !isLoading && (
                             <div className="pt-4 space-y-2">
                                 <p className="text-[9px] font-black uppercase text-muted-foreground/40 ml-1 tracking-widest">Suggestions :</p>
@@ -132,12 +134,12 @@ export function AiAssistant() {
                                     {[
                                         { t: "Paiement en Pi ?", i: <Cpu size={10}/> },
                                         { t: "Où êtes-vous ?", i: <MapPin size={10}/> },
-                                        { t: "Stock RTX dispo ?", i: <Smartphone size={10}/> }
+                                        { t: "Stock RTX ?", i: <Smartphone size={10}/> }
                                     ].map(s => (
                                         <button 
                                             key={s.t} 
                                             onClick={() => { setInput(s.t); }}
-                                            className="px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-[10px] font-bold hover:bg-accent/10 hover:text-accent hover:border-accent/30 transition-all flex items-center gap-2"
+                                            className="px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-[10px] font-bold hover:bg-accent/10 hover:text-accent transition-all flex items-center gap-2"
                                         >
                                             {s.i} {s.t}
                                         </button>
@@ -160,7 +162,7 @@ export function AiAssistant() {
                                 type="submit" 
                                 size="icon" 
                                 disabled={!input.trim() || isLoading}
-                                className="h-12 w-12 rounded-xl bg-accent text-black hover:bg-accent/90 shadow-lg shadow-accent/20 shrink-0"
+                                className="h-12 w-12 rounded-xl bg-accent text-black shadow-accent/20"
                             >
                                 <Send size={18} />
                             </Button>
@@ -173,18 +175,13 @@ export function AiAssistant() {
             <Button 
                 onClick={() => setIsOpen(!isOpen)}
                 className={cn(
-                    "h-16 w-16 rounded-[2rem] shadow-2xl transition-all duration-500 group",
+                    "h-16 w-16 rounded-[2rem] shadow-2xl transition-all duration-500",
                     isOpen 
-                        ? "bg-background border border-white/10 text-white rotate-90 scale-90" 
-                        : "bg-accent text-black hover:scale-110 active:scale-95 shadow-accent/20"
+                        ? "bg-background border border-white/10 text-white rotate-90" 
+                        : "bg-accent text-black hover:scale-110 active:scale-95"
                 )}
             >
-                {isOpen ? <X size={28} /> : (
-                    <div className="relative">
-                        <Sparkles size={28} className="group-hover:rotate-12 transition-transform" />
-                        <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-accent animate-ping" />
-                    </div>
-                )}
+                {isOpen ? <X size={28} /> : <Sparkles size={28} />}
             </Button>
         </div>
     );
