@@ -31,7 +31,9 @@ import {
   User as UserIcon,
   ArrowLeft,
   History,
-  Clock
+  Clock,
+  ShoppingBag,
+  ExternalLink
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -51,7 +53,7 @@ import {
 } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { db } from "@/lib/firebase";
-import { collection, onSnapshot, doc, updateDoc, addDoc, serverTimestamp, increment, query, orderBy, limit, getDoc } from "firebase/firestore";
+import { collection, onSnapshot, doc, updateDoc, addDoc, serverTimestamp, increment, query, orderBy, limit, getDoc, where } from "firebase/firestore";
 import { useAuth } from "@/context/AuthContext";
 import withAuth from "@/components/auth/withAuth";
 
@@ -70,7 +72,9 @@ function POS() {
   const [showReceipt, setShowReceipt] = useState(false);
   const [loadingProducts, setLoadingProducts] = useState(true);
   const [recentSales, setRecentSales] = useState<any[]>([]);
+  const [pendingOrders, setPendingOrders] = useState<any[]>([]);
   const [exchangeRate, setExchangeRate] = useState(2500);
+  const [activeOrderId, setActiveOrderId] = useState<string | null>(null);
   const [lastTransaction, setLastTransaction] = useState<{
     id: string;
     items: any[];
@@ -119,6 +123,23 @@ function POS() {
     return () => unsubscribe();
   }, []);
 
+  // Fetch Pending Web Orders
+  useEffect(() => {
+    const q = query(
+      collection(db, "orders"), 
+      where("status", "in", ["pending", "pending_payment"]),
+      orderBy("createdAt", "desc")
+    );
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const orders = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setPendingOrders(orders);
+    });
+    return () => unsubscribe();
+  }, []);
+
   const addToCart = (product: Product) => {
     if (product.stockQuantity <= 0) {
         toast({ title: "Rupture de stock", description: "Cet article n'est plus disponible.", variant: "destructive" });
@@ -138,8 +159,33 @@ function POS() {
     });
   };
 
+  const loadOrderInPOS = (order: any) => {
+    if (cart.length > 0) {
+        if (!window.confirm("Le panier actuel sera remplacé par le contenu de la commande. Continuer ?")) return;
+    }
+
+    const itemsToLoad = order.items.map((item: any) => {
+        const product = products.find(p => p.id === item.id || p.id === item.productId);
+        return {
+            ...product,
+            id: item.id || item.productId,
+            name: item.name,
+            sellingPrice: item.price,
+            price: item.price,
+            quantity: item.quantity,
+            imageUrl: product?.imageUrl || ''
+        } as CartItem;
+    });
+
+    setCart(itemsToLoad);
+    setCustomerName(order.customerName);
+    setActiveOrderId(order.id);
+    toast({ title: "Commande chargée", description: `Commande #${order.id.substring(0, 8)} de ${order.customerName}` });
+  };
+
   const removeFromCart = (id: string) => {
     setCart(prev => prev.filter(item => item.id !== id));
+    if (cart.length === 1) setActiveOrderId(null);
   };
 
   const updateQuantity = (id: string, delta: number) => {
@@ -186,17 +232,37 @@ function POS() {
             totalCDF: total * exchangeRate,
             paymentMode: paymentMode,
             createdAt: serverTimestamp(),
-            status: 'Payé'
+            status: 'Payé',
+            orderId: activeOrderId || null
         };
 
         const saleRef = await addDoc(collection(db, "sales"), saleData);
 
+        // Update Stock
         await Promise.all(cart.map(item => {
             const productRef = doc(db, "products", item.id);
             return updateDoc(productRef, {
                 stockQuantity: increment(-item.quantity)
             });
         }));
+
+        // Update Source Order if exists
+        if (activeOrderId) {
+            await updateDoc(doc(db, "orders", activeOrderId), {
+                status: 'payée',
+                updatedAt: serverTimestamp()
+            });
+
+            // Notify customer
+            await addDoc(collection(db, "notifications"), {
+                userId: 'staff', // Log to staff too
+                title: "Commande Payée (Caisse)",
+                message: `La commande #${activeOrderId.substring(0, 8)} de ${finalCustomerName} a été encaissée.`,
+                type: 'success',
+                isRead: false,
+                createdAt: serverTimestamp()
+            });
+        }
 
         const now = new Date().toLocaleString('fr-FR');
         setLastTransaction({
@@ -215,6 +281,7 @@ function POS() {
 
         setCart([]);
         setCustomerName("");
+        setActiveOrderId(null);
         setShowConfirmation(false);
         setShowReceipt(true);
     } catch (error) {
@@ -285,49 +352,106 @@ function POS() {
                 />
             </div>
             
-            <Sheet>
-                <SheetTrigger asChild>
-                    <Button variant="outline" className="h-14 w-14 rounded-2xl border-white/10 hover:bg-accent/10 hover:text-accent p-0">
-                        <History size={24} />
-                    </Button>
-                </SheetTrigger>
-                <SheetContent className="bg-card/95 backdrop-blur-3xl border-white/10 w-full sm:max-w-md">
-                    <SheetHeader className="mb-6">
-                        <SheetTitle className="text-xl font-black uppercase italic flex items-center gap-3">
-                            <Clock className="text-accent" /> Historique Ventes
-                        </SheetTitle>
-                    </SheetHeader>
-                    <div className="space-y-4 overflow-y-auto max-h-[85vh] pr-2 custom-scrollbar">
-                        {recentSales.map(sale => (
-                            <div key={sale.id} className="p-4 rounded-2xl bg-white/5 border border-white/5 space-y-3 hover:border-accent/20 transition-all group">
-                                <div className="flex justify-between items-start">
-                                    <div>
-                                        <p className="font-bold text-sm uppercase italic">#{sale.id.substring(0, 8)}</p>
-                                        <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest">{sale.formattedDate}</p>
-                                    </div>
-                                    <Badge className="bg-accent/10 text-accent font-black uppercase text-[10px] border-none">
-                                        {sale.paymentMode?.replace('_', ' ')}
-                                    </Badge>
+            <div className="flex gap-2">
+                <Sheet>
+                    <SheetTrigger asChild>
+                        <Button variant="outline" className="h-14 px-5 rounded-2xl border-white/10 hover:bg-accent/10 hover:text-accent gap-3 font-black uppercase italic text-xs">
+                            <ShoppingBag size={20} />
+                            <span className="hidden sm:inline">Commandes Web</span>
+                            {pendingOrders.length > 0 && (
+                                <Badge className="bg-accent text-black font-black text-[10px] h-5 min-w-[20px] flex items-center justify-center p-0 rounded-full">{pendingOrders.length}</Badge>
+                            )}
+                        </Button>
+                    </SheetTrigger>
+                    <SheetContent className="bg-card/95 backdrop-blur-3xl border-white/10 w-full sm:max-w-md">
+                        <SheetHeader className="mb-6">
+                            <SheetTitle className="text-xl font-black uppercase italic flex items-center gap-3">
+                                <ShoppingBag className="text-accent" /> Commandes en Attente
+                            </SheetTitle>
+                        </SheetHeader>
+                        <div className="space-y-4 overflow-y-auto max-h-[85vh] pr-2 custom-scrollbar">
+                            {pendingOrders.length === 0 ? (
+                                <div className="text-center py-20 opacity-20 italic">
+                                    <ShoppingBag size={48} className="mx-auto mb-4" />
+                                    <p>Aucune commande web en attente</p>
                                 </div>
-                                <div className="flex justify-between items-end">
-                                    <div>
-                                        <p className="text-xs text-white/60">Client: {sale.customerName}</p>
-                                        <p className="text-lg font-black text-white">${sale.totalAmount.toFixed(2)}</p>
+                            ) : pendingOrders.map(order => (
+                                <div key={order.id} className="p-5 rounded-2xl bg-white/5 border border-white/5 space-y-4 hover:border-accent/20 transition-all">
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            <p className="font-black text-sm uppercase italic">#{order.id.substring(0, 8)}</p>
+                                            <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">{order.customerName}</p>
+                                        </div>
+                                        <Badge className="bg-orange-500/10 text-orange-400 border-none uppercase text-[9px] font-black">{order.status}</Badge>
                                     </div>
-                                    <Button 
-                                        variant="ghost" 
-                                        size="sm" 
-                                        className="h-9 gap-2 font-black uppercase italic text-[10px] bg-white/5 hover:bg-accent hover:text-black rounded-xl"
-                                        onClick={() => reprintReceipt(sale)}
-                                    >
-                                        <Printer size={14} /> Reçu
-                                    </Button>
+                                    <div className="space-y-1">
+                                        {order.items.slice(0, 2).map((it: any, idx: number) => (
+                                            <p key={idx} className="text-[10px] text-white/60 truncate">{it.quantity}x {it.name}</p>
+                                        ))}
+                                        {order.items.length > 2 && <p className="text-[9px] text-accent font-black">+ {order.items.length - 2} autres articles</p>}
+                                    </div>
+                                    <div className="flex justify-between items-end pt-2 border-t border-white/5">
+                                        <div>
+                                            <p className="text-[9px] text-muted-foreground uppercase font-black">Total</p>
+                                            <p className="text-xl font-black text-white">${order.total?.toFixed(2)}</p>
+                                        </div>
+                                        <Button 
+                                            className="bg-accent text-black font-black uppercase italic text-[10px] h-10 px-4 rounded-xl gap-2"
+                                            onClick={() => loadOrderInPOS(order)}
+                                        >
+                                            <ExternalLink size={14} /> Charger en Caisse
+                                        </Button>
+                                    </div>
                                 </div>
-                            </div>
-                        ))}
-                    </div>
-                </SheetContent>
-            </Sheet>
+                            ))}
+                        </div>
+                    </SheetContent>
+                </Sheet>
+
+                <Sheet>
+                    <SheetTrigger asChild>
+                        <Button variant="outline" className="h-14 w-14 rounded-2xl border-white/10 hover:bg-accent/10 hover:text-accent p-0">
+                            <History size={24} />
+                        </Button>
+                    </SheetTrigger>
+                    <SheetContent className="bg-card/95 backdrop-blur-3xl border-white/10 w-full sm:max-w-md">
+                        <SheetHeader className="mb-6">
+                            <SheetTitle className="text-xl font-black uppercase italic flex items-center gap-3">
+                                <Clock className="text-accent" /> Historique Ventes
+                            </SheetTitle>
+                        </SheetHeader>
+                        <div className="space-y-4 overflow-y-auto max-h-[85vh] pr-2 custom-scrollbar">
+                            {recentSales.map(sale => (
+                                <div key={sale.id} className="p-4 rounded-2xl bg-white/5 border border-white/5 space-y-3 hover:border-accent/20 transition-all group">
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            <p className="font-bold text-sm uppercase italic">#{sale.id.substring(0, 8)}</p>
+                                            <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest">{sale.formattedDate}</p>
+                                        </div>
+                                        <Badge className="bg-accent/10 text-accent font-black uppercase text-[10px] border-none">
+                                            {sale.paymentMode?.replace('_', ' ')}
+                                        </Badge>
+                                    </div>
+                                    <div className="flex justify-between items-end">
+                                        <div>
+                                            <p className="text-xs text-white/60">Client: {sale.customerName}</p>
+                                            <p className="text-lg font-black text-white">${sale.totalAmount.toFixed(2)}</p>
+                                        </div>
+                                        <Button 
+                                            variant="ghost" 
+                                            size="sm" 
+                                            className="h-9 gap-2 font-black uppercase italic text-[10px] bg-white/5 hover:bg-accent hover:text-black rounded-xl"
+                                            onClick={() => reprintReceipt(sale)}
+                                        >
+                                            <Printer size={14} /> Reçu
+                                        </Button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </SheetContent>
+                </Sheet>
+            </div>
           </div>
           
           {loadingProducts ? (
@@ -372,7 +496,10 @@ function POS() {
                   <ShoppingCart size={20} className="text-accent" />
                   Panier Caisse
                 </CardTitle>
-                <Badge className="bg-accent text-accent-foreground font-black">{cart.length} ITEMS</Badge>
+                <div className="flex gap-2">
+                    {activeOrderId && <Badge className="bg-orange-500 text-white font-black animate-pulse">WEB ORDER</Badge>}
+                    <Badge className="bg-accent text-accent-foreground font-black">{cart.length} ITEMS</Badge>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="flex-1 overflow-y-auto p-0 scrollbar-hide">
@@ -448,7 +575,7 @@ function POS() {
                 onClick={handleCheckout}
               >
                 {isProcessing ? <Loader2 className="animate-spin" /> : <CheckCircle2 />}
-                Valider la Vente
+                {activeOrderId ? "Encaisser Commande Web" : "Valider la Vente"}
               </Button>
             </CardFooter>
           </Card>
