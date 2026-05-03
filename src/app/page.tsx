@@ -68,6 +68,10 @@ const TESTIMONIALS = [
   }
 ];
 
+const BRANDS = [
+  "INTEL", "NVIDIA", "ASUS", "SAMSUNG", "LOGITECH", "RAZER", "CORSAIR", "MSI"
+];
+
 const SEARCH_TAGS = ["RTX 4090", "Clavier Mécanique", "Laptop Pro", "SSD 1TB", "Ecran Gaming"];
 
 export default function LandingPage() {
@@ -142,7 +146,7 @@ export default function LandingPage() {
           
           <div className="space-y-4 mb-14 animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-500">
             <p className="text-xl md:text-2xl text-white font-bold uppercase italic tracking-tight">
-              Le plus grand stock de composants certifiés à Bunia.
+              Le plus grand stock de composants informatiques certifiés à Bunia.
             </p>
             <p className="text-base md:text-lg text-muted-foreground font-light max-w-2xl mx-auto leading-relaxed">
               Livraison flash en <span className="text-accent font-bold">2 heures</span> et garantie locale sur site. 
@@ -196,6 +200,20 @@ export default function LandingPage() {
                 </div>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* Brand Partners Section */}
+      <section className="py-16 border-b border-white/5 overflow-hidden">
+        <div className="container max-w-7xl mx-auto px-6 text-center">
+            <p className="text-[9px] font-black uppercase tracking-[0.4em] text-muted-foreground/40 mb-10 italic">Partenaires Technologiques Officiels</p>
+            <div className="flex flex-wrap justify-center items-center gap-x-12 gap-y-8 opacity-30 grayscale hover:opacity-100 transition-all duration-700">
+                {BRANDS.map(brand => (
+                    <span key={brand} className="text-2xl md:text-3xl font-black italic tracking-tighter text-white hover:text-accent transition-colors cursor-default">
+                        {brand}
+                    </span>
+                ))}
+            </div>
         </div>
       </section>
 
