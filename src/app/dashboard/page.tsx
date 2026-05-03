@@ -30,7 +30,8 @@ import {
   MapPin,
   MessageCircle,
   ExternalLink,
-  Wrench
+  Wrench,
+  GraduationCap
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -76,6 +77,7 @@ const navConfig = [
   { href: "/dashboard/products", icon: Package, label: "Produits", roles: ["Admin", "Seller"] },
   { href: "/dashboard/categories", icon: Tags, label: "Catégories", roles: ["Admin", "Seller"] },
   { href: "/dashboard/orders", icon: ShoppingBag, label: "Commandes", roles: ["Admin", "Seller", "Cashier"] },
+  { href: "/dashboard/services", icon: GraduationCap, label: "Services & Pôles", roles: ["Admin", "Seller", "Cashier"] },
   { href: "/dashboard/support", icon: Wrench, label: "SAV & Support", roles: ["Admin", "Seller", "Cashier"] },
   { href: "/dashboard/customers", icon: Users, label: "Clients", roles: ["Admin", "Seller", "Cashier"] },
   { href: "/dashboard/users", icon: UsersRound, label: "Équipe", roles: ["Admin"] },
@@ -106,15 +108,15 @@ function DashboardPage() {
   
   const { data: userOrders } = useCollection(ordersQuery);
 
-  const ticketsQuery = useMemoFirebase(() => {
+  const bookingsQuery = useMemoFirebase(() => {
     if (authLoading || !user?.uid || isStaff) return null;
     return query(
-      collection(db, "supportTickets"), 
+      collection(db, "serviceBookings"), 
       where("userId", "==", user.uid)
     );
   }, [user?.uid, isStaff, authLoading]);
 
-  const { data: userTickets } = useCollection(ticketsQuery);
+  const { data: userBookings } = useCollection(bookingsQuery);
 
   const lastOrder = useMemo(() => {
     if (!userOrders) return null;
@@ -123,20 +125,6 @@ function DashboardPage() {
       const dateB = b.createdAt?.toDate?.() || new Date(0);
       return dateB - dateA;
     })[0];
-  }, [userOrders]);
-
-  const protectedItemsCount = useMemo(() => {
-    if (!userOrders) return 0;
-    return userOrders
-      .filter(o => ["payée", "payé", "terminé", "completed"].includes(o.status?.toLowerCase()))
-      .reduce((acc, order) => acc + (order.items?.length || 0), 0);
-  }, [userOrders]);
-
-  const pendingWarrantyCount = useMemo(() => {
-    if (!userOrders) return 0;
-    return userOrders
-      .filter(o => !["payée", "payé", "terminé", "completed", "annulé", "cancelled"].includes(o.status?.toLowerCase()))
-      .reduce((acc, order) => acc + (order.items?.length || 0), 0);
   }, [userOrders]);
 
   useEffect(() => {
@@ -221,10 +209,15 @@ function DashboardPage() {
                     <CardContent className="p-10 space-y-4">
                         <Badge className="bg-accent/20 text-accent border-none font-black uppercase tracking-tighter px-3">Membre Premium DKS</Badge>
                         <h2 className="text-4xl font-black uppercase italic leading-tight">VOTRE SETUP,<br /><span className="text-accent">NOTRE PRIORITÉ</span></h2>
-                        <p className="text-muted-foreground text-sm max-w-md font-light leading-relaxed">Gérez vos commandes, activez vos garanties et profitez de l'expertise Double King Shop Bunia.</p>
-                        <Button className="bg-primary hover:bg-primary/90 h-12 rounded-xl px-8 font-black uppercase italic gap-2 mt-4" asChild>
-                            <Link href="/#shop">Continuer mes achats <ArrowRight size={18} /></Link>
-                        </Button>
+                        <p className="text-muted-foreground text-sm max-w-md font-light leading-relaxed">Gérez vos commandes, réservez vos formations IA et suivez vos interventions techniques en direct.</p>
+                        <div className="flex flex-wrap gap-4 mt-4">
+                            <Button className="bg-primary hover:bg-primary/90 h-12 rounded-xl px-8 font-black uppercase italic gap-2" asChild>
+                                <Link href="/#shop">Continuer mes achats <ArrowRight size={18} /></Link>
+                            </Button>
+                            <Button variant="outline" className="border-white/10 h-12 rounded-xl px-8 font-black uppercase italic gap-2" asChild>
+                                <Link href="/services">Réserver un Service <Wrench size={18} /></Link>
+                            </Button>
+                        </div>
                     </CardContent>
                 </Card>
 
@@ -254,18 +247,13 @@ function DashboardPage() {
                                                 <p className="text-xs font-bold">Immeuble Bahati, Bunia</p>
                                             </div>
                                         </div>
-                                        <Button variant="link" className="text-[9px] font-black uppercase italic text-accent h-auto p-0" asChild>
-                                            <a href="https://www.google.com/maps/search/?api=1&query=Immeuble+Bahati+Bunia+Ituri" target="_blank" rel="noopener noreferrer">
-                                                Voir itinéraire <ExternalLink size={10} className="ml-1" />
-                                            </a>
-                                        </Button>
                                     </div>
                                 </div>
 
                                 <div className="space-y-2">
                                     <Button className="w-full h-12 bg-green-600 hover:bg-green-700 text-white font-black uppercase italic text-[10px] rounded-xl gap-2 shadow-lg" asChild>
                                         <a href={`https://wa.me/243823038945?text=Bonjour,%20j'ai%20besoin%20d'aide%20pour%20ma%20commande%20#${lastOrder.id.substring(0, 8).toUpperCase()}`} target="_blank" rel="noopener noreferrer">
-                                            <MessageCircle size={14} /> Besoin d'aide sur cette commande ?
+                                            <MessageCircle size={14} /> Besoin d'aide ?
                                         </a>
                                     </Button>
                                     <Button variant="ghost" className="w-full text-[10px] font-black uppercase italic gap-2 h-10 border border-white/5 hover:bg-white/5 rounded-xl" asChild>
@@ -288,30 +276,22 @@ function DashboardPage() {
                     <CardContent className="p-10 space-y-6">
                         <div className="flex justify-between items-start">
                             <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
-                                <ShieldCheck size={28} />
+                                <GraduationCap size={28} />
                             </div>
                             <div className="flex flex-col items-end gap-1">
                               <Badge className="bg-primary/20 text-primary border-none uppercase text-[10px] font-black px-3 py-1">
-                                  {protectedItemsCount} {protectedItemsCount > 1 ? 'Articles protégés' : 'Article protégé'}
+                                  {userBookings?.length || 0} Prestations
                               </Badge>
-                              {pendingWarrantyCount > 0 && (
-                                <Badge className="bg-orange-500/10 text-orange-400 border-none uppercase text-[8px] font-bold px-2 py-0.5">
-                                  +{pendingWarrantyCount} en attente
-                                </Badge>
-                              )}
                             </div>
                         </div>
                         <div className="space-y-2">
-                            <h3 className="text-xl font-black uppercase italic tracking-tighter">Mes Garanties & SAV</h3>
+                            <h3 className="text-xl font-black uppercase italic tracking-tighter">Mes Pôles Services</h3>
                             <p className="text-xs text-muted-foreground leading-relaxed font-light">
-                                {protectedItemsCount > 0 
-                                  ? "Tous vos articles DKS bénéficient d'un support local. Suivez vos réparations et tickets support ici."
-                                  : "Faites votre premier achat pour activer vos garanties locales à Bunia. Nous protégeons chaque composant hardware."
-                                }
+                                Suivez vos inscriptions aux ateliers IA, vos installations réseau ou vos upgrades hardware en cours.
                             </p>
                         </div>
-                        <Link href="/dashboard/support" className="inline-flex items-center text-[10px] font-black uppercase italic text-primary hover:underline gap-2">
-                            Gérer mes tickets SAV {userTickets && userTickets.length > 0 && <Badge className="bg-primary text-white h-4 px-1 rounded-full text-[8px]">{userTickets.length}</Badge>} <ArrowRight size={12} />
+                        <Link href="/dashboard/services" className="inline-flex items-center text-[10px] font-black uppercase italic text-primary hover:underline gap-2">
+                            Gérer mes réservations <ArrowRight size={12} />
                         </Link>
                     </CardContent>
                 </Card>
@@ -319,16 +299,16 @@ function DashboardPage() {
                 <Card className="glossy-card border-none rounded-[2.5rem] overflow-hidden group hover:bg-accent/5 transition-all">
                     <CardContent className="p-10 space-y-6">
                         <div className="w-14 h-14 rounded-2xl bg-accent/10 flex items-center justify-center text-accent group-hover:scale-110 transition-transform">
-                            <User size={28} />
+                            <Wrench size={28} />
                         </div>
                         <div className="space-y-2">
-                            <h3 className="text-xl font-black uppercase italic tracking-tighter">Mon Profil</h3>
+                            <h3 className="text-xl font-black uppercase italic tracking-tighter">Support & SAV</h3>
                             <p className="text-xs text-muted-foreground leading-relaxed font-light">
-                                Modifiez vos coordonnées pour faciliter vos livraisons et vos transactions M-Pesa ou Airtel Money.
+                                Un problème technique sur votre matériel ? Ouvrez un ticket SAV pour un diagnostic rapide à notre bureau.
                             </p>
                         </div>
-                        <Link href="/dashboard/settings" className="inline-flex items-center text-[10px] font-black uppercase italic text-accent hover:underline gap-2">
-                            Mettre à jour <ArrowRight size={12} />
+                        <Link href="/dashboard/support" className="inline-flex items-center text-[10px] font-black uppercase italic text-accent hover:underline gap-2">
+                            Ouvrir un ticket <ArrowRight size={12} />
                         </Link>
                     </CardContent>
                 </Card>
@@ -336,35 +316,18 @@ function DashboardPage() {
                 <Card className="glossy-card border-none rounded-[2.5rem] overflow-hidden group hover:bg-green-500/5 transition-all">
                     <CardContent className="p-10 space-y-6">
                         <div className="w-14 h-14 rounded-2xl bg-green-500/10 flex items-center justify-center text-green-500 group-hover:scale-110 transition-transform">
-                            <Headset size={28} />
+                            <ShieldCheck size={28} />
                         </div>
                         <div className="space-y-2">
-                            <h3 className="text-xl font-black uppercase italic tracking-tighter">Besoin d'aide ?</h3>
+                            <h3 className="text-xl font-black uppercase italic tracking-tighter">Certifications DKS</h3>
                             <p className="text-xs text-muted-foreground leading-relaxed font-light">
-                                Une question sur un processeur ou une RTX ? Nos experts de Bunia vous répondent en direct sur WhatsApp.
+                                Chaque intervention est certifiée conforme aux normes internationales pour la sécurité de vos données.
                             </p>
                         </div>
-                        <Link href="https://wa.me/243823038945" target="_blank" className="inline-flex items-center text-[10px] font-black uppercase italic text-green-500 hover:underline gap-2">
-                            Lancer le chat <ArrowRight size={12} />
+                        <Link href="/services" className="inline-flex items-center text-[10px] font-black uppercase italic text-green-500 hover:underline gap-2">
+                            Nos engagements <ArrowRight size={12} />
                         </Link>
                     </CardContent>
-                </Card>
-            </div>
-
-            <div className="pt-10">
-                <Card className="bg-white/5 border border-white/5 rounded-[2.5rem] p-8 flex flex-col md:flex-row items-center justify-between gap-6">
-                    <div className="flex items-center gap-6">
-                        <div className="w-12 h-12 rounded-full bg-accent/20 flex items-center justify-center text-accent">
-                            <Zap size={20} className="fill-accent" />
-                        </div>
-                        <div>
-                            <h4 className="font-black uppercase italic text-sm">NOUVEAUX ARRIVAGES CE MATIN</h4>
-                            <p className="text-xs text-muted-foreground">Découvrez les dernières cartes graphiques reçues en stock.</p>
-                        </div>
-                    </div>
-                    <Button variant="outline" className="rounded-xl font-black uppercase italic text-xs h-12 px-8 border-white/10" asChild>
-                        <Link href="/#shop">Voir la collection</Link>
-                    </Button>
                 </Card>
             </div>
         </main>
@@ -416,14 +379,14 @@ function DashboardPage() {
                 </h2>
             </div>
 
-            <nav className="hidden lg:flex items-center gap-2">
+            <nav className="hidden xl:flex items-center gap-1">
                 {filteredNavLinks.map((link) => (
                     <Link key={link.href} href={link.href}>
                         <Button
                             variant="ghost"
                             size="sm"
                             className={cn(
-                                "group rounded-none h-20 px-5 gap-2.5 font-medium transition-all text-[11px] relative",
+                                "group rounded-none h-20 px-4 gap-2.5 font-medium transition-all text-[10px] relative",
                                 pathname === link.href 
                                     ? 'text-accent' 
                                     : 'text-slate-400 hover:text-white'
@@ -443,7 +406,7 @@ function DashboardPage() {
                 {(user?.role?.toLowerCase() === 'cashier' || user?.role?.toLowerCase() === 'admin') && (
                   <Link href="/pos">
                     <Button className="bg-accent text-black font-black uppercase italic text-xs rounded-2xl h-11 px-6 shadow-xl shadow-accent/10 hover:scale-105 active:scale-95 transition-all">
-                      Aller à la Caisse
+                      Caisse
                     </Button>
                   </Link>
                 )}
@@ -462,13 +425,13 @@ function DashboardPage() {
       <main className="flex-1 p-4 md:p-8 space-y-8">
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
              <Card className="lg:col-span-2 glossy-card border-none rounded-[2.5rem] relative overflow-hidden group">
-              <div className="absolute -top-12 -right-12 w-48 h-48 bg-accent/5 rounded-full blur-3xl group-hover:bg-accent/10 transition-all duration-700" />
+              <div className="absolute -top-12 -right-12 w-48 h-48 bg-accent/5 rounded-full blur-3xl group-hover:bg-accent/20 transition-all duration-700" />
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <div className="space-y-1">
                     <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Revenu Global Boutique</CardTitle>
                     <p className="text-[9px] text-accent font-bold uppercase tracking-widest">Temps réel</p>
                 </div>
-                <div className="w-12 h-12 rounded-2xl bg-accent/10 flex items-center justify-center text-accent shadow-[0_0_20px_rgba(56,189,248,0.3)] group-hover:shadow-[0_0_30px_rgba(56,189,248,0.5)] transition-all">
+                <div className="w-12 h-12 rounded-2xl bg-accent/10 flex items-center justify-center text-accent shadow-[0_0_20px_rgba(56,189,248,0.3)]">
                     <DollarSign className="h-6 w-6" />
                 </div>
               </CardHeader>
@@ -480,7 +443,6 @@ function DashboardPage() {
                     <Badge variant="outline" className="border-white/5 bg-white/5 px-3 py-1 font-mono text-slate-400">
                         ≈ {formatCurrency(stats?.totalRevenueUSD || 0)} USD
                     </Badge>
-                    <span className="text-[10px] text-slate-500 italic font-light">Taux : 1 USD = {rate} CDF</span>
                 </div>
               </CardContent>
             </Card>
@@ -488,7 +450,7 @@ function DashboardPage() {
              <Card className="glossy-card border-none rounded-[2.5rem] group">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Ventes Jour</CardTitle>
-                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white shadow-[0_0_15px_rgba(37,99,235,0.2)] group-hover:shadow-[0_0_25px_rgba(37,99,235,0.4)] transition-all duration-500">
+                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-all duration-500">
                     <TrendingUp className="h-5 w-5" />
                 </div>
               </CardHeader>
@@ -503,7 +465,7 @@ function DashboardPage() {
              <Card className="glossy-card border-none rounded-[2.5rem] group">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Inventaire</CardTitle>
-                <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white group-hover:bg-white group-hover:text-black shadow-[0_0_15px_rgba(255,255,255,0.05)] group-hover:shadow-[0_0_25px_rgba(255,255,255,0.15)] transition-all duration-500">
+                <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white group-hover:bg-white group-hover:text-black transition-all duration-500">
                     <Package className="h-5 w-5" />
                 </div>
               </CardHeader>
@@ -539,9 +501,7 @@ function DashboardPage() {
                                 tick={{fill: '#94a3b8', fontSize: 10}}
                                 dy={10}
                             />
-                            <YAxis 
-                                hide 
-                            />
+                            <YAxis hide />
                             <Tooltip 
                                 contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', borderRadius: '12px', fontSize: '12px' }}
                                 itemStyle={{ color: 'hsl(var(--accent))' }}
@@ -576,7 +536,7 @@ function DashboardPage() {
                                 <div className="flex-1">
                                     <div className="flex items-center justify-between mb-1">
                                         <p className="text-sm font-bold uppercase italic">{sale.cashierName}</p>
-                                        <p className="font-mono font-bold text-sm text-white">{formatCurrency(sale.totalAmount)} <span className="text-[9px] font-light opacity-30">USD</span></p>
+                                        <p className="font-mono font-bold text-sm text-white">{formatCurrency(sale.totalAmount)} USD</p>
                                     </div>
                                     <div className="flex items-center justify-between">
                                         <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">REF: #{sale.id.substring(0, 8)}</p>
@@ -587,52 +547,6 @@ function DashboardPage() {
                         ))}
                     </div>
                 </CardContent>
-            </Card>
-          </div>
-
-          <div className="grid gap-6 grid-cols-1 lg:grid-cols-7">
-            <Card className="lg:col-span-7 glossy-card border-none rounded-[2.5rem] overflow-hidden">
-              <CardHeader className="border-b border-white/5 bg-white/[0.02] flex flex-row items-center justify-between py-6 px-8">
-                <CardTitle className="text-lg font-bold uppercase italic flex items-center gap-3">
-                   <Package className="text-accent" size={20} />
-                   Alertes Stock
-                </CardTitle>
-                <Badge className="bg-destructive/10 text-destructive border-none font-black text-[10px] px-3">{lowStock.length} ALERTES</Badge>
-              </CardHeader>
-              <CardContent className="p-8">
-                {lowStock.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {lowStock.map(item => (
-                            <div key={item.id} className="flex items-center justify-between p-5 bg-white/5 rounded-2xl border border-white/5 hover:bg-white/10 hover:border-white/10 transition-all group">
-                                <div className="flex items-center gap-5">
-                                    <div className="w-12 h-12 rounded-xl bg-background border border-white/5 flex items-center justify-center overflow-hidden">
-                                        <img src={item.imageUrl} alt={item.name} className="object-cover group-hover:scale-110 transition-transform duration-500" />
-                                    </div>
-                                    <div>
-                                        <p className="font-bold text-sm uppercase italic">{item.name}</p>
-                                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{item.category}</p>
-                                    </div>
-                                </div>
-                                <div className="text-right">
-                                    <Badge variant="destructive" className="font-black italic uppercase text-[10px] px-3 py-1 shadow-lg shadow-destructive/20">
-                                        {item.stockQuantity} RESTANTS
-                                    </Badge>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                ) : (
-                    <div className="flex flex-col items-center justify-center py-20 text-center space-y-4 opacity-30">
-                        <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center">
-                            <Package size={40} className="text-slate-400" />
-                        </div>
-                        <div className="space-y-1">
-                            <p className="text-sm font-bold uppercase italic tracking-widest text-slate-300">Inventaire Sain</p>
-                            <p className="text-[10px] font-bold text-slate-500">Aucun produit en rupture de stock.</p>
-                        </div>
-                    </div>
-                )}
-              </CardContent>
             </Card>
           </div>
       </main>

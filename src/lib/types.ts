@@ -60,6 +60,32 @@ export type SupportTicket = {
   updatedAt: any;
 };
 
+export type AppService = {
+  id: string;
+  title: string;
+  description: string;
+  category: 'formation' | 'infrastructure' | 'digitalisation' | 'upgrade';
+  price: number;
+  duration?: string;
+  icon: string;
+};
+
+export type ServiceBooking = {
+  id: string;
+  userId: string;
+  customerName: string;
+  customerPhone: string;
+  serviceId: string;
+  serviceTitle: string;
+  category: string;
+  status: 'pending' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled';
+  scheduledDate: any;
+  location: string; // 'shop' or 'client_site'
+  technicianId?: string;
+  notes?: string;
+  createdAt: any;
+};
+
 export type Sale = {
   id: string;
   userId: string;
