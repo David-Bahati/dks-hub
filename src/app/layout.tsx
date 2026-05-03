@@ -16,19 +16,28 @@ const fontSans = FontSans({
 
 export const metadata: Metadata = {
   title: "DKS ShopManager - Votre boutique informatique premium",
-  description: "La qualité informatique au coeur de l'Ituri. Paiements en Pi Network, Mobile Money et Cash.",
+  description: "La qualité informatique au coeur de l'Ituri. Paiements en Pi Network (GCV), Mobile Money et Cash.",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
     title: "DKS Shop",
   },
+  other: {
+    "mobile-web-app-capable": "yes",
+    "application-name": "DKS Shop",
+    "apple-mobile-web-app-title": "DKS Shop",
+    "msapplication-starturl": "/",
+    "viewport": "width=device-width, initial-scale=1, shrink-to-fit=no"
+  }
 };
 
 export const viewport: Viewport = {
   themeColor: "#0f172a",
   width: "device-width",
   initialScale: 1,
+  maximumScale: 1,
+  userScalable: false
 };
 
 export default function RootLayout({
@@ -51,7 +60,7 @@ export default function RootLayout({
           {`
             if (window.Pi) {
               window.Pi.init({ version: "2.0", sandbox: true });
-              console.log("[Pi SDK] Initialisé en mode Sandbox");
+              console.log("[Pi SDK] Initialisé en mode Sandbox - URL de production configurée");
             }
           `}
         </Script>
