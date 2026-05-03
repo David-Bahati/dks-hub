@@ -86,8 +86,12 @@ export default function CheckoutPage() {
     }, [cartItems, router, isProcessing, orderConfirmed]);
 
     const fetchRate = async () => {
-        const snap = await getDoc(doc(db, "system", "config"));
-        if (snap.exists()) setExchangeRate(snap.data().exchangeRate || 2500);
+        try {
+            const snap = await getDoc(doc(db, "system", "config"));
+            if (snap.exists()) setExchangeRate(snap.data().exchangeRate || 2500);
+        } catch (e) {
+            console.error(e);
+        }
     };
 
     const validatePhoneNumber = (phone: string, network: MobileNetwork) => {
@@ -98,14 +102,17 @@ export default function CheckoutPage() {
     };
 
     const handlePlaceOrder = async () => {
+        // Déterminer si on doit traiter l'utilisateur comme un invité
+        // Un utilisateur est un invité s'il n'est pas connecté OU s'il n'a pas de rôle staff et pas de nom
+        const wasGuest = !user || auth.currentUser?.isAnonymous;
+        
         let currentUserId = user?.uid;
         let finalName = user?.name || guestName;
         let finalEmail = user?.email || guestEmail;
-        const wasGuest = !user;
 
         if (wasGuest) {
-            if (!guestName || !guestEmail) {
-                toast({ title: "Infos requises", description: "Veuillez entrer votre nom et email.", variant: "destructive" });
+            if (!guestName.trim() || !guestEmail.trim()) {
+                toast({ title: "Infos requises", description: "Veuillez entrer votre nom et email pour le reçu.", variant: "destructive" });
                 return;
             }
         }
@@ -157,8 +164,11 @@ export default function CheckoutPage() {
             };
 
             const orderRef = await addDoc(collection(db, "orders"), orderData);
+            
+            // On prépare la vue de succès AVANT de changer l'état global
             setConfirmedOrderId(orderRef.id);
             setOrderSnapshot(orderData);
+            if (wasGuest) setShowFinishAccount(true);
 
             // Notifications Staff
             await addDoc(collection(db, "notifications"), {
@@ -173,7 +183,6 @@ export default function CheckoutPage() {
 
             clearCart();
             setOrderConfirmed(true);
-            if (wasGuest) setShowFinishAccount(true);
             
             toast({ title: "Commande validée !", description: "Merci de votre confiance." });
 
@@ -194,6 +203,7 @@ export default function CheckoutPage() {
         try {
             const currentUser = auth.currentUser;
             if (currentUser) {
+                // On essaie de lier l'email et le mot de passe
                 await updateEmail(currentUser, guestEmail);
                 await updatePassword(currentUser, password);
                 toast({ title: "Compte activé !", description: "Bienvenue dans l'univers Premium DKS." });
@@ -234,6 +244,7 @@ export default function CheckoutPage() {
         }
     };
 
+    // VUE DE SUCCÈS (APPRÈS CONFIRMATION)
     if (orderConfirmed) {
         return (
             <div className="min-h-screen bg-background text-foreground flex flex-col items-center py-12 px-6">
@@ -245,10 +256,6 @@ export default function CheckoutPage() {
                         .order-slip { border: none !important; box-shadow: none !important; padding: 0 !important; margin: 0 !important; width: 100% !important; max-width: none !important; }
                     }
                 `}</style>
-
-                <div className="absolute top-0 left-0 w-full h-full -z-10 overflow-hidden opacity-20 no-print">
-                    <div className="absolute top-[20%] left-[20%] w-[60vw] h-[60vw] bg-accent/20 rounded-full blur-[120px]" />
-                </div>
                 
                 <div className="max-w-2xl w-full space-y-8 animate-in fade-in zoom-in duration-700">
                     <div className="text-center no-print">
@@ -259,7 +266,6 @@ export default function CheckoutPage() {
                         <p className="text-muted-foreground font-medium uppercase tracking-widest text-[10px] mt-2">Votre reçu numérique est prêt</p>
                     </div>
 
-                    {/* BON DE COMMANDE */}
                     <div ref={receiptRef}>
                         <Card className="order-slip glossy-card border-none rounded-[2.5rem] overflow-hidden bg-white text-black shadow-2xl relative">
                             <div className="absolute top-0 left-0 w-full h-2 bg-accent no-print" />
@@ -348,15 +354,9 @@ export default function CheckoutPage() {
                         >
                             {isDownloading ? <Loader2 className="animate-spin" /> : <><Download size={20} /> Télécharger (PDF)</>}
                         </Button>
-                        <Button 
-                            variant="outline"
-                            className="flex-1 h-14 border-white/10 hover:bg-white/5 font-black uppercase italic rounded-2xl"
-                            onClick={() => router.push('/')}
-                        >
-                            Retour Boutique
-                        </Button>
                     </div>
 
+                    {/* CRÉATION DE COMPTE SILENCIEUSE (SI NOUVEAU CLIENT) */}
                     {showFinishAccount && (
                         <Card className="glossy-card border-none rounded-[2.5rem] p-8 space-y-6 relative overflow-hidden no-print animate-in slide-in-from-bottom-4 delay-500 duration-1000">
                             <div className="absolute -top-10 -right-10 w-32 h-32 bg-accent/10 rounded-full blur-2xl" />
@@ -395,11 +395,18 @@ export default function CheckoutPage() {
                             </div>
                         </Card>
                     )}
+
+                    <div className="text-center no-print">
+                        <Button variant="ghost" className="uppercase font-black italic text-xs opacity-40 hover:opacity-100" onClick={() => router.push('/')}>
+                            Retour à la boutique
+                        </Button>
+                    </div>
                 </div>
             </div>
         );
     }
 
+    // VUE DU FORMULAIRE DE PAIEMENT
     return (
         <div className="min-h-screen bg-background text-foreground">
             <Navbar />
@@ -428,8 +435,8 @@ export default function CheckoutPage() {
                             <p className="text-muted-foreground font-light uppercase tracking-widest text-xs opacity-60">Validation de votre sélection premium</p>
                         </div>
 
-                        {/* RENSEIGNEMENTS CLIENT - TOUJOURS VISIBLES SI NON CONNECTÉ */}
-                        {!user && (
+                        {/* RENSEIGNEMENTS CLIENT - VISIBLES SI PAS DE COMPTE PERMANENT */}
+                        {(!user || auth.currentUser?.isAnonymous) && (
                             <Card className="p-8 rounded-[2.5rem] bg-white/5 border border-white/5 space-y-6 animate-in fade-in slide-in-from-top-4">
                                 <div className="flex items-center gap-3">
                                     <Sparkles className="text-accent" size={20} />
@@ -585,11 +592,6 @@ export default function CheckoutPage() {
                                 </Button>
                             </CardFooter>
                         </Card>
-                        
-                        <div className="flex items-center gap-3 px-6 py-4 bg-white/5 rounded-2xl border border-white/5 opacity-40">
-                            <ShieldCheck size={20} className="text-accent" />
-                            <p className="text-[9px] font-bold uppercase tracking-widest leading-relaxed">Paiement ultra-sécurisé & Protection DKS.</p>
-                        </div>
                     </div>
 
                 </div>
