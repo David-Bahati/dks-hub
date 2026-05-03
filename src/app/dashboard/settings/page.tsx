@@ -154,6 +154,24 @@ export default function SettingsPage() {
         return { label: "Membre Bronze", color: "text-orange-400", bg: "bg-orange-400/10", border: "border-orange-400/20" };
     }, [orderCount]);
 
+    // Password strength logic
+    const passwordStrength = useMemo(() => {
+        if (!newPassword) return 0;
+        let score = 0;
+        if (newPassword.length >= 8) score += 25;
+        if (/[A-Z]/.test(newPassword)) score += 25;
+        if (/[0-9]/.test(newPassword)) score += 25;
+        if (/[^A-Za-z0-9]/.test(newPassword)) score += 25;
+        return score;
+    }, [newPassword]);
+
+    const getStrengthColor = (score: number) => {
+        if (score <= 25) return "bg-red-500";
+        if (score <= 50) return "bg-orange-500";
+        if (score <= 75) return "bg-yellow-500";
+        return "bg-green-500";
+    };
+
     const handleUpdateProfile = async () => {
         if (!user?.uid) return;
         setIsSaving(true);
@@ -183,7 +201,7 @@ export default function SettingsPage() {
         const file = e.target.files?.[0];
         if (!file) return;
         if (file.size > 2 * 1024 * 1024) {
-            toast({ title: "Fichier volumineux", variant: "destructive" });
+            toast({ title: "Fichier volumineux", description: "La taille maximale est de 2Mo.", variant: "destructive" });
             return;
         }
 
@@ -247,7 +265,6 @@ export default function SettingsPage() {
                     {/* ONGLET PROFIL */}
                     <TabsContent value="profile" className="space-y-10 animate-in fade-in slide-in-from-bottom-4">
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-                            {/* Colonne Gauche: Avatar & Fidélité */}
                             <div className="lg:col-span-1 space-y-6">
                                 <Card className="glossy-card border-none rounded-[2.5rem] overflow-hidden text-center p-8">
                                     <div className="relative inline-block mx-auto mb-6 group">
@@ -258,9 +275,10 @@ export default function SettingsPage() {
                                             </AvatarFallback>
                                             <button 
                                                 onClick={() => fileInputRef.current?.click()}
+                                                disabled={isUploading}
                                                 className="absolute bottom-2 right-2 w-10 h-10 bg-accent text-black rounded-full flex items-center justify-center shadow-xl border-4 border-background hover:scale-110 active:scale-95 transition-all"
                                             >
-                                                <Camera size={16} />
+                                                {isUploading ? <Loader2 className="animate-spin w-4 h-4" /> : <Camera size={16} />}
                                             </button>
                                             <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageChange} />
                                         </Avatar>
@@ -272,7 +290,7 @@ export default function SettingsPage() {
                                         <Trophy className={cn("w-8 h-8", loyaltyInfo.color)} />
                                         <p className={cn("text-[10px] font-black uppercase italic tracking-widest", loyaltyInfo.color)}>{loyaltyInfo.label}</p>
                                         <div className="w-full h-1.5 bg-black/20 rounded-full mt-2">
-                                            <div className={cn("h-full rounded-full bg-current opacity-50", loyaltyInfo.color)} style={{ width: `${Math.min(100, (orderCount/10)*100)}%` }} />
+                                            <div className={cn("h-full rounded-full bg-current opacity-50 transition-all duration-1000", loyaltyInfo.color)} style={{ width: `${Math.min(100, (orderCount/10)*100)}%` }} />
                                         </div>
                                         <p className="text-[8px] font-bold uppercase text-muted-foreground">{orderCount}/10 commandes vers Or</p>
                                     </div>
@@ -305,7 +323,6 @@ export default function SettingsPage() {
                                 </Card>
                             </div>
 
-                            {/* Colonne Droite: Formulaires */}
                             <div className="lg:col-span-2 space-y-6">
                                 <Card className="glossy-card border-none rounded-[2.5rem] p-10">
                                     <div className="flex items-center gap-4 mb-10">
@@ -362,7 +379,6 @@ export default function SettingsPage() {
                                             </div>
                                             <Badge className="bg-accent/10 text-accent border-none text-[8px] px-2 h-5">LIÉ</Badge>
                                         </Card>
-                                        
                                         <Card className="bg-white/5 border border-white/5 rounded-3xl p-6 flex items-center justify-between">
                                             <div className="flex items-center gap-4">
                                                 <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center">
@@ -392,8 +408,12 @@ export default function SettingsPage() {
                                         <Input type={showPasswords ? "text" : "password"} value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} className="h-14 bg-background/50 border-white/5 rounded-xl" />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Nouveau mot de passe</Label>
+                                        <div className="flex justify-between items-end mb-1">
+                                            <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Nouveau mot de passe</Label>
+                                            <span className="text-[8px] font-bold uppercase opacity-40">Force: {passwordStrength}%</span>
+                                        </div>
                                         <Input type={showPasswords ? "text" : "password"} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="h-14 bg-background/50 border-white/5 rounded-xl" />
+                                        <Progress value={passwordStrength} className="h-1 bg-white/5" indicatorClassName={getStrengthColor(passwordStrength)} />
                                     </div>
                                     <div className="space-y-2">
                                         <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Confirmer</Label>
@@ -404,17 +424,19 @@ export default function SettingsPage() {
                                     </button>
                                 </div>
                                 <Button onClick={async () => {
-                                    if (newPassword !== confirmPassword) { toast({ title: "Incohérent", variant: "destructive" }); return; }
+                                    if (newPassword !== confirmPassword) { toast({ title: "Incohérent", description: "Les mots de passe ne correspondent pas.", variant: "destructive" }); return; }
+                                    if (newPassword.length < 6) { toast({ title: "Trop court", description: "Minimum 6 caractères.", variant: "destructive" }); return; }
                                     setIsUpdatingPassword(true);
                                     try {
                                         const credential = EmailAuthProvider.credential(user?.email || "", currentPassword);
                                         await reauthenticateWithCredential(auth.currentUser!, credential);
                                         await updatePassword(auth.currentUser!, newPassword);
-                                        toast({ title: "Succès !" });
-                                    } catch (e) { toast({ title: "Échec", variant: "destructive" }); }
+                                        toast({ title: "Succès !", description: "Sécurité mise à jour." });
+                                        setCurrentPassword(""); setNewPassword(""); setConfirmPassword("");
+                                    } catch (e) { toast({ title: "Échec", description: "Vérifiez votre mot de passe actuel.", variant: "destructive" }); }
                                     setIsUpdatingPassword(false);
-                                }} disabled={isUpdatingPassword || !currentPassword} className="w-full h-14 bg-white text-black font-black uppercase italic rounded-xl">
-                                    {isUpdatingPassword ? <Loader2 className="animate-spin" /> : "Sauvegarder le code"}
+                                }} disabled={isUpdatingPassword || !currentPassword} className="w-full h-16 bg-accent text-black font-black uppercase italic rounded-2xl shadow-xl shadow-accent/10">
+                                    {isUpdatingPassword ? <Loader2 className="animate-spin" /> : "Mettre à jour la sécurité"}
                                 </Button>
                              </Card>
 
@@ -432,6 +454,15 @@ export default function SettingsPage() {
                                             </div>
                                             <Badge className="bg-accent text-black font-black text-[9px] px-2 h-5">SESSION</Badge>
                                         </div>
+                                        
+                                        <div className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5">
+                                            <div className="flex flex-col gap-1">
+                                                <span className="text-[10px] font-black uppercase italic">Confirmation par email</span>
+                                                <span className="text-[8px] text-muted-foreground uppercase">Protéger les commandes sensibles</span>
+                                            </div>
+                                            <Switch />
+                                        </div>
+
                                         <Button variant="ghost" className="w-full h-12 text-[10px] font-black uppercase italic text-destructive hover:bg-destructive/5 rounded-xl border border-dashed border-destructive/20">Se déconnecter de tous les autres appareils</Button>
                                     </div>
                                 </Card>
@@ -441,11 +472,11 @@ export default function SettingsPage() {
                                     <div className="space-y-4">
                                         <div className="flex items-center gap-4 py-2 border-b border-white/5">
                                             <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                                            <div><p className="text-[10px] font-black uppercase italic">Connexion réussie</p><p className="text-[8px] text-muted-foreground uppercase font-bold tracking-widest">Il y a 10 min • Bunia</p></div>
+                                            <div><p className="text-[10px] font-black uppercase italic">Connexion réussie</p><p className="text-[8px] text-muted-foreground uppercase font-bold tracking-widest">Il y a quelques instants • Bunia</p></div>
                                         </div>
                                         <div className="flex items-center gap-4 py-2">
                                             <div className="w-2 h-2 rounded-full bg-accent" />
-                                            <div><p className="text-[10px] font-black uppercase italic">Photo profil modifiée</p><p className="text-[8px] text-muted-foreground uppercase font-bold tracking-widest">Aujourd'hui, 09:12</p></div>
+                                            <div><p className="text-[10px] font-black uppercase italic">Profil Premium Activé</p><p className="text-[8px] text-muted-foreground uppercase font-bold tracking-widest">Aujourd'hui, {new Date().getHours()}:{new Date().getMinutes()}</p></div>
                                         </div>
                                     </div>
                                 </Card>
@@ -477,7 +508,7 @@ export default function SettingsPage() {
                                     <Button onClick={async () => {
                                         setIsSavingSystem(true);
                                         await setDoc(doc(db, "system", "config"), { exchangeRate: parseInt(exchangeRate) }, { merge: true });
-                                        toast({ title: "Boutique mise à jour" });
+                                        toast({ title: "Boutique mise à jour", description: `Taux fixé à ${exchangeRate} CDF.` });
                                         setIsSavingSystem(false);
                                     }} disabled={isSavingSystem} className="w-full h-14 bg-accent text-black font-black uppercase italic rounded-xl">{isSavingSystem ? <Loader2 className="animate-spin" /> : "Appliquer à la boutique"}</Button>
                                 </Card>
