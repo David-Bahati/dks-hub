@@ -10,7 +10,12 @@ import { useRouter } from 'next/navigation';
 import { useToast } from "@/hooks/use-toast";
 import { auth, db } from "@/lib/firebase";
 import { collection, addDoc, serverTimestamp, doc, setDoc, getDoc } from "firebase/firestore";
-import { signInAnonymously, updatePassword, updateProfile, updateEmail } from "firebase/auth";
+import { 
+    signInAnonymously, 
+    updateProfile, 
+    EmailAuthProvider, 
+    linkWithCredential 
+} from "firebase/auth";
 import { PI_CONVERSION_RATE } from "@/lib/constants";
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
@@ -104,7 +109,7 @@ export default function CheckoutPage() {
     const handlePlaceOrder = async () => {
         const isGuestSession = !user || auth.currentUser?.isAnonymous;
         
-        // Priorité absolue au nom saisi dans le formulaire pour éviter les erreurs de cache (maki maki)
+        // Priorité absolue au nom saisi dans le formulaire
         let finalName = guestName.trim() || user?.name || "Client DKS";
         let finalEmail = guestEmail.trim() || user?.email || "";
 
@@ -128,14 +133,16 @@ export default function CheckoutPage() {
             let currentUserId = user?.uid;
 
             if (isGuestSession) {
-                // Si session anonyme, on s'assure qu'elle existe
+                // Si aucune session, on en crée une anonyme
                 if (!currentUserId) {
                     const userCred = await signInAnonymously(auth);
                     currentUserId = userCred.user.uid;
                 }
                 
-                // On met à jour le profil auth et le document Firestore avec le BON nom
-                await updateProfile(auth.currentUser!, { displayName: finalName });
+                // On met à jour immédiatement le profil auth avec le BON NOM
+                if (auth.currentUser) {
+                    await updateProfile(auth.currentUser, { displayName: finalName });
+                }
                 
                 await setDoc(doc(db, "users", currentUserId), {
                     id: currentUserId,
@@ -144,7 +151,7 @@ export default function CheckoutPage() {
                     name: finalName,
                     role: 'customer',
                     updatedAt: serverTimestamp(),
-                    createdAt: serverTimestamp() // On garde la date si c'est une nouvelle session
+                    createdAt: serverTimestamp() 
                 }, { merge: true });
             }
 
@@ -172,6 +179,8 @@ export default function CheckoutPage() {
             
             setConfirmedOrderId(orderRef.id);
             setOrderSnapshot(orderData);
+            
+            // On active l'affichage du mot de passe si c'est un nouveau client
             if (isGuestSession) setShowFinishAccount(true);
 
             // Notifications Staff
@@ -198,28 +207,44 @@ export default function CheckoutPage() {
     };
 
     const handleFinishAccount = async () => {
+        const currentUser = auth.currentUser;
+        if (!currentUser) {
+            toast({ title: "Session expirée", description: "Veuillez rafraîchir la page.", variant: "destructive" });
+            return;
+        }
+
         if (password.length < 6) {
             toast({ title: "Mot de passe court", description: "Minimum 6 caractères.", variant: "destructive" });
             return;
         }
+
         setIsFinishingAccount(true);
+        
         try {
-            const currentUser = auth.currentUser;
-            if (currentUser) {
-                // On transforme le compte anonyme en permanent
-                await updateEmail(currentUser, guestEmail);
-                await updatePassword(currentUser, password);
-                
-                toast({ title: "Compte activé !", description: "Bienvenue dans l'univers Premium DKS." });
-                
-                // Redirection forcée vers le dashboard
-                setTimeout(() => {
-                    router.push('/dashboard');
-                }, 800);
-            }
+            // Conversion officielle Anonyme -> Email/Password via linking
+            const credential = EmailAuthProvider.credential(guestEmail, password);
+            await linkWithCredential(currentUser, credential);
+            
+            // S'assurer que le nom est bien enregistré sur le nouveau compte permanent
+            await updateProfile(currentUser, { displayName: guestName });
+            
+            toast({ title: "Compte activé !", description: "Bienvenue dans l'univers Premium DKS." });
+            
+            // Redirection immédiate
+            router.push('/dashboard');
         } catch (err: any) {
             console.error("Activation Error:", err);
-            toast({ title: "Erreur d'activation", description: err.message, variant: "destructive" });
+            let message = "Une erreur est survenue lors de l'activation.";
+            
+            if (err.code === 'auth/email-already-in-use') {
+                message = "Cet email est déjà utilisé par un autre compte.";
+            } else if (err.code === 'auth/invalid-email') {
+                message = "L'adresse email est mal formatée.";
+            } else if (err.code === 'auth/weak-password') {
+                message = "Le mot de passe choisi est trop simple.";
+            }
+            
+            toast({ title: "Erreur d'activation", description: message, variant: "destructive" });
         } finally {
             setIsFinishingAccount(false);
         }
@@ -474,4 +499,3 @@ export default function CheckoutPage() {
         </div>
     );
 }
-
