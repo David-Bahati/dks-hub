@@ -8,6 +8,7 @@ import { AuthProvider } from "@/context/AuthContext";
 import { Toaster } from "@/components/ui/toaster";
 import { FirebaseClientProvider } from "@/firebase";
 import { AiAssistant } from "@/components/chat/AiAssistant";
+import Script from "next/script";
 
 const fontSans = FontSans({
   subsets: ["latin"],
@@ -26,7 +27,22 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="fr" suppressHydrationWarning>
+      <head>
+        <Script 
+          src="https://sdk.minepi.com/pi-sdk.js" 
+          strategy="beforeInteractive"
+        />
+      </head>
       <body className={cn("min-h-screen bg-background font-sans antialiased", fontSans.variable)}>
+        {/* Initialisation du SDK Pi */}
+        <Script id="pi-init" strategy="afterInteractive">
+          {`
+            if (window.Pi) {
+              window.Pi.init({ version: "2.0", sandbox: true });
+            }
+          `}
+        </Script>
+        
         <FirebaseClientProvider>
           <AuthProvider>
             <CartProvider>

@@ -17,6 +17,7 @@ import {
     linkWithCredential 
 } from "firebase/auth";
 import { PI_CONVERSION_RATE } from "@/lib/constants";
+import { authenticateWithPi, createPiPayment } from "@/lib/pi-payment";
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import { 
@@ -109,7 +110,6 @@ export default function CheckoutPage() {
     const handlePlaceOrder = async () => {
         const isGuestSession = !user || auth.currentUser?.isAnonymous;
         
-        // Priorité absolue au nom saisi dans le formulaire
         let finalName = guestName.trim() || user?.name || "Client DKS";
         let finalEmail = guestEmail.trim() || user?.email || "";
 
@@ -132,14 +132,72 @@ export default function CheckoutPage() {
         try {
             let currentUserId = user?.uid;
 
+            // 1. GESTION DU FLUX PI NETWORK (Si sélectionné)
+            if (paymentMethod === "PI_NETWORK") {
+                try {
+                    toast({ title: "Connexion au Pi Browser", description: "Authentification en cours..." });
+                    const piUser = await authenticateWithPi();
+                    
+                    const piAmount = totalPrice / PI_CONVERSION_RATE;
+                    
+                    // Création du paiement Pi
+                    await createPiPayment({
+                        amount: piAmount,
+                        memo: `Commande DKS Shop - ${finalName}`,
+                        metadata: { customerName: finalName, orderTotal: totalPrice }
+                    }, {
+                        onReadyForServerApproval: async (paymentId: string) => {
+                            await fetch('/api/pi/approve', {
+                                method: 'POST',
+                                body: JSON.stringify({ paymentId })
+                            });
+                        },
+                        onReadyForServerCompletion: async (paymentId: string, txid: string) => {
+                            await fetch('/api/pi/complete', {
+                                method: 'POST',
+                                body: JSON.stringify({ paymentId, txid })
+                            });
+                            // On continue vers l'enregistrement Firestore après succès Pi
+                            finalizeFirestoreOrder(currentUserId, finalName, finalEmail, 'paid_pi');
+                        },
+                        onCancel: () => {
+                            toast({ title: "Paiement annulé", description: "Vous avez annulé la transaction Pi." });
+                            setIsProcessing(false);
+                        },
+                        onError: (error: any) => {
+                            console.error(error);
+                            toast({ title: "Erreur Pi", description: "Échec du paiement Pi.", variant: "destructive" });
+                            setIsProcessing(false);
+                        }
+                    });
+                    
+                    return; // Le reste se passe dans le callback completion
+                } catch (e) {
+                    setIsProcessing(false);
+                    return;
+                }
+            }
+
+            // 2. GESTION DES AUTRES MODES (CASH / MOBILE MONEY)
+            await finalizeFirestoreOrder(currentUserId, finalName, finalEmail, paymentMethod === 'CASH' ? 'pending_payment' : 'pending');
+
+        } catch (error) {
+            console.error("Order error:", error);
+            toast({ title: "Erreur", description: "Échec de l'enregistrement.", variant: "destructive" });
+            setIsProcessing(false);
+        }
+    };
+
+    const finalizeFirestoreOrder = async (currentUserId: string | undefined, finalName: string, finalEmail: string, status: string) => {
+        const isGuestSession = !user || auth.currentUser?.isAnonymous;
+        
+        try {
             if (isGuestSession) {
-                // Si aucune session, on en crée une anonyme
                 if (!currentUserId) {
                     const userCred = await signInAnonymously(auth);
                     currentUserId = userCred.user.uid;
                 }
                 
-                // On met à jour immédiatement le profil auth avec le BON NOM
                 if (auth.currentUser) {
                     await updateProfile(auth.currentUser, { displayName: finalName });
                 }
@@ -170,7 +228,7 @@ export default function CheckoutPage() {
                 mobileNetwork: paymentMethod === 'MOBILE_MONEY' ? mobileNetwork : null,
                 customerPhone: paymentMethod === 'MOBILE_MONEY' ? customerPhone : null,
                 createdAt: serverTimestamp(),
-                status: paymentMethod === 'CASH' ? 'pending_payment' : 'pending',
+                status: status,
                 updatedAt: serverTimestamp(),
                 piValue: totalPrice / PI_CONVERSION_RATE
             };
@@ -180,10 +238,8 @@ export default function CheckoutPage() {
             setConfirmedOrderId(orderRef.id);
             setOrderSnapshot(orderData);
             
-            // On active l'affichage du mot de passe si c'est un nouveau client
             if (isGuestSession) setShowFinishAccount(true);
 
-            // Notifications Staff
             await addDoc(collection(db, "notifications"), {
                 userId: 'staff',
                 title: "Nouvelle Commande !",
@@ -197,10 +253,9 @@ export default function CheckoutPage() {
             clearCart();
             setOrderConfirmed(true);
             toast({ title: "Commande validée !", description: "Merci de votre confiance." });
-
-        } catch (error) {
-            console.error("Order error:", error);
-            toast({ title: "Erreur", description: "Échec de l'enregistrement.", variant: "destructive" });
+        } catch (e) {
+            console.error(e);
+            toast({ title: "Erreur", description: "Échec de la validation finale.", variant: "destructive" });
         } finally {
             setIsProcessing(false);
         }
@@ -208,43 +263,21 @@ export default function CheckoutPage() {
 
     const handleFinishAccount = async () => {
         const currentUser = auth.currentUser;
-        if (!currentUser) {
-            toast({ title: "Session expirée", description: "Veuillez rafraîchir la page.", variant: "destructive" });
-            return;
-        }
-
+        if (!currentUser) return;
         if (password.length < 6) {
             toast({ title: "Mot de passe court", description: "Minimum 6 caractères.", variant: "destructive" });
             return;
         }
 
         setIsFinishingAccount(true);
-        
         try {
-            // Conversion officielle Anonyme -> Email/Password via linking
             const credential = EmailAuthProvider.credential(guestEmail, password);
             await linkWithCredential(currentUser, credential);
-            
-            // S'assurer que le nom est bien enregistré sur le nouveau compte permanent
             await updateProfile(currentUser, { displayName: guestName });
-            
-            toast({ title: "Compte activé !", description: "Bienvenue dans l'univers Premium DKS." });
-            
-            // Redirection immédiate
+            toast({ title: "Compte activé !" });
             router.push('/dashboard');
         } catch (err: any) {
-            console.error("Activation Error:", err);
-            let message = "Une erreur est survenue lors de l'activation.";
-            
-            if (err.code === 'auth/email-already-in-use') {
-                message = "Cet email est déjà utilisé par un autre compte.";
-            } else if (err.code === 'auth/invalid-email') {
-                message = "L'adresse email est mal formatée.";
-            } else if (err.code === 'auth/weak-password') {
-                message = "Le mot de passe choisi est trop simple.";
-            }
-            
-            toast({ title: "Erreur d'activation", description: message, variant: "destructive" });
+            toast({ title: "Erreur d'activation", variant: "destructive" });
         } finally {
             setIsFinishingAccount(false);
         }
@@ -254,21 +287,11 @@ export default function CheckoutPage() {
         if (!receiptRef.current) return;
         setIsDownloading(true);
         try {
-            const canvas = await html2canvas(receiptRef.current, {
-                scale: 2,
-                useCORS: true,
-                backgroundColor: "#ffffff",
-                logging: false
-            });
+            const canvas = await html2canvas(receiptRef.current, { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
             const imgData = canvas.toDataURL('image/png');
-            const pdf = new jsPDF({
-                orientation: 'portrait',
-                unit: 'px',
-                format: [canvas.width / 2, canvas.height / 2]
-            });
+            const pdf = new jsPDF({ orientation: 'portrait', unit: 'px', format: [canvas.width / 2, canvas.height / 2] });
             pdf.addImage(imgData, 'PNG', 0, 0, canvas.width / 2, canvas.height / 2);
             pdf.save(`BON_DKS_${confirmedOrderId.substring(0, 8).toUpperCase()}.pdf`);
-            toast({ title: "Téléchargement réussi" });
         } catch (error) {
             toast({ title: "Erreur PDF", variant: "destructive" });
         } finally {
@@ -276,24 +299,15 @@ export default function CheckoutPage() {
         }
     };
 
-    // VUE DE SUCCÈS
     if (orderConfirmed) {
         return (
             <div className="min-h-screen bg-background text-foreground flex flex-col items-center py-12 px-6">
-                <style jsx global>{`
-                    @media print {
-                        .no-print { display: none !important; }
-                        .order-slip { border: none !important; box-shadow: none !important; padding: 0 !important; margin: 0 !important; width: 100% !important; max-width: none !important; }
-                    }
-                `}</style>
-                
                 <div className="max-w-2xl w-full space-y-8 animate-in fade-in zoom-in duration-700">
                     <div className="text-center no-print">
                         <div className="w-20 h-20 bg-green-500/10 rounded-[2rem] flex items-center justify-center mx-auto text-green-500 border border-green-500/20 shadow-[0_0_50px_rgba(34,197,94,0.2)] mb-6">
                             <CheckCircle2 size={40} />
                         </div>
                         <h1 className="text-4xl font-black uppercase italic tracking-tighter text-white">COMMANDE <span className="text-accent">RÉUSSIE</span></h1>
-                        <p className="text-muted-foreground font-medium uppercase tracking-widest text-[10px] mt-2">Votre reçu numérique est prêt</p>
                     </div>
 
                     <div ref={receiptRef}>
@@ -398,7 +412,6 @@ export default function CheckoutPage() {
         );
     }
 
-    // FORMULAIRE DE PAIEMENT
     return (
         <div className="min-h-screen bg-background text-foreground">
             <Navbar />
@@ -418,11 +431,11 @@ export default function CheckoutPage() {
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div className="space-y-2">
                                         <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Nom complet</Label>
-                                        <div className="relative"><User className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} /><Input value={guestName} onChange={(e) => setGuestName(e.target.value)} placeholder="Ex: Maki Maki" className="h-12 pl-12 bg-background/50 border-white/5 rounded-xl focus:border-accent" /></div>
+                                        <div className="relative"><User className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} /><Input value={guestName} onChange={(e) => setGuestName(e.target.value)} placeholder="Ex: Maki Maki" className="h-12 pl-12 bg-background/50 border-white/10 rounded-xl focus:border-accent" /></div>
                                     </div>
                                     <div className="space-y-2">
                                         <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Email pour le reçu</Label>
-                                        <div className="relative"><Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} /><Input type="email" value={guestEmail} onChange={(e) => setGuestEmail(e.target.value)} placeholder="maki@example.com" className="h-12 pl-12 bg-background/50 border-white/5 rounded-xl focus:border-accent" /></div>
+                                        <div className="relative"><Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} /><Input type="email" value={guestEmail} onChange={(e) => setGuestEmail(e.target.value)} placeholder="maki@example.com" className="h-12 pl-12 bg-background/50 border-white/10 rounded-xl focus:border-accent" /></div>
                                     </div>
                                 </div>
                             </Card>
