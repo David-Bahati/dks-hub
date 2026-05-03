@@ -33,7 +33,8 @@ import {
   Headphones,
   MessageSquare,
   Zap,
-  Lock
+  Lock,
+  LayoutGrid
 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -114,7 +115,7 @@ export default function LandingPage() {
   const filteredProducts = useMemo(() => {
     return products.filter(p => {
       const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                            p.category.toLowerCase().includes(searchTerm.toLowerCase());
+                            p.category?.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesCategory = selectedCategory ? p.category === selectedCategory : true;
       return matchesSearch && matchesCategory;
     });
@@ -255,28 +256,34 @@ export default function LandingPage() {
           </div>
         </div>
 
-        {/* Category Icons Row */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-16">
-            {[
-                { id: null, label: "Tous", icon: Cpu },
-                { id: "Laptops", label: "Laptops", icon: Laptop },
-                { id: "Périphériques", label: "Périphériques", icon: MousePointer2 },
-                { id: "Composants", label: "Composants", icon: Monitor },
-                { id: "Audio", label: "Audio", icon: Headphones },
-                { id: "Networking", label: "Réseau", icon: Zap },
-            ].map((cat) => (
+        {/* Category Icons Row (Synchronisée avec Firestore) */}
+        <div className="flex flex-wrap gap-4 mb-16">
+            <button
+                onClick={() => setSelectedCategory(null)}
+                className={cn(
+                    "flex flex-col items-center justify-center gap-3 h-32 min-w-[120px] px-6 rounded-[2rem] border transition-all duration-500",
+                    selectedCategory === null 
+                        ? "bg-accent text-black border-accent shadow-xl scale-105" 
+                        : "bg-white/5 border-white/5 text-muted-foreground hover:bg-white/10"
+                )}
+            >
+                <LayoutGrid size={28} strokeWidth={selectedCategory === null ? 2.5 : 1.5} />
+                <span className="text-[10px] font-black uppercase italic tracking-widest">Tous</span>
+            </button>
+
+            {categories?.map((cat: any) => (
                 <button
-                    key={cat.label}
-                    onClick={() => setSelectedCategory(cat.id)}
+                    key={cat.id}
+                    onClick={() => setSelectedCategory(cat.name)}
                     className={cn(
-                        "flex flex-col items-center justify-center gap-3 h-32 rounded-[2rem] border transition-all duration-500",
-                        selectedCategory === cat.id 
+                        "flex flex-col items-center justify-center gap-3 h-32 min-w-[120px] px-6 rounded-[2rem] border transition-all duration-500",
+                        selectedCategory === cat.name 
                             ? "bg-accent text-black border-accent shadow-xl scale-105" 
                             : "bg-white/5 border-white/5 text-muted-foreground hover:bg-white/10"
                     )}
                 >
-                    <cat.icon size={28} strokeWidth={selectedCategory === cat.id ? 2.5 : 1.5} />
-                    <span className="text-[10px] font-black uppercase italic tracking-widest">{cat.label}</span>
+                    <span className="text-3xl">{cat.icon || "📦"}</span>
+                    <span className="text-[10px] font-black uppercase italic tracking-widest">{cat.name}</span>
                 </button>
             ))}
         </div>
