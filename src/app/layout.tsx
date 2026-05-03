@@ -1,5 +1,4 @@
-
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter as FontSans } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
@@ -18,6 +17,18 @@ const fontSans = FontSans({
 export const metadata: Metadata = {
   title: "DKS ShopManager - Votre boutique informatique premium",
   description: "La qualité informatique au coeur de l'Ituri. Paiements en Pi Network, Mobile Money et Cash.",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "DKS Shop",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0f172a",
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({
