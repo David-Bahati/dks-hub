@@ -14,12 +14,12 @@ import {
   TableRow, 
 } from "@/components/ui/table";
 import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogFooter 
-} from "@/components/ui/dialog";
+  Sheet, 
+  SheetContent, 
+  SheetHeader, 
+  SheetTitle, 
+  SheetFooter 
+} from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -43,7 +43,7 @@ import { generateProductImage } from '@/ai/flows/generate-product-image';
 import { cn } from '@/lib/utils';
 
 function ProductsPage() {
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [isPublished, setIsPublished] = useState(true);
   const [isGeneratingDesc, setIsGeneratingDesc] = useState(false);
@@ -62,21 +62,21 @@ function ProductsPage() {
   const categoriesQuery = useMemoFirebase(() => collection(db, "categories"), []);
   const { data: categories } = useCollection(categoriesQuery);
 
-  const openModal = (product: Product | null = null) => {
+  const openSheet = (product: Product | null = null) => {
     setEditingProduct(product);
     setIsPublished(product ? product.isPublished : true);
     setAiDescription(product ? product.description : "");
     setImageUrl(product ? product.imageUrl : "");
     setSelectedCategory(product ? product.category : "");
-    setIsModalOpen(true);
+    setIsSheetOpen(true);
   };
 
-  const closeModal = () => {
+  const closeSheet = () => {
     setEditingProduct(null);
     setAiDescription("");
     setImageUrl("");
     setSelectedCategory("");
-    setIsModalOpen(false);
+    setIsSheetOpen(false);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -189,7 +189,7 @@ function ProductsPage() {
       });
       toast({ title: "Produit créé" });
     }
-    closeModal();
+    closeSheet();
   };
 
   const handleDelete = (id: string) => {
@@ -216,12 +216,12 @@ function ProductsPage() {
                 <p className="text-muted-foreground">Pilotez votre inventaire hardware en temps réel.</p>
              </div>
           </div>
-          <Button onClick={() => openModal()} className="bg-primary hover:bg-primary/90 gap-2 neon-glow font-black uppercase italic rounded-2xl h-12 px-6">
+          <Button onClick={() => openSheet()} className="bg-primary hover:bg-primary/90 gap-2 neon-glow font-black uppercase italic rounded-2xl h-12 px-6">
             <PlusCircle size={20} /> Ajouter un Produit
           </Button>
         </div>
 
-        <div className="glossy-card border-none rounded-[2rem] overflow-hidden">
+        <div className="glossy-card border-none rounded-[2rem] overflow-hidden shadow-2xl">
           <Table>
             <TableHeader className="bg-white/5">
               <TableRow className="border-white/5 hover:bg-transparent">
@@ -262,7 +262,7 @@ function ProductsPage() {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
-                        <Button variant="ghost" size="icon" onClick={() => openModal(product)} className="h-8 w-8 hover:bg-white/10"><Edit className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" onClick={() => openSheet(product)} className="h-8 w-8 hover:bg-white/10"><Edit className="h-4 w-4" /></Button>
                         <Button variant="ghost" size="icon" onClick={() => handleDelete(product.id)} className="h-8 w-8 text-destructive hover:bg-destructive/10"><Trash2 className="h-4 w-4" /></Button>
                     </div>
                   </TableCell>
@@ -275,187 +275,177 @@ function ProductsPage() {
         </div>
       </main>
 
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        {/* Structure verrouillée ici avec w-[95vw] et h-[85vh] */}
-        <DialogContent className="glossy-card border-none rounded-[2.5rem] w-[95vw] max-w-4xl h-[85vh] flex flex-col p-0 overflow-hidden shadow-[0_0_80px_rgba(0,0,0,0.5)]">
-          <DialogHeader className="p-8 pb-4 shrink-0 border-b border-white/5">
-            <DialogTitle className="text-2xl font-black uppercase italic tracking-tighter">
+      {/* Remplacement du Dialog par un Sheet ancré à droite */}
+      <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
+        <SheetContent side="right" className="bg-card/95 backdrop-blur-3xl border-l border-white/5 w-full sm:max-w-2xl p-0 overflow-hidden flex flex-col shadow-[-20px_0_60px_rgba(0,0,0,0.5)]">
+          <SheetHeader className="p-8 pb-4 shrink-0 border-b border-white/5">
+            <SheetTitle className="text-2xl font-black uppercase italic tracking-tighter">
                 {editingProduct ? 'Modifier le Produit' : 'Nouveau Produit Hardware'}
-            </DialogTitle>
-          </DialogHeader>
+            </SheetTitle>
+          </SheetHeader>
           
           <form onSubmit={handleSave} className="flex-1 flex flex-col min-h-0">
-            {/* Zone de contenu défilante stable */}
-            <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                    {/* Colonne Gauche : Données */}
-                    <div className="space-y-6">
-                        <div className="space-y-2">
-                            <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Nom commercial</Label>
-                            <Input ref={nameRef} name="name" defaultValue={editingProduct?.name} className="h-12 bg-background/50 border-white/10 rounded-xl focus:border-accent" required />
+            <div className="flex-1 overflow-y-auto p-8 custom-scrollbar space-y-10">
+                
+                {/* Section Informations de base */}
+                <div className="space-y-6">
+                    <div className="flex items-center gap-3 mb-2">
+                        <div className="w-6 h-6 rounded-lg bg-accent/20 flex items-center justify-center text-accent">
+                            <PlusCircle size={14} />
                         </div>
-                        <div className="space-y-2">
-                            <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Catégorie technique</Label>
-                            <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                                <SelectTrigger className="h-12 bg-background/50 border-white/10 rounded-xl">
-                                    <SelectValue placeholder="Choisir une catégorie" />
-                                </SelectTrigger>
-                                <SelectContent className="bg-card border-white/10">
-                                    {categories?.map((cat: any) => (
-                                        <SelectItem key={cat.id} value={cat.name} className="uppercase font-bold text-xs">
-                                        {cat.icon} {cat.name}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Prix d'Achat ($)</Label>
-                                <Input name="purchasePrice" type="number" step="0.01" defaultValue={editingProduct?.purchasePrice || 0} className="h-12 bg-background/50 border-white/10 rounded-xl" required />
-                            </div>
-                            <div className="space-y-2">
-                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Prix de Vente ($)</Label>
-                                <Input name="sellingPrice" type="number" step="0.01" defaultValue={editingProduct?.sellingPrice || editingProduct?.price} className="h-12 bg-background/50 border-white/10 rounded-xl" required />
-                            </div>
-                        </div>
-                        <div className="space-y-2">
-                            <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Stock Initial</Label>
-                            <Input name="stockQuantity" type="number" defaultValue={editingProduct?.stockQuantity} className="h-12 bg-background/50 border-white/10 rounded-xl" required />
-                        </div>
+                        <h3 className="text-[10px] font-black uppercase tracking-widest text-white/50 italic">Détails Techniques</h3>
+                    </div>
 
+                    <div className="space-y-2">
+                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Nom commercial</Label>
+                        <Input ref={nameRef} name="name" defaultValue={editingProduct?.name} className="h-12 bg-background/50 border-white/10 rounded-xl focus:border-accent" required />
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Catégorie technique</Label>
+                        <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                            <SelectTrigger className="h-12 bg-background/50 border-white/10 rounded-xl">
+                                <SelectValue placeholder="Choisir une catégorie" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-card border-white/10">
+                                {categories?.map((cat: any) => (
+                                    <SelectItem key={cat.id} value={cat.name} className="uppercase font-bold text-xs">
+                                    {cat.icon} {cat.name}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
-                            <div className="flex justify-between items-end mb-1">
-                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Description technique</Label>
-                                <Button 
-                                    type="button" 
-                                    size="sm" 
-                                    variant="ghost" 
-                                    className="h-7 px-2 text-[8px] font-black uppercase italic gap-1.5 border border-accent/20 bg-accent/5 text-accent hover:bg-accent hover:text-black transition-all"
-                                    disabled={isGeneratingDesc}
-                                    onClick={handleAiGenerateDesc}
-                                >
-                                    {isGeneratingDesc ? <Loader2 size={10} className="animate-spin" /> : <Sparkles size={10} />}
-                                    Générer texte
-                                </Button>
-                            </div>
-                            {/* Hauteur minimale fixée pour éviter le saut lors du chargement */}
-                            <div className="min-h-[160px] relative bg-background/30 rounded-xl border border-white/5">
-                                <Textarea 
-                                    name="description" 
-                                    value={aiDescription} 
-                                    onChange={(e) => setAiDescription(e.target.value)}
-                                    className="min-h-[160px] bg-transparent border-none rounded-xl resize-none text-xs leading-relaxed focus-visible:ring-1 focus-visible:ring-accent" 
-                                    required 
-                                />
-                                {isGeneratingDesc && (
-                                    <div className="absolute inset-0 bg-background/60 backdrop-blur-sm flex items-center justify-center rounded-xl">
-                                        <Loader2 className="animate-spin text-accent" />
-                                    </div>
-                                )}
-                            </div>
+                            <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Prix d'Achat ($)</Label>
+                            <Input name="purchasePrice" type="number" step="0.01" defaultValue={editingProduct?.purchasePrice || 0} className="h-12 bg-background/50 border-white/10 rounded-xl" required />
+                        </div>
+                        <div className="space-y-2">
+                            <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Prix de Vente ($)</Label>
+                            <Input name="sellingPrice" type="number" step="0.01" defaultValue={editingProduct?.sellingPrice || editingProduct?.price} className="h-12 bg-background/50 border-white/10 rounded-xl" required />
                         </div>
                     </div>
 
-                    {/* Colonne Droite : Visuel */}
-                    <div className="space-y-8">
-                        <div className="space-y-4">
-                            <div className="flex justify-between items-end">
-                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Visuel du produit</Label>
-                                <Button 
-                                    type="button" 
-                                    size="sm" 
-                                    variant="ghost" 
-                                    className="h-7 px-2 text-[8px] font-black uppercase italic gap-1.5 border border-primary/20 bg-primary/5 text-primary hover:bg-primary hover:text-white transition-all"
-                                    disabled={isGeneratingImg}
-                                    onClick={handleAiGenerateImage}
-                                >
-                                    {isGeneratingImg ? <Loader2 size={10} className="animate-spin" /> : <ImageIcon size={10} />}
-                                    Générer photo IA
-                                </Button>
-                            </div>
-                            
-                            {/* CADRE IMAGE TOTALEMENT FIXE : w-full max-w-[320px] aspect-square */}
-                            <div 
-                                onClick={() => !isGeneratingImg && fileInputRef.current?.click()}
-                                className="aspect-square w-full max-w-[320px] mx-auto rounded-3xl bg-white/5 border-2 border-dashed border-white/10 overflow-hidden relative group shrink-0 cursor-pointer hover:border-accent/40 transition-all shadow-inner"
-                            >
-                                {imageUrl ? (
-                                    <>
-                                        <img src={imageUrl} alt="Preview" className="w-full h-full object-cover" />
-                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center transition-opacity backdrop-blur-sm">
-                                            <Upload className="text-white mb-2" size={24} />
-                                            <span className="text-[8px] font-black uppercase text-white tracking-widest">Changer l'image</span>
-                                        </div>
-                                    </>
-                                ) : (
-                                    <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground opacity-30">
-                                        <Upload size={48} className="mb-3 group-hover:text-accent transition-colors" />
-                                        <span className="text-[10px] font-bold uppercase tracking-widest">Choisir un fichier</span>
-                                        <span className="text-[8px] mt-1">(Photo locale)</span>
-                                    </div>
-                                )}
+                    <div className="space-y-2">
+                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Stock Initial</Label>
+                        <Input name="stockQuantity" type="number" defaultValue={editingProduct?.stockQuantity} className="h-12 bg-background/50 border-white/10 rounded-xl" required />
+                    </div>
+                </div>
 
-                                {/* Overlay de chargement stable qui ne change pas la taille du cadre */}
-                                {isGeneratingImg && (
-                                    <div className="absolute inset-0 bg-black/80 backdrop-blur-md flex flex-col items-center justify-center gap-4 z-20">
-                                        <div className="relative">
-                                            <Loader2 className="animate-spin text-primary h-12 w-12" />
-                                            <Sparkles className="absolute -top-2 -right-2 text-accent h-4 w-4 animate-pulse" />
-                                        </div>
-                                        <p className="text-[10px] font-black uppercase italic tracking-[0.2em] text-white animate-pulse">Création de l'image...</p>
-                                    </div>
-                                )}
+                {/* Section Description IA */}
+                <div className="space-y-4 pt-4 border-t border-white/5">
+                    <div className="flex justify-between items-end mb-1">
+                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Description marketing</Label>
+                        <Button 
+                            type="button" 
+                            size="sm" 
+                            variant="ghost" 
+                            className="h-8 px-3 text-[9px] font-black uppercase italic gap-2 border border-accent/20 bg-accent/5 text-accent hover:bg-accent hover:text-black transition-all rounded-lg"
+                            disabled={isGeneratingDesc}
+                            onClick={handleAiGenerateDesc}
+                        >
+                            {isGeneratingDesc ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+                            Générer avec l'IA
+                        </Button>
+                    </div>
+                    <div className="min-h-[160px] relative bg-background/30 rounded-2xl border border-white/5 overflow-hidden">
+                        <Textarea 
+                            name="description" 
+                            value={aiDescription} 
+                            onChange={(e) => setAiDescription(e.target.value)}
+                            className="min-h-[160px] bg-transparent border-none rounded-2xl resize-none text-sm leading-relaxed p-4 focus-visible:ring-0" 
+                            placeholder="La description générée par l'IA apparaîtra ici..."
+                            required 
+                        />
+                        {isGeneratingDesc && (
+                            <div className="absolute inset-0 bg-background/60 backdrop-blur-sm flex flex-col items-center justify-center gap-2">
+                                <Loader2 className="animate-spin text-accent" />
+                                <span className="text-[8px] font-black uppercase tracking-widest text-accent">Rédaction en cours...</span>
                             </div>
-                            
-                            <input 
-                                type="file" 
-                                ref={fileInputRef} 
-                                className="hidden" 
-                                accept="image/*" 
-                                onChange={handleFileChange} 
-                            />
-                            
-                            <div className="space-y-2">
-                                <Label className="text-[8px] font-black uppercase tracking-widest opacity-40">URL de l'image (Optionnel)</Label>
-                                <Input 
-                                    name="imageUrl" 
-                                    value={imageUrl.startsWith('data:') ? '' : imageUrl} 
-                                    onChange={(e) => setImageUrl(e.target.value)} 
-                                    placeholder="https://..." 
-                                    className="h-11 bg-background/50 border-white/10 rounded-xl text-[10px] focus:border-accent" 
-                                />
-                            </div>
-                        </div>
+                        )}
+                    </div>
+                </div>
 
-                        <div className="p-6 bg-white/5 rounded-3xl border border-white/10 space-y-4">
-                            <div className="flex items-center justify-between">
-                                <div className="flex flex-col gap-1">
-                                    <span className="text-xs font-black uppercase italic">Visibilité Boutique</span>
-                                    <span className="text-[9px] text-muted-foreground">Publier l'article immédiatement</span>
+                {/* Section Visuel */}
+                <div className="space-y-6 pt-4 border-t border-white/5">
+                    <div className="flex justify-between items-end">
+                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Visuel Premium</Label>
+                        <Button 
+                            type="button" 
+                            size="sm" 
+                            variant="ghost" 
+                            className="h-8 px-3 text-[9px] font-black uppercase italic gap-2 border border-primary/20 bg-primary/5 text-primary hover:bg-primary hover:text-white transition-all rounded-lg"
+                            disabled={isGeneratingImg}
+                            onClick={handleAiGenerateImage}
+                        >
+                            {isGeneratingImg ? <Loader2 size={12} className="animate-spin" /> : <ImageIcon size={12} />}
+                            Studio IA Imagen
+                        </Button>
+                    </div>
+                    
+                    <div 
+                        onClick={() => !isGeneratingImg && fileInputRef.current?.click()}
+                        className="aspect-square w-full rounded-3xl bg-white/5 border-2 border-dashed border-white/10 overflow-hidden relative group cursor-pointer hover:border-accent/40 transition-all shadow-inner"
+                    >
+                        {imageUrl ? (
+                            <>
+                                <img src={imageUrl} alt="Preview" className="w-full h-full object-cover" />
+                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center transition-opacity backdrop-blur-sm">
+                                    <Upload className="text-white mb-2" size={24} />
+                                    <span className="text-[10px] font-black uppercase text-white tracking-widest">Modifier l'image</span>
                                 </div>
-                                <Switch 
-                                    checked={isPublished} 
-                                    onCheckedChange={setIsPublished} 
-                                />
+                            </>
+                        ) : (
+                            <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground opacity-30">
+                                <Upload size={48} className="mb-3 group-hover:text-accent transition-colors" />
+                                <span className="text-[10px] font-bold uppercase tracking-widest">Charger une photo</span>
                             </div>
-                        </div>
+                        )}
+
+                        {isGeneratingImg && (
+                            <div className="absolute inset-0 bg-black/80 backdrop-blur-md flex flex-col items-center justify-center gap-4 z-20">
+                                <Loader2 className="animate-spin text-primary h-12 w-12" />
+                                <p className="text-[10px] font-black uppercase italic tracking-[0.2em] text-white animate-pulse">Génération de l'image de studio...</p>
+                            </div>
+                        )}
                     </div>
+                    
+                    <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
+                    
+                    <div className="space-y-2">
+                        <Label className="text-[9px] font-black uppercase tracking-widest opacity-40">URL alternative (Optionnel)</Label>
+                        <Input 
+                            name="imageUrl" 
+                            value={imageUrl.startsWith('data:') ? '' : imageUrl} 
+                            onChange={(e) => setImageUrl(e.target.value)} 
+                            placeholder="https://..." 
+                            className="h-10 bg-background/50 border-white/5 rounded-xl text-xs" 
+                        />
+                    </div>
+                </div>
+
+                <div className="p-6 bg-white/5 rounded-3xl border border-white/10 flex items-center justify-between">
+                    <div className="flex flex-col gap-1">
+                        <span className="text-xs font-black uppercase italic">Visibilité Boutique</span>
+                        <span className="text-[9px] text-muted-foreground uppercase">Publier immédiatement</span>
+                    </div>
+                    <Switch checked={isPublished} onCheckedChange={setIsPublished} />
                 </div>
             </div>
 
-            {/* Pied de page fixe ancré en bas pour la stabilité */}
-            <DialogFooter className="p-8 pt-6 border-t border-white/5 bg-background/80 backdrop-blur-xl shrink-0">
+            <SheetFooter className="p-8 border-t border-white/5 bg-background/80 backdrop-blur-xl shrink-0">
               <div className="flex gap-4 w-full">
-                <Button type="button" variant="ghost" onClick={closeModal} className="flex-1 rounded-2xl font-bold uppercase text-[10px] h-14 border border-white/5 hover:bg-white/5">Annuler</Button>
-                <Button type="submit" className="flex-[2] bg-accent text-accent-foreground font-black uppercase italic rounded-2xl px-10 h-14 shadow-2xl shadow-accent/20 hover:scale-[1.02] active:scale-95 transition-all">
-                  {editingProduct ? 'Mettre à jour le stock' : 'Enregistrer le nouveau produit'}
+                <Button type="button" variant="ghost" onClick={closeSheet} className="flex-1 rounded-xl font-bold uppercase text-[10px] h-14">Annuler</Button>
+                <Button type="submit" className="flex-[2] bg-accent text-black font-black uppercase italic rounded-xl px-10 h-14 shadow-xl">
+                  {editingProduct ? 'Mettre à jour le stock' : 'Enregistrer le produit'}
                 </Button>
               </div>
-            </DialogFooter>
+            </SheetFooter>
           </form>
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
