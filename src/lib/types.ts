@@ -5,6 +5,7 @@ export type AppUser = {
   name: string;
   role: 'admin' | 'seller' | 'cashier' | 'customer' | 'Admin' | 'Seller' | 'Cashier';
   createdAt?: any;
+  photoURL?: string;
 };
 
 export type Product = {

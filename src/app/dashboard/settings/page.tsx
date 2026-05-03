@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { 
@@ -9,17 +9,17 @@ import {
     ShieldCheck, 
     Settings, 
     Mail, 
-    Phone, 
     LogOut, 
     ArrowLeft,
-    CheckCircle2,
     Lock,
     Smartphone,
     Database,
     DollarSign,
     Coins,
     RefreshCw,
-    Loader2
+    Loader2,
+    Camera,
+    Upload
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -35,7 +35,7 @@ import {
 } from "@/components/ui/tabs";
 import { useAuth } from '@/context/AuthContext';
 import { auth, db } from '@/lib/firebase';
-import { signOut } from 'firebase/auth';
+import { signOut, updateProfile } from 'firebase/auth';
 import { doc, updateDoc, serverTimestamp, getDoc, setDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -45,12 +45,15 @@ export default function SettingsPage() {
     const { user } = useAuth();
     const router = useRouter();
     const { toast } = useToast();
+    const fileInputRef = useRef<HTMLInputElement>(null);
     
     // Form States
     const [name, setName] = useState("");
     const [email, setEmail] = useState("");
     const [phone, setPhone] = useState("");
+    const [photoURL, setPhotoURL] = useState("");
     const [isSaving, setIsSaving] = useState(false);
+    const [isUploading, setIsUploading] = useState(false);
 
     // System States
     const [exchangeRate, setExchangeRate] = useState("2500");
@@ -62,6 +65,7 @@ export default function SettingsPage() {
         if (user) {
             setName(user.name || "");
             setEmail(user.email || "");
+            setPhotoURL(user.photoURL || "");
         }
         fetchSystemConfig();
     }, [user]);
@@ -91,6 +95,44 @@ export default function SettingsPage() {
         }
     };
 
+    const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        // Limite de taille simple (ex: 2MB)
+        if (file.size > 2 * 1024 * 1024) {
+            toast({ title: "Fichier volumineux", description: "Veuillez choisir une image de moins de 2MB.", variant: "destructive" });
+            return;
+        }
+
+        setIsUploading(true);
+        const reader = new FileReader();
+        reader.onloadend = async () => {
+            const base64String = reader.result as string;
+            setPhotoURL(base64String);
+            
+            // Mise à jour immédiate pour le feedback visuel
+            if (user?.uid) {
+                try {
+                    await updateDoc(doc(db, "users", user.uid), {
+                        photoURL: base64String,
+                        updatedAt: serverTimestamp()
+                    });
+                    
+                    if (auth.currentUser) {
+                        await updateProfile(auth.currentUser, { photoURL: base64String });
+                    }
+                    
+                    toast({ title: "Photo mise à jour", description: "Votre nouvel avatar est enregistré." });
+                } catch (err) {
+                    toast({ title: "Erreur", description: "Impossible d'enregistrer l'image.", variant: "destructive" });
+                }
+            }
+            setIsUploading(false);
+        };
+        reader.readAsDataURL(file);
+    };
+
     const handleUpdateProfile = async () => {
         if (!user?.uid) return;
         setIsSaving(true);
@@ -101,6 +143,11 @@ export default function SettingsPage() {
                 phoneNumber: phone,
                 updatedAt: serverTimestamp()
             });
+
+            if (auth.currentUser) {
+                await updateProfile(auth.currentUser, { displayName: name });
+            }
+
             toast({ title: "Profil mis à jour", description: "Vos informations ont été enregistrées avec succès." });
         } catch (error) {
             console.error(error);
@@ -129,7 +176,6 @@ export default function SettingsPage() {
     const fetchTodayRate = async () => {
         setIsFetchingRate(true);
         try {
-            // Utilisation d'une API gratuite pour récupérer le taux réel USD/CDF
             const response = await fetch('https://open.er-api.com/v6/latest/USD');
             const data = await response.json();
             if (data && data.rates && data.rates.CDF) {
@@ -190,17 +236,32 @@ export default function SettingsPage() {
                     <TabsContent value="profile" className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
                         <div className="flex flex-col md:flex-row gap-10 items-center md:items-start text-center md:text-left">
                             <div className="relative group">
-                                <Avatar className="h-40 w-40 border-4 border-accent p-1.5 bg-background shadow-[0_0_40px_rgba(56,189,248,0.2)]">
-                                    <AvatarImage src={`https://picsum.photos/seed/${user?.uid}/200/200`} />
+                                <Avatar className="h-40 w-40 border-4 border-accent p-1.5 bg-background shadow-[0_0_40px_rgba(56,189,248,0.2)] overflow-visible">
+                                    <AvatarImage src={photoURL || `https://picsum.photos/seed/${user?.uid}/200/200`} className="rounded-full object-cover" />
                                     <AvatarFallback className="bg-primary/20 text-accent text-4xl font-black italic">
                                         {user?.name?.substring(0, 1)}
                                     </AvatarFallback>
+                                    
+                                    <button 
+                                        onClick={() => fileInputRef.current?.click()}
+                                        className="absolute bottom-2 right-2 w-10 h-10 bg-accent text-black rounded-full flex items-center justify-center shadow-xl border-4 border-background hover:scale-110 active:scale-95 transition-all z-10"
+                                        disabled={isUploading}
+                                    >
+                                        {isUploading ? <Loader2 className="animate-spin" size={16} /> : <Camera size={16} />}
+                                    </button>
+                                    <input 
+                                        type="file" 
+                                        ref={fileInputRef} 
+                                        className="hidden" 
+                                        accept="image/*" 
+                                        onChange={handleImageChange} 
+                                    />
                                 </Avatar>
                             </div>
-                            <div className="flex-1 space-y-3">
+                            <div className="flex-1 space-y-3 pt-4">
                                 <h3 className="text-4xl font-black uppercase italic tracking-tighter">{user?.name}</h3>
                                 <Badge className="bg-accent/20 text-accent border-none font-black uppercase text-[10px] px-3 py-1 italic tracking-widest">{user?.role} Premium</Badge>
-                                <p className="text-sm text-muted-foreground font-light max-w-md leading-relaxed">Gérez votre identité sur la plateforme.</p>
+                                <p className="text-sm text-muted-foreground font-light max-w-md leading-relaxed">Gérez votre identité et votre image sur la plateforme.</p>
                             </div>
                         </div>
 

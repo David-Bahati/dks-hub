@@ -45,6 +45,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               name: userData.name || userData.displayName || userData.username || 'Utilisateur',
               role: userData.role || 'customer',
               createdAt: userData.createdAt || null,
+              photoURL: userData.photoURL || null,
             });
           } else {
             setUser({
@@ -52,6 +53,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               email: firebaseUser.email || '',
               name: firebaseUser.displayName || 'Utilisateur',
               role: 'customer',
+              photoURL: firebaseUser.photoURL || null,
             });
           }
           setIsLoading(false);
