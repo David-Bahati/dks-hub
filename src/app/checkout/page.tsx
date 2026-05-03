@@ -33,7 +33,6 @@ import {
   ShoppingBag,
   Star,
   Printer,
-  FileText,
   QrCode,
   Download
 } from "lucide-react";
@@ -102,7 +101,7 @@ export default function CheckoutPage() {
         let currentUserId = user?.uid;
         let finalName = user?.name || guestName;
         let finalEmail = user?.email || guestEmail;
-        let wasGuest = !user;
+        const wasGuest = !user;
 
         if (wasGuest) {
             if (!guestName || !guestEmail) {
@@ -354,12 +353,12 @@ export default function CheckoutPage() {
                             className="flex-1 h-14 border-white/10 hover:bg-white/5 font-black uppercase italic rounded-2xl"
                             onClick={() => router.push('/')}
                         >
-                            Retour
+                            Retour Boutique
                         </Button>
                     </div>
 
                     {showFinishAccount && (
-                        <Card className="glossy-card border-none rounded-[2.5rem] p-8 space-y-6 relative overflow-hidden no-print">
+                        <Card className="glossy-card border-none rounded-[2.5rem] p-8 space-y-6 relative overflow-hidden no-print animate-in slide-in-from-bottom-4 delay-500 duration-1000">
                             <div className="absolute -top-10 -right-10 w-32 h-32 bg-accent/10 rounded-full blur-2xl" />
                             <div className="space-y-2 relative z-10">
                                 <Badge className="bg-accent/20 text-accent border-none uppercase text-[10px] font-black px-3 py-1 mb-2">
@@ -367,7 +366,7 @@ export default function CheckoutPage() {
                                 </Badge>
                                 <h2 className="text-xl font-black uppercase italic tracking-tight leading-none">ACTIVER VOTRE ESPACE PREMIUM ?</h2>
                                 <p className="text-[11px] text-muted-foreground leading-relaxed font-light">
-                                    Définissez un mot de passe pour suivre votre colis, gérer vos garanties et bénéficier de remises exclusives sur vos futurs achats.
+                                    Définissez un mot de passe pour suivre votre colis, gérer vos garanties et bénéficier de remises exclusives.
                                 </p>
                             </div>
                             <div className="space-y-4 relative z-10">
@@ -429,6 +428,7 @@ export default function CheckoutPage() {
                             <p className="text-muted-foreground font-light uppercase tracking-widest text-xs opacity-60">Validation de votre sélection premium</p>
                         </div>
 
+                        {/* RENSEIGNEMENTS CLIENT - TOUJOURS VISIBLES SI NON CONNECTÉ */}
                         {!user && (
                             <Card className="p-8 rounded-[2.5rem] bg-white/5 border border-white/5 space-y-6 animate-in fade-in slide-in-from-top-4">
                                 <div className="flex items-center gap-3">
