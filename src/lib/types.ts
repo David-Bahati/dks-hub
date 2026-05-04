@@ -16,6 +16,7 @@ export type AppUser = {
   points?: number;
   tokenBalance?: number;
   pointsConverted?: number;
+  piWalletAddress?: string;
 };
 
 export type TokenTransaction = {
@@ -24,6 +25,7 @@ export type TokenTransaction = {
   type: 'mint' | 'burn' | 'transfer';
   pointsAmount?: number;
   tokenAmount: number;
+  piTxId?: string;
   createdAt: any;
 };
 

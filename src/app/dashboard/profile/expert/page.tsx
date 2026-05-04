@@ -30,7 +30,10 @@ import {
     TrendingUp,
     Coins,
     RefreshCw,
-    Wallet
+    Wallet,
+    Globe,
+    ExternalLink,
+    Lock
 } from "lucide-react";
 import { db } from '@/lib/firebase';
 import { collection, query, where, orderBy, updateDoc, doc, addDoc, serverTimestamp, increment } from 'firebase/firestore';
@@ -53,6 +56,7 @@ import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import { Logo } from '@/components/ui/Logo';
 import { useToast } from '@/hooks/use-toast';
+import { Input } from "@/components/ui/input";
 
 const POINTS_PER_TOKEN = 100;
 
@@ -61,6 +65,8 @@ function ExpertProfilePage() {
     const { toast } = useToast();
     const [isGenerating, setIsGenerating] = useState(false);
     const [isMinting, setIsMinting] = useState(false);
+    const [isSyncing, setIsSyncing] = useState(false);
+    const [tempPiAddress, setTempPiAddress] = useState("");
     const reportRef = useRef<HTMLDivElement>(null);
 
     // Fetch User Logs
@@ -89,6 +95,13 @@ function ExpertProfilePage() {
         return query(collection(db, "sales"), where("userId", "==", user.uid));
     }, [user?.uid]);
     const { data: sales, isLoading: loadingSales } = useCollection(salesQuery);
+
+    // Fetch Token Transactions
+    const txQuery = useMemoFirebase(() => {
+        if (!user?.uid) return null;
+        return query(collection(db, "tokenTransactions"), where("userId", "==", user.uid), orderBy("createdAt", "desc"), limit(10));
+    }, [user?.uid]);
+    const { data: transactions } = useCollection(txQuery);
 
     const careerStats = useMemo(() => {
         if (!user || !logs) return null;
@@ -138,6 +151,23 @@ function ExpertProfilePage() {
         return { stats, badges, radarData };
     }, [user, logs, academySessions, savTickets, sales]);
 
+    const handleSavePiWallet = async () => {
+        if (!user || !tempPiAddress) return;
+        setIsSyncing(true);
+        try {
+            await updateDoc(doc(db, "users", user.uid), {
+                piWalletAddress: tempPiAddress,
+                updatedAt: serverTimestamp()
+            });
+            toast({ title: "Wallet Pi Associé", description: "Votre identité blockchain est liée à votre profil Expert." });
+            setTempPiAddress("");
+        } catch (error) {
+            toast({ title: "Erreur", variant: "destructive" });
+        } finally {
+            setIsSyncing(false);
+        }
+    };
+
     const mintTokens = async () => {
         if (!user || !careerStats) return;
         const availablePoints = careerStats.stats.totalPoints - (user.pointsConverted || 0);
@@ -156,6 +186,9 @@ function ExpertProfilePage() {
 
         setIsMinting(true);
         try {
+            // Simulated Pi Blockchain Interaction
+            const simulatedPiTxId = `PI-TX-${Math.random().toString(36).substring(2, 15).toUpperCase()}`;
+
             const userRef = doc(db, "users", user.uid);
             await updateDoc(userRef, {
                 tokenBalance: increment(tokensToMint),
@@ -168,12 +201,13 @@ function ExpertProfilePage() {
                 type: 'mint',
                 pointsAmount: pointsToConvert,
                 tokenAmount: tokensToMint,
+                piTxId: simulatedPiTxId,
                 createdAt: serverTimestamp()
             });
 
             toast({ 
-                title: "Points Tokenisés !", 
-                description: `Vous avez généré ${tokensToMint} DKST. Votre wallet a été mis à jour.` 
+                title: "Points Blockchain-Verified !", 
+                description: `Vous avez généré ${tokensToMint} DKST. Transaction enregistrée sur le simulateur Pi.` 
             });
         } catch (error) {
             toast({ title: "Erreur de frappe", variant: "destructive" });
@@ -218,7 +252,7 @@ function ExpertProfilePage() {
                         </Link>
                         <div>
                             <h1 className="text-4xl font-black uppercase italic tracking-tighter">Profil <span className="text-accent">Expert Élite</span></h1>
-                            <p className="text-muted-foreground text-xs uppercase font-black opacity-40 mt-1">Traçabilité & Historique de Carrière Technologique</p>
+                            <p className="text-muted-foreground text-xs uppercase font-black opacity-40 mt-1">Traçabilité & Historique Blockchain Technologique</p>
                         </div>
                     </div>
 
@@ -262,19 +296,47 @@ function ExpertProfilePage() {
                             </div>
                         </Card>
 
-                        {/* TOKEN WALLET SECTION */}
+                        {/* PI BLOCKCHAIN WALLET SECTION */}
                         <Card className="bg-accent/10 border-accent/20 rounded-[3rem] p-10 space-y-8 relative overflow-hidden group">
-                            <div className="absolute top-0 right-0 p-6 opacity-10"><Coins size={80} className="text-accent" /></div>
+                            <div className="absolute top-0 right-0 p-6 opacity-10"><Globe size={80} className="text-accent animate-spin-slow" /></div>
                             <div className="relative z-10 space-y-6">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-xl bg-accent text-black flex items-center justify-center shadow-lg"><Wallet size={20}/></div>
-                                    <h4 className="text-lg font-black uppercase italic tracking-tight">DKS Token Wallet</h4>
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-xl bg-accent text-black flex items-center justify-center shadow-lg"><Coins size={20}/></div>
+                                        <h4 className="text-lg font-black uppercase italic tracking-tight">DKS Token Wallet</h4>
+                                    </div>
+                                    {user?.piWalletAddress && <Badge className="bg-green-500 text-white border-none uppercase text-[8px] font-black">Linked to Pi</Badge>}
                                 </div>
 
                                 <div className="space-y-1">
                                     <p className="text-[10px] font-black uppercase text-accent/60 tracking-widest">Solde Actuel</p>
                                     <p className="text-5xl font-black text-white italic">{user?.tokenBalance || 0} <span className="text-sm font-light opacity-40 not-italic">DKST</span></p>
                                 </div>
+
+                                {!user?.piWalletAddress ? (
+                                    <div className="p-6 bg-black/40 rounded-2xl border border-dashed border-accent/20 space-y-4">
+                                        <p className="text-[9px] font-bold text-accent uppercase text-center">Associer mon adresse Pi Blockchain</p>
+                                        <div className="flex gap-2">
+                                            <Input 
+                                                value={tempPiAddress} 
+                                                onChange={(e) => setTempPiAddress(e.target.value)}
+                                                placeholder="G..." 
+                                                className="bg-background/50 border-white/5 h-10 text-[10px] font-mono" 
+                                            />
+                                            <Button onClick={handleSavePiWallet} disabled={isSyncing} className="h-10 bg-accent text-black px-4 rounded-lg">
+                                                {isSyncing ? <Loader2 className="animate-spin w-4 h-4" /> : <CheckCircle2 size={16} />}
+                                            </Button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="p-4 bg-accent/5 rounded-2xl border border-accent/20 flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <Lock size={14} className="text-accent opacity-40" />
+                                            <p className="text-[9px] font-mono text-white/40 truncate max-w-[150px]">{user.piWalletAddress}</p>
+                                        </div>
+                                        <button className="text-[8px] font-black uppercase text-accent hover:underline">Modifier</button>
+                                    </div>
+                                )}
 
                                 <div className="p-6 bg-black/40 rounded-2xl border border-white/5 space-y-4">
                                     <div className="flex justify-between items-end">
@@ -288,10 +350,9 @@ function ExpertProfilePage() {
                                         disabled={isMinting || redeemableTokens < 1}
                                         className="w-full h-12 bg-accent text-black font-black uppercase italic text-[10px] rounded-xl gap-2 shadow-xl shadow-accent/10 mt-2"
                                     >
-                                        {isMinting ? <Loader2 className="animate-spin h-4 w-4" /> : <><RefreshCw size={14} /> Frapper des Jetons (Mint)</>}
+                                        {isMinting ? <Loader2 className="animate-spin h-4 w-4" /> : <><RefreshCw size={14} /> Frapper sur Blockchain (Mint)</>}
                                     </Button>
                                 </div>
-                                <p className="text-[7px] text-center text-muted-foreground uppercase font-black tracking-tighter opacity-40">Conversion automatique : 100 Points = 1 DKST</p>
                             </div>
                         </Card>
 
@@ -365,39 +426,39 @@ function ExpertProfilePage() {
                             </div>
                         </div>
 
+                        {/* BLOCKCHAIN LEDGER PREVIEW */}
                         <Card className="glossy-card border-none rounded-[3rem] overflow-hidden">
-                            <CardHeader className="p-10 border-b border-white/5 bg-white/[0.02]">
-                                <CardTitle className="text-xl font-black uppercase italic flex items-center gap-4">
-                                    <HistoryIcon className="text-accent" /> Timeline d'Interventions
-                                </CardTitle>
-                            </CardHeader>
-                            <div className="p-10">
-                                <div className="relative space-y-10 pl-8 before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-0.5 before:bg-white/5">
-                                    {academySessions?.slice(0, 2).map((session) => (
-                                        <div key={session.id} className="relative group">
-                                            <div className="absolute -left-10 top-0 w-6 h-6 rounded-full border-4 border-background bg-primary flex items-center justify-center">
-                                                <GraduationCap size={10} className="text-white" />
-                                            </div>
-                                            <div>
-                                                <p className="text-[9px] font-black uppercase text-primary mb-1">Academy Session Terminée</p>
-                                                <h5 className="font-bold text-sm uppercase italic">{session.serviceTitle}</h5>
-                                                <p className="text-xs text-muted-foreground mt-1">Étudiant: {session.customerName} • {session.scheduledDate}</p>
-                                            </div>
-                                        </div>
-                                    ))}
-                                    {sales?.slice(0, 2).map((sale) => (
-                                        <div key={sale.id} className="relative group">
-                                            <div className="absolute -left-10 top-0 w-6 h-6 rounded-full border-4 border-background bg-green-500 flex items-center justify-center">
-                                                <ShoppingCart size={10} className="text-white" />
-                                            </div>
-                                            <div>
-                                                <p className="text-[9px] font-black uppercase text-green-500 mb-1">Vente Conclue</p>
-                                                <h5 className="font-bold text-sm uppercase italic">Transaction #{sale.id.substring(0,8)}</h5>
-                                                <p className="text-xs text-muted-foreground mt-1">Montant: {sale.totalAmount}$ • Client: {sale.customerName}</p>
-                                            </div>
-                                        </div>
-                                    ))}
+                            <CardHeader className="p-10 border-b border-white/5 bg-accent/5">
+                                <div className="flex justify-between items-center">
+                                    <CardTitle className="text-xl font-black uppercase italic flex items-center gap-4">
+                                        <Globe className="text-accent" /> Registre Blockchain Pi
+                                    </CardTitle>
+                                    <Badge variant="outline" className="border-accent/20 text-accent text-[8px] font-black uppercase">Simulated Mainnet</Badge>
                                 </div>
+                            </CardHeader>
+                            <div className="divide-y divide-white/5">
+                                {transactions && transactions.length > 0 ? transactions.map((tx) => (
+                                    <div key={tx.id} className="p-6 flex items-center justify-between hover:bg-white/[0.02] transition-colors">
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-accent">
+                                                <RefreshCw size={18} />
+                                            </div>
+                                            <div>
+                                                <p className="text-sm font-bold uppercase italic">Minting {tx.tokenAmount} DKST</p>
+                                                <div className="flex items-center gap-2 mt-1">
+                                                    <Lock size={10} className="text-green-500" />
+                                                    <p className="text-[8px] font-mono text-muted-foreground truncate max-w-[200px]">{tx.piTxId || "Hachage en attente..."}</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-[10px] font-black text-accent uppercase">Confirmed</p>
+                                            <p className="text-[8px] font-bold opacity-30 uppercase">{tx.createdAt?.toDate?.().toLocaleString()}</p>
+                                        </div>
+                                    </div>
+                                )) : (
+                                    <div className="p-20 text-center opacity-20 italic text-xs uppercase font-black tracking-widest">Aucune transaction blockchain enregistrée.</div>
+                                )}
                             </div>
                         </Card>
                     </div>

@@ -16,6 +16,7 @@
         "points": { "type": "number", "description": "Accumulated prestige points" },
         "tokenBalance": { "type": "number", "description": "DKST Token balance" },
         "pointsConverted": { "type": "number", "description": "Points already turned into tokens" },
+        "piWalletAddress": { "type": "string", "description": "Public address on the Pi blockchain" },
         "createdAt": { "type": "string", "format": "date-time" },
         "updatedAt": { "type": "string", "format": "date-time" }
       },
@@ -23,7 +24,7 @@
     },
     "TokenTransaction": {
       "title": "TokenTransaction",
-      "description": "Represents a point-to-token conversion or token usage.",
+      "description": "Represents a point-to-token conversion or token usage on the Pi blockchain.",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
@@ -31,6 +32,7 @@
         "type": { "type": "string", "enum": ["mint", "burn", "transfer"] },
         "pointsAmount": { "type": "number" },
         "tokenAmount": { "type": "number" },
+        "piTxId": { "type": "string", "description": "Pi Blockchain transaction hash" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["userId", "type", "tokenAmount", "createdAt"]
