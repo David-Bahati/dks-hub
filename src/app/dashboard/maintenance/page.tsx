@@ -30,7 +30,8 @@ import {
     Barcode,
     Printer,
     Download,
-    QrCode
+    QrCode,
+    ShoppingCart
 } from "lucide-react";
 import { db } from '@/lib/firebase';
 import { collection, addDoc, deleteDoc, doc, updateDoc, serverTimestamp, query, orderBy, increment } from 'firebase/firestore';
@@ -86,6 +87,8 @@ function MaintenanceInventoryPage() {
 
     const { data: items, isLoading } = useCollection(inventoryQuery);
 
+    const alertCount = items?.filter(i => i.quantity <= i.minThreshold).length || 0;
+
     // Camera Logic
     useEffect(() => {
         if (isScannerOpen) {
@@ -108,7 +111,6 @@ function MaintenanceInventoryPage() {
             };
             getCameraPermission();
         } else {
-            // Stop stream when closing
             if (videoRef.current && videoRef.current.srcObject) {
                 const stream = videoRef.current.srcObject as MediaStream;
                 stream.getTracks().forEach(track => track.stop());
@@ -227,6 +229,17 @@ function MaintenanceInventoryPage() {
                     </div>
                     
                     <div className="flex flex-wrap gap-3">
+                        <Link href="/dashboard/maintenance/procurement">
+                            <Button 
+                                variant="outline"
+                                className="h-14 px-6 rounded-2xl border-red-500/20 text-red-400 bg-red-500/5 font-black uppercase italic gap-3 hover:bg-red-500/10 transition-all relative"
+                            >
+                                <ShoppingCart size={20} /> Besoins Réappro
+                                {alertCount > 0 && (
+                                    <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] font-black h-6 min-w-[24px] flex items-center justify-center p-1 rounded-full border-2 border-background animate-bounce">{alertCount}</span>
+                                )}
+                            </Button>
+                        </Link>
                         <Button 
                             onClick={() => { setScannerMode('usage'); setIsScannerOpen(true); }} 
                             className="bg-accent text-black hover:bg-accent/90 h-14 px-8 rounded-2xl font-black uppercase italic gap-3 shadow-xl shadow-accent/20"
@@ -390,7 +403,6 @@ function MaintenanceInventoryPage() {
                             <div className="lg:col-span-7 relative aspect-video rounded-[3rem] overflow-hidden border-4 border-white/5 shadow-[0_0_50px_rgba(255,255,255,0.05)]">
                                 <video ref={videoRef} className="w-full h-full object-cover" autoPlay muted playsInline />
                                 
-                                {/* Scanner Overlays */}
                                 <div className="absolute inset-0 flex items-center justify-center">
                                     <div className={cn(
                                         "w-64 h-64 border-2 rounded-3xl relative transition-colors duration-500",
@@ -405,7 +417,6 @@ function MaintenanceInventoryPage() {
                                             scannerMode === 'usage' ? "bg-orange-500" : "bg-green-500"
                                         )} />
                                         
-                                        {/* Corners */}
                                         <div className={cn("absolute -top-1 -left-1 w-8 h-8 border-t-4 border-l-4 rounded-tl-xl", scannerMode === 'usage' ? "border-orange-500" : "border-green-500")} />
                                         <div className={cn("absolute -top-1 -right-1 w-8 h-8 border-t-4 border-r-4 rounded-tr-xl", scannerMode === 'usage' ? "border-orange-500" : "border-green-500")} />
                                         <div className={cn("absolute -bottom-1 -left-1 w-8 h-8 border-b-4 border-l-4 rounded-bl-xl", scannerMode === 'usage' ? "border-orange-500" : "border-green-500")} />
@@ -475,7 +486,6 @@ function MaintenanceInventoryPage() {
                     </DialogHeader>
                     
                     <div className="p-10 flex flex-col items-center justify-center space-y-10 bg-black/20">
-                        {/* Étiquette Réelle */}
                         <div ref={labelRef} className="w-[400px] h-[240px] bg-white text-black p-8 rounded-lg shadow-2xl relative overflow-hidden flex flex-col justify-between font-sans">
                             <div className="flex justify-between items-start">
                                 <div className="space-y-4">

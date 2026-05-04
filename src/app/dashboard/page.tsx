@@ -42,7 +42,8 @@ import {
   ShieldCheck,
   FileText,
   CreditCard,
-  FlaskConical
+  FlaskConical,
+  PackagePlus
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -93,6 +94,7 @@ const navConfig = [
   { href: "/dashboard/products", icon: Package, label: "Produits / Stock", roles: ["Admin", "Seller"] },
   { href: "/dashboard/categories", icon: Tags, label: "Catégories", roles: ["Admin", "Seller"] },
   { href: "/dashboard/maintenance", icon: FlaskConical, label: "Stocks Labo", roles: ["Admin", "Seller"] },
+  { href: "/dashboard/maintenance/procurement", icon: PackagePlus, label: "Besoin Réappro", roles: ["Admin", "Seller"] },
   { href: "/dashboard/maintenance/stats", icon: BarChart3, label: "Analytique Labo", roles: ["Admin", "Seller"] },
   { href: "/dashboard/quotes", icon: FileText, label: "Devis Pro", roles: ["Admin", "Seller", "customer"] },
   { href: "/dashboard/subscriptions", icon: CreditCard, label: "Contrats Services", roles: ["Admin", "Seller", "Cashier", "customer"] },
@@ -180,7 +182,6 @@ function DashboardPage() {
       const term = uSearch.toLowerCase();
 
       try {
-        // Search in Orders
         const ordersSnap = await getDocs(collection(db, "orders"));
         ordersSnap.forEach(doc => {
           const data = doc.data();
@@ -189,7 +190,6 @@ function DashboardPage() {
           }
         });
 
-        // Search in Hardware Assets (Serial Number)
         const hardwareSnap = await getDocs(collection(db, "hardwareAssets"));
         hardwareSnap.forEach(doc => {
           const data = doc.data();
@@ -198,7 +198,6 @@ function DashboardPage() {
           }
         });
 
-        // Search in Users (Clients)
         if (isStaff) {
           const usersSnap = await getDocs(collection(db, "users"));
           usersSnap.forEach(doc => {
@@ -232,7 +231,7 @@ function DashboardPage() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-background gap-4">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground">Initialisation du Hub Elite...</p>
+        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground">Initialisation du Hub Élite...</p>
       </div>
     );
   }
@@ -313,7 +312,6 @@ function DashboardPage() {
       </header>
 
       <main className="flex-1 p-4 md:p-8 space-y-8 pb-24 max-w-[1600px] mx-auto w-full">
-          {/* STATS RAPIDES (Staff) */}
           {isStaff && (
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
               <Card className="lg:col-span-2 glossy-card border-none rounded-[2.5rem] relative overflow-hidden group">
@@ -359,7 +357,6 @@ function DashboardPage() {
             </div>
           )}
 
-          {/* VUE CLIENT (Hero Card) */}
           {!isStaff && (
             <Card className="bg-primary/10 border-primary/20 rounded-[3rem] p-10 relative overflow-hidden mb-12">
                <div className="absolute top-0 right-0 p-12 opacity-5"><Logo size="xl" /></div>
@@ -382,7 +379,6 @@ function DashboardPage() {
           )}
 
           <div className="grid gap-6 grid-cols-1 lg:grid-cols-7">
-            {/* GRAPHIQUE OU HISTORIQUE PRINCIPAL */}
             <Card className="lg:col-span-4 glossy-card border-none rounded-[2.5rem] overflow-hidden">
                 <CardHeader className="py-6 px-8 flex flex-row items-center justify-between">
                   <CardTitle className="text-lg font-bold uppercase italic flex items-center gap-3">
@@ -425,7 +421,6 @@ function DashboardPage() {
                 </CardContent>
             </Card>
 
-            {/* FLUX d'ACTIVITÉ / NOTIFICATIONS */}
             <Card className="lg:col-span-3 glossy-card border-none rounded-[2.5rem] overflow-hidden flex flex-col">
                 <CardHeader className="py-6 px-8 border-b border-white/5 bg-white/[0.02]">
                   <CardTitle className="text-lg font-bold uppercase italic flex items-center gap-3">
