@@ -1,4 +1,3 @@
-
 {
   "entities": {
     "User": {
@@ -69,6 +68,19 @@
         "updatedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["userId", "productName", "issueDescription", "status", "createdAt"]
+    },
+    "SupportMessage": {
+      "title": "SupportMessage",
+      "description": "Un message envoyé dans le chat d'un ticket de support.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "senderId": { "type": "string" },
+        "senderName": { "type": "string" },
+        "senderRole": { "type": "string" },
+        "text": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
     },
     "RemoteSupportSession": {
       "title": "RemoteSupportSession",
@@ -152,6 +164,10 @@
     "/supportTickets/{ticketId}": {
       "schema": "SupportTicket",
       "description": "Technical support tickets."
+    },
+    "/supportTickets/{ticketId}/messages/{messageId}": {
+      "schema": "SupportMessage",
+      "description": "Chat messages for a support ticket."
     },
     "/remoteSessions/{sessionId}": {
       "schema": "RemoteSupportSession",

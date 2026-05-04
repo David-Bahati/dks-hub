@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Navbar } from "@/components/layout/Navbar";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,10 +16,13 @@ import {
     Search,
     MessageCircle,
     BadgeAlert,
-    ExternalLink
+    ExternalLink,
+    Send,
+    User as UserIcon,
+    ShieldCheck
 } from "lucide-react";
 import { db } from '@/lib/firebase';
-import { collection, addDoc, serverTimestamp, doc, updateDoc, query, orderBy } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, updateDoc, query, orderBy, onSnapshot, where } from 'firebase/firestore';
 import withAuth from '@/components/auth/withAuth';
 import Link from 'next/link';
 import { useCollection, useMemoFirebase } from '@/firebase';
@@ -37,13 +40,20 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { cn } from '@/lib/utils';
+import { SupportMessage } from '@/lib/types';
 
 function SupportPage() {
     const { user } = useAuth();
     const { toast } = useToast();
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isChatOpen, setIsChatOpen] = useState(false);
+    const [selectedTicket, setSelectedTicket] = useState<any>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [search, setSearch] = useState("");
+    const [chatMessages, setChatMessages] = useState<SupportMessage[]>([]);
+    const [newMessage, setNewMessage] = useState("");
+    const scrollRef = useRef<HTMLDivElement>(null);
 
     const ticketsQuery = useMemoFirebase(() => {
         const baseRef = collection(db, "supportTickets");
@@ -54,13 +64,30 @@ function SupportPage() {
 
     const isStaff = user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'seller' || user?.role?.toLowerCase() === 'cashier';
 
+    useEffect(() => {
+        if (isChatOpen && selectedTicket) {
+            const messagesRef = collection(db, "supportTickets", selectedTicket.id, "messages");
+            const q = query(messagesRef, orderBy("createdAt", "asc"));
+            
+            const unsubscribe = onSnapshot(q, (snapshot) => {
+                const messages = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as SupportMessage[];
+                setChatMessages(messages);
+                setTimeout(() => {
+                    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+                }, 100);
+            });
+            
+            return () => unsubscribe();
+        }
+    }, [isChatOpen, selectedTicket]);
+
     const handleCreateTicket = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         setIsSubmitting(true);
         const formData = new FormData(e.currentTarget);
         
         try {
-            await addDoc(collection(db, "supportTickets"), {
+            const ticketData = {
                 userId: user?.uid,
                 customerName: user?.name || "Client DKS",
                 productName: formData.get('productName'),
@@ -69,7 +96,9 @@ function SupportPage() {
                 priority: formData.get('priority'),
                 createdAt: serverTimestamp(),
                 updatedAt: serverTimestamp()
-            });
+            };
+
+            const docRef = await addDoc(collection(db, "supportTickets"), ticketData);
 
             await addDoc(collection(db, "notifications"), {
                 userId: 'staff',
@@ -113,6 +142,45 @@ function SupportPage() {
         }
     };
 
+    const handleSendMessage = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newMessage.trim() || !selectedTicket || !user) return;
+
+        const text = newMessage.trim();
+        setNewMessage("");
+
+        try {
+            const messagesRef = collection(db, "supportTickets", selectedTicket.id, "messages");
+            await addDoc(messagesRef, {
+                senderId: user.uid,
+                senderName: user.name,
+                senderRole: user.role,
+                text: text,
+                createdAt: serverTimestamp()
+            });
+
+            // Update ticket updatedAt for sorting
+            await updateDoc(doc(db, "supportTickets", selectedTicket.id), {
+                updatedAt: serverTimestamp()
+            });
+
+            // Notify other party
+            const recipientId = isStaff ? selectedTicket.userId : 'staff';
+            await addDoc(collection(db, "notifications"), {
+                userId: recipientId,
+                title: "Nouveau message Support",
+                message: `${user.name} : ${text.substring(0, 50)}${text.length > 50 ? '...' : ''}`,
+                type: 'info',
+                isRead: false,
+                createdAt: serverTimestamp(),
+                link: '/dashboard/support'
+            });
+
+        } catch (error) {
+            console.error(error);
+        }
+    };
+
     const getStatusBadge = (status: string) => {
         switch (status) {
             case 'pending': return <Badge className="bg-orange-500/10 text-orange-400 border-none uppercase text-[9px] font-black">En attente</Badge>;
@@ -125,7 +193,7 @@ function SupportPage() {
     };
 
     return (
-        <div className="min-h-screen bg-background text-foreground">
+        <div className="min-h-screen bg-background text-foreground pb-20">
             <Navbar />
             <main className="max-w-7xl mx-auto px-4 py-12">
                 <div className="flex flex-col md:flex-row justify-between items-start gap-8 mb-12">
@@ -148,17 +216,15 @@ function SupportPage() {
                     )}
                 </div>
 
-                {isStaff && (
-                    <div className="mb-10 relative">
-                        <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-muted-foreground" size={20} />
-                        <Input 
-                            placeholder="Rechercher un ticket par nom de client ou produit..." 
-                            className="h-16 pl-14 bg-white/5 border-white/10 rounded-2xl focus:border-accent"
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                        />
-                    </div>
-                )}
+                <div className="mb-10 relative">
+                    <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-muted-foreground" size={20} />
+                    <Input 
+                        placeholder="Rechercher un ticket par nom de client ou produit..." 
+                        className="h-16 pl-14 bg-white/5 border-white/10 rounded-2xl focus:border-accent"
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                    />
+                </div>
 
                 <div className="grid grid-cols-1 gap-6">
                     {isLoading ? (
@@ -188,7 +254,17 @@ function SupportPage() {
                                     </div>
 
                                     <div className="flex flex-col gap-3 shrink-0 min-w-[200px]">
-                                        {isStaff ? (
+                                        <Button 
+                                            variant="outline" 
+                                            className="rounded-xl border-accent/20 text-accent hover:bg-accent/10 gap-2 h-12 font-black uppercase italic text-[10px]"
+                                            onClick={() => {
+                                                setSelectedTicket(ticket);
+                                                setIsChatOpen(true);
+                                            }}
+                                        >
+                                            <MessageCircle size={14} /> Chat Live
+                                        </Button>
+                                        {isStaff && (
                                             <Select value={ticket.status} onValueChange={(val) => updateTicketStatus(ticket.id, val, ticket.userId)}>
                                                 <SelectTrigger className="h-12 bg-white/5 border-white/10 rounded-xl font-black uppercase italic text-[10px]">
                                                     <SelectValue placeholder="Changer statut" />
@@ -201,10 +277,11 @@ function SupportPage() {
                                                     <SelectItem value="completed">Terminé</SelectItem>
                                                 </SelectContent>
                                             </Select>
-                                        ) : (
+                                        )}
+                                        {!isStaff && (
                                             <Button variant="outline" className="rounded-xl border-green-500/20 text-green-500 hover:bg-green-500/10 gap-2 h-12 font-black uppercase italic text-[10px]" asChild>
                                                 <a href={`https://wa.me/243823038945?text=Bonjour,%20je%20vous%20contacte%20pour%20mon%20ticket%20SAV%20#${ticket.id.substring(0, 8).toUpperCase()}`}>
-                                                    <MessageCircle size={14} /> Aide WhatsApp
+                                                    <ExternalLink size={14} /> WhatsApp Aide
                                                 </a>
                                             </Button>
                                         )}
@@ -221,6 +298,7 @@ function SupportPage() {
                 </div>
             </main>
 
+            {/* Modal de création de ticket */}
             <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
                 <DialogContent className="glossy-card border-none rounded-[2.5rem]">
                     <DialogHeader>
@@ -251,10 +329,76 @@ function SupportPage() {
                         </div>
                         <DialogFooter>
                             <Button type="button" variant="ghost" onClick={() => setIsModalOpen(false)} className="font-bold uppercase text-[10px]">Annuler</Button>
-                            <Button type="submit" disabled={isSubmitting} className="bg-accent text-black font-black uppercase italic rounded-xl px-10 h-14 shadow-xl">
+                            <Button type="submit" disabled={isSubmitting} className="bg-accent text-black font-black uppercase italic rounded-xl px-10 h-14 shadow-xl flex-1">
                                 {isSubmitting ? <Loader2 className="animate-spin" /> : "Ouvrir le Ticket SAV"}
                             </Button>
                         </DialogFooter>
+                    </form>
+                </DialogContent>
+            </Dialog>
+
+            {/* Modal de Chat Live */}
+            <Dialog open={isChatOpen} onOpenChange={setIsChatOpen}>
+                <DialogContent className="glossy-card border-none rounded-[2.5rem] sm:max-w-2xl h-[80vh] flex flex-col p-0 overflow-hidden">
+                    <div className="bg-accent/10 p-6 border-b border-white/5 flex justify-between items-center">
+                        <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 rounded-2xl bg-accent/20 flex items-center justify-center text-accent">
+                                <MessageCircle size={24} />
+                            </div>
+                            <div>
+                                <h3 className="font-black uppercase italic tracking-tighter">Chat Support : {selectedTicket?.productName}</h3>
+                                <p className="text-[10px] text-muted-foreground uppercase font-bold">Ticket #{selectedTicket?.id.substring(0, 8)}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar bg-black/20" ref={scrollRef}>
+                        <div className="bg-white/5 border border-white/5 rounded-2xl p-4 text-xs text-muted-foreground italic mb-8">
+                            <p className="font-black uppercase text-[10px] mb-2 text-accent">Problème initial :</p>
+                            "{selectedTicket?.issueDescription}"
+                        </div>
+
+                        {chatMessages.length === 0 && (
+                            <div className="text-center py-20 opacity-20 italic text-sm">
+                                <MessageCircle size={48} className="mx-auto mb-4" />
+                                <p>Aucun message. Commencez la discussion !</p>
+                            </div>
+                        )}
+
+                        {chatMessages.map((msg) => {
+                            const isMe = msg.senderId === user?.uid;
+                            return (
+                                <div key={msg.id} className={cn("flex flex-col", isMe ? "items-end" : "items-start")}>
+                                    <div className={cn(
+                                        "max-w-[85%] p-4 rounded-2xl text-sm leading-relaxed",
+                                        isMe ? "bg-accent text-black rounded-tr-none font-medium" : "bg-white/5 text-white border border-white/5 rounded-tl-none"
+                                    )}>
+                                        {msg.text}
+                                    </div>
+                                    <div className="flex items-center gap-2 mt-1 px-2">
+                                        <span className="text-[8px] font-black uppercase opacity-30 tracking-widest">
+                                            {isMe ? 'Moi' : msg.senderName}
+                                        </span>
+                                        <span className="text-[8px] opacity-20">•</span>
+                                        <span className="text-[8px] opacity-20">
+                                            {msg.createdAt?.toDate ? msg.createdAt.toDate().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '...'}
+                                        </span>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+
+                    <form onSubmit={handleSendMessage} className="p-6 bg-black/40 border-t border-white/5 flex gap-3">
+                        <Input 
+                            value={newMessage}
+                            onChange={(e) => setNewMessage(e.target.value)}
+                            placeholder="Écrivez votre message à l'expert..."
+                            className="h-14 bg-background/50 border-white/10 rounded-xl focus:border-accent text-sm"
+                        />
+                        <Button type="submit" size="icon" className="h-14 w-14 rounded-xl bg-accent text-black shadow-lg shadow-accent/20">
+                            <Send size={20} />
+                        </Button>
                     </form>
                 </DialogContent>
             </Dialog>

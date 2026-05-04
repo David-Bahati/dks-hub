@@ -63,6 +63,15 @@ export type SupportTicket = {
   updatedAt: any;
 };
 
+export type SupportMessage = {
+  id: string;
+  senderId: string;
+  senderName: string;
+  senderRole: string;
+  text: string;
+  createdAt: any;
+};
+
 export type RemoteSupportSession = {
   id: string;
   userId: string;
