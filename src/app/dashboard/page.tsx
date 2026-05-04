@@ -63,7 +63,8 @@ import {
   Flame,
   Layout,
   Gem,
-  ArrowUpCircle
+  ArrowUpCircle,
+  Heart
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -187,6 +188,27 @@ function DashboardPage() {
     return { count, totalPower, luckMultiplier };
   }, [activeMiners]);
 
+  // Query for Benefactors (Legendary discoveries)
+  const legendaryTxQuery = useMemoFirebase(() => {
+    return query(collection(db, "tokenTransactions"), where("type", "==", "mining"), where("rarity", "==", "legendary"));
+  }, []);
+  const { data: legendaryTx } = useCollection(legendaryTxQuery);
+
+  const benefactorsLeaderboard = useMemo(() => {
+    if (!legendaryTx) return [];
+    const counts: Record<string, { name: string, count: number }> = {};
+    legendaryTx.forEach(tx => {
+        if (!counts[tx.userId]) {
+            counts[tx.userId] = { name: tx.userName || "Bienfaiteur", count: 0 };
+        }
+        counts[tx.userId].count++;
+    });
+    return Object.entries(counts)
+        .map(([id, data]) => ({ id, ...data }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 5);
+  }, [legendaryTx]);
+
   // Basic Queries
   const ordersQuery = useMemoFirebase(() => {
     if (authLoading || !user?.uid) return null;
@@ -292,13 +314,11 @@ function DashboardPage() {
             const others = activeMiners.filter(u => u.id !== user.uid);
             
             others.forEach(async (other) => {
-                // Update their balance
                 updateDoc(doc(db, "users", other.id), {
                     tokenBalance: increment(shareAmount),
                     updatedAt: serverTimestamp()
                 });
                 
-                // Log transaction for them
                 addDoc(collection(db, "tokenTransactions"), {
                     userId: other.id,
                     userName: other.name,
@@ -310,7 +330,6 @@ function DashboardPage() {
                     createdAt: serverTimestamp()
                 });
 
-                // Notify them
                 addDoc(collection(db, "notifications"), {
                     userId: other.id,
                     title: "Bonus de Pool !",
@@ -812,6 +831,104 @@ function DashboardPage() {
             </div>
           )}
 
+          <div className="grid gap-6 grid-cols-1 lg:grid-cols-10">
+            <div className="lg:col-span-10 grid grid-cols-1 md:grid-cols-3 gap-6">
+                <Card className="glossy-card border-none rounded-[2.5rem] overflow-hidden">
+                    <CardHeader className="py-6 px-8 border-b border-white/5 bg-accent/5">
+                      <CardTitle className="text-sm font-black uppercase italic flex items-center gap-3">
+                        <Trophy className="text-accent" size={16} /> Équipe Hub (Staff)
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                       <div className="divide-y divide-white/5">
+                          {leaderboard.map((member, index) => (
+                            <div key={member.id} className="p-4 flex items-center justify-between hover:bg-white/5 transition-all group">
+                                <div className="flex items-center gap-3">
+                                    <div className={cn(
+                                      "w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm italic",
+                                      index === 0 ? "bg-yellow-500/20 text-yellow-500" : "bg-white/5 text-muted-foreground"
+                                    )}>
+                                      {index === 0 ? <Crown size={16} /> : index + 1}
+                                    </div>
+                                    <div>
+                                        <p className="font-black text-xs uppercase italic truncate max-w-[100px]">{member.name}</p>
+                                        <p className="text-[8px] font-bold text-muted-foreground uppercase">{member.points} PTS</p>
+                                    </div>
+                                </div>
+                                <Badge variant="outline" className="border-none font-black text-[9px] italic text-accent/60">
+                                  {member.actions} ACT.
+                                </Badge>
+                            </div>
+                          ))}
+                       </div>
+                    </CardContent>
+                </Card>
+
+                <Card className="glossy-card border-none rounded-[2.5rem] overflow-hidden">
+                    <CardHeader className="py-6 px-8 border-b border-white/5 bg-primary/5">
+                      <CardTitle className="text-sm font-black uppercase italic flex items-center gap-3">
+                        <Users className="text-primary" size={16} /> Élite Communauté (Clients)
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                       <div className="divide-y divide-white/5">
+                          {customerLeaderboard.map((cust, index) => (
+                            <div key={cust.id} className="p-4 flex items-center justify-between hover:bg-white/5 transition-all group">
+                                <div className="flex items-center gap-3">
+                                    <div className={cn(
+                                      "w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm italic",
+                                      index === 0 ? "bg-primary/20 text-primary" : "bg-white/5 text-muted-foreground"
+                                    )}>
+                                      {index === 0 ? <Star size={16} /> : index + 1}
+                                    </div>
+                                    <div>
+                                        <p className="font-black text-xs uppercase italic truncate max-w-[100px]">{cust.name}</p>
+                                        <p className="text-[8px] font-bold text-muted-foreground uppercase">{cust.points} PTS • {cust.level}</p>
+                                    </div>
+                                </div>
+                            </div>
+                          ))}
+                       </div>
+                    </CardContent>
+                </Card>
+
+                <Card className="glossy-card border-none rounded-[2.5rem] overflow-hidden">
+                    <CardHeader className="py-6 px-8 border-b border-white/5 bg-yellow-500/10">
+                      <CardTitle className="text-sm font-black uppercase italic flex items-center gap-3">
+                        <Heart className="text-yellow-500" size={16} /> Philanthropes du Hub
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                       <div className="divide-y divide-white/5">
+                          {benefactorsLeaderboard.length > 0 ? benefactorsLeaderboard.map((benefactor, index) => (
+                            <div key={benefactor.id} className="p-4 flex items-center justify-between hover:bg-white/5 transition-all group">
+                                <div className="flex items-center gap-3">
+                                    <div className={cn(
+                                      "w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm italic",
+                                      index === 0 ? "bg-yellow-500 text-black" : "bg-white/5 text-muted-foreground"
+                                    )}>
+                                      <Gem size={14} />
+                                    </div>
+                                    <div>
+                                        <p className="font-black text-xs uppercase italic truncate max-w-[100px]">{benefactor.name}</p>
+                                        <p className="text-[8px] font-bold text-yellow-500 uppercase">{benefactor.count} Bloc(s) Légendaire(s)</p>
+                                    </div>
+                                </div>
+                                <Badge variant="outline" className="border-yellow-500/20 text-yellow-500 font-black text-[8px] italic">
+                                  BÉNÉFACTEUR
+                                </Badge>
+                            </div>
+                          )) : (
+                            <div className="p-10 text-center opacity-30 italic text-[10px] uppercase font-black">
+                                Aucun bloc légendaire extrait.
+                            </div>
+                          )}
+                       </div>
+                    </CardContent>
+                </Card>
+            </div>
+          </div>
+
           <div className="grid gap-6 grid-cols-1 lg:grid-cols-7">
             <div className="lg:col-span-4 space-y-6">
                 <Card className="glossy-card border-none rounded-[2.5rem] overflow-hidden">
@@ -854,67 +971,6 @@ function DashboardPage() {
                         )}
                     </CardContent>
                 </Card>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <Card className="glossy-card border-none rounded-[2.5rem] overflow-hidden">
-                    <CardHeader className="py-6 px-8 border-b border-white/5 bg-accent/5">
-                      <CardTitle className="text-sm font-black uppercase italic flex items-center gap-3">
-                        <Trophy className="text-accent" size={16} /> Équipe Hub (Staff)
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-0">
-                       <div className="divide-y divide-white/5">
-                          {leaderboard.map((member, index) => (
-                            <div key={member.id} className="p-4 flex items-center justify-between hover:bg-white/5 transition-all group">
-                                <div className="flex items-center gap-3">
-                                    <div className={cn(
-                                      "w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm italic",
-                                      index === 0 ? "bg-yellow-500/20 text-yellow-500" : "bg-white/5 text-muted-foreground"
-                                    )}>
-                                      {index === 0 ? <Crown size={16} /> : index + 1}
-                                    </div>
-                                    <div>
-                                        <p className="font-black text-xs uppercase italic truncate max-w-[100px]">{member.name}</p>
-                                        <p className="text-[8px] font-bold text-muted-foreground uppercase">{member.points} PTS</p>
-                                    </div>
-                                </div>
-                                <Badge variant="outline" className="border-none font-black text-[9px] italic text-accent/60">
-                                  {member.actions} ACT.
-                                </Badge>
-                            </div>
-                          ))}
-                       </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="glossy-card border-none rounded-[2.5rem] overflow-hidden">
-                    <CardHeader className="py-6 px-8 border-b border-white/5 bg-primary/5">
-                      <CardTitle className="text-sm font-black uppercase italic flex items-center gap-3">
-                        <Users className="text-primary" size={16} /> Élite Communauté (Clients)
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-0">
-                       <div className="divide-y divide-white/5">
-                          {customerLeaderboard.map((cust, index) => (
-                            <div key={cust.id} className="p-4 flex items-center justify-between hover:bg-white/5 transition-all group">
-                                <div className="flex items-center gap-3">
-                                    <div className={cn(
-                                      "w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm italic",
-                                      index === 0 ? "bg-primary/20 text-primary" : "bg-white/5 text-muted-foreground"
-                                    )}>
-                                      {index === 0 ? <Star size={16} /> : index + 1}
-                                    </div>
-                                    <div>
-                                        <p className="font-black text-xs uppercase italic truncate max-w-[100px]">{cust.name}</p>
-                                        <p className="text-[8px] font-bold text-muted-foreground uppercase">{cust.points} PTS • {cust.level}</p>
-                                    </div>
-                                </div>
-                            </div>
-                          ))}
-                       </div>
-                    </CardContent>
-                  </Card>
-                </div>
             </div>
 
             <div className="lg:col-span-3 space-y-6">
