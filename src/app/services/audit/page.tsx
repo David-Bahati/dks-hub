@@ -19,7 +19,9 @@ import {
     Smartphone,
     User,
     CheckCircle2,
-    Briefcase
+    Briefcase,
+    Calendar as CalendarIcon,
+    Clock
 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -31,8 +33,12 @@ import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { format } from "date-fns";
+import { fr } from "date-fns/locale";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const AUDIT_NEEDS = [
     { id: "wifi", label: "Couverture Wi-Fi Intégrale", icon: <Wifi size={14}/> },
@@ -49,6 +55,8 @@ export default function TechnicalAuditRequestPage() {
     const router = useRouter();
     const [selectedNeeds, setSelectedNeeds] = useState<string[]>([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [date, setDate] = useState<Date>();
+    const [timeSlot, setTimeSlot] = useState<string>("morning");
 
     const toggleNeed = (id: string) => {
         setSelectedNeeds(prev => 
@@ -69,6 +77,11 @@ export default function TechnicalAuditRequestPage() {
             return;
         }
 
+        if (!date) {
+            toast({ title: "Date manquante", description: "Veuillez choisir une date pour l'expertise.", variant: "destructive" });
+            return;
+        }
+
         setIsSubmitting(true);
         const formData = new FormData(e.currentTarget);
         
@@ -81,6 +94,8 @@ export default function TechnicalAuditRequestPage() {
                 location: formData.get('location'),
                 needs: selectedNeeds,
                 description: formData.get('description'),
+                scheduledDate: date.toISOString(),
+                timeSlot: timeSlot,
                 status: 'pending',
                 createdAt: serverTimestamp(),
                 updatedAt: serverTimestamp()
@@ -91,7 +106,7 @@ export default function TechnicalAuditRequestPage() {
             await addDoc(collection(db, "notifications"), {
                 userId: 'staff',
                 title: "NOUVEAU DOSSIER BUSINESS",
-                message: `Demande d'audit technique pour l'entreprise ${formData.get('businessName')}.`,
+                message: `Demande d'audit technique pour ${formData.get('businessName')} le ${format(date, "dd/MM")}.`,
                 type: 'warning',
                 isRead: false,
                 createdAt: serverTimestamp(),
@@ -125,21 +140,17 @@ export default function TechnicalAuditRequestPage() {
                     <h1 className="text-5xl md:text-7xl font-black uppercase italic tracking-tighter leading-none mb-6">
                         AUDIT <span className="premium-gradient-text">TECHNIQUE</span>
                     </h1>
-                    <p className="text-lg text-muted-foreground font-light max-w-2xl mx-auto uppercase tracking-widest leading-relaxed">
-                        Évaluation complète de votre environnement technologique par les experts certifiés de Double King Shop.
-                    </p>
                 </div>
             </header>
 
-            <main className="container max-w-5xl mx-auto px-6 py-20">
+            <main className="container max-w-6xl mx-auto px-6 py-20">
                 <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-12">
-                    {/* Colonne de gauche: Besoins */}
                     <div className="lg:col-span-1 space-y-8">
                         <div className="space-y-4">
                             <h2 className="text-xs font-black uppercase tracking-[0.3em] text-accent flex items-center gap-2">
                                 <ShieldCheck size={16} /> Domaines d'Audit
                             </h2>
-                            <p className="text-[10px] text-muted-foreground font-bold uppercase opacity-60">Sélectionnez les pôles à expertiser :</p>
+                            <p className="text-[10px] text-muted-foreground font-bold uppercase opacity-60">Sélectionnez les pôles :</p>
                         </div>
 
                         <div className="grid grid-cols-1 gap-3">
@@ -149,7 +160,7 @@ export default function TechnicalAuditRequestPage() {
                                     type="button"
                                     onClick={() => toggleNeed(need.id)}
                                     className={cn(
-                                        "flex items-center gap-4 p-5 rounded-[1.5rem] border-2 transition-all text-left group",
+                                        "flex items-center gap-4 p-5 rounded-[1.5rem] border-2 transition-all text-left",
                                         selectedNeeds.includes(need.id)
                                             ? "bg-accent/20 border-accent text-white"
                                             : "bg-white/5 border-transparent text-white/40 hover:bg-white/10"
@@ -165,53 +176,69 @@ export default function TechnicalAuditRequestPage() {
                                 </button>
                             ))}
                         </div>
-
-                        <Card className="bg-white/5 border-white/10 rounded-[2rem] p-8 space-y-4">
-                            <p className="text-[9px] font-bold text-muted-foreground leading-relaxed uppercase">
-                                L'audit technique DKS inclut un diagnostic sur site, une analyse de vulnérabilités et la remise d'un rapport de préconisations stratégiques.
-                            </p>
-                        </Card>
                     </div>
 
-                    {/* Colonne de droite: Formulaire */}
                     <Card className="lg:col-span-2 glossy-card border-none rounded-[3rem] p-12 overflow-hidden relative">
                         <div className="absolute top-0 right-0 p-8 opacity-5"><Building2 size={120} /></div>
                         
                         <div className="relative z-10 space-y-10">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                 <div className="space-y-3">
-                                    <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Nom de l'Institution / Entreprise</Label>
-                                    <div className="relative">
-                                        <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
-                                        <Input name="businessName" placeholder="Ex: Banque de l'Ituri" required className="h-14 pl-12 bg-background/50 border-white/5 rounded-2xl focus:border-accent text-lg font-bold" />
-                                    </div>
+                                    <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Entreprise</Label>
+                                    <Input name="businessName" placeholder="Ex: Banque de l'Ituri" required className="h-14 bg-background/50 border-white/5 rounded-2xl focus:border-accent text-lg font-bold" />
                                 </div>
                                 <div className="space-y-3">
-                                    <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Personne de Contact</Label>
-                                    <div className="relative">
-                                        <User className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
-                                        <Input name="contactPerson" defaultValue={user?.name} required className="h-14 pl-12 bg-background/50 border-white/5 rounded-2xl focus:border-accent" />
-                                    </div>
+                                    <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Localisation</Label>
+                                    <Input name="location" placeholder="Quartier..." required className="h-14 bg-background/50 border-white/5 rounded-2xl focus:border-accent" />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                <div className="space-y-3">
+                                    <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Planification Expertise</Label>
+                                    <Popover>
+                                        <PopoverTrigger asChild>
+                                            <Button
+                                                variant={"outline"}
+                                                className={cn(
+                                                    "w-full h-14 justify-start text-left font-black uppercase italic text-xs bg-background/50 border-white/5 rounded-2xl",
+                                                    !date && "text-muted-foreground"
+                                                )}
+                                            >
+                                                <CalendarIcon className="mr-2 h-4 w-4 text-accent" />
+                                                {date ? format(date, "PPP", { locale: fr }) : <span>Choisir une date</span>}
+                                            </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-auto p-0 bg-card border-white/10" align="start">
+                                            <Calendar
+                                                mode="single"
+                                                selected={date}
+                                                onSelect={setDate}
+                                                initialFocus
+                                                locale={fr}
+                                                disabled={(date) => date < new Date()}
+                                            />
+                                        </PopoverContent>
+                                    </Popover>
                                 </div>
                                 <div className="space-y-3">
-                                    <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Téléphone de l'Entreprise</Label>
-                                    <div className="relative">
-                                        <Smartphone className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
-                                        <Input name="phone" placeholder="+243..." required className="h-14 pl-12 bg-background/50 border-white/5 rounded-2xl focus:border-accent" />
-                                    </div>
-                                </div>
-                                <div className="space-y-3">
-                                    <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Localisation (Quartier/Commune)</Label>
-                                    <div className="relative">
-                                        <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
-                                        <Input name="location" placeholder="Ex: Bunia, Centre-ville" required className="h-14 pl-12 bg-background/50 border-white/5 rounded-2xl focus:border-accent" />
-                                    </div>
+                                    <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Créneau Horaire</Label>
+                                    <Select value={timeSlot} onValueChange={setTimeSlot}>
+                                        <SelectTrigger className="h-14 bg-background/50 border-white/5 rounded-2xl text-[10px] font-black uppercase">
+                                            <Clock className="mr-2 h-4 w-4 text-accent" />
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent className="bg-card border-white/10">
+                                            <SelectItem value="morning" className="text-[10px] font-black uppercase">Matinée (Expertise site)</SelectItem>
+                                            <SelectItem value="afternoon" className="text-[10px] font-black uppercase">Après-midi (Audit technique)</SelectItem>
+                                        </SelectContent>
+                                    </Select>
                                 </div>
                             </div>
 
                             <div className="space-y-3">
-                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Description des défis techniques</Label>
-                                <Textarea name="description" placeholder="Quels sont les problèmes rencontrés ? (Lenteurs, coupures, manque de sécurité...)" required className="min-h-[150px] bg-background/50 border-white/5 rounded-[2rem] p-6 text-sm italic" />
+                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Description technique</Label>
+                                <Textarea name="description" placeholder="Problèmes rencontrés..." required className="min-h-[120px] bg-background/50 border-white/5 rounded-[2rem] p-6 text-sm italic" />
                             </div>
 
                             <div className="pt-6">
@@ -222,7 +249,6 @@ export default function TechnicalAuditRequestPage() {
                                 >
                                     {isSubmitting ? <Loader2 className="animate-spin" /> : <><ShieldCheck /> Lancer la Mission d'Expertise</>}
                                 </Button>
-                                <p className="text-[9px] font-bold text-center mt-6 text-muted-foreground uppercase opacity-40">Un consultant Business DKS prendra contact pour fixer le rendez-vous d'expertise.</p>
                             </div>
                         </div>
                     </Card>

@@ -10,7 +10,7 @@ import {
     Cpu, 
     ArrowRight, 
     Loader2, 
-    Calendar,
+    Calendar as CalendarIcon,
     Sparkles,
     MonitorSmartphone,
     MapPin,
@@ -21,7 +21,8 @@ import {
     BookOpen,
     Users,
     ShieldCheck,
-    Building2
+    Building2,
+    Clock
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -42,6 +43,10 @@ import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { cn } from "@/lib/utils";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { format } from "date-fns";
+import { fr } from "date-fns/locale";
 
 const ACADEMY_COURSES = [
     {
@@ -98,6 +103,8 @@ export default function ServicesCataloguePage() {
     const [selectedService, setSelectedService] = useState<any>(null);
     const [isSheetOpen, setIsSheetOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [date, setDate] = useState<Date>();
+    const [timeSlot, setTimeSlot] = useState<string>("morning");
 
     const handleOpenBooking = (service: any) => {
         if (!user) { 
@@ -111,6 +118,11 @@ export default function ServicesCataloguePage() {
 
     const handleBooking = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
+        if (!date) {
+            toast({ title: "Date manquante", description: "Veuillez choisir une date dans le calendrier.", variant: "destructive" });
+            return;
+        }
+
         setIsSubmitting(true);
         const formData = new FormData(e.currentTarget);
         
@@ -124,7 +136,8 @@ export default function ServicesCataloguePage() {
                 category: selectedService.category,
                 level: formData.get('level'),
                 status: 'pending',
-                scheduledDate: formData.get('date'),
+                scheduledDate: date.toISOString(),
+                timeSlot: timeSlot,
                 location: formData.get('location') || 'shop',
                 notes: formData.get('notes'),
                 createdAt: serverTimestamp()
@@ -144,7 +157,6 @@ export default function ServicesCataloguePage() {
         <div className="min-h-screen bg-background text-foreground pb-24">
             <Navbar />
             
-            {/* HERO SECTION PREMIUM */}
             <section className="relative py-32 px-6 overflow-hidden">
                 <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-primary/10 via-transparent to-transparent opacity-50" />
                 <div className="container max-w-6xl mx-auto text-center relative z-10">
@@ -160,7 +172,6 @@ export default function ServicesCataloguePage() {
                 </div>
             </section>
 
-            {/* SECTION AUDIT TECHNIQUE - NEW */}
             <section className="container max-w-7xl mx-auto px-6 mb-32">
                 <Card className="bg-accent/10 border-accent/20 rounded-[4rem] p-12 relative overflow-hidden group">
                     <div className="absolute top-0 right-0 p-12 opacity-5 scale-150 rotate-12 group-hover:rotate-0 transition-transform duration-1000"><Building2 size={240} /></div>
@@ -173,14 +184,6 @@ export default function ServicesCataloguePage() {
                             <p className="text-lg text-muted-foreground max-w-2xl leading-relaxed font-medium">
                                 Votre entreprise fait face à des lenteurs réseaux ou des failles de sécurité ? Nos experts certifiés interviennent pour un audit complet de vos systèmes à Bunia.
                             </p>
-                            <div className="flex flex-wrap gap-4">
-                                <div className="flex items-center gap-2 bg-white/5 px-4 py-2 rounded-xl border border-white/10 text-[10px] font-black uppercase tracking-widest text-accent">
-                                    <ShieldCheck size={14}/> Diagnostic Sécurité
-                                </div>
-                                <div className="flex items-center gap-2 bg-white/5 px-4 py-2 rounded-xl border border-white/10 text-[10px] font-black uppercase tracking-widest text-accent">
-                                    <Globe size={14}/> Optimisation Starlink
-                                </div>
-                            </div>
                         </div>
                         <div className="shrink-0">
                             <Link href="/services/audit">
@@ -193,7 +196,6 @@ export default function ServicesCataloguePage() {
                 </Card>
             </section>
 
-            {/* SECTION ACADEMY (LES FORMATIONS) */}
             <section className="container max-w-7xl mx-auto px-6 mb-32">
                 <div className="flex items-center gap-6 mb-16">
                     <div className="h-px flex-1 bg-white/5" />
@@ -221,25 +223,6 @@ export default function ServicesCataloguePage() {
                                         <p className="text-primary text-[11px] font-black uppercase tracking-widest opacity-80">{course.subtitle}</p>
                                     </div>
                                     <p className="text-muted-foreground text-sm leading-relaxed italic">"{course.description}"</p>
-                                    
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-4">
-                                        <div className="space-y-3">
-                                            <p className="text-[10px] font-black uppercase text-white/40 tracking-[0.2em] flex items-center gap-2"><BookOpen size={12}/> Programme</p>
-                                            {course.curriculum.map((item, i) => (
-                                                <div key={i} className="flex items-center gap-3 text-[10px] font-bold text-white/70 uppercase">
-                                                    <div className="w-1.5 h-1.5 rounded-full bg-primary" /> {item}
-                                                </div>
-                                            ))}
-                                        </div>
-                                        <div className="space-y-3">
-                                            <p className="text-[10px] font-black uppercase text-white/40 tracking-[0.2em] flex items-center gap-2"><CheckCircle2 size={12}/> Avantages</p>
-                                            {course.includes.map((item, i) => (
-                                                <div key={i} className="flex items-center gap-3 text-[10px] font-bold text-white/70 uppercase">
-                                                    <div className="w-1.5 h-1.5 rounded-full bg-accent" /> {item}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
                                 </div>
                                 <div className="md:w-64 bg-black/40 backdrop-blur-3xl rounded-[2.5rem] border border-white/5 p-8 flex flex-col justify-between items-center text-center">
                                     <div className="space-y-2">
@@ -249,7 +232,6 @@ export default function ServicesCataloguePage() {
                                             <p className="text-[9px] font-black uppercase leading-tight text-muted-foreground">{course.certification}</p>
                                         </div>
                                     </div>
-                                    
                                     <div className="w-full space-y-6">
                                         <div className="space-y-1">
                                             <p className="text-[9px] font-black uppercase text-muted-foreground italic">Investissement</p>
@@ -269,46 +251,6 @@ export default function ServicesCataloguePage() {
                 </div>
             </section>
 
-            {/* SECTION SERVICES TECHNIQUES PRO */}
-            <section className="container max-w-7xl mx-auto px-6">
-                <div className="flex items-center gap-6 mb-16">
-                    <div className="h-px flex-1 bg-white/5" />
-                    <h2 className="text-2xl font-black uppercase italic tracking-tighter flex items-center gap-4">
-                        <Cpu className="text-accent" /> Expertises Solutions
-                    </h2>
-                    <div className="h-px flex-1 bg-white/5" />
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    {TECHNICAL_SERVICES.map((service) => (
-                        <Card key={service.id} className="glossy-card border-none rounded-[3rem] p-10 group flex flex-col md:flex-row items-center gap-10">
-                            <div className="w-20 h-20 rounded-3xl bg-accent/10 flex items-center justify-center text-accent shrink-0 shadow-2xl">
-                                {service.icon}
-                            </div>
-                            <div className="flex-1 text-center md:text-left space-y-4">
-                                <div>
-                                    <h3 className="text-2xl font-black uppercase italic tracking-tight">{service.title}</h3>
-                                    <p className="text-muted-foreground text-sm font-medium italic">"{service.description}"</p>
-                                </div>
-                                <div className="flex flex-wrap justify-center md:justify-start items-center gap-6">
-                                    <div className="flex flex-col">
-                                        <span className="text-[10px] font-black uppercase text-muted-foreground/40 italic">À partir de</span>
-                                        <span className="text-2xl font-black text-white">${service.price}</span>
-                                    </div>
-                                    <Button 
-                                        variant="outline"
-                                        onClick={() => handleOpenBooking(service)}
-                                        className="h-12 px-8 rounded-xl border-white/10 font-black uppercase italic text-xs hover:bg-accent hover:text-black transition-all"
-                                    >
-                                        Démarrer le projet
-                                    </Button>
-                                </div>
-                            </div>
-                        </Card>
-                    ))}
-                </div>
-            </section>
-
             <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
                 <SheetContent side="right" className="bg-card/95 backdrop-blur-3xl border-white/10 w-full sm:max-w-md flex flex-col p-0">
                     <SheetHeader className="p-10 bg-primary/10 border-b border-white/5">
@@ -318,7 +260,7 @@ export default function ServicesCataloguePage() {
                             </div>
                             <div>
                                 <SheetTitle className="text-3xl font-black uppercase italic tracking-tighter">
-                                    {selectedService?.category === 'formation' ? 'Demande d\'Admission' : 'Réservation Expert'}
+                                    Demande d'Admission
                                 </SheetTitle>
                                 <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Planification Hub DKS</p>
                             </div>
@@ -336,29 +278,50 @@ export default function ServicesCataloguePage() {
                                 </div>
                             </div>
 
-                            {selectedService?.category === 'formation' && (
-                                <div className="space-y-2">
-                                    <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Niveau d'Expertise Actuel</Label>
-                                    <Select name="level" defaultValue="beginner">
-                                        <SelectTrigger className="h-14 bg-background/50 border-white/5 rounded-2xl">
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent className="bg-card border-white/10">
-                                            <SelectItem value="beginner" className="font-black uppercase text-[10px]">Débutant (Curieux)</SelectItem>
-                                            <SelectItem value="intermediate" className="font-black uppercase text-[10px]">Intermédiaire (Praticien)</SelectItem>
-                                            <SelectItem value="expert" className="font-black uppercase text-[10px]">Expert (Professionnel)</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                            )}
+                            <div className="space-y-2">
+                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Planification Visuelle</Label>
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Button
+                                            variant={"outline"}
+                                            className={cn(
+                                                "w-full h-14 justify-start text-left font-black uppercase italic text-xs bg-background/50 border-white/5 rounded-2xl",
+                                                !date && "text-muted-foreground"
+                                            )}
+                                        >
+                                            <CalendarIcon className="mr-2 h-4 w-4 text-accent" />
+                                            {date ? format(date, "PPP", { locale: fr }) : <span>Choisir une date</span>}
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0 bg-card border-white/10" align="start">
+                                        <Calendar
+                                            mode="single"
+                                            selected={date}
+                                            onSelect={setDate}
+                                            initialFocus
+                                            locale={fr}
+                                            disabled={(date) => date < new Date()}
+                                        />
+                                    </PopoverContent>
+                                </Popover>
+                            </div>
 
                             <div className="space-y-2">
-                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Date d'Intervention Souhaitée</Label>
-                                <Input name="date" type="date" required className="h-14 bg-background/50 border-white/5 rounded-2xl focus:border-accent uppercase font-black" />
+                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Créneau Souhaité</Label>
+                                <Select value={timeSlot} onValueChange={setTimeSlot}>
+                                    <SelectTrigger className="h-14 bg-background/50 border-white/5 rounded-2xl text-[10px] font-black uppercase">
+                                        <Clock className="mr-2 h-4 w-4 text-accent" />
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent className="bg-card border-white/10">
+                                        <SelectItem value="morning" className="text-[10px] font-black uppercase">Matinée (09:00 - 12:00)</SelectItem>
+                                        <SelectItem value="afternoon" className="text-[10px] font-black uppercase">Après-midi (14:00 - 17:00)</SelectItem>
+                                    </SelectContent>
+                                </Select>
                             </div>
                             
                             <div className="space-y-2">
-                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Objectifs Spécifiques</Label>
+                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Objectifs & Niveau</Label>
                                 <Textarea name="notes" placeholder="Décrivez vos attentes ou le projet à réaliser..." className="min-h-[120px] bg-background/50 border-white/5 rounded-2xl italic text-sm" />
                             </div>
                         </div>
@@ -367,7 +330,6 @@ export default function ServicesCataloguePage() {
                             <Button type="submit" disabled={isSubmitting} className="w-full h-16 bg-primary text-white font-black uppercase italic rounded-2xl shadow-xl shadow-primary/20 text-lg">
                                 {isSubmitting ? <Loader2 className="animate-spin" /> : "Envoyer ma Candidature Academy"}
                             </Button>
-                            <p className="text-[9px] font-bold text-center mt-6 text-muted-foreground uppercase opacity-40">Votre demande sera traitée sous 12 heures par un Expert DKS.</p>
                         </div>
                     </form>
                 </SheetContent>

@@ -30,7 +30,7 @@ import {
   Star,
   Home,
   BarChart3,
-  Calendar,
+  Calendar as CalendarIcon,
   MonitorSmartphone,
   PieChart as PieChartIcon,
   Bell,
@@ -86,6 +86,7 @@ import {
 
 const navConfig = [
   { href: "/dashboard", icon: LineChart, label: "Aperçu", roles: ["Admin", "Seller", "Cashier", "customer"] },
+  { href: "/dashboard/calendar", icon: CalendarIcon, label: "Agenda Hub", roles: ["Admin", "Seller", "Cashier"] },
   { href: "/dashboard/products", icon: Package, label: "Produits / Stock", roles: ["Admin", "Seller"] },
   { href: "/dashboard/categories", icon: Tags, label: "Catégories", roles: ["Admin", "Seller"] },
   { href: "/dashboard/orders", icon: ShoppingBag, label: "Commandes / Factures", roles: ["Admin", "Seller", "Cashier", "customer"] },
@@ -326,13 +327,27 @@ function DashboardPage() {
               </Card>
 
               <Card className="glossy-card border-none rounded-[2.5rem]">
-                <CardHeader className="flex flex-row items-center justify-between pb-2"><CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Ventes Terminées</CardTitle><div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-accent"><ShoppingCart className="h-5 w-5" /></div></CardHeader>
-                <CardContent className="pt-4"><div className="text-3xl font-bold font-mono">{stats?.totalSalesCount || 0}</div></CardContent>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Ventes Terminées</CardTitle>
+                  <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-accent">
+                    <ShoppingCart className="h-5 w-5" />
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-4">
+                  <div className="text-3xl font-bold font-mono">{stats?.totalSalesCount || 0}</div>
+                </CardContent>
               </Card>
 
               <Card className="glossy-card border-none rounded-[2.5rem]">
-                <CardHeader className="flex flex-row items-center justify-between pb-2"><CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Articles Critiques</CardTitle><div className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center text-red-500"><Package className="h-5 w-5" /></div></CardHeader>
-                <CardContent className="pt-4"><div className="text-3xl font-bold font-mono">{lowStock.length}</div></CardContent>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Articles Critiques</CardTitle>
+                  <div className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center text-red-500">
+                    <Package className="h-5 w-5" />
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-4">
+                  <div className="text-3xl font-bold font-mono">{lowStock.length}</div>
+                </CardContent>
               </Card>
             </div>
           )}
