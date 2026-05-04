@@ -52,7 +52,9 @@ import {
   Send,
   MailCheck,
   Download,
-  QrCode
+  QrCode,
+  Coins,
+  Wallet
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -428,7 +430,13 @@ function DashboardPage() {
                 ))}
             </nav>
             
-            <div className="flex items-center gap-6">
+            <div className="flex items-center gap-4">
+                {/* TOKEN QUICK BALANCE */}
+                <Link href="/dashboard/profile/expert">
+                    <Badge className="bg-accent/20 text-accent border-accent/20 h-10 px-4 rounded-xl gap-2 font-black italic cursor-pointer hover:bg-accent/30 transition-all">
+                        <Coins size={16} /> {user?.tokenBalance || 0} DKST
+                    </Badge>
+                </Link>
                 <Button variant="ghost" size="icon" onClick={fetchGlobalData} className="h-10 w-10 text-slate-400 hover:text-accent hover:bg-accent/10 rounded-xl transition-all group">
                   <RefreshCw size={18} className={cn("transition-transform duration-700", loading ? "animate-spin" : "group-hover:rotate-180")} />
                 </Button>

@@ -50,6 +50,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               address: userData.address || '',
               loyaltyLevel: userData.loyaltyLevel || 'Bronze',
               language: userData.language || 'fr',
+              tokenBalance: userData.tokenBalance || 0,
+              pointsConverted: userData.pointsConverted || 0,
             });
           } else {
             setUser({
@@ -58,6 +60,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               name: firebaseUser.displayName || 'Utilisateur',
               role: 'customer',
               photoURL: firebaseUser.photoURL || null,
+              tokenBalance: 0,
+              pointsConverted: 0,
             });
           }
           setIsLoading(false);

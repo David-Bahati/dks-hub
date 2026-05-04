@@ -13,11 +13,27 @@
         "displayName": { "type": "string" },
         "role": { "type": "string", "enum": ["Admin", "Seller", "Cashier", "customer"] },
         "loyaltyLevel": { "type": "string", "enum": ["Bronze", "Silver", "Gold"] },
-        "points": { "type": "number" },
+        "points": { "type": "number", "description": "Accumulated prestige points" },
+        "tokenBalance": { "type": "number", "description": "DKST Token balance" },
+        "pointsConverted": { "type": "number", "description": "Points already turned into tokens" },
         "createdAt": { "type": "string", "format": "date-time" },
         "updatedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["id", "email", "role", "updatedAt"]
+    },
+    "TokenTransaction": {
+      "title": "TokenTransaction",
+      "description": "Represents a point-to-token conversion or token usage.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "type": { "type": "string", "enum": ["mint", "burn", "transfer"] },
+        "pointsAmount": { "type": "number" },
+        "tokenAmount": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "type", "tokenAmount", "createdAt"]
     },
     "Order": {
       "title": "Order",
@@ -70,88 +86,6 @@
         "updatedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["userId", "productName", "issueDescription", "status", "createdAt"]
-    },
-    "HardwareAsset": {
-      "title": "HardwareAsset",
-      "description": "Un appareil appartenant à un client enregistré dans le Hub pour suivi.",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "userId": { "type": "string" },
-        "brand": { "type": "string" },
-        "model": { "type": "string" },
-        "serialNumber": { "type": "string" },
-        "specs": { "type": "string" },
-        "status": { "type": "string", "enum": ["excellent", "good", "warning", "repair_needed"] },
-        "lastMaintenance": { "type": "string", "format": "date-time" }
-      }
-    },
-    "TechnicalAudit": {
-      "title": "TechnicalAudit",
-      "description": "A professional technical audit request for business infrastructure.",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "userId": { "type": "string" },
-        "businessName": { "type": "string" },
-        "contactPerson": { "type": "string" },
-        "phone": { "type": "string" },
-        "location": { "type": "string" },
-        "needs": { "type": "array" },
-        "description": { "type": "string" },
-        "status": { "type": "string", "enum": ["pending", "scheduled", "completed", "cancelled"] },
-        "scheduledDate": { "type": "string", "format": "date-time" },
-        "reportUrl": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" },
-        "updatedAt": { "type": "string", "format": "date-time" }
-      },
-      "required": ["userId", "businessName", "phone", "status", "createdAt"]
-    },
-    "Consumable": {
-      "title": "Consumable",
-      "description": "Lab maintenance resources like thermal paste, solder, etc.",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "name": { "type": "string" },
-        "category": { "type": "string" },
-        "quantity": { "type": "number" },
-        "unit": { "type": "string" },
-        "minThreshold": { "type": "number" },
-        "unitCost": { "type": "number", "description": "Unit cost for stock valuation" },
-        "updatedAt": { "type": "string", "format": "date-time" }
-      },
-      "required": ["name", "quantity", "unit", "minThreshold"]
-    },
-    "LabTool": {
-      "title": "LabTool",
-      "description": "Équipement de laboratoire nécessitant un suivi d'usure (ex: Fer à souder, Station air chaud).",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "name": { "type": "string" },
-        "serialNumber": { "type": "string" },
-        "status": { "type": "string", "enum": ["excellent", "good", "warning", "service_needed"] },
-        "usageCount": { "type": "number" },
-        "usageThreshold": { "type": "number" },
-        "lastMaintenance": { "type": "string", "format": "date-time" },
-        "updatedAt": { "type": "string", "format": "date-time" }
-      },
-      "required": ["name", "status", "usageCount", "usageThreshold"]
-    },
-    "TechnicianLog": {
-      "title": "TechnicianLog",
-      "description": "Journal de bord quotidien du laboratoire pour les observations techniques et passations.",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "userId": { "type": "string" },
-        "userName": { "type": "string" },
-        "content": { "type": "string" },
-        "type": { "type": "string", "enum": ["info", "technical", "incident", "handover"] },
-        "createdAt": { "type": "string", "format": "date-time" }
-      },
-      "required": ["userId", "userName", "content", "type", "createdAt"]
     }
   },
   "auth": {
@@ -161,6 +95,10 @@
     "/users/{userId}": {
       "schema": "User",
       "description": "User profiles."
+    },
+    "/tokenTransactions/{txId}": {
+      "schema": "TokenTransaction",
+      "description": "Prestige point conversions."
     },
     "/products/{productId}": {
       "schema": "Product",
@@ -173,26 +111,6 @@
     "/supportTickets/{ticketId}": {
       "schema": "SupportTicket",
       "description": "Technical support tickets."
-    },
-    "/hardwareAssets/{assetId}": {
-      "schema": "HardwareAsset",
-      "description": "Client hardware park."
-    },
-    "/audits/{auditId}": {
-      "schema": "TechnicalAudit",
-      "description": "Business infrastructure audits."
-    },
-    "/consumables/{consumableId}": {
-      "schema": "Consumable",
-      "description": "Lab consumables."
-    },
-    "/labTools/{toolId}": {
-      "schema": "LabTool",
-      "description": "Lab tools tracking."
-    },
-    "/technicianLogs/{logId}": {
-      "schema": "TechnicianLog",
-      "description": "Lab daily logbook."
     }
   }
 }

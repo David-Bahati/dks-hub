@@ -14,6 +14,17 @@ export type AppUser = {
   referralCode?: string;
   referralCount?: number;
   points?: number;
+  tokenBalance?: number;
+  pointsConverted?: number;
+};
+
+export type TokenTransaction = {
+  id: string;
+  userId: string;
+  type: 'mint' | 'burn' | 'transfer';
+  pointsAmount?: number;
+  tokenAmount: number;
+  createdAt: any;
 };
 
 export type Product = {

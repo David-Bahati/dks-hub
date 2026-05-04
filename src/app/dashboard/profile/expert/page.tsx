@@ -27,10 +27,13 @@ import {
     User as UserIcon,
     ShieldAlert,
     ShoppingCart,
-    TrendingUp
+    TrendingUp,
+    Coins,
+    RefreshCw,
+    Wallet
 } from "lucide-react";
 import { db } from '@/lib/firebase';
-import { collection, query, where, orderBy } from 'firebase/firestore';
+import { collection, query, where, orderBy, updateDoc, doc, addDoc, serverTimestamp, increment } from 'firebase/firestore';
 import withAuth from '@/components/auth/withAuth';
 import Link from 'next/link';
 import { useCollection, useMemoFirebase } from '@/firebase';
@@ -51,10 +54,13 @@ import { jsPDF } from 'jspdf';
 import { Logo } from '@/components/ui/Logo';
 import { useToast } from '@/hooks/use-toast';
 
+const POINTS_PER_TOKEN = 100;
+
 function ExpertProfilePage() {
     const { user } = useAuth();
     const { toast } = useToast();
     const [isGenerating, setIsGenerating] = useState(false);
+    const [isMinting, setIsMinting] = useState(false);
     const reportRef = useRef<HTMLDivElement>(null);
 
     // Fetch User Logs
@@ -93,12 +99,23 @@ function ExpertProfilePage() {
         const mySales = sales || [];
         const myTotalSalesAmount = mySales.reduce((acc, s) => acc + (s.totalAmount || 0), 0);
 
+        // Point calculation matches leaderboard logic in Dashboard
+        let totalPoints = myLogs.length * 10;
+        totalPoints += myAcademy.length * 50;
+        totalPoints += mySAVCount * 30;
+        mySales.forEach(sale => {
+            if (sale.totalAmount >= 1000) totalPoints += 100;
+            else if (sale.totalAmount >= 500) totalPoints += 50;
+            else totalPoints += 20;
+        });
+
         const stats = {
             logs: myLogs.length,
             academy: myAcademy.length,
             sav: mySAVCount,
             sales: mySales.length,
             totalSalesAmount: myTotalSalesAmount,
+            totalPoints,
             totalActions: myLogs.length + myAcademy.length + mySAVCount + mySales.length
         };
 
@@ -121,6 +138,50 @@ function ExpertProfilePage() {
         return { stats, badges, radarData };
     }, [user, logs, academySessions, savTickets, sales]);
 
+    const mintTokens = async () => {
+        if (!user || !careerStats) return;
+        const availablePoints = careerStats.stats.totalPoints - (user.pointsConverted || 0);
+        
+        if (availablePoints < POINTS_PER_TOKEN) {
+            toast({ 
+                title: "Points insuffisants", 
+                description: `Il vous faut au moins ${POINTS_PER_TOKEN} points pour frapper 1 DKST.`,
+                variant: "destructive"
+            });
+            return;
+        }
+
+        const tokensToMint = Math.floor(availablePoints / POINTS_PER_TOKEN);
+        const pointsToConvert = tokensToMint * POINTS_PER_TOKEN;
+
+        setIsMinting(true);
+        try {
+            const userRef = doc(db, "users", user.uid);
+            await updateDoc(userRef, {
+                tokenBalance: increment(tokensToMint),
+                pointsConverted: increment(pointsToConvert),
+                updatedAt: serverTimestamp()
+            });
+
+            await addDoc(collection(db, "tokenTransactions"), {
+                userId: user.uid,
+                type: 'mint',
+                pointsAmount: pointsToConvert,
+                tokenAmount: tokensToMint,
+                createdAt: serverTimestamp()
+            });
+
+            toast({ 
+                title: "Points Tokenisés !", 
+                description: `Vous avez généré ${tokensToMint} DKST. Votre wallet a été mis à jour.` 
+            });
+        } catch (error) {
+            toast({ title: "Erreur de frappe", variant: "destructive" });
+        } finally {
+            setIsMinting(false);
+        }
+    };
+
     const handleExportReport = async () => {
         if (!reportRef.current) return;
         setIsGenerating(true);
@@ -142,6 +203,8 @@ function ExpertProfilePage() {
         return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin text-accent" /></div>;
     }
 
+    const redeemableTokens = Math.floor((careerStats?.stats.totalPoints || 0) - (user?.pointsConverted || 0)) / POINTS_PER_TOKEN;
+
     return (
         <div className="min-h-screen bg-background text-foreground pb-20">
             <Navbar />
@@ -159,17 +222,20 @@ function ExpertProfilePage() {
                         </div>
                     </div>
 
-                    <Button 
-                        onClick={handleExportReport} 
-                        disabled={isGenerating}
-                        className="bg-primary hover:bg-primary/90 h-14 px-8 rounded-2xl font-black uppercase italic gap-3 shadow-xl shadow-primary/10"
-                    >
-                        {isGenerating ? <Loader2 className="animate-spin" /> : <><FileDown size={20} /> Exporter Bilan Carrière</>}
-                    </Button>
+                    <div className="flex gap-3">
+                        <Button 
+                            onClick={handleExportReport} 
+                            disabled={isGenerating}
+                            variant="outline"
+                            className="border-white/10 h-14 px-8 rounded-2xl font-black uppercase italic gap-3 hover:bg-white/5 transition-all"
+                        >
+                            {isGenerating ? <Loader2 className="animate-spin" /> : <><FileDown size={20} /> Bilan PDF</>}
+                        </Button>
+                    </div>
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                    {/* Colonne Gauche: Identité & Badges */}
+                    {/* Colonne Gauche: Identité & Wallet */}
                     <div className="lg:col-span-4 space-y-8">
                         <Card className="glossy-card border-none rounded-[3rem] p-10 text-center relative overflow-hidden">
                             <div className="absolute top-0 right-0 p-8 opacity-5"><Cpu size={120} /></div>
@@ -192,15 +258,40 @@ function ExpertProfilePage() {
                                         <p className="text-2xl font-black text-primary">{careerStats?.stats.academy}</p>
                                         <p className="text-[8px] font-black uppercase opacity-40">Cours Academy</p>
                                     </div>
-                                    <div className="text-center">
-                                        <p className="text-2xl font-black text-orange-500">{careerStats?.stats.logs}</p>
-                                        <p className="text-[8px] font-black uppercase opacity-40">Notes Labo</p>
-                                    </div>
-                                    <div className="text-center">
-                                        <p className="text-2xl font-black text-green-400">{careerStats?.stats.sales}</p>
-                                        <p className="text-[8px] font-black uppercase opacity-40">Ventes Conclues</p>
-                                    </div>
                                 </div>
+                            </div>
+                        </Card>
+
+                        {/* TOKEN WALLET SECTION */}
+                        <Card className="bg-accent/10 border-accent/20 rounded-[3rem] p-10 space-y-8 relative overflow-hidden group">
+                            <div className="absolute top-0 right-0 p-6 opacity-10"><Coins size={80} className="text-accent" /></div>
+                            <div className="relative z-10 space-y-6">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-xl bg-accent text-black flex items-center justify-center shadow-lg"><Wallet size={20}/></div>
+                                    <h4 className="text-lg font-black uppercase italic tracking-tight">DKS Token Wallet</h4>
+                                </div>
+
+                                <div className="space-y-1">
+                                    <p className="text-[10px] font-black uppercase text-accent/60 tracking-widest">Solde Actuel</p>
+                                    <p className="text-5xl font-black text-white italic">{user?.tokenBalance || 0} <span className="text-sm font-light opacity-40 not-italic">DKST</span></p>
+                                </div>
+
+                                <div className="p-6 bg-black/40 rounded-2xl border border-white/5 space-y-4">
+                                    <div className="flex justify-between items-end">
+                                        <p className="text-[8px] font-black uppercase opacity-40">Points convertibles</p>
+                                        <span className="text-xs font-bold text-accent">{(careerStats?.stats.totalPoints || 0) - (user?.pointsConverted || 0)} / {POINTS_PER_TOKEN}</span>
+                                    </div>
+                                    <Progress value={Math.min(100, (((careerStats?.stats.totalPoints || 0) - (user?.pointsConverted || 0)) / POINTS_PER_TOKEN) * 100)} className="h-1.5 bg-white/5" indicatorClassName="bg-accent" />
+                                    
+                                    <Button 
+                                        onClick={mintTokens} 
+                                        disabled={isMinting || redeemableTokens < 1}
+                                        className="w-full h-12 bg-accent text-black font-black uppercase italic text-[10px] rounded-xl gap-2 shadow-xl shadow-accent/10 mt-2"
+                                    >
+                                        {isMinting ? <Loader2 className="animate-spin h-4 w-4" /> : <><RefreshCw size={14} /> Frapper des Jetons (Mint)</>}
+                                    </Button>
+                                </div>
+                                <p className="text-[7px] text-center text-muted-foreground uppercase font-black tracking-tighter opacity-40">Conversion automatique : 100 Points = 1 DKST</p>
                             </div>
                         </Card>
 
@@ -214,9 +305,6 @@ function ExpertProfilePage() {
                                         {b.icon} {b.label}
                                     </div>
                                 ))}
-                                {careerStats?.badges.length === 0 && (
-                                    <p className="text-[10px] text-white/20 uppercase font-black italic">Aucun insigne débloqué.</p>
-                                )}
                             </div>
                         </Card>
                     </div>
@@ -309,9 +397,6 @@ function ExpertProfilePage() {
                                             </div>
                                         </div>
                                     ))}
-                                    {(!academySessions?.length && !sales?.length) && (
-                                        <p className="text-center py-10 opacity-20 italic font-black uppercase text-[10px] tracking-widest">Aucun historique récent.</p>
-                                    )}
                                 </div>
                             </div>
                         </Card>
@@ -365,7 +450,7 @@ function ExpertProfilePage() {
                             {[
                                 { l: "Tickets SAV", v: careerStats.stats.sav, c: "text-blue-600" },
                                 { l: "Academy", v: careerStats.stats.academy, c: "text-purple-600" },
-                                { l: "Logs Labo", v: careerStats.stats.logs, c: "text-orange-600" },
+                                { l: "Points Prestige", v: careerStats.stats.totalPoints, c: "text-orange-600" },
                                 { l: "Ventes (Qty)", v: careerStats.stats.sales, c: "text-green-600" }
                             ].map((stat, i) => (
                                 <div key={i} className="p-6 text-center border-2 border-gray-50 rounded-2xl">
