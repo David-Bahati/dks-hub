@@ -49,6 +49,9 @@ export type Order = {
   paymentMethod: string;
   createdAt: any;
   updatedAt: any;
+  source?: string;
+  sourceId?: string;
+  piValue?: number;
 };
 
 export type SupportTicket = {
@@ -98,6 +101,14 @@ export type HardwareAsset = {
     createdAt: any;
 };
 
+export type MaintenanceLog = {
+  id: string;
+  type: 'repair' | 'upgrade' | 'checkup' | 'cleaning';
+  description: string;
+  technicianName: string;
+  createdAt: any;
+};
+
 export type ServiceBooking = {
   id: string;
   userId: string;
@@ -120,9 +131,11 @@ export type Sale = {
   userId: string;
   items: { productId: string; quantity: number; price: number }[];
   totalAmount: number;
+  totalCDF?: number;
   status: string;
   paymentMode?: string;
   createdAt: any;
+  customerName?: string;
 };
 
 export type PaymentMode = "CASH" | "MOBILE_MONEY" | "PI_NETWORK";

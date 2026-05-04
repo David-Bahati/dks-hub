@@ -71,36 +71,6 @@
       },
       "required": ["userId", "productName", "issueDescription", "status", "createdAt"]
     },
-    "SupportMessage": {
-      "title": "SupportMessage",
-      "description": "Un message envoyé dans le chat d'un ticket de support.",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "senderId": { "type": "string" },
-        "senderName": { "type": "string" },
-        "senderRole": { "type": "string" },
-        "text": { "type": "string" },
-        "imageUrl": { "type": "string", "description": "Optional attached photo." },
-        "createdAt": { "type": "string", "format": "date-time" }
-      }
-    },
-    "RemoteSupportSession": {
-      "title": "RemoteSupportSession",
-      "description": "Demande de prise en main à distance via AnyDesk ou TeamViewer.",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "userId": { "type": "string" },
-        "customerName": { "type": "string" },
-        "software": { "type": "string", "enum": ["anydesk", "teamviewer"] },
-        "remoteId": { "type": "string" },
-        "issueDescription": { "type": "string" },
-        "status": { "type": "string", "enum": ["pending", "active", "completed", "cancelled"] },
-        "createdAt": { "type": "string", "format": "date-time" },
-        "updatedAt": { "type": "string", "format": "date-time" }
-      }
-    },
     "HardwareAsset": {
       "title": "HardwareAsset",
       "description": "Un appareil appartenant à un client enregistré dans le Hub pour suivi.",
@@ -116,35 +86,16 @@
         "lastMaintenance": { "type": "string", "format": "date-time" }
       }
     },
-    "ServiceBooking": {
-      "title": "ServiceBooking",
-      "description": "Réservation d'une formation ou d'une intervention technique.",
+    "MaintenanceLog": {
+      "title": "MaintenanceLog",
+      "description": "Une entrée dans l'historique technique d'un appareil.",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
-        "userId": { "type": "string" },
-        "customerName": { "type": "string" },
-        "serviceTitle": { "type": "string" },
-        "category": { "type": "string" },
-        "status": { "type": "string" },
-        "scheduledDate": { "type": "string" },
-        "location": { "type": "string" },
+        "type": { "type": "string", "enum": ["repair", "upgrade", "checkup", "cleaning"] },
+        "description": { "type": "string" },
+        "technicianName": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" }
-      }
-    },
-    "Notification": {
-      "title": "Notification",
-      "description": "System or user alerts.",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "userId": { "type": "string" },
-        "title": { "type": "string" },
-        "message": { "type": "string" },
-        "type": { "type": "string", "enum": ["info", "success", "warning", "error"] },
-        "isRead": { "type": "boolean" },
-        "createdAt": { "type": "string", "format": "date-time" },
-        "link": { "type": "string" }
       }
     }
   },
@@ -168,33 +119,13 @@
       "schema": "SupportTicket",
       "description": "Technical support tickets."
     },
-    "/supportTickets/{ticketId}/messages/{messageId}": {
-      "schema": "SupportMessage",
-      "description": "Chat messages for a support ticket."
-    },
-    "/remoteSessions/{sessionId}": {
-      "schema": "RemoteSupportSession",
-      "description": "Remote desktop support requests."
-    },
     "/hardwareAssets/{assetId}": {
       "schema": "HardwareAsset",
       "description": "Client hardware park."
     },
-    "/serviceBookings/{bookingId}": {
-      "schema": "ServiceBooking",
-      "description": "Service and training reservations."
-    },
-    "/notifications/{notifId}": {
-      "schema": "Notification",
-      "description": "System notifications."
-    },
-    "/sales/{saleId}": {
-      "schema": "object",
-      "description": "POS sales records."
-    },
-    "/system/{docId}": {
-      "schema": "object",
-      "description": "Global shop configuration."
+    "/hardwareAssets/{assetId}/logs/{logId}": {
+      "schema": "MaintenanceLog",
+      "description": "Detailed history for a specific hardware device."
     }
   }
 }
