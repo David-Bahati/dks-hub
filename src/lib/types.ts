@@ -22,10 +22,16 @@ export type AppUser = {
 export type TokenTransaction = {
   id: string;
   userId: string;
+  userName?: string;
   type: 'mint' | 'burn' | 'transfer';
   pointsAmount?: number;
   tokenAmount: number;
   piTxId?: string;
+  senderId?: string;
+  senderName?: string;
+  recipientId?: string;
+  recipientName?: string;
+  memo?: string;
   createdAt: any;
 };
 

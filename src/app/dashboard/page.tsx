@@ -101,6 +101,7 @@ import { jsPDF } from 'jspdf';
 const navConfig = [
   { href: "/dashboard", icon: LineChart, label: "Aperçu", roles: ["Admin", "Seller", "Cashier", "customer"] },
   { href: "/dashboard/profile/expert", icon: UserIcon, label: "Mon Profil Expert", roles: ["Admin", "Seller", "Cashier"] },
+  { href: "/dashboard/tokens", icon: Coins, label: "Économie DKST", roles: ["Admin", "Seller", "Cashier"] },
   { href: "/dashboard/calendar", icon: CalendarIcon, label: "Agenda Hub", roles: ["Admin", "Seller", "Cashier"] },
   { href: "/dashboard/products", icon: Package, label: "Produits / Stock", roles: ["Admin", "Seller"] },
   { href: "/dashboard/categories", icon: Tags, label: "Catégories", roles: ["Admin", "Seller"] },
@@ -432,7 +433,7 @@ function DashboardPage() {
             
             <div className="flex items-center gap-4">
                 {/* TOKEN QUICK BALANCE */}
-                <Link href="/dashboard/profile/expert">
+                <Link href="/dashboard/tokens">
                     <Badge className="bg-accent/20 text-accent border-accent/20 h-10 px-4 rounded-xl gap-2 font-black italic cursor-pointer hover:bg-accent/30 transition-all">
                         <Coins size={16} /> {user?.tokenBalance || 0} DKST
                     </Badge>
