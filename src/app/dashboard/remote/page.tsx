@@ -17,7 +17,8 @@ import {
     Activity,
     Clock,
     Terminal,
-    ShieldAlert
+    ShieldAlert,
+    Receipt
 } from "lucide-react";
 import { db } from '@/lib/firebase';
 import { collection, addDoc, serverTimestamp, doc, updateDoc, query, orderBy } from 'firebase/firestore';
@@ -85,24 +86,46 @@ function RemoteSupportPage() {
         }
     };
 
-    const updateStatus = async (sessionId: string, newStatus: string, clientUserId: string) => {
+    const updateStatus = async (session: any, newStatus: string) => {
         try {
-            await updateDoc(doc(db, "remoteSessions", sessionId), {
+            await updateDoc(doc(db, "remoteSessions", session.id), {
                 status: newStatus,
                 updatedAt: serverTimestamp()
             });
 
+            // LOGIQUE DE FACTURATION AUTOMATIQUE
+            if (newStatus === 'completed') {
+                await addDoc(collection(db, "orders"), {
+                    userId: session.userId,
+                    customerName: session.customerName,
+                    items: [{ 
+                        name: `Support à Distance: ${session.issueDescription.substring(0, 30)}...`, 
+                        quantity: 1, 
+                        price: 15 
+                    }],
+                    total: 15,
+                    status: "pending_payment",
+                    paymentMethod: "CASH",
+                    createdAt: serverTimestamp(),
+                    updatedAt: serverTimestamp(),
+                    source: 'remote_support',
+                    sourceId: session.id
+                });
+                
+                toast({ title: "Session terminée", description: "Une facture de 15$ a été générée pour le client." });
+            }
+
             await addDoc(collection(db, "notifications"), {
-                userId: clientUserId,
+                userId: session.userId,
                 title: "Statut Prise en Main",
-                message: `L'expert DKS a mis à jour votre session : ${newStatus.toUpperCase()}.`,
+                message: `L'expert DKS a mis à jour votre session : ${newStatus.toUpperCase()}.${newStatus === 'completed' ? ' Une facture a été générée.' : ''}`,
                 type: 'info',
                 isRead: false,
                 createdAt: serverTimestamp(),
                 link: '/dashboard/remote'
             });
 
-            toast({ title: "Statut mis à jour" });
+            if (newStatus !== 'completed') toast({ title: "Statut mis à jour" });
         } catch (error) {
             toast({ title: "Erreur", variant: "destructive" });
         }
@@ -112,7 +135,7 @@ function RemoteSupportPage() {
         switch (status) {
             case 'pending': return <Badge className="bg-orange-500/10 text-orange-400 border-none uppercase text-[9px] font-black animate-pulse">En attente</Badge>;
             case 'active': return <Badge className="bg-green-500/10 text-green-400 border-none uppercase text-[9px] font-black">Session Active</Badge>;
-            case 'completed': return <Badge className="bg-white/5 text-muted-foreground border-none uppercase text-[9px] font-black">Terminé</Badge>;
+            case 'completed': return <Badge className="bg-white/5 text-muted-foreground border-none uppercase text-[9px] font-black">Terminé & Facturé</Badge>;
             case 'cancelled': return <Badge className="bg-destructive/10 text-destructive border-none uppercase text-[9px] font-black">Annulé</Badge>;
             default: return <Badge>{status}</Badge>;
         }
@@ -162,7 +185,7 @@ function RemoteSupportPage() {
                                             <Badge variant="outline" className="border-white/10 text-[9px] uppercase font-bold text-accent">ID: {session.remoteId}</Badge>
                                         </div>
                                         <div className="flex items-center justify-center md:justify-start gap-4 text-[10px] font-black uppercase italic text-muted-foreground/40">
-                                            <span className="flex items-center gap-2"><Terminal size={12} /> Logiciel: {session.software.toUpperCase()}</span>
+                                            <span className="flex items-center gap-2"><Terminal size={12} /> Logiciel: {session.software?.toUpperCase()}</span>
                                             <span>•</span>
                                             <span className="flex items-center gap-2"><Clock size={12} /> Demandé le {session.createdAt?.toDate?.().toLocaleTimeString() || 'Récemment'}</span>
                                         </div>
@@ -172,16 +195,22 @@ function RemoteSupportPage() {
                                     <div className="flex flex-col gap-3 shrink-0 min-w-[220px]">
                                         {isStaff ? (
                                             <>
-                                                <Button className="bg-primary text-white rounded-xl h-12 font-black uppercase italic text-[10px] gap-2 shadow-lg" onClick={() => updateStatus(session.id, 'active', session.userId)}>
-                                                    <ExternalLink size={14} /> Lancer la Connexion
-                                                </Button>
+                                                {session.status !== 'completed' && session.status !== 'cancelled' && (
+                                                    <Button className="bg-primary text-white rounded-xl h-12 font-black uppercase italic text-[10px] gap-2 shadow-lg" onClick={() => updateStatus(session, 'active')}>
+                                                        <ExternalLink size={14} /> Lancer la Connexion
+                                                    </Button>
+                                                )}
                                                 <div className="flex gap-2">
-                                                    <Button variant="outline" className="flex-1 rounded-xl border-white/10 text-[9px] font-black uppercase h-10" onClick={() => updateStatus(session.id, 'completed', session.userId)}>
-                                                        <CheckCircle2 size={12} className="mr-1" /> Fixé
-                                                    </Button>
-                                                    <Button variant="outline" className="flex-1 rounded-xl border-white/10 text-destructive/60 hover:text-destructive text-[9px] font-black h-10" onClick={() => updateStatus(session.id, 'cancelled', session.userId)}>
-                                                        <XCircle size={12} className="mr-1" /> Annuler
-                                                    </Button>
+                                                    {session.status !== 'completed' && session.status !== 'cancelled' && (
+                                                        <Button variant="outline" className="flex-1 rounded-xl border-white/10 text-[9px] font-black uppercase h-10 hover:bg-green-500/10 hover:text-green-400" onClick={() => updateStatus(session, 'completed')}>
+                                                            <Receipt size={12} className="mr-1" /> Fixé
+                                                        </Button>
+                                                    )}
+                                                    {session.status === 'pending' && (
+                                                        <Button variant="outline" className="flex-1 rounded-xl border-white/10 text-destructive/60 hover:text-destructive text-[9px] font-black h-10" onClick={() => updateStatus(session, 'cancelled')}>
+                                                            <XCircle size={12} className="mr-1" /> Annuler
+                                                        </Button>
+                                                    )}
                                                 </div>
                                             </>
                                         ) : (
@@ -199,7 +228,7 @@ function RemoteSupportPage() {
                         <div className="py-32 text-center bg-white/5 rounded-[3rem] border border-dashed border-white/10 opacity-30 flex flex-col items-center gap-6">
                             <MonitorSmartphone size={80} strokeWidth={1} />
                             <p className="text-xl font-black uppercase italic tracking-tighter">Aucune session active</p>
-                            <p className="text-xs max-w-xs leading-relaxed">Le support à distance permet une résolution rapide des problèmes logiciels sans déplacement.</p>
+                            <p className="text-xs max-w-sm leading-relaxed">Le support à distance permet une résolution rapide des problèmes logiciels sans déplacement.</p>
                         </div>
                     )}
                 </div>

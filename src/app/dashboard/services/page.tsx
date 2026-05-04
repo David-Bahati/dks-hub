@@ -21,7 +21,8 @@ import {
     Filter,
     Plus,
     UserCheck,
-    Smartphone
+    Smartphone,
+    Receipt
 } from "lucide-react";
 import { db } from '@/lib/firebase';
 import { collection, query, orderBy, updateDoc, doc, addDoc, serverTimestamp, onSnapshot, where } from 'firebase/firestore';
@@ -34,6 +35,17 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+
+// Mapping des prix pour la facturation automatique
+const SERVICE_PRICES: Record<string, number> = {
+    "ia-workshop": 50,
+    "network-install": 150,
+    "hardware-upgrade": 25,
+    "formation": 50,
+    "infrastructure": 150,
+    "upgrade": 25,
+    "support": 15
+};
 
 function ServiceManagementPage() {
     const { user } = useAuth();
@@ -58,24 +70,48 @@ function ServiceManagementPage() {
 
     const isStaff = user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'seller' || user?.role?.toLowerCase() === 'cashier';
 
-    const updateBookingStatus = async (bookingId: string, newStatus: string, clientUserId: string) => {
+    const updateBookingStatus = async (booking: any, newStatus: string) => {
         try {
-            await updateDoc(doc(db, "serviceBookings", bookingId), {
+            await updateDoc(doc(db, "serviceBookings", booking.id), {
                 status: newStatus,
                 updatedAt: serverTimestamp()
             });
 
+            // LOGIQUE DE FACTURATION AUTOMATIQUE
+            if (newStatus === 'completed') {
+                const price = SERVICE_PRICES[booking.serviceId] || SERVICE_PRICES[booking.category] || 30;
+                
+                await addDoc(collection(db, "orders"), {
+                    userId: booking.userId,
+                    customerName: booking.customerName,
+                    items: [{ 
+                        name: `Prestation Hub: ${booking.serviceTitle}`, 
+                        quantity: 1, 
+                        price: price 
+                    }],
+                    total: price,
+                    status: "pending_payment",
+                    paymentMethod: "CASH",
+                    createdAt: serverTimestamp(),
+                    updatedAt: serverTimestamp(),
+                    source: 'service_hub',
+                    sourceId: booking.id
+                });
+
+                toast({ title: "Service terminé", description: `Facture de ${price}$ générée pour le client.` });
+            }
+
             await addDoc(collection(db, "notifications"), {
-                userId: clientUserId,
+                userId: booking.userId,
                 title: "Statut de votre Service",
-                message: `Le statut de votre prestation "${newStatus.toUpperCase()}" a été mis à jour.`,
+                message: `Le statut de votre prestation "${booking.serviceTitle}" a été mis à jour : ${newStatus.toUpperCase()}.${newStatus === 'completed' ? ' Une facture a été générée.' : ''}`,
                 type: 'info',
                 isRead: false,
                 createdAt: serverTimestamp(),
                 link: '/dashboard/services'
             });
 
-            toast({ title: "Statut mis à jour", description: "Le client a été notifié." });
+            if (newStatus !== 'completed') toast({ title: "Statut mis à jour", description: "Le client a été notifié." });
         } catch (error) {
             toast({ title: "Erreur", variant: "destructive" });
         }
@@ -97,7 +133,7 @@ function ServiceManagementPage() {
             case 'pending': return <Badge className="bg-orange-500/10 text-orange-400 border-none uppercase text-[9px] font-black">Attente</Badge>;
             case 'confirmed': return <Badge className="bg-blue-500/10 text-blue-400 border-none uppercase text-[9px] font-black">Confirmé</Badge>;
             case 'in_progress': return <Badge className="bg-purple-500/10 text-purple-400 border-none uppercase text-[9px] font-black">En cours</Badge>;
-            case 'completed': return <Badge className="bg-green-500/10 text-green-400 border-none uppercase text-[9px] font-black">Terminé</Badge>;
+            case 'completed': return <Badge className="bg-green-500/10 text-green-400 border-none uppercase text-[9px] font-black">Terminé & Facturé</Badge>;
             case 'cancelled': return <Badge className="bg-white/5 text-muted-foreground border-none uppercase text-[9px] font-black">Annulé</Badge>;
             default: return <Badge>{status}</Badge>;
         }
@@ -186,13 +222,13 @@ function ServiceManagementPage() {
                                                         {staffMembers.map(m => <SelectItem key={m.id} value={m.id}>{m.displayName || m.name}</SelectItem>)}
                                                     </SelectContent>
                                                 </Select>
-                                                <Select value={booking.status} onValueChange={(val) => updateBookingStatus(booking.id, val, booking.userId)}>
+                                                <Select value={booking.status} onValueChange={(val) => updateBookingStatus(booking, val)}>
                                                     <SelectTrigger className="h-10 bg-white/5 border-white/10 rounded-xl font-black uppercase italic text-[9px]"><SelectValue placeholder="Statut" /></SelectTrigger>
                                                     <SelectContent className="bg-card border-white/10">
                                                         <SelectItem value="pending">En attente</SelectItem>
                                                         <SelectItem value="confirmed">Confirmer</SelectItem>
                                                         <SelectItem value="in_progress">Démarrer</SelectItem>
-                                                        <SelectItem value="completed">Terminer</SelectItem>
+                                                        <SelectItem value="completed">Terminer & Facturer</SelectItem>
                                                         <SelectItem value="cancelled">Annuler</SelectItem>
                                                     </SelectContent>
                                                 </Select>

@@ -20,7 +20,8 @@ import {
   Download,
   Printer,
   FileText,
-  QrCode
+  QrCode,
+  Zap
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useCollection, useMemoFirebase } from '@/firebase';
@@ -86,7 +87,7 @@ export default function OrdersPage() {
     if (statusFilter !== "all") {
       result = result.filter(order => {
         const s = order.status?.toLowerCase();
-        if (statusFilter === "pending") return s?.includes("attente") || s === "pending";
+        if (statusFilter === "pending") return s?.includes("attente") || s === "pending" || s === "pending_payment";
         if (statusFilter === "paid") return s?.includes("payé") || s?.includes("payée") || s === "completed";
         if (statusFilter === "cancelled") return s?.includes("annulé") || s === "cancelled";
         return true;
@@ -190,7 +191,7 @@ export default function OrdersPage() {
                     <ShoppingBag className="text-accent"/> {isStaff ? 'Gestion des' : 'Mes'} <span className="text-accent">Commandes</span>
                 </h1>
                 <Link href="/dashboard">
-                    <Button variant="outline" className="h-12 border-white/10 hover:bg-accent/10 hover:text-accent rounded-2xl gap-2 font-black uppercase italic text-xs">
+                    <Button variant="outline" className="h-12 border-white/10 rounded-2xl gap-2 font-black uppercase italic text-xs">
                         <ArrowLeft size={16} />
                         Retour
                     </Button>
@@ -237,6 +238,7 @@ export default function OrdersPage() {
                                         <div className="flex items-center gap-3">
                                             <span className="text-xs font-black uppercase text-muted-foreground">Commande #{order.id.substring(0, 8)}</span>
                                             {getStatusBadge(order.status)}
+                                            {order.source && <Badge className="bg-accent/10 text-accent border-none uppercase text-[8px] font-black"><Zap size={10} className="mr-1" /> SERVICE HUB</Badge>}
                                         </div>
                                         <h3 className="text-xl font-black uppercase italic">{order.customerName || 'Client DKS'}</h3>
                                         <p className="text-xs text-muted-foreground">{order.createdAt?.toDate ? order.createdAt.toDate().toLocaleString() : 'Date inconnue'}</p>
@@ -338,7 +340,7 @@ export default function OrdersPage() {
                             <h3 className="text-[10px] font-black uppercase text-gray-400 border-b pb-2 tracking-widest">Facturé à</h3>
                             <div className="space-y-1">
                                 <p className="text-xl font-black uppercase italic">{selectedOrderForPDF.customerName}</p>
-                                <p className="text-sm text-gray-600">{selectedOrderForPDF.customerEmail}</p>
+                                <p className="text-sm text-gray-600">{selectedOrderForPDF.customerEmail || "Client Double King Shop"}</p>
                                 <p className="text-xs font-medium text-gray-400 mt-2">Client ID: {selectedOrderForPDF.userId?.substring(0, 8)}</p>
                             </div>
                         </div>
@@ -357,7 +359,7 @@ export default function OrdersPage() {
                     <table className="w-full mb-12">
                         <thead>
                             <tr className="bg-gray-100 text-[10px] font-black uppercase tracking-widest">
-                                <th className="text-left p-4">Description de l'article</th>
+                                <th className="text-left p-4">Description de l'article / Service</th>
                                 <th className="text-center p-4">Qté</th>
                                 <th className="text-right p-4">Prix Unitaire</th>
                                 <th className="text-right p-4">Total</th>
@@ -368,7 +370,9 @@ export default function OrdersPage() {
                                 <tr key={idx} className="border-b border-gray-100">
                                     <td className="p-4">
                                         <p className="font-bold uppercase italic">{item.name}</p>
-                                        <p className="text-[10px] text-gray-400 uppercase mt-1">Garantie DKS incluse</p>
+                                        <p className="text-[10px] text-gray-400 uppercase mt-1">
+                                            {selectedOrderForPDF.source ? "Garantie Service Hub Incluse" : "Garantie Hardware DKS incluse"}
+                                        </p>
                                     </td>
                                     <td className="p-4 text-center font-bold">{item.quantity}</td>
                                     <td className="p-4 text-right font-medium">${item.price?.toFixed(2)}</td>
@@ -411,7 +415,7 @@ export default function OrdersPage() {
                             <QrCode size={60} className="opacity-20" />
                             <p className="text-[9px] font-bold text-gray-400 uppercase leading-relaxed max-w-[250px]">
                                 Cette facture est un document officiel de Double King Shop. <br />
-                                Les articles hardware ne sont ni repris ni échangés après sortie du magasin, sauf application de la garantie.
+                                Les prestations de service ne sont pas remboursables après exécution.
                             </p>
                         </div>
                         <div className="text-right space-y-1">
