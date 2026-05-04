@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Navbar } from "@/components/layout/Navbar";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -24,7 +24,11 @@ import {
     Smartphone,
     Receipt,
     Star,
-    Award
+    Award,
+    Download,
+    FileBadge,
+    QrCode,
+    ShieldCheck
 } from "lucide-react";
 import { db } from '@/lib/firebase';
 import { collection, query, orderBy, updateDoc, doc, addDoc, serverTimestamp, onSnapshot, where } from 'firebase/firestore';
@@ -37,6 +41,9 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
+import { Logo } from '@/components/ui/Logo';
 
 // Mapping des prix pour la facturation automatique
 const SERVICE_PRICES: Record<string, number> = {
@@ -56,6 +63,11 @@ function ServiceManagementPage() {
     const [search, setSearch] = useState("");
     const [statusFilter, setStatusFilter] = useState("all");
     const [staffMembers, setStaffMembers] = useState<any[]>([]);
+    
+    // PDF Generation States
+    const [selectedBookingForCert, setSelectedBookingForCert] = useState<any | null>(null);
+    const [isGeneratingCert, setIsGeneratingCert] = useState(false);
+    const certRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         const q = query(collection(db, "users"), where("role", "in", ["admin", "Admin", "seller", "Seller", "cashier", "Cashier"]));
@@ -106,7 +118,7 @@ function ServiceManagementPage() {
             await addDoc(collection(db, "notifications"), {
                 userId: booking.userId,
                 title: "Statut DKS Academy",
-                message: `Mise à jour : ${newStatus.toUpperCase()}.${newStatus === 'completed' ? ' Votre facture est prête.' : ''}`,
+                message: `Mise à jour : ${newStatus.toUpperCase()}.${newStatus === 'completed' ? ' Votre certificat est prêt !' : ''}`,
                 type: 'info',
                 isRead: false,
                 createdAt: serverTimestamp(),
@@ -117,6 +129,33 @@ function ServiceManagementPage() {
         } catch (error) {
             toast({ title: "Erreur", variant: "destructive" });
         }
+    };
+
+    const handleDownloadCertificate = async (booking: any) => {
+        setSelectedBookingForCert(booking);
+        // Attendre le rendu du DOM pour html2canvas
+        setTimeout(async () => {
+            if (!certRef.current) return;
+            setIsGeneratingCert(true);
+            try {
+                const canvas = await html2canvas(certRef.current, { 
+                    scale: 2, 
+                    useCORS: true, 
+                    backgroundColor: "#ffffff" 
+                });
+                const imgData = canvas.toDataURL('image/png');
+                // Format A4 Paysage
+                const pdf = new jsPDF({ orientation: 'landscape', unit: 'px', format: [canvas.width / 2, canvas.height / 2] });
+                pdf.addImage(imgData, 'PNG', 0, 0, canvas.width / 2, canvas.height / 2);
+                pdf.save(`CERTIFICAT_DKS_${booking.customerName.replace(/\s+/g, '_')}.pdf`);
+                toast({ title: "Certificat généré", description: "Félicitations pour cette réussite !" });
+            } catch (error) {
+                toast({ title: "Erreur PDF", variant: "destructive" });
+            } finally {
+                setIsGeneratingCert(false);
+                setSelectedBookingForCert(null);
+            }
+        }, 500);
     };
 
     const assignTechnician = async (bookingId: string, techId: string, techName: string) => {
@@ -226,23 +265,48 @@ function ServiceManagementPage() {
                                                         {staffMembers.map(m => <SelectItem key={m.id} value={m.id}>{m.displayName || m.name}</SelectItem>)}
                                                     </SelectContent>
                                                 </Select>
-                                                <Select value={booking.status} onValueChange={(val) => updateBookingStatus(booking, val)}>
-                                                    <SelectTrigger className="h-10 bg-white/5 border-white/10 rounded-xl font-black uppercase italic text-[9px]"><SelectValue placeholder="Suivi Cursus" /></SelectTrigger>
-                                                    <SelectContent className="bg-card border-white/10">
-                                                        <SelectItem value="pending">En attente</SelectItem>
-                                                        <SelectItem value="confirmed">Admettre / Confirmer</SelectItem>
-                                                        <SelectItem value="in_progress">Démarrer Session</SelectItem>
-                                                        <SelectItem value="completed">Diplômer & Facturer</SelectItem>
-                                                        <SelectItem value="cancelled">Refuser / Annuler</SelectItem>
-                                                    </SelectContent>
-                                                </Select>
+                                                <div className="flex gap-2">
+                                                    <Select value={booking.status} onValueChange={(val) => updateBookingStatus(booking, val)}>
+                                                        <SelectTrigger className="flex-1 h-10 bg-white/5 border-white/10 rounded-xl font-black uppercase italic text-[9px]"><SelectValue placeholder="Suivi Cursus" /></SelectTrigger>
+                                                        <SelectContent className="bg-card border-white/10">
+                                                            <SelectItem value="pending">En attente</SelectItem>
+                                                            <SelectItem value="confirmed">Admettre / Confirmer</SelectItem>
+                                                            <SelectItem value="in_progress">Démarrer Session</SelectItem>
+                                                            <SelectItem value="completed">Diplômer & Facturer</SelectItem>
+                                                            <SelectItem value="cancelled">Refuser / Annuler</SelectItem>
+                                                        </SelectContent>
+                                                    </Select>
+                                                    {booking.status === 'completed' && booking.category === 'formation' && (
+                                                        <Button 
+                                                            size="icon" 
+                                                            variant="outline" 
+                                                            className="h-10 w-10 border-accent/20 text-accent"
+                                                            onClick={() => handleDownloadCertificate(booking)}
+                                                            disabled={isGeneratingCert}
+                                                        >
+                                                            {isGeneratingCert ? <Loader2 className="animate-spin h-4 w-4" /> : <Download size={16} />}
+                                                        </Button>
+                                                    )}
+                                                </div>
                                             </div>
                                         ) : (
-                                            <Button variant="outline" className="rounded-xl border-primary/20 text-primary hover:bg-primary/10 gap-2 h-12 font-black uppercase italic text-[10px]" asChild>
-                                                <a href={`https://wa.me/243823038945?text=Bonjour,%20je%20suis%20inscrit%20à%20l'Academy%20DKS%20pour%20le%20cursus%20${booking.serviceTitle}.`} target="_blank" rel="noopener noreferrer">
-                                                    <Smartphone size={14} /> Contacter mon Instructeur
-                                                </a>
-                                            </Button>
+                                            <div className="flex flex-col gap-2">
+                                                {booking.status === 'completed' && booking.category === 'formation' && (
+                                                    <Button 
+                                                        className="bg-accent text-black h-12 rounded-xl font-black uppercase italic text-[10px] gap-2 shadow-lg"
+                                                        onClick={() => handleDownloadCertificate(booking)}
+                                                        disabled={isGeneratingCert}
+                                                    >
+                                                        {isGeneratingCert ? <Loader2 className="animate-spin h-4 w-4" /> : <FileBadge size={16} />}
+                                                        Télécharger mon Diplôme
+                                                    </Button>
+                                                )}
+                                                <Button variant="outline" className="rounded-xl border-primary/20 text-primary hover:bg-primary/10 gap-2 h-12 font-black uppercase italic text-[10px]" asChild>
+                                                    <a href={`https://wa.me/243823038945?text=Bonjour,%20je%20suis%20inscrit%20à%20l'Academy%20DKS%20pour%20le%20cursus%20${booking.serviceTitle}.`} target="_blank" rel="noopener noreferrer">
+                                                        <Smartphone size={14} /> Contacter mon Instructeur
+                                                    </a>
+                                                </Button>
+                                            </div>
                                         )}
                                     </div>
                                 </CardContent>
@@ -255,6 +319,75 @@ function ServiceManagementPage() {
                     )}
                 </div>
             </main>
+
+            {/* MODÈLE DE CERTIFICAT CACHÉ POUR GÉNÉRATION PDF */}
+            <div style={{ position: 'absolute', left: '-9999px', top: 0 }}>
+                {selectedBookingForCert && (
+                    <div ref={certRef} className="bg-white text-black p-0 w-[1123px] h-[794px] font-serif relative overflow-hidden flex items-center justify-center">
+                        {/* Bordure Premium */}
+                        <div className="absolute inset-0 border-[30px] border-double border-[#0f172a]" />
+                        <div className="absolute inset-10 border-4 border-[#3b82f6]/20" />
+                        
+                        {/* Filigrane Logo */}
+                        <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none">
+                            <Logo size="xl" />
+                        </div>
+
+                        <div className="relative z-10 text-center w-full px-40 space-y-12">
+                            <div className="flex flex-col items-center gap-6">
+                                <Logo size="lg" />
+                                <div className="space-y-1">
+                                    <h2 className="text-sm font-bold tracking-[0.4em] uppercase text-[#3b82f6]">Double King Academy</h2>
+                                    <p className="text-[10px] font-medium uppercase tracking-[0.2em] opacity-40">Excellence Technologique • Bunia, RDC</p>
+                                </div>
+                            </div>
+
+                            <div className="space-y-4">
+                                <h1 className="text-6xl font-black uppercase italic tracking-tighter text-[#0f172a]">CERTIFICAT</h1>
+                                <p className="text-xl font-light italic text-gray-500">DE RÉUSSITE ACADÉMIQUE</p>
+                            </div>
+
+                            <div className="space-y-6 py-8">
+                                <p className="text-lg font-medium text-gray-400">Le présent certificat est fièrement décerné à</p>
+                                <h3 className="text-5xl font-black uppercase tracking-tight border-b-2 border-gray-100 inline-block pb-2 px-10">
+                                    {selectedBookingForCert.customerName}
+                                </h3>
+                                <p className="text-lg font-medium text-gray-500 max-w-2xl mx-auto leading-relaxed">
+                                    Pour avoir complété avec succès et démontré une expertise exceptionnelle lors du cursus intensif :
+                                </p>
+                                <h4 className="text-3xl font-bold italic text-[#3b82f6] uppercase tracking-wide">
+                                    {selectedBookingForCert.serviceTitle}
+                                </h4>
+                            </div>
+
+                            <div className="grid grid-cols-3 items-end pt-12">
+                                <div className="text-center space-y-2">
+                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Date de délivrance</p>
+                                    <p className="text-sm font-bold">{new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+                                </div>
+                                <div className="flex flex-col items-center gap-4">
+                                    <div className="p-3 border-2 border-gray-100 rounded-2xl bg-gray-50/50">
+                                        <QrCode size={60} className="opacity-20" />
+                                    </div>
+                                    <p className="text-[8px] font-bold text-gray-300 uppercase tracking-tighter">ID: DKS-CERT-{selectedBookingForCert.id.substring(0, 8).toUpperCase()}</p>
+                                </div>
+                                <div className="text-center space-y-2">
+                                    <div className="w-40 h-px bg-gray-200 mx-auto" />
+                                    <div className="flex flex-col items-center">
+                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Direction Technique</p>
+                                        <p className="text-sm font-black italic">Expert Double King</p>
+                                        <ShieldCheck size={24} className="text-[#3b82f6] mt-2 opacity-30" />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        {/* Décoration d'angle */}
+                        <div className="absolute top-0 left-0 w-40 h-40 bg-[#3b82f6]/5 rounded-br-full" />
+                        <div className="absolute bottom-0 right-0 w-40 h-40 bg-[#0f172a]/5 rounded-tl-full" />
+                    </div>
+                )}
+            </div>
         </div>
     );
 }
