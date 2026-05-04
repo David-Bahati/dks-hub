@@ -17,6 +17,9 @@
         "tokenBalance": { "type": "number", "description": "DKST Token balance" },
         "pointsConverted": { "type": "number", "description": "Points already turned into tokens" },
         "piWalletAddress": { "type": "string", "description": "Public address on the Pi blockchain" },
+        "lastMiningAt": { "type": "string", "format": "date-time" },
+        "miningPower": { "type": "number" },
+        "completedMissionsToday": { "type": "array", "items": { "type": "string" } },
         "createdAt": { "type": "string", "format": "date-time" },
         "updatedAt": { "type": "string", "format": "date-time" }
       },
@@ -29,65 +32,15 @@
       "properties": {
         "id": { "type": "string" },
         "userId": { "type": "string" },
-        "type": { "type": "string", "enum": ["mint", "burn", "transfer"] },
+        "type": { "type": "string", "enum": ["mint", "burn", "transfer", "mining"] },
         "pointsAmount": { "type": "number" },
         "tokenAmount": { "type": "number" },
         "piTxId": { "type": "string", "description": "Pi Blockchain transaction hash" },
+        "direction": { "type": "string", "enum": ["sent", "received"] },
+        "memo": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["userId", "type", "tokenAmount", "createdAt"]
-    },
-    "Order": {
-      "title": "Order",
-      "description": "Represents a customer order placed through the store.",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "userId": { "type": "string" },
-        "customerEmail": { "type": "string" },
-        "customerName": { "type": "string" },
-        "items": { "type": "array" },
-        "total": { "type": "number" },
-        "paymentMethod": { "type": "string" },
-        "status": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" },
-        "updatedAt": { "type": "string", "format": "date-time" }
-      },
-      "required": ["userId", "items", "total", "status", "createdAt"]
-    },
-    "Product": {
-      "title": "Product",
-      "description": "Represents an item available for sale.",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "name": { "type": "string" },
-        "description": { "type": "string" },
-        "category": { "type": "string" },
-        "sellingPrice": { "type": "number" },
-        "stockQuantity": { "type": "number" },
-        "imageUrl": { "type": "string", "format": "uri" },
-        "isPublished": { "type": "boolean" }
-      },
-      "required": ["id", "name", "sellingPrice", "stockQuantity"]
-    },
-    "SupportTicket": {
-      "title": "SupportTicket",
-      "description": "Represents a technical support or warranty claim.",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "userId": { "type": "string" },
-        "customerName": { "type": "string" },
-        "productName": { "type": "string" },
-        "issueDescription": { "type": "string" },
-        "status": { "type": "string", "enum": ["pending", "diagnosing", "repairing", "ready", "completed"] },
-        "priority": { "type": "string", "enum": ["low", "medium", "high", "urgent"] },
-        "imageUrl": { "type": "string", "description": "Optional photo of the issue." },
-        "createdAt": { "type": "string", "format": "date-time" },
-        "updatedAt": { "type": "string", "format": "date-time" }
-      },
-      "required": ["userId", "productName", "issueDescription", "status", "createdAt"]
     }
   },
   "auth": {
@@ -101,18 +54,6 @@
     "/tokenTransactions/{txId}": {
       "schema": "TokenTransaction",
       "description": "Prestige point conversions."
-    },
-    "/products/{productId}": {
-      "schema": "Product",
-      "description": "Hardware products inventory."
-    },
-    "/orders/{orderId}": {
-      "schema": "Order",
-      "description": "Customer orders."
-    },
-    "/supportTickets/{ticketId}": {
-      "schema": "SupportTicket",
-      "description": "Technical support tickets."
     }
   }
 }

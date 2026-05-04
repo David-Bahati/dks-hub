@@ -56,7 +56,12 @@ import {
   Coins,
   Wallet,
   Gift,
-  Award
+  Award,
+  Cpu,
+  Pickaxe,
+  Target,
+  Flame,
+  Layout
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -78,7 +83,7 @@ import {
     getLowStockItems,
     getRevenueChartData
 } from '@/lib/data';
-import { Product } from '@/lib/types';
+import { Product, DailyMission } from '@/lib/types';
 import withAuth from '@/components/auth/withAuth';
 import { useAuth } from '@/context/AuthContext';
 import { useCollection, useMemoFirebase } from '@/firebase';
@@ -97,8 +102,16 @@ import {
   Tooltip, 
   ResponsiveContainer
 } from 'recharts';
+import { Progress } from "@/components/ui/progress";
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
+
+const DAILY_MISSIONS: DailyMission[] = [
+    { id: 'm1', title: 'Consultation Stock', description: 'Visiter le catalogue hardware pour voir les nouveautés.', rewardPoints: 10, icon: '📦', targetRole: 'all' },
+    { id: 'm2', title: 'Alerte Labo', description: 'Consulter le journal de bord pour les mises à jour techniques.', rewardPoints: 20, icon: '📑', targetRole: 'staff' },
+    { id: 'm3', title: 'Ambassadeur DKS', description: 'Partager votre code de parrainage sur WhatsApp.', rewardPoints: 50, icon: '📱', targetRole: 'customer' },
+    { id: 'm4', title: 'Révision Config', description: 'Lancer une simulation avec l\'Assistant IA.', rewardPoints: 15, icon: '🤖', targetRole: 'all' },
+];
 
 const navConfig = [
   { href: "/dashboard", icon: LineChart, label: "Aperçu", roles: ["Admin", "Seller", "Cashier", "customer"] },
@@ -145,6 +158,10 @@ function DashboardPage() {
   const [uResults, setUResults] = useState<{type: string, title: string, id: string, link: string}[]>([]);
   const [isUSearching, setIsUSearching] = useState(false);
 
+  // Mining & Missions States
+  const [isMining, setIsMining] = useState(false);
+  const [miningTimeLeft, setMiningTimeLeft] = useState<string | null>(null);
+
   const isStaff = user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'seller' || user?.role?.toLowerCase() === 'cashier';
   const isAdmin = user?.role?.toLowerCase() === 'admin';
 
@@ -184,22 +201,100 @@ function DashboardPage() {
   const salesQuery = useMemoFirebase(() => query(collection(db, "sales")), []);
   const { data: allSales } = useCollection(salesQuery);
 
-  // Staff Leaderboard Logic
+  // Mining Timer Effect
+  useEffect(() => {
+    if (!user?.lastMiningAt) return;
+    
+    const interval = setInterval(() => {
+        const lastMining = user.lastMiningAt?.toDate ? user.lastMiningAt.toDate() : new Date(user.lastMiningAt);
+        const nextMining = new Date(lastMining.getTime() + 24 * 60 * 60 * 1000);
+        const now = new Date();
+        
+        if (now >= nextMining) {
+            setMiningTimeLeft(null);
+            clearInterval(interval);
+        } else {
+            const diff = nextMining.getTime() - now.getTime();
+            const h = Math.floor(diff / (1000 * 60 * 60));
+            const m = Math.floor((diff / (1000 * 60)) % 60);
+            const s = Math.floor((diff / 1000) % 60);
+            setMiningTimeLeft(`${h}h ${m}m ${s}s`);
+        }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [user?.lastMiningAt]);
+
+  const handleStartMining = async () => {
+    if (!user || miningTimeLeft) return;
+    setIsMining(true);
+    try {
+        const reward = user.loyaltyLevel === 'Gold' ? 0.5 : user.loyaltyLevel === 'Silver' ? 0.2 : 0.1;
+        const txId = `PI-MINING-${Math.random().toString(36).substring(2, 12).toUpperCase()}`;
+
+        await updateDoc(doc(db, "users", user.uid), {
+            lastMiningAt: serverTimestamp(),
+            tokenBalance: increment(reward),
+            updatedAt: serverTimestamp()
+        });
+
+        await addDoc(collection(db, "tokenTransactions"), {
+            userId: user.uid,
+            userName: user.name,
+            type: 'mining',
+            tokenAmount: reward,
+            piTxId: txId,
+            createdAt: serverTimestamp()
+        });
+
+        toast({ title: "Minage Réussi !", description: `Vous avez extrait ${reward} DKST du bloc Hub.` });
+    } catch (e) {
+        toast({ title: "Erreur Minage", variant: "destructive" });
+    } finally {
+        setIsMining(false);
+    }
+  };
+
+  const handleCompleteMission = async (mission: DailyMission) => {
+      if (!user) return;
+      if (user.completedMissionsToday?.includes(mission.id)) {
+          toast({ title: "Déjà accomplie", description: "Revenez demain pour de nouveaux points." });
+          return;
+      }
+
+      try {
+          await updateDoc(doc(db, "users", user.uid), {
+              points: increment(mission.rewardPoints),
+              completedMissionsToday: [...(user.completedMissionsToday || []), mission.id],
+              updatedAt: serverTimestamp()
+          });
+
+          await addDoc(collection(db, "notifications"), {
+              userId: user.uid,
+              title: "Mission Réussie !",
+              message: `Félicitations ! Vous avez gagné ${mission.rewardPoints} points de prestige.`,
+              type: 'success',
+              isRead: false,
+              createdAt: serverTimestamp()
+          });
+
+          toast({ title: "Mission Terminée", description: `+${mission.rewardPoints} points de prestige !` });
+      } catch (e) {
+          toast({ title: "Erreur Mission", variant: "destructive" });
+      }
+  };
+
   const leaderboard = useMemo(() => {
     if (!allLogs || !allBookings || !allSav || !allSales) return [];
-
     const userPoints: Record<string, { name: string, points: number, actions: number }> = {};
-
     const initUser = (uid: string, name: string) => {
         if (!userPoints[uid]) userPoints[uid] = { name: name || "Expert", points: 0, actions: 0 };
     };
-
     allLogs.forEach(log => {
       initUser(log.userId, log.userName);
       userPoints[log.userId].points += 10;
       userPoints[log.userId].actions += 1;
     });
-
     allBookings.forEach(booking => {
       if (booking.technicianId) {
         initUser(booking.technicianId, booking.technicianName);
@@ -207,7 +302,6 @@ function DashboardPage() {
         userPoints[booking.technicianId].actions += 1;
       }
     });
-
     allSav.forEach(ticket => {
       if (ticket.technicianId) {
         initUser(ticket.technicianId, ticket.technicianName);
@@ -215,35 +309,29 @@ function DashboardPage() {
         userPoints[ticket.technicianId].actions += 1;
       }
     });
-
     allSales.forEach(sale => {
       if (sale.userId) {
         initUser(sale.userId, sale.customerName || "Vendeur");
         let pts = 20;
         if (sale.totalAmount >= 1000) pts = 100;
         else if (sale.totalAmount >= 500) pts = 50;
-        
         userPoints[sale.userId].points += pts;
         userPoints[sale.userId].actions += 1;
       }
     });
-
     return Object.entries(userPoints)
       .map(([id, data]) => ({ id, ...data }))
       .sort((a, b) => b.points - a.points)
       .slice(0, 5);
   }, [allLogs, allBookings, allSav, allSales]);
 
-  // Customer Loyalty Leaderboard Logic
   const customerLeaderboard = useMemo(() => {
     if (!allCustomers || !allOrders) return [];
-
     return allCustomers.map(cust => {
       const custOrders = allOrders?.filter(o => o.userId === cust.id && ["payée", "payé", "completed"].includes(o.status.toLowerCase())) || [];
       const orderPoints = custOrders.length * 100;
       const referralPoints = (cust.referralCount || 0) * 500;
       const totalPoints = orderPoints + referralPoints;
-
       return {
         id: cust.id,
         name: cust.name || cust.displayName || "Client Élite",
@@ -256,7 +344,6 @@ function DashboardPage() {
   }, [allCustomers, allOrders]);
 
   const weeklyWinner = leaderboard[0];
-  const topCustomer = customerLeaderboard[0];
 
   useEffect(() => {
     fetchGlobalData();
@@ -282,58 +369,6 @@ function DashboardPage() {
     }
   };
 
-  const handleRewardCustomer = async (cust: any) => {
-      if (!isAdmin) return;
-      try {
-          const rewardAmount = 10; // 10 DKST reward
-          await updateDoc(doc(db, "users", cust.id), {
-              tokenBalance: increment(rewardAmount),
-              updatedAt: serverTimestamp()
-          });
-
-          await addDoc(collection(db, "notifications"), {
-              userId: cust.id,
-              title: "RÉCOMPENSE ÉLITE !",
-              message: `Félicitations ! En tant que membre actif de la communauté, Double King Shop vous offre ${rewardAmount} DKST.`,
-              type: 'success',
-              isRead: false,
-              createdAt: serverTimestamp(),
-              link: '/dashboard/wallet'
-          });
-
-          toast({ title: "Client Récompensé", description: `${rewardAmount} DKST envoyés à ${cust.name}.` });
-      } catch (e) {
-          toast({ title: "Erreur récompense", variant: "destructive" });
-      }
-  };
-
-  const handleTriggerWeeklyDigest = async () => {
-      if (!weeklyWinner) return;
-      setIsSendingDigest(true);
-      try {
-          const totalPoints = leaderboard.reduce((acc, curr) => acc + curr.points, 0);
-          
-          await addDoc(collection(db, "notifications"), {
-              userId: 'staff',
-              title: "DÉPÊCHE HEBDOMADAIRE DKS",
-              message: `Félicitations à ${weeklyWinner.name} qui termine Élite de la semaine avec ${weeklyWinner.points} points ! L'équipe a cumulé ${totalPoints} points d'excellence.`,
-              type: 'success',
-              isRead: false,
-              createdAt: serverTimestamp(),
-              link: '/dashboard'
-          });
-
-          toast({ 
-              title: "Digest Envoyé (Simulé)", 
-              description: "Le rapport hebdomadaire a été diffusé à toute l'équipe." 
-          });
-      } catch (e) {
-          toast({ title: "Erreur simulation", variant: "destructive" });
-      } finally {
-          setIsSendingDigest(false);
-      }
-  };
-
   const handleDownloadWeeklyCertificate = async () => {
     if (!certRef.current || !weeklyWinner) return;
     setIsGeneratingCert(true);
@@ -343,7 +378,7 @@ function DashboardPage() {
         const pdf = new jsPDF({ orientation: 'landscape', unit: 'px', format: [canvas.width / 2, canvas.height / 2] });
         pdf.addImage(imgData, 'PNG', 0, 0, canvas.width / 2, canvas.height / 2);
         pdf.save(`CERTIFICAT_ELITE_DKS_${weeklyWinner.name.replace(/\s+/g, '_')}.pdf`);
-        toast({ title: "Certificat généré", description: "Félicitations au champion de la semaine !" });
+        toast({ title: "Certificat généré" });
     } catch (error) {
         toast({ title: "Erreur PDF", variant: "destructive" });
     } finally {
@@ -353,15 +388,10 @@ function DashboardPage() {
 
   useEffect(() => {
     const delayDebounce = setTimeout(async () => {
-      if (uSearch.length < 3) {
-        setUResults([]);
-        return;
-      }
-
+      if (uSearch.length < 3) { setUResults([]); return; }
       setIsUSearching(true);
       const results: any[] = [];
       const term = uSearch.toLowerCase();
-
       try {
         const ordersSnap = await getDocs(collection(db, "orders"));
         ordersSnap.forEach(doc => {
@@ -370,52 +400,11 @@ function DashboardPage() {
             results.push({ type: 'Commande', title: `CMD #${doc.id.substring(0,8)} - ${data.customerName}`, id: doc.id, link: '/dashboard/orders' });
           }
         });
-
-        const hardwareSnap = await getDocs(collection(db, "hardwareAssets"));
-        hardwareSnap.forEach(doc => {
-          const data = doc.data();
-          if (data.serialNumber?.toLowerCase().includes(term) || data.model?.toLowerCase().includes(term)) {
-            results.push({ type: 'Appareil', title: `${data.brand} ${data.model} (S/N: ${data.serialNumber})`, id: doc.id, link: '/dashboard/hardware' });
-          }
-        });
-
-        if (isStaff) {
-          const usersSnap = await getDocs(collection(db, "users"));
-          usersSnap.forEach(doc => {
-            const data = doc.data();
-            if (data.name?.toLowerCase().includes(term) || data.email?.toLowerCase().includes(term)) {
-              results.push({ type: 'Client', title: `${data.name} (${data.email})`, id: doc.id, link: '/dashboard/customers' });
-            }
-          });
-        }
-
         setUResults(results.slice(0, 8));
-      } catch (e) {
-        console.error(e);
-      } finally {
-        setIsUSearching(false);
-      }
+      } catch (e) { console.error(e); } finally { setIsUSearching(false); }
     }, 500);
-
     return () => clearTimeout(delayDebounce);
-  }, [uSearch, isStaff]);
-
-  const getStatusBadge = (status: string) => {
-    const s = status?.toLowerCase();
-    if (s?.includes('payé') || s?.includes('ready') || s === 'completed' || s === 'payée') {
-      return <Badge className="bg-green-500/10 text-green-400 border-none uppercase text-[9px] font-black px-2 py-0.5">TERMINÉ</Badge>;
-    }
-    return <Badge className="bg-orange-500/10 text-orange-400 border-none uppercase text-[9px] font-black px-2 py-0.5">EN COURS</Badge>;
-  };
-
-  if (loading || authLoading) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-background gap-4">
-        <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground">Initialisation du Hub Élite...</p>
-      </div>
-    );
-  }
+  }, [uSearch]);
 
   const SidebarContent = () => (
     <nav className="grid gap-1 p-6 overflow-y-auto custom-scrollbar h-full">
@@ -475,21 +464,10 @@ function DashboardPage() {
               </div>
             </div>
             
-            <nav className="hidden xl:flex items-center gap-1">
-                {filteredNavLinks.slice(0, 7).map((link) => (
-                    <Link key={link.href} href={link.href}>
-                        <Button variant="ghost" size="sm" className={cn("group rounded-none h-20 px-4 gap-2.5 font-medium transition-all text-[10px] relative", pathname === link.href ? 'text-accent' : 'text-slate-400 hover:text-white')}>
-                            <link.icon className={cn("h-4 w-4 transition-transform group-hover:translate-x-0.5", pathname === link.href ? 'text-accent' : '')} /><span>{link.label}</span>
-                            {pathname === link.href && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-accent" />}
-                        </Button>
-                    </Link>
-                ))}
-            </nav>
-            
             <div className="flex items-center gap-4">
                 <Link href="/dashboard/wallet">
                     <Badge className="bg-accent/20 text-accent border-accent/20 h-10 px-4 rounded-xl gap-2 font-black italic cursor-pointer hover:bg-accent/30 transition-all">
-                        <Coins size={16} /> {user?.tokenBalance || 0} DKST
+                        <Coins size={16} /> {user?.tokenBalance?.toFixed(2) || 0} DKST
                     </Badge>
                 </Link>
                 <Button variant="ghost" size="icon" onClick={fetchGlobalData} className="h-10 w-10 text-slate-400 hover:text-accent hover:bg-accent/10 rounded-xl transition-all group">
@@ -500,6 +478,103 @@ function DashboardPage() {
       </header>
 
       <main className="flex-1 p-4 md:p-8 space-y-8 pb-24 max-w-[1600px] mx-auto w-full">
+          {/* MINING & MISSIONS SECTION */}
+          <div className="grid gap-6 grid-cols-1 lg:grid-cols-12">
+              {/* CLOUD MINING INTERFACE */}
+              <Card className="lg:col-span-5 bg-gradient-to-br from-accent/10 via-background to-black border-accent/20 rounded-[3rem] p-10 relative overflow-hidden group shadow-2xl">
+                  <div className="absolute top-0 right-0 p-8 opacity-5 scale-150 rotate-45 group-hover:rotate-0 transition-transform duration-1000"><Pickaxe size={200} className="text-accent" /></div>
+                  <div className="relative z-10 space-y-8">
+                      <div className="flex justify-between items-start">
+                          <div className="space-y-1">
+                              <Badge className="bg-accent text-black font-black uppercase italic text-[8px] tracking-[0.3em] px-4 py-1 mb-2">Extraction en Cours</Badge>
+                              <h2 className="text-3xl font-black uppercase italic tracking-tighter">MINAGE <span className="text-accent">NUAGIQUE</span></h2>
+                              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Générez des DKST passivement</p>
+                          </div>
+                          <div className="w-16 h-16 rounded-[2rem] bg-accent/20 flex items-center justify-center text-accent shadow-[0_0_40px_rgba(56,189,248,0.2)]">
+                              <Pickaxe className={cn("transition-all duration-300", !miningTimeLeft ? "animate-bounce" : "animate-pulse")} size={32} />
+                          </div>
+                      </div>
+
+                      <div className="p-8 bg-black/60 backdrop-blur-3xl rounded-[2.5rem] border border-white/5 flex flex-col items-center gap-8 shadow-inner">
+                          {miningTimeLeft ? (
+                              <div className="text-center space-y-4">
+                                  <p className="text-[10px] font-black uppercase text-accent tracking-[0.5em]">Session Active</p>
+                                  <div className="flex items-center gap-6 justify-center">
+                                      <div className="w-2 h-16 bg-accent rounded-full animate-[pulse_1.5s_infinite]" />
+                                      <div className="text-6xl font-black text-white italic tracking-tighter font-mono">{miningTimeLeft}</div>
+                                      <div className="w-2 h-16 bg-accent rounded-full animate-[pulse_1.5s_infinite] delay-300" />
+                                  </div>
+                                  <div className="flex items-center gap-2 justify-center text-[10px] font-bold text-muted-foreground uppercase italic">
+                                      <Zap size={12} className="text-accent" /> Puissance: {user?.loyaltyLevel === 'Gold' ? '5.0' : user?.loyaltyLevel === 'Silver' ? '2.0' : '1.0'} GH/s
+                                  </div>
+                              </div>
+                          ) : (
+                              <div className="text-center space-y-6">
+                                  <div className="space-y-2">
+                                      <p className="text-4xl font-black text-white uppercase italic tracking-tighter leading-none">PRÊT À <br /><span className="text-accent">EXTRAIRE</span></p>
+                                      <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest italic leading-relaxed">Récompense cycle : {user?.loyaltyLevel === 'Gold' ? '0.50' : user?.loyaltyLevel === 'Silver' ? '0.20' : '0.10'} DKST</p>
+                                  </div>
+                                  <Button 
+                                      onClick={handleStartMining} 
+                                      disabled={isMining}
+                                      className="h-20 px-12 rounded-[2rem] bg-accent text-black font-black uppercase italic text-xl shadow-[0_0_50px_rgba(56,189,248,0.4)] hover:scale-105 active:scale-95 transition-all gap-4"
+                                  >
+                                      {isMining ? <Loader2 className="animate-spin" /> : <><Flame size={28} /> Lancer le Cycle</>}
+                                  </Button>
+                              </div>
+                          )}
+                      </div>
+                  </div>
+              </Card>
+
+              {/* DAILY MISSIONS TABLEAU */}
+              <div className="lg:col-span-7 space-y-6">
+                  <div className="flex items-center justify-between px-4">
+                      <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary"><Target size={20} /></div>
+                          <h2 className="text-xl font-black uppercase italic tracking-tight">Objectifs <span className="text-primary">du Jour</span></h2>
+                      </div>
+                      <Badge variant="outline" className="border-primary/20 text-primary uppercase font-black text-[9px] tracking-widest">Reset en 12h</Badge>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {DAILY_MISSIONS.filter(m => !m.targetRole || m.targetRole === 'all' || (m.targetRole === 'staff' && isStaff) || (m.targetRole === 'customer' && !isStaff)).map((mission) => {
+                          const isDone = user?.completedMissionsToday?.includes(mission.id);
+                          return (
+                              <Card key={mission.id} className={cn(
+                                  "bg-white/5 border border-white/5 rounded-[2.2rem] p-6 transition-all group relative overflow-hidden",
+                                  isDone ? "opacity-60 border-green-500/20" : "hover:bg-white/[0.08] hover:border-primary/30"
+                              )}>
+                                  {isDone && <div className="absolute top-4 right-6 text-green-400 animate-in zoom-in-50"><CheckCircle2 size={24} /></div>}
+                                  <div className="flex items-start gap-5">
+                                      <div className="w-14 h-14 rounded-2xl bg-white/5 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">
+                                          {mission.icon}
+                                      </div>
+                                      <div className="flex-1 space-y-2">
+                                          <div>
+                                              <h4 className="font-black uppercase italic text-sm tracking-tight text-white">{mission.title}</h4>
+                                              <p className="text-[10px] text-muted-foreground leading-snug">{mission.description}</p>
+                                          </div>
+                                          <div className="flex items-center gap-3">
+                                              <Badge className="bg-primary/20 text-primary border-none uppercase text-[8px] font-black">+{mission.rewardPoints} PTS</Badge>
+                                              {!isDone && (
+                                                  <button 
+                                                      onClick={() => handleCompleteMission(mission)}
+                                                      className="text-[9px] font-black uppercase italic text-accent hover:underline flex items-center gap-1"
+                                                  >
+                                                      Valider <ArrowRight size={10} />
+                                                  </button>
+                                              )}
+                                          </div>
+                                      </div>
+                                  </div>
+                              </Card>
+                          );
+                      })}
+                  </div>
+              </div>
+          </div>
+
           {isStaff && (
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
               <Card className="lg:col-span-2 glossy-card border-none rounded-[2.5rem] relative overflow-hidden group">
@@ -548,17 +623,6 @@ function DashboardPage() {
                               {isGeneratingCert ? <Loader2 className="animate-spin h-3 w-3" /> : <Download size={14} />} Certificat de Champion
                           </Button>
                         )}
-                        {isAdmin && (
-                          <Button 
-                              variant="ghost" 
-                              size="sm" 
-                              className="w-full h-10 text-muted-foreground/60 hover:text-white rounded-xl text-[9px] font-black uppercase italic gap-2"
-                              onClick={handleTriggerWeeklyDigest}
-                              disabled={isSendingDigest}
-                          >
-                              {isSendingDigest ? <Loader2 className="animate-spin h-3 w-3" /> : <MailCheck size={14} />} Diffuser le Digest
-                          </Button>
-                        )}
                       </div>
                     </>
                   ) : (
@@ -601,24 +665,6 @@ function DashboardPage() {
                         </div>
                     </div>
                 </Card>
-
-                {/* CONVERSION POINTS CTA FOR CUSTOMERS */}
-                <Card className="bg-accent/5 border border-accent/20 rounded-[2.5rem] p-10 flex flex-col md:flex-row items-center justify-between gap-8 shadow-xl shadow-accent/5">
-                    <div className="flex items-center gap-6">
-                        <div className="w-16 h-16 rounded-2xl bg-accent text-black flex items-center justify-center shadow-lg shadow-accent/20">
-                            <Coins size={32} />
-                        </div>
-                        <div className="space-y-1">
-                            <h3 className="text-xl font-black uppercase italic">Convertir vos Points en Jetons</h3>
-                            <p className="text-xs text-muted-foreground max-w-md">Transformez vos récompenses en **DKS Tokens** synchronisables sur Pi Network.</p>
-                        </div>
-                    </div>
-                    <Link href="/dashboard/wallet">
-                        <Button className="bg-accent text-black font-black uppercase italic h-14 px-10 rounded-2xl gap-3">
-                            Aller au Wallet <ArrowRight size={20}/>
-                        </Button>
-                    </Link>
-                </Card>
             </div>
           )}
 
@@ -655,7 +701,6 @@ function DashboardPage() {
                                     </div>
                                     <div className="text-right">
                                         <p className="font-black text-accent text-lg">${order.total?.toFixed(2)}</p>
-                                        {getStatusBadge(order.status)}
                                     </div>
                                 </div>
                             )) || (
@@ -666,7 +711,6 @@ function DashboardPage() {
                     </CardContent>
                 </Card>
 
-                {/* DOUBLE LEADERBOARD : STAFF & CUSTOMERS */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* STAFF LEADERBOARD */}
                   <Card className="glossy-card border-none rounded-[2.5rem] overflow-hidden">
@@ -723,29 +767,10 @@ function DashboardPage() {
                                         <p className="text-[8px] font-bold text-muted-foreground uppercase">{cust.points} PTS • {cust.level}</p>
                                     </div>
                                 </div>
-                                {isAdmin ? (
-                                    <Button 
-                                        variant="ghost" 
-                                        size="icon" 
-                                        className="h-8 w-8 text-primary hover:bg-primary/10 rounded-lg opacity-0 group-hover:opacity-100"
-                                        onClick={() => handleRewardCustomer(cust)}
-                                    >
-                                        <Gift size={14} />
-                                    </Button>
-                                ) : (
-                                    <Badge variant="outline" className="border-none font-black text-[9px] italic text-primary/60">
-                                      {cust.orders} CMD.
-                                    </Badge>
-                                )}
                             </div>
                           ))}
                        </div>
                     </CardContent>
-                    {isAdmin && (
-                        <div className="p-3 bg-primary/5 text-center">
-                            <p className="text-[8px] font-black uppercase text-primary/40 italic">Offrir des jetons aux clients fidèles</p>
-                        </div>
-                    )}
                   </Card>
                 </div>
             </div>
@@ -770,7 +795,6 @@ function DashboardPage() {
                                     <div className="space-y-1">
                                         <p className="text-[11px] font-black uppercase tracking-tight">{notif.title}</p>
                                         <p className="text-[10px] text-muted-foreground leading-snug line-clamp-2">{notif.message}</p>
-                                        <p className="text-[8px] font-bold uppercase opacity-30">{notif.createdAt?.toDate?.().toLocaleTimeString() || 'Maintenant'}</p>
                                     </div>
                                 </div>
                             )) : (
@@ -790,56 +814,22 @@ function DashboardPage() {
           {weeklyWinner && (
               <div ref={certRef} className="bg-white text-black p-0 w-[1123px] h-[794px] font-serif relative overflow-hidden flex items-center justify-center">
                   <div className="absolute inset-0 border-[40px] border-double border-[#0f172a]" />
-                  <div className="absolute inset-10 border-4 border-[#3b82f6]/10" />
-                  
                   <div className="relative z-10 text-center w-full px-40 space-y-12">
-                      <div className="flex flex-col items-center gap-6">
-                          <Logo size="lg" />
-                          <div className="space-y-1">
-                              <h2 className="text-sm font-bold tracking-[0.4em] uppercase text-[#0f172a]">DKS EXCELLENCE HUB</h2>
-                              <p className="text-[10px] font-medium uppercase tracking-[0.2em] opacity-40">Récompense de la Performance Staff • Bunia, RDC</p>
-                          </div>
-                      </div>
-
-                      <div className="space-y-4">
-                          <h1 className="text-6xl font-black uppercase italic tracking-tighter text-[#0f172a]">EMPLOYÉ DU MOIS</h1>
-                          <p className="text-xl font-light italic text-gray-500 tracking-[0.2em]">CERTIFICAT DE PRESTIGE & EXCELLENCE</p>
-                      </div>
-
-                      <div className="space-y-10 py-10 bg-gray-50/50 rounded-[3rem] border border-gray-100">
-                          <p className="text-lg font-medium text-gray-400 italic">Nous décernons fièrement ce titre à</p>
-                          
-                          <div className="space-y-4">
-                              <h3 className="text-6xl font-black uppercase italic text-[#0f172a] tracking-tight">{weeklyWinner.name}</h3>
-                              <div className="w-40 h-1 bg-[#3b82f6] mx-auto" />
-                          </div>
-
-                          <p className="text-lg font-medium text-gray-500 max-w-2xl mx-auto leading-relaxed">
-                              En reconnaissance de son investissement exceptionnel et de sa contribution à l'élite technologique, totalisant un score de prestige de <strong>{weeklyWinner.points} points</strong>.
-                          </p>
-                      </div>
-
+                      <Logo size="lg" />
+                      <h1 className="text-6xl font-black uppercase italic tracking-tighter text-[#0f172a]">EMPLOYÉ DU MOIS</h1>
+                      <h3 className="text-5xl font-black uppercase italic text-[#3b82f6] tracking-tight">{weeklyWinner.name}</h3>
+                      <p className="text-lg font-medium text-gray-500 max-w-2xl mx-auto leading-relaxed">
+                          En reconnaissance de son investissement exceptionnel, totalisant un score de prestige de <strong>{weeklyWinner.points} points</strong>.
+                      </p>
                       <div className="grid grid-cols-3 items-end pt-12">
-                          <div className="text-center space-y-2">
-                              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Date de distinction</p>
-                              <p className="text-sm font-bold">{new Date().toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }).toUpperCase()}</p>
-                          </div>
-                          <div className="flex flex-col items-center gap-4">
-                              <div className="p-3 border-2 border-gray-100 rounded-2xl bg-white shadow-sm"><QrCode size={60} className="opacity-10" /></div>
-                              <p className="text-[8px] font-bold text-gray-300 uppercase tracking-tighter">ID-DISTINCTION: DKS-WIN-{weeklyWinner.id.substring(0, 10).toUpperCase()}</p>
-                          </div>
-                          <div className="text-center space-y-4">
-                              <div className="w-40 h-px bg-gray-200 mx-auto" />
-                              <div className="flex flex-col items-center">
-                                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Direction Générale</p>
-                                  <p className="text-sm font-black italic">Double King Shop</p>
-                                  <ShieldCheck size={24} className="text-green-600 mt-2 opacity-30" />
-                              </div>
+                          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Date de distinction</p>
+                          <div className="p-3 border-2 border-gray-100 rounded-2xl bg-white shadow-sm"><QrCode size={60} className="opacity-10" /></div>
+                          <div className="flex flex-col items-center">
+                              <p className="text-sm font-black italic">Double King Shop</p>
+                              <ShieldCheck size={24} className="text-green-600 mt-2 opacity-30" />
                           </div>
                       </div>
                   </div>
-                  <div className="absolute top-0 right-0 w-40 h-40 bg-accent/5 rounded-bl-full -z-10" />
-                  <div className="absolute bottom-0 left-0 w-40 h-40 bg-primary/5 rounded-tr-full -z-10" />
               </div>
           )}
       </div>
