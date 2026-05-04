@@ -22,7 +22,9 @@ import {
     Plus,
     UserCheck,
     Smartphone,
-    Receipt
+    Receipt,
+    Star,
+    Award
 } from "lucide-react";
 import { db } from '@/lib/firebase';
 import { collection, query, orderBy, updateDoc, doc, addDoc, serverTimestamp, onSnapshot, where } from 'firebase/firestore';
@@ -38,12 +40,13 @@ import { cn } from "@/lib/utils";
 
 // Mapping des prix pour la facturation automatique
 const SERVICE_PRICES: Record<string, number> = {
+    "ia-mastery": 75,
+    "crypto-trading": 50,
+    "network-pro": 150,
+    "hardware-extreme": 45,
     "ia-workshop": 50,
     "network-install": 150,
     "hardware-upgrade": 25,
-    "formation": 50,
-    "infrastructure": 150,
-    "upgrade": 25,
     "support": 15
 };
 
@@ -77,7 +80,6 @@ function ServiceManagementPage() {
                 updatedAt: serverTimestamp()
             });
 
-            // LOGIQUE DE FACTURATION AUTOMATIQUE
             if (newStatus === 'completed') {
                 const price = SERVICE_PRICES[booking.serviceId] || SERVICE_PRICES[booking.category] || 30;
                 
@@ -85,7 +87,7 @@ function ServiceManagementPage() {
                     userId: booking.userId,
                     customerName: booking.customerName,
                     items: [{ 
-                        name: `Prestation Hub: ${booking.serviceTitle}`, 
+                        name: `Academy/Solution: ${booking.serviceTitle}`, 
                         quantity: 1, 
                         price: price 
                     }],
@@ -98,20 +100,20 @@ function ServiceManagementPage() {
                     sourceId: booking.id
                 });
 
-                toast({ title: "Service terminé", description: `Facture de ${price}$ générée pour le client.` });
+                toast({ title: "Prestation terminée", description: `Facture de ${price}$ générée.` });
             }
 
             await addDoc(collection(db, "notifications"), {
                 userId: booking.userId,
-                title: "Statut de votre Service",
-                message: `Le statut de votre prestation "${booking.serviceTitle}" a été mis à jour : ${newStatus.toUpperCase()}.${newStatus === 'completed' ? ' Une facture a été générée.' : ''}`,
+                title: "Statut DKS Academy",
+                message: `Mise à jour : ${newStatus.toUpperCase()}.${newStatus === 'completed' ? ' Votre facture est prête.' : ''}`,
                 type: 'info',
                 isRead: false,
                 createdAt: serverTimestamp(),
                 link: '/dashboard/services'
             });
 
-            if (newStatus !== 'completed') toast({ title: "Statut mis à jour", description: "Le client a été notifié." });
+            if (newStatus !== 'completed') toast({ title: "Statut mis à jour" });
         } catch (error) {
             toast({ title: "Erreur", variant: "destructive" });
         }
@@ -124,16 +126,16 @@ function ServiceManagementPage() {
                 technicianName: techName,
                 updatedAt: serverTimestamp()
             });
-            toast({ title: "Technicien assigné", description: `${techName} prend en charge ce dossier.` });
-        } catch (e) { toast({ title: "Erreur assignation", variant: "destructive" }); }
+            toast({ title: "Instructeur assigné", description: `${techName} pilote ce dossier.` });
+        } catch (e) { toast({ title: "Erreur", variant: "destructive" }); }
     };
 
     const getStatusBadge = (status: string) => {
         switch (status) {
-            case 'pending': return <Badge className="bg-orange-500/10 text-orange-400 border-none uppercase text-[9px] font-black">Attente</Badge>;
-            case 'confirmed': return <Badge className="bg-blue-500/10 text-blue-400 border-none uppercase text-[9px] font-black">Confirmé</Badge>;
-            case 'in_progress': return <Badge className="bg-purple-500/10 text-purple-400 border-none uppercase text-[9px] font-black">En cours</Badge>;
-            case 'completed': return <Badge className="bg-green-500/10 text-green-400 border-none uppercase text-[9px] font-black">Terminé & Facturé</Badge>;
+            case 'pending': return <Badge className="bg-orange-500/10 text-orange-400 border-none uppercase text-[9px] font-black">Candidature</Badge>;
+            case 'confirmed': return <Badge className="bg-blue-500/10 text-blue-400 border-none uppercase text-[9px] font-black">Admis / Planifié</Badge>;
+            case 'in_progress': return <Badge className="bg-purple-500/10 text-purple-400 border-none uppercase text-[9px] font-black">En Cours</Badge>;
+            case 'completed': return <Badge className="bg-green-500/10 text-green-400 border-none uppercase text-[9px] font-black">Diplômé / Terminé</Badge>;
             case 'cancelled': return <Badge className="bg-white/5 text-muted-foreground border-none uppercase text-[9px] font-black">Annulé</Badge>;
             default: return <Badge>{status}</Badge>;
         }
@@ -163,26 +165,26 @@ function ServiceManagementPage() {
                     <div className="flex items-start gap-5">
                         <Link href="/dashboard"><Button variant="outline" className="h-14 w-14 rounded-2xl border-white/10 hover:bg-accent/10 hover:text-accent p-0"><ArrowLeft size={24} /></Button></Link>
                         <div>
-                            <h1 className="text-4xl font-black uppercase italic tracking-tighter">Pôle <span className="text-accent">Services Hub</span></h1>
-                            <p className="text-muted-foreground font-light mt-1">Interventions techniques et formations professionnelles à Bunia.</p>
+                            <h1 className="text-4xl font-black uppercase italic tracking-tighter">Pilotage <span className="text-primary">Academy & Solutions</span></h1>
+                            <p className="text-muted-foreground font-light mt-1">Gestion des admissions et déploiements techniques DKS.</p>
                         </div>
                     </div>
-                    {!isStaff && <Link href="/services"><Button className="bg-primary hover:bg-primary/90 h-14 px-8 rounded-2xl font-black uppercase italic gap-3 shadow-xl"><Plus size={20} /> Nouvelle demande</Button></Link>}
+                    {!isStaff && <Link href="/services"><Button className="bg-primary hover:bg-primary/90 h-14 px-8 rounded-2xl font-black uppercase italic gap-3 shadow-xl"><Plus size={20} /> Nouvelle admission</Button></Link>}
                 </div>
 
                 <div className="flex flex-col md:flex-row gap-4 mb-10">
                     <div className="relative flex-1">
                         <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-muted-foreground" size={20} />
-                        <Input placeholder="Rechercher par client ou service..." className="h-16 pl-14 bg-white/5 border-white/10 rounded-2xl focus:border-accent" value={search} onChange={(e) => setSearch(e.target.value)} />
+                        <Input placeholder="Rechercher un étudiant ou un projet..." className="h-16 pl-14 bg-white/5 border-white/10 rounded-2xl focus:border-accent" value={search} onChange={(e) => setSearch(e.target.value)} />
                     </div>
                     <Select value={statusFilter} onValueChange={setStatusFilter}>
                         <SelectTrigger className="h-16 w-full md:w-[200px] bg-white/5 border-white/10 rounded-2xl font-black uppercase italic text-[10px]"><Filter className="mr-2 h-4 w-4" /><SelectValue placeholder="Filtrer" /></SelectTrigger>
                         <SelectContent className="bg-card border-white/10">
-                            <SelectItem value="all">Tous les statuts</SelectItem>
-                            <SelectItem value="pending">En attente</SelectItem>
-                            <SelectItem value="confirmed">Confirmé</SelectItem>
+                            <SelectItem value="all">Tout voir</SelectItem>
+                            <SelectItem value="pending">Candidatures</SelectItem>
+                            <SelectItem value="confirmed">Confirmés</SelectItem>
                             <SelectItem value="in_progress">En cours</SelectItem>
-                            <SelectItem value="completed">Terminé</SelectItem>
+                            <SelectItem value="completed">Terminés</SelectItem>
                         </SelectContent>
                     </Select>
                 </div>
@@ -194,17 +196,19 @@ function ServiceManagementPage() {
                                 <CardContent className="p-8 flex flex-col lg:flex-row items-center gap-8">
                                     <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center shrink-0">{getCategoryIcon(booking.category)}</div>
                                     
-                                    <div className="flex-1 space-y-2 text-center md:text-left">
+                                    <div className="flex-1 space-y-4 text-center md:text-left">
                                         <div className="flex flex-wrap justify-center md:justify-start items-center gap-3">
                                             <h3 className="text-xl font-black uppercase italic tracking-tight">{booking.serviceTitle}</h3>
                                             {getStatusBadge(booking.status)}
+                                            {booking.level && <Badge variant="outline" className="border-primary/20 text-primary text-[8px] font-black uppercase px-2">{booking.level}</Badge>}
                                         </div>
                                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-y-2 gap-x-6 text-[10px] font-black uppercase italic text-muted-foreground/60">
-                                            <div className="flex items-center gap-2"><User size={12} className="text-accent"/> {booking.customerName}</div>
+                                            <div className="flex items-center gap-2"><User size={12} className="text-primary"/> {booking.customerName}</div>
                                             <div className="flex items-center gap-2"><Calendar size={12} className="text-accent"/> {booking.scheduledDate || 'Date à fixer'}</div>
-                                            <div className="flex items-center gap-2"><MapPin size={12} className="text-accent"/> {booking.location === 'shop' ? 'Boutique' : 'Sur site'}</div>
-                                            <div className="flex items-center gap-2"><UserCheck size={12} className="text-primary"/> {booking.technicianName || 'Expert non assigné'}</div>
+                                            <div className="flex items-center gap-2"><Award size={12} className="text-accent"/> Certif: {booking.category === 'formation' ? 'Oui' : 'Non'}</div>
+                                            <div className="flex items-center gap-2"><UserCheck size={12} className="text-primary"/> Expert: {booking.technicianName || 'Non assigné'}</div>
                                         </div>
+                                        {booking.notes && <p className="text-xs italic text-muted-foreground line-clamp-1 border-t border-white/5 pt-2">Objectif: "{booking.notes}"</p>}
                                     </div>
 
                                     <div className="flex flex-col gap-3 shrink-0 min-w-[220px]">
@@ -216,27 +220,27 @@ function ServiceManagementPage() {
                                                 }}>
                                                     <SelectTrigger className="h-10 bg-primary/10 border-primary/20 rounded-xl font-bold uppercase text-[9px]">
                                                         <UserCheck className="mr-2 h-3 w-3" />
-                                                        <SelectValue placeholder="Assigner Expert" />
+                                                        <SelectValue placeholder="Assigner Instructeur" />
                                                     </SelectTrigger>
                                                     <SelectContent className="bg-card border-white/10">
                                                         {staffMembers.map(m => <SelectItem key={m.id} value={m.id}>{m.displayName || m.name}</SelectItem>)}
                                                     </SelectContent>
                                                 </Select>
                                                 <Select value={booking.status} onValueChange={(val) => updateBookingStatus(booking, val)}>
-                                                    <SelectTrigger className="h-10 bg-white/5 border-white/10 rounded-xl font-black uppercase italic text-[9px]"><SelectValue placeholder="Statut" /></SelectTrigger>
+                                                    <SelectTrigger className="h-10 bg-white/5 border-white/10 rounded-xl font-black uppercase italic text-[9px]"><SelectValue placeholder="Suivi Cursus" /></SelectTrigger>
                                                     <SelectContent className="bg-card border-white/10">
                                                         <SelectItem value="pending">En attente</SelectItem>
-                                                        <SelectItem value="confirmed">Confirmer</SelectItem>
-                                                        <SelectItem value="in_progress">Démarrer</SelectItem>
-                                                        <SelectItem value="completed">Terminer & Facturer</SelectItem>
-                                                        <SelectItem value="cancelled">Annuler</SelectItem>
+                                                        <SelectItem value="confirmed">Admettre / Confirmer</SelectItem>
+                                                        <SelectItem value="in_progress">Démarrer Session</SelectItem>
+                                                        <SelectItem value="completed">Diplômer & Facturer</SelectItem>
+                                                        <SelectItem value="cancelled">Refuser / Annuler</SelectItem>
                                                     </SelectContent>
                                                 </Select>
                                             </div>
                                         ) : (
-                                            <Button variant="outline" className="rounded-xl border-accent/20 text-accent hover:bg-accent/10 gap-2 h-12 font-black uppercase italic text-[10px]" asChild>
-                                                <a href={`https://wa.me/243823038945?text=Bonjour,%20je%20vous%20contacte%20pour%20ma%20réservation%20#${booking.id.substring(0, 8)}`} target="_blank" rel="noopener noreferrer">
-                                                    <Smartphone size={14} /> WhatsApp Support
+                                            <Button variant="outline" className="rounded-xl border-primary/20 text-primary hover:bg-primary/10 gap-2 h-12 font-black uppercase italic text-[10px]" asChild>
+                                                <a href={`https://wa.me/243823038945?text=Bonjour,%20je%20suis%20inscrit%20à%20l'Academy%20DKS%20pour%20le%20cursus%20${booking.serviceTitle}.`} target="_blank" rel="noopener noreferrer">
+                                                    <Smartphone size={14} /> Contacter mon Instructeur
                                                 </a>
                                             </Button>
                                         )}
@@ -246,7 +250,7 @@ function ServiceManagementPage() {
                         ))
                     ) : (
                         <div className="py-32 text-center bg-white/5 rounded-[3rem] border border-dashed border-white/10 opacity-30 flex flex-col items-center gap-6">
-                            <Calendar size={80} strokeWidth={1} /><p className="text-xl font-black uppercase italic tracking-tighter">Aucune activité prévue</p>
+                            <GraduationCap size={80} strokeWidth={1} /><p className="text-xl font-black uppercase italic tracking-tighter">Aucun cursus actif</p>
                         </div>
                     )}
                 </div>
