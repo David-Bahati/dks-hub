@@ -19,7 +19,10 @@ import {
     ExternalLink,
     Send,
     User as UserIcon,
-    ShieldCheck
+    ShieldCheck,
+    Image as ImageIcon,
+    Upload,
+    X
 } from "lucide-react";
 import { db } from '@/lib/firebase';
 import { collection, addDoc, serverTimestamp, doc, updateDoc, query, orderBy, onSnapshot, where } from 'firebase/firestore';
@@ -53,7 +56,11 @@ function SupportPage() {
     const [search, setSearch] = useState("");
     const [chatMessages, setChatMessages] = useState<SupportMessage[]>([]);
     const [newMessage, setNewMessage] = useState("");
+    const [ticketImage, setTicketImage] = useState<string | null>(null);
+    const [chatImage, setChatImage] = useState<string | null>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
+    const ticketFileInputRef = useRef<HTMLInputElement>(null);
+    const chatFileInputRef = useRef<HTMLInputElement>(null);
 
     const ticketsQuery = useMemoFirebase(() => {
         const baseRef = collection(db, "supportTickets");
@@ -81,6 +88,22 @@ function SupportPage() {
         }
     }, [isChatOpen, selectedTicket]);
 
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, target: 'ticket' | 'chat') => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        if (file.size > 2 * 1024 * 1024) {
+            toast({ title: "Fichier trop lourd", description: "Max 2Mo", variant: "destructive" });
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            if (target === 'ticket') setTicketImage(reader.result as string);
+            else setChatImage(reader.result as string);
+        };
+        reader.readAsDataURL(file);
+    };
+
     const handleCreateTicket = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         setIsSubmitting(true);
@@ -94,6 +117,7 @@ function SupportPage() {
                 issueDescription: formData.get('description'),
                 status: 'pending',
                 priority: formData.get('priority'),
+                imageUrl: ticketImage,
                 createdAt: serverTimestamp(),
                 updatedAt: serverTimestamp()
             };
@@ -111,6 +135,7 @@ function SupportPage() {
             });
 
             toast({ title: "Ticket ouvert", description: "Notre équipe technique reviendra vers vous rapidement." });
+            setTicketImage(null);
             setIsModalOpen(false);
         } catch (error) {
             toast({ title: "Erreur", description: "Impossible d'ouvrir le ticket.", variant: "destructive" });
@@ -144,10 +169,12 @@ function SupportPage() {
 
     const handleSendMessage = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!newMessage.trim() || !selectedTicket || !user) return;
+        if ((!newMessage.trim() && !chatImage) || !selectedTicket || !user) return;
 
         const text = newMessage.trim();
+        const img = chatImage;
         setNewMessage("");
+        setChatImage(null);
 
         try {
             const messagesRef = collection(db, "supportTickets", selectedTicket.id, "messages");
@@ -156,20 +183,19 @@ function SupportPage() {
                 senderName: user.name,
                 senderRole: user.role,
                 text: text,
+                imageUrl: img,
                 createdAt: serverTimestamp()
             });
 
-            // Update ticket updatedAt for sorting
             await updateDoc(doc(db, "supportTickets", selectedTicket.id), {
                 updatedAt: serverTimestamp()
             });
 
-            // Notify other party
             const recipientId = isStaff ? selectedTicket.userId : 'staff';
             await addDoc(collection(db, "notifications"), {
                 userId: recipientId,
                 title: "Nouveau message Support",
-                message: `${user.name} : ${text.substring(0, 50)}${text.length > 50 ? '...' : ''}`,
+                message: img ? `${user.name} a envoyé une image.` : `${user.name} : ${text.substring(0, 50)}`,
                 type: 'info',
                 isRead: false,
                 createdAt: serverTimestamp(),
@@ -235,8 +261,12 @@ function SupportPage() {
                         .map((ticket) => (
                             <Card key={ticket.id} className="glossy-card border-none rounded-[2.5rem] overflow-hidden group">
                                 <CardContent className="p-8 flex flex-col md:flex-row items-center gap-8">
-                                    <div className="w-16 h-16 rounded-2xl bg-accent/10 flex items-center justify-center text-accent shrink-0">
-                                        <Wrench size={28} />
+                                    <div className="w-16 h-16 rounded-2xl bg-accent/10 flex items-center justify-center text-accent shrink-0 overflow-hidden">
+                                        {ticket.imageUrl ? (
+                                            <img src={ticket.imageUrl} className="w-full h-full object-cover" />
+                                        ) : (
+                                            <Wrench size={28} />
+                                        )}
                                     </div>
                                     
                                     <div className="flex-1 space-y-2 text-center md:text-left">
@@ -300,33 +330,70 @@ function SupportPage() {
 
             {/* Modal de création de ticket */}
             <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-                <DialogContent className="glossy-card border-none rounded-[2.5rem]">
+                <DialogContent className="glossy-card border-none rounded-[2.5rem] sm:max-w-2xl">
                     <DialogHeader>
                         <DialogTitle className="text-2xl font-black uppercase italic tracking-tighter">Demander une Assistance</DialogTitle>
                     </DialogHeader>
                     <form onSubmit={handleCreateTicket} className="space-y-6 py-4">
-                        <div className="space-y-2">
-                            <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Matériel concerné</Label>
-                            <Input name="productName" placeholder="Ex: Laptop ASUS ROG, RTX 4070..." required className="h-14 bg-background/50 border-white/10 rounded-xl" />
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="space-y-6">
+                                <div className="space-y-2">
+                                    <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Matériel concerné</Label>
+                                    <Input name="productName" placeholder="Ex: Laptop ASUS ROG, RTX 4070..." required className="h-14 bg-background/50 border-white/10 rounded-xl" />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Priorité</Label>
+                                    <Select name="priority" defaultValue="medium">
+                                        <SelectTrigger className="h-14 bg-background/50 border-white/10 rounded-xl">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent className="bg-card border-white/10">
+                                            <SelectItem value="low">Faible</SelectItem>
+                                            <SelectItem value="medium">Normale</SelectItem>
+                                            <SelectItem value="high">Haute</SelectItem>
+                                            <SelectItem value="urgent">Urgent</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Description du problème</Label>
+                                    <Textarea name="description" placeholder="Détaillez le souci technique..." required className="min-h-[120px] bg-background/50 border-white/10 rounded-xl" />
+                                </div>
+                            </div>
+                            
+                            <div className="space-y-2">
+                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Photo de la panne (Optionnel)</Label>
+                                <div 
+                                    onClick={() => ticketFileInputRef.current?.click()}
+                                    className="aspect-square rounded-2xl border-2 border-dashed border-white/10 hover:border-accent/50 bg-background/50 flex flex-col items-center justify-center cursor-pointer transition-all overflow-hidden relative group"
+                                >
+                                    {ticketImage ? (
+                                        <>
+                                            <img src={ticketImage} className="w-full h-full object-cover" />
+                                            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                                <Upload className="text-white" />
+                                            </div>
+                                            <Button 
+                                                type="button" 
+                                                variant="destructive" 
+                                                size="icon" 
+                                                className="absolute top-2 right-2 h-8 w-8 rounded-full"
+                                                onClick={(e) => { e.stopPropagation(); setTicketImage(null); }}
+                                            >
+                                                <X size={14} />
+                                            </Button>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <ImageIcon className="h-10 w-10 text-muted-foreground mb-2 group-hover:text-accent transition-colors" />
+                                            <span className="text-[10px] font-black uppercase text-muted-foreground group-hover:text-accent">Cliquez pour joindre</span>
+                                        </>
+                                    )}
+                                </div>
+                                <input type="file" ref={ticketFileInputRef} className="hidden" accept="image/*" onChange={(e) => handleFileChange(e, 'ticket')} />
+                            </div>
                         </div>
-                        <div className="space-y-2">
-                            <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Priorité</Label>
-                            <Select name="priority" defaultValue="medium">
-                                <SelectTrigger className="h-14 bg-background/50 border-white/10 rounded-xl">
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent className="bg-card border-white/10">
-                                    <SelectItem value="low">Faible</SelectItem>
-                                    <SelectItem value="medium">Normale</SelectItem>
-                                    <SelectItem value="high">Haute</SelectItem>
-                                    <SelectItem value="urgent">Urgent</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="space-y-2">
-                            <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Description du problème</Label>
-                            <Textarea name="description" placeholder="Détaillez le souci technique ou la demande de garantie..." required className="min-h-[120px] bg-background/50 border-white/10 rounded-xl" />
-                        </div>
+
                         <DialogFooter>
                             <Button type="button" variant="ghost" onClick={() => setIsModalOpen(false)} className="font-bold uppercase text-[10px]">Annuler</Button>
                             <Button type="submit" disabled={isSubmitting} className="bg-accent text-black font-black uppercase italic rounded-xl px-10 h-14 shadow-xl flex-1">
@@ -356,6 +423,9 @@ function SupportPage() {
                         <div className="bg-white/5 border border-white/5 rounded-2xl p-4 text-xs text-muted-foreground italic mb-8">
                             <p className="font-black uppercase text-[10px] mb-2 text-accent">Problème initial :</p>
                             "{selectedTicket?.issueDescription}"
+                            {selectedTicket?.imageUrl && (
+                                <img src={selectedTicket.imageUrl} className="mt-4 rounded-xl max-h-40 object-cover cursor-pointer hover:opacity-80" onClick={() => window.open(selectedTicket.imageUrl)} />
+                            )}
                         </div>
 
                         {chatMessages.length === 0 && (
@@ -370,10 +440,13 @@ function SupportPage() {
                             return (
                                 <div key={msg.id} className={cn("flex flex-col", isMe ? "items-end" : "items-start")}>
                                     <div className={cn(
-                                        "max-w-[85%] p-4 rounded-2xl text-sm leading-relaxed",
+                                        "max-w-[85%] p-4 rounded-2xl text-sm leading-relaxed overflow-hidden",
                                         isMe ? "bg-accent text-black rounded-tr-none font-medium" : "bg-white/5 text-white border border-white/5 rounded-tl-none"
                                     )}>
-                                        {msg.text}
+                                        {msg.imageUrl && (
+                                            <img src={msg.imageUrl} className="rounded-lg mb-2 max-w-full cursor-pointer" onClick={() => window.open(msg.imageUrl)} />
+                                        )}
+                                        {msg.text && <p>{msg.text}</p>}
                                     </div>
                                     <div className="flex items-center gap-2 mt-1 px-2">
                                         <span className="text-[8px] font-black uppercase opacity-30 tracking-widest">
@@ -389,16 +462,38 @@ function SupportPage() {
                         })}
                     </div>
 
-                    <form onSubmit={handleSendMessage} className="p-6 bg-black/40 border-t border-white/5 flex gap-3">
-                        <Input 
-                            value={newMessage}
-                            onChange={(e) => setNewMessage(e.target.value)}
-                            placeholder="Écrivez votre message à l'expert..."
-                            className="h-14 bg-background/50 border-white/10 rounded-xl focus:border-accent text-sm"
-                        />
-                        <Button type="submit" size="icon" className="h-14 w-14 rounded-xl bg-accent text-black shadow-lg shadow-accent/20">
-                            <Send size={20} />
-                        </Button>
+                    <form onSubmit={handleSendMessage} className="p-6 bg-black/40 border-t border-white/5 flex flex-col gap-4">
+                        {chatImage && (
+                            <div className="relative w-20 h-20 rounded-xl overflow-hidden border border-accent">
+                                <img src={chatImage} className="w-full h-full object-cover" />
+                                <button type="button" onClick={() => setChatImage(null)} className="absolute top-1 right-1 bg-black/60 rounded-full p-0.5 text-white">
+                                    <X size={12} />
+                                </button>
+                            </div>
+                        )}
+                        <div className="flex gap-3">
+                            <Button 
+                                type="button" 
+                                variant="outline" 
+                                size="icon" 
+                                className="h-14 w-14 rounded-xl border-white/10 hover:bg-white/5 shrink-0"
+                                onClick={() => chatFileInputRef.current?.click()}
+                            >
+                                <ImageIcon size={20} />
+                            </Button>
+                            <input type="file" ref={chatFileInputRef} className="hidden" accept="image/*" onChange={(e) => handleFileChange(e, 'chat')} />
+                            
+                            <Input 
+                                value={newMessage}
+                                onChange={(e) => setNewMessage(e.target.value)}
+                                placeholder="Écrivez à l'expert..."
+                                className="h-14 bg-background/50 border-white/10 rounded-xl focus:border-accent text-sm"
+                                disabled={isLoading}
+                            />
+                            <Button type="submit" size="icon" className="h-14 w-14 rounded-xl bg-accent text-black shadow-lg shadow-accent/20 shrink-0">
+                                <Send size={20} />
+                            </Button>
+                        </div>
                     </form>
                 </DialogContent>
             </Dialog>

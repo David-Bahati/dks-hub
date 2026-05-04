@@ -59,6 +59,7 @@ export type SupportTicket = {
   issueDescription: string;
   status: 'pending' | 'diagnosing' | 'repairing' | 'ready' | 'completed';
   priority: 'low' | 'medium' | 'high' | 'urgent';
+  imageUrl?: string;
   createdAt: any;
   updatedAt: any;
 };
@@ -69,6 +70,7 @@ export type SupportMessage = {
   senderName: string;
   senderRole: string;
   text: string;
+  imageUrl?: string;
   createdAt: any;
 };
 

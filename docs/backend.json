@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "User": {
@@ -64,6 +65,7 @@
         "issueDescription": { "type": "string" },
         "status": { "type": "string", "enum": ["pending", "diagnosing", "repairing", "ready", "completed"] },
         "priority": { "type": "string", "enum": ["low", "medium", "high", "urgent"] },
+        "imageUrl": { "type": "string", "description": "Optional photo of the issue." },
         "createdAt": { "type": "string", "format": "date-time" },
         "updatedAt": { "type": "string", "format": "date-time" }
       },
@@ -79,6 +81,7 @@
         "senderName": { "type": "string" },
         "senderRole": { "type": "string" },
         "text": { "type": "string" },
+        "imageUrl": { "type": "string", "description": "Optional attached photo." },
         "createdAt": { "type": "string", "format": "date-time" }
       }
     },
