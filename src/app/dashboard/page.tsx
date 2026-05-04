@@ -100,8 +100,9 @@ import { jsPDF } from 'jspdf';
 
 const navConfig = [
   { href: "/dashboard", icon: LineChart, label: "Aperçu", roles: ["Admin", "Seller", "Cashier", "customer"] },
+  { href: "/dashboard/wallet", icon: Wallet, label: "Mon Wallet DKST", roles: ["Admin", "Seller", "Cashier", "customer"] },
   { href: "/dashboard/profile/expert", icon: UserIcon, label: "Mon Profil Expert", roles: ["Admin", "Seller", "Cashier"] },
-  { href: "/dashboard/tokens", icon: Coins, label: "Économie DKST", roles: ["Admin", "Seller", "Cashier"] },
+  { href: "/dashboard/tokens", icon: Coins, label: "Économie Hub", roles: ["Admin", "Seller", "Cashier"] },
   { href: "/dashboard/calendar", icon: CalendarIcon, label: "Agenda Hub", roles: ["Admin", "Seller", "Cashier"] },
   { href: "/dashboard/products", icon: Package, label: "Produits / Stock", roles: ["Admin", "Seller"] },
   { href: "/dashboard/categories", icon: Tags, label: "Catégories", roles: ["Admin", "Seller"] },
@@ -138,7 +139,6 @@ function DashboardPage() {
   const [isGeneratingCert, setIsGeneratingCert] = useState(false);
   const certRef = useRef<HTMLDivElement>(null);
 
-  // Universal Search States
   const [uSearch, setUSearch] = useState("");
   const [uResults, setUResults] = useState<{type: string, title: string, id: string, link: string}[]>([]);
   const [isUSearching, setIsUSearching] = useState(false);
@@ -165,7 +165,6 @@ function DashboardPage() {
   }, [user?.uid, authLoading]);
   const { data: recentNotifs } = useCollection(notificationsQuery);
 
-  // --- LEADERBOARD LOGIC ---
   const logsQuery = useMemoFirebase(() => query(collection(db, "technicianLogs")), []);
   const { data: allLogs } = useCollection(logsQuery);
 
@@ -297,7 +296,6 @@ function DashboardPage() {
     }
   };
 
-  // Universal Search Logic
   useEffect(() => {
     const delayDebounce = setTimeout(async () => {
       if (uSearch.length < 3) {
@@ -378,6 +376,8 @@ function DashboardPage() {
     </nav>
   );
 
+  const customerPoints = (orders?.length || 0) * 100 + (user?.referralCount || 0) * 500;
+
   return (
     <div className="flex min-h-screen w-full flex-col bg-background">
       <header className="sticky top-0 z-30 flex h-20 items-center gap-4 border-b border-white/5 bg-background/40 backdrop-blur-2xl px-6">
@@ -432,8 +432,7 @@ function DashboardPage() {
             </nav>
             
             <div className="flex items-center gap-4">
-                {/* TOKEN QUICK BALANCE */}
-                <Link href="/dashboard/tokens">
+                <Link href="/dashboard/wallet">
                     <Badge className="bg-accent/20 text-accent border-accent/20 h-10 px-4 rounded-xl gap-2 font-black italic cursor-pointer hover:bg-accent/30 transition-all">
                         <Coins size={16} /> {user?.tokenBalance || 0} DKST
                     </Badge>
@@ -465,7 +464,6 @@ function DashboardPage() {
                 </CardContent>
               </Card>
 
-              {/* SPOTLIGHT ELITE DE LA SEMAINE */}
               <Card className="glossy-card border-none rounded-[2.5rem] bg-accent/5 border-accent/10 relative overflow-hidden">
                 <div className="absolute top-0 right-0 p-6 opacity-10"><Crown size={80} className="text-accent" /></div>
                 <CardHeader className="pb-2">
@@ -529,24 +527,44 @@ function DashboardPage() {
           )}
 
           {!isStaff && (
-            <Card className="bg-primary/10 border-primary/20 rounded-[3rem] p-10 relative overflow-hidden mb-12">
-               <div className="absolute top-0 right-0 p-12 opacity-5"><Logo size="xl" /></div>
-               <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-10">
-                  <div className="space-y-6 text-center md:text-left">
-                      <Badge className="bg-primary text-white border-none px-4 py-1.5 font-black uppercase italic">Membre Privilège DKS</Badge>
-                      <h1 className="text-4xl md:text-6xl font-black uppercase italic tracking-tighter leading-tight text-white">BIENVENUE DANS <br />VOTRE <span className="text-primary">HUB CENTRAL</span></h1>
-                      <div className="flex flex-wrap gap-4 justify-center md:justify-start">
-                          <Link href="/services"><Button className="h-14 px-8 rounded-2xl bg-white text-primary font-black uppercase italic shadow-xl">Nouvelle Demande Service</Button></Link>
-                          <Link href="/"><Button variant="outline" className="h-14 px-8 rounded-2xl border-white/10 font-black uppercase italic">Aller à la Boutique</Button></Link>
-                      </div>
-                  </div>
-                  <div className="bg-black/40 backdrop-blur-3xl p-8 rounded-[2.5rem] border border-white/5 min-w-[300px] text-center">
-                      <p className="text-[10px] font-black uppercase opacity-40 mb-2">Points Fidélité Cumulés</p>
-                      <p className="text-6xl font-black text-primary italic">{(orders?.length || 0) * 100}</p>
-                      <p className="text-[9px] font-bold uppercase mt-4 text-muted-foreground">Grade Actuel: {user?.loyaltyLevel || 'Bronze'}</p>
-                  </div>
-               </div>
-            </Card>
+            <div className="space-y-8">
+                <Card className="bg-primary/10 border-primary/20 rounded-[3rem] p-10 relative overflow-hidden">
+                    <div className="absolute top-0 right-0 p-12 opacity-5"><Logo size="xl" /></div>
+                    <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-10">
+                        <div className="space-y-6 text-center md:text-left">
+                            <Badge className="bg-primary text-white border-none px-4 py-1.5 font-black uppercase italic">Membre Privilège DKS</Badge>
+                            <h1 className="text-4xl md:text-6xl font-black uppercase italic tracking-tighter leading-tight text-white">BIENVENUE DANS <br />VOTRE <span className="text-primary">HUB CENTRAL</span></h1>
+                            <div className="flex flex-wrap gap-4 justify-center md:justify-start">
+                                <Link href="/services"><Button className="h-14 px-8 rounded-2xl bg-white text-primary font-black uppercase italic shadow-xl">Nouvelle Demande Service</Button></Link>
+                                <Link href="/dashboard/wallet"><Button className="h-14 px-8 rounded-2xl bg-accent text-black font-black uppercase italic shadow-xl">Gérer mon Wallet DKST</Button></Link>
+                            </div>
+                        </div>
+                        <div className="bg-black/40 backdrop-blur-3xl p-8 rounded-[2.5rem] border border-white/5 min-w-[300px] text-center">
+                            <p className="text-[10px] font-black uppercase opacity-40 mb-2">Points Fidélité Cumulés</p>
+                            <p className="text-6xl font-black text-primary italic">{customerPoints}</p>
+                            <p className="text-[9px] font-bold uppercase mt-4 text-muted-foreground">Grade Actuel: {user?.loyaltyLevel || 'Bronze'}</p>
+                        </div>
+                    </div>
+                </Card>
+
+                {/* CONVERSION POINTS CTA FOR CUSTOMERS */}
+                <Card className="bg-accent/5 border border-accent/20 rounded-[2.5rem] p-10 flex flex-col md:flex-row items-center justify-between gap-8 shadow-xl shadow-accent/5">
+                    <div className="flex items-center gap-6">
+                        <div className="w-16 h-16 rounded-2xl bg-accent text-black flex items-center justify-center shadow-lg shadow-accent/20">
+                            <Coins size={32} />
+                        </div>
+                        <div className="space-y-1">
+                            <h3 className="text-xl font-black uppercase italic">Convertir vos Points en Jetons</h3>
+                            <p className="text-xs text-muted-foreground max-w-md">Transformez vos récompenses en **DKS Tokens** synchronisables sur Pi Network.</p>
+                        </div>
+                    </div>
+                    <Link href="/dashboard/wallet">
+                        <Button className="bg-accent text-black font-black uppercase italic h-14 px-10 rounded-2xl gap-3">
+                            Aller au Wallet <ArrowRight size={20}/>
+                        </Button>
+                    </Link>
+                </Card>
+            </div>
           )}
 
           <div className="grid gap-6 grid-cols-1 lg:grid-cols-7">
@@ -680,7 +698,6 @@ function DashboardPage() {
           </div>
       </main>
 
-      {/* HIDDEN WEEKLY CHAMPION CERTIFICATE FOR PDF GENERATION */}
       <div style={{ position: 'absolute', left: '-9999px', top: 0 }}>
           {weeklyWinner && (
               <div ref={certRef} className="bg-white text-black p-0 w-[1123px] h-[794px] font-serif relative overflow-hidden flex items-center justify-center">

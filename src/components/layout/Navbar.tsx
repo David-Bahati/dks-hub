@@ -1,6 +1,7 @@
+
 "use client";
 
-import { LogOut, LayoutDashboard, ShoppingCart, Home, Trash2, User, Sparkles, Loader2, GraduationCap, Wrench, Laptop, Layout, Bell, Award } from 'lucide-react';
+import { LogOut, LayoutDashboard, ShoppingCart, Home, Trash2, User, Sparkles, Loader2, GraduationCap, Wrench, Laptop, Layout, Bell, Award, Wallet, Coins } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from "@/components/ui/button";
@@ -76,6 +77,15 @@ export function Navbar() {
                                     <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full animate-ping" />
                                 )}
                             </Button>
+                        </Link>
+                    )}
+
+                    {/* UNIVERSAL DKST WALLET BADGE */}
+                    {user && (
+                        <Link href="/dashboard/wallet">
+                            <Badge className="bg-accent/20 text-accent border-accent/20 h-10 px-4 rounded-xl gap-2 font-black italic cursor-pointer hover:bg-accent/30 transition-all hidden sm:flex">
+                                <Coins size={16} /> {user?.tokenBalance || 0} DKST
+                            </Badge>
                         </Link>
                     )}
 
