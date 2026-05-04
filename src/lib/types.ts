@@ -40,6 +40,16 @@ export type Consumable = {
   updatedAt: any;
 };
 
+export type ConsumptionLog = {
+  id: string;
+  consumableId: string;
+  consumableName: string;
+  quantity: number;
+  type: 'usage' | 'restock';
+  userId: string;
+  createdAt: any;
+};
+
 export type OrderItem = {
   id?: string;
   productId?: string;

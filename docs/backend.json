@@ -106,6 +106,20 @@
         "updatedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["userId", "businessName", "phone", "status", "createdAt"]
+    },
+    "ConsumptionLog": {
+      "title": "ConsumptionLog",
+      "description": "Journalise l'utilisation ou le réapprovisionnement des consommables labo.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "consumableId": { "type": "string" },
+        "consumableName": { "type": "string" },
+        "quantity": { "type": "number" },
+        "type": { "type": "string", "enum": ["usage", "restock"] },
+        "userId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
     }
   },
   "auth": {
@@ -135,6 +149,10 @@
     "/audits/{auditId}": {
       "schema": "TechnicalAudit",
       "description": "Business infrastructure audits."
+    },
+    "/consumptionLogs/{logId}": {
+      "schema": "ConsumptionLog",
+      "description": "Lab consumables logs."
     }
   }
 }

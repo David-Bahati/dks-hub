@@ -17,7 +17,8 @@ import {
     CheckCircle2,
     Minus,
     PackageSearch,
-    History
+    History,
+    BarChart3
 } from "lucide-react";
 import { db } from '@/lib/firebase';
 import { collection, addDoc, deleteDoc, doc, updateDoc, serverTimestamp, query, orderBy, increment } from 'firebase/firestore';
@@ -84,12 +85,24 @@ function MaintenanceInventoryPage() {
         }
     };
 
-    const updateQuantity = async (itemId: string, delta: number) => {
+    const updateQuantity = async (item: any, delta: number) => {
         try {
-            await updateDoc(doc(db, "consumables", itemId), {
+            await updateDoc(doc(db, "consumables", item.id), {
                 quantity: increment(delta),
                 updatedAt: serverTimestamp()
             });
+
+            // Log consumption if delta is negative
+            await addDoc(collection(db, "consumptionLogs"), {
+                consumableId: item.id,
+                consumableName: item.name,
+                category: item.category,
+                quantity: Math.abs(delta),
+                type: delta < 0 ? 'usage' : 'restock',
+                userId: user?.uid,
+                createdAt: serverTimestamp()
+            });
+
         } catch (error) {
             toast({ title: "Erreur", variant: "destructive" });
         }
@@ -125,9 +138,16 @@ function MaintenanceInventoryPage() {
                         </div>
                     </div>
                     
-                    <Button onClick={() => { setEditingItem(null); setIsSheetOpen(true); }} className="bg-primary hover:bg-primary/90 h-14 px-8 rounded-2xl font-black uppercase italic gap-3 shadow-xl">
-                        <Plus size={20} /> Nouvel Article
-                    </Button>
+                    <div className="flex gap-3">
+                        <Link href="/dashboard/maintenance/stats">
+                            <Button variant="outline" className="h-14 px-6 rounded-2xl border-white/10 font-black uppercase italic gap-3">
+                                <BarChart3 size={20} /> Statistiques
+                            </Button>
+                        </Link>
+                        <Button onClick={() => { setEditingItem(null); setIsSheetOpen(true); }} className="bg-primary hover:bg-primary/90 h-14 px-8 rounded-2xl font-black uppercase italic gap-3 shadow-xl">
+                            <Plus size={20} /> Nouvel Article
+                        </Button>
+                    </div>
                 </div>
 
                 <div className="mb-10 relative">
@@ -176,8 +196,8 @@ function MaintenanceInventoryPage() {
                                             </p>
                                         </div>
                                         <div className="flex flex-col gap-2">
-                                            <button onClick={() => updateQuantity(item.id, 1)} className="w-10 h-10 rounded-xl bg-white/5 hover:bg-accent hover:text-black flex items-center justify-center transition-all"><Plus size={16}/></button>
-                                            <button onClick={() => updateQuantity(item.id, -1)} className="w-10 h-10 rounded-xl bg-white/5 hover:bg-red-500/20 hover:text-red-500 flex items-center justify-center transition-all"><Minus size={16}/></button>
+                                            <button onClick={() => updateQuantity(item, 1)} className="w-10 h-10 rounded-xl bg-white/5 hover:bg-accent hover:text-black flex items-center justify-center transition-all"><Plus size={16}/></button>
+                                            <button onClick={() => updateQuantity(item, -1)} className="w-10 h-10 rounded-xl bg-white/5 hover:bg-red-500/20 hover:text-red-500 flex items-center justify-center transition-all"><Minus size={16}/></button>
                                         </div>
                                     </div>
 
