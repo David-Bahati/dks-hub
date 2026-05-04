@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import Link from "next/link";
 import { usePathname } from 'next/navigation';
 import {
@@ -50,7 +50,9 @@ import {
   User as UserIcon,
   Medal,
   Send,
-  MailCheck
+  MailCheck,
+  Download,
+  QrCode
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -91,6 +93,8 @@ import {
   Tooltip, 
   ResponsiveContainer
 } from 'recharts';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
 
 const navConfig = [
   { href: "/dashboard", icon: LineChart, label: "Aperçu", roles: ["Admin", "Seller", "Cashier", "customer"] },
@@ -128,6 +132,8 @@ function DashboardPage() {
   const [chartData, setChartData] = useState<any[]>([]);
   const [rate, setRate] = useState(2500);
   const [isSendingDigest, setIsSendingDigest] = useState(false);
+  const [isGeneratingCert, setIsGeneratingCert] = useState(false);
+  const certRef = useRef<HTMLDivElement>(null);
 
   // Universal Search States
   const [uSearch, setUSearch] = useState("");
@@ -269,6 +275,23 @@ function DashboardPage() {
       } finally {
           setIsSendingDigest(false);
       }
+  };
+
+  const handleDownloadWeeklyCertificate = async () => {
+    if (!certRef.current || !weeklyWinner) return;
+    setIsGeneratingCert(true);
+    try {
+        const canvas = await html2canvas(certRef.current, { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
+        const imgData = canvas.toDataURL('image/png');
+        const pdf = new jsPDF({ orientation: 'landscape', unit: 'px', format: [canvas.width / 2, canvas.height / 2] });
+        pdf.addImage(imgData, 'PNG', 0, 0, canvas.width / 2, canvas.height / 2);
+        pdf.save(`CERTIFICAT_ELITE_DKS_${weeklyWinner.name.replace(/\s+/g, '_')}.pdf`);
+        toast({ title: "Certificat généré", description: "Félicitations au champion de la semaine !" });
+    } catch (error) {
+        toast({ title: "Erreur PDF", variant: "destructive" });
+    } finally {
+        setIsGeneratingCert(false);
+    }
   };
 
   // Universal Search Logic
@@ -451,17 +474,30 @@ function DashboardPage() {
                           <p className="text-[10px] font-bold text-accent uppercase">{weeklyWinner.points} Points Excellence</p>
                         </div>
                       </div>
-                      {isAdmin && (
-                        <Button 
-                            variant="outline" 
-                            size="sm" 
-                            className="w-full h-10 border-accent/20 text-accent hover:bg-accent hover:text-black rounded-xl text-[9px] font-black uppercase italic gap-2"
-                            onClick={handleTriggerWeeklyDigest}
-                            disabled={isSendingDigest}
-                        >
-                            {isSendingDigest ? <Loader2 className="animate-spin h-3 w-3" /> : <MailCheck size={14} />} Diffuser le Digest
-                        </Button>
-                      )}
+                      <div className="flex flex-col gap-2">
+                        {(isAdmin || user?.uid === weeklyWinner.id) && (
+                          <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="w-full h-10 border-accent/20 text-accent hover:bg-accent hover:text-black rounded-xl text-[9px] font-black uppercase italic gap-2"
+                              onClick={handleDownloadWeeklyCertificate}
+                              disabled={isGeneratingCert}
+                          >
+                              {isGeneratingCert ? <Loader2 className="animate-spin h-3 w-3" /> : <Download size={14} />} Certificat de Champion
+                          </Button>
+                        )}
+                        {isAdmin && (
+                          <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="w-full h-10 text-muted-foreground/60 hover:text-white rounded-xl text-[9px] font-black uppercase italic gap-2"
+                              onClick={handleTriggerWeeklyDigest}
+                              disabled={isSendingDigest}
+                          >
+                              {isSendingDigest ? <Loader2 className="animate-spin h-3 w-3" /> : <MailCheck size={14} />} Diffuser le Digest
+                          </Button>
+                        )}
+                      </div>
                     </>
                   ) : (
                     <div className="h-20 flex items-center justify-center opacity-20 italic text-xs uppercase font-black">Calcul en cours...</div>
@@ -634,6 +670,65 @@ function DashboardPage() {
             </div>
           </div>
       </main>
+
+      {/* HIDDEN WEEKLY CHAMPION CERTIFICATE FOR PDF GENERATION */}
+      <div style={{ position: 'absolute', left: '-9999px', top: 0 }}>
+          {weeklyWinner && (
+              <div ref={certRef} className="bg-white text-black p-0 w-[1123px] h-[794px] font-serif relative overflow-hidden flex items-center justify-center">
+                  <div className="absolute inset-0 border-[40px] border-double border-[#0f172a]" />
+                  <div className="absolute inset-10 border-4 border-[#3b82f6]/10" />
+                  
+                  <div className="relative z-10 text-center w-full px-40 space-y-12">
+                      <div className="flex flex-col items-center gap-6">
+                          <Logo size="lg" />
+                          <div className="space-y-1">
+                              <h2 className="text-sm font-bold tracking-[0.4em] uppercase text-[#0f172a]">DKS EXCELLENCE HUB</h2>
+                              <p className="text-[10px] font-medium uppercase tracking-[0.2em] opacity-40">Récompense de la Performance Staff • Bunia, RDC</p>
+                          </div>
+                      </div>
+
+                      <div className="space-y-4">
+                          <h1 className="text-6xl font-black uppercase italic tracking-tighter text-[#0f172a]">EMPLOYÉ DU MOIS</h1>
+                          <p className="text-xl font-light italic text-gray-500 tracking-[0.2em]">CERTIFICAT DE PRESTIGE & EXCELLENCE</p>
+                      </div>
+
+                      <div className="space-y-10 py-10 bg-gray-50/50 rounded-[3rem] border border-gray-100">
+                          <p className="text-lg font-medium text-gray-400 italic">Nous décernons fièrement ce titre à</p>
+                          
+                          <div className="space-y-4">
+                              <h3 className="text-6xl font-black uppercase italic text-[#0f172a] tracking-tight">{weeklyWinner.name}</h3>
+                              <div className="w-40 h-1 bg-[#3b82f6] mx-auto" />
+                          </div>
+
+                          <p className="text-lg font-medium text-gray-500 max-w-2xl mx-auto leading-relaxed">
+                              En reconnaissance de son investissement exceptionnel et de sa contribution à l'élite technologique, totalisant un score de prestige de <strong>{weeklyWinner.points} points</strong>.
+                          </p>
+                      </div>
+
+                      <div className="grid grid-cols-3 items-end pt-12">
+                          <div className="text-center space-y-2">
+                              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Date de distinction</p>
+                              <p className="text-sm font-bold">{new Date().toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }).toUpperCase()}</p>
+                          </div>
+                          <div className="flex flex-col items-center gap-4">
+                              <div className="p-3 border-2 border-gray-100 rounded-2xl bg-white shadow-sm"><QrCode size={60} className="opacity-10" /></div>
+                              <p className="text-[8px] font-bold text-gray-300 uppercase tracking-tighter">ID-DISTINCTION: DKS-WIN-{weeklyWinner.id.substring(0, 10).toUpperCase()}</p>
+                          </div>
+                          <div className="text-center space-y-4">
+                              <div className="w-40 h-px bg-gray-200 mx-auto" />
+                              <div className="flex flex-col items-center">
+                                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Direction Générale</p>
+                                  <p className="text-sm font-black italic">Double King Shop</p>
+                                  <ShieldCheck size={24} className="text-green-600 mt-2 opacity-30" />
+                              </div>
+                          </div>
+                      </div>
+                  </div>
+                  <div className="absolute top-0 right-0 w-40 h-40 bg-accent/5 rounded-bl-full -z-10" />
+                  <div className="absolute bottom-0 left-0 w-40 h-40 bg-primary/5 rounded-tr-full -z-10" />
+              </div>
+          )}
+      </div>
     </div>
   );
 }
