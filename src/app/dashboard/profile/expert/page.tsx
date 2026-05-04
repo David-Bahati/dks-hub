@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useMemo } from 'react';
+import { useMemo, useState, useRef } from 'react';
 import { Navbar } from "@/components/layout/Navbar";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -21,7 +21,11 @@ import {
     ShieldCheck,
     Cpu,
     Briefcase,
-    Crown
+    Crown,
+    FileDown,
+    QrCode,
+    User as UserIcon,
+    ShieldAlert
 } from "lucide-react";
 import { db } from '@/lib/firebase';
 import { collection, query, where, orderBy } from 'firebase/firestore';
@@ -40,14 +44,21 @@ import {
     PolarRadiusAxis, 
     ResponsiveContainer 
 } from 'recharts';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
+import { Logo } from '@/components/ui/Logo';
+import { useToast } from '@/hooks/use-toast';
 
 function ExpertProfilePage() {
     const { user } = useAuth();
+    const { toast } = useToast();
+    const [isGenerating, setIsGenerating] = useState(false);
+    const reportRef = useRef<HTMLDivElement>(null);
 
     // Fetch User Logs for Prestige
     const logsQuery = useMemoFirebase(() => {
         if (!user?.uid) return null;
-        return query(collection(db, "technicianLogs"), where("userId", "==", user.uid));
+        return query(collection(db, "technicianLogs"), where("userId", "==", user.uid), orderBy("createdAt", "desc"));
     }, [user?.uid]);
     const { data: logs, isLoading: loadingLogs } = useCollection(logsQuery);
 
@@ -58,7 +69,7 @@ function ExpertProfilePage() {
     }, [user?.uid]);
     const { data: academySessions, isLoading: loadingAcademy } = useCollection(academyQuery);
 
-    // Fetch SAV tickets handled (simulated via messages for now or status)
+    // Fetch SAV tickets handled
     const savQuery = useMemoFirebase(() => {
         return query(collection(db, "supportTickets"), where("status", "==", "completed"));
     }, []);
@@ -69,7 +80,6 @@ function ExpertProfilePage() {
 
         const myLogs = logs || [];
         const myAcademy = academySessions || [];
-        // We'll filter SAV by messages where I am the technician if direct ID not yet populated
         const mySAVCount = savTickets?.filter(t => t.technicianId === user.uid).length || 0;
 
         const stats = {
@@ -79,7 +89,6 @@ function ExpertProfilePage() {
             totalActions: myLogs.length + myAcademy.length + mySAVCount
         };
 
-        // Badge Logic (Reuse existing logic)
         const badges = [];
         if (stats.totalActions >= 100) badges.push({ id: 'legend', label: 'Légende DKS', icon: <Crown size={14} />, color: 'bg-yellow-500/20 text-yellow-500' });
         else if (stats.totalActions >= 50) badges.push({ id: 'expert', label: 'Expert Senior', icon: <ShieldCheck size={14} />, color: 'bg-accent/20 text-accent' });
@@ -88,17 +97,33 @@ function ExpertProfilePage() {
         if (stats.academy >= 5) badges.push({ id: 'mentor', label: 'Mentor Academy', icon: <GraduationCap size={14} />, color: 'bg-primary/20 text-primary' });
         if (stats.logs >= 30) badges.push({ id: 'keeper', label: 'Gardien du Savoir', icon: <BookText size={14} />, color: 'bg-orange-500/20 text-orange-500' });
 
-        // Radar Data
         const radarData = [
-            { subject: 'SAV', A: stats.sav * 10, fullMark: 100 },
-            { subject: 'Academy', A: stats.academy * 20, fullMark: 100 },
-            { subject: 'Documentation', A: stats.logs * 2, fullMark: 100 },
+            { subject: 'SAV', A: Math.min(100, stats.sav * 10), fullMark: 100 },
+            { subject: 'Academy', A: Math.min(100, stats.academy * 20), fullMark: 100 },
+            { subject: 'Logistique', A: Math.min(100, stats.logs * 2), fullMark: 100 },
             { subject: 'Réactivité', A: 85, fullMark: 100 },
             { subject: 'Qualité', A: 95, fullMark: 100 },
         ];
 
         return { stats, badges, radarData };
     }, [user, logs, academySessions, savTickets]);
+
+    const handleExportReport = async () => {
+        if (!reportRef.current) return;
+        setIsGenerating(true);
+        try {
+            const canvas = await html2canvas(reportRef.current, { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
+            const imgData = canvas.toDataURL('image/png');
+            const pdf = new jsPDF({ orientation: 'portrait', unit: 'px', format: [canvas.width / 2, canvas.height / 2] });
+            pdf.addImage(imgData, 'PNG', 0, 0, canvas.width / 2, canvas.height / 2);
+            pdf.save(`BILAN_EXPERT_DKS_${user?.name?.replace(/\s+/g, '_')}.pdf`);
+            toast({ title: "Bilan exporté", description: "Le document de performance est prêt." });
+        } catch (error) {
+            toast({ title: "Erreur PDF", variant: "destructive" });
+        } finally {
+            setIsGenerating(false);
+        }
+    };
 
     if (loadingLogs || loadingAcademy || loadingSAV) {
         return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin text-accent" /></div>;
@@ -120,6 +145,14 @@ function ExpertProfilePage() {
                             <p className="text-muted-foreground text-xs uppercase font-black opacity-40 mt-1">Traçabilité & Historique de Carrière Technologique</p>
                         </div>
                     </div>
+
+                    <Button 
+                        onClick={handleExportReport} 
+                        disabled={isGenerating}
+                        className="bg-primary hover:bg-primary/90 h-14 px-8 rounded-2xl font-black uppercase italic gap-3 shadow-xl shadow-primary/10"
+                    >
+                        {isGenerating ? <Loader2 className="animate-spin" /> : <><FileDown size={20} /> Exporter Bilan Carrière</>}
+                    </Button>
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -268,6 +301,131 @@ function ExpertProfilePage() {
                     </div>
                 </div>
             </main>
+
+            {/* HIDDEN PERFORMANCE REPORT FOR PDF GENERATION */}
+            <div style={{ position: 'absolute', left: '-9999px', top: 0 }}>
+                {user && careerStats && (
+                    <div ref={reportRef} className="bg-white text-black p-16 w-[800px] font-sans">
+                        <header className="flex justify-between items-start border-b-4 border-black pb-10 mb-12">
+                            <div className="space-y-4">
+                                <div className="bg-black text-white px-6 py-2 inline-block font-black text-3xl italic tracking-tighter">DKS ELITE HUB</div>
+                                <div className="text-sm font-bold uppercase tracking-widest text-gray-500">Direction des Ressources Techniques</div>
+                                <div className="text-[11px] leading-relaxed mt-4 font-medium">
+                                    <p>Immeuble Bahati, Bunia, RDC</p>
+                                    <p>Évaluation de Performance Individuelle</p>
+                                    <p>Document Confidentiel • ISO-DKS 2024</p>
+                                </div>
+                            </div>
+                            <div className="text-right">
+                                <h2 className="text-5xl font-black uppercase italic tracking-tighter mb-2 leading-none">RAPPORT<br/>EXPERT</h2>
+                                <p className="text-xs font-bold text-gray-400 uppercase tracking-[0.2em]">Période: {new Date().toLocaleString('fr-FR', { month: 'long', year: 'numeric' }).toUpperCase()}</p>
+                                <div className="mt-8">
+                                    <p className="text-[10px] font-black uppercase text-gray-400">Date de génération</p>
+                                    <p className="text-lg font-bold">{new Date().toLocaleDateString('fr-FR')}</p>
+                                </div>
+                            </div>
+                        </header>
+
+                        <div className="grid grid-cols-2 gap-10 mb-12">
+                            <div className="p-8 bg-gray-50 rounded-[2rem] border border-gray-100 flex flex-col justify-center">
+                                <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-4">Identification de l'Expert</p>
+                                <h3 className="text-3xl font-black uppercase italic leading-none mb-2">{user.name}</h3>
+                                <p className="text-sm font-bold text-blue-600 uppercase tracking-widest">{user.role} Certifié DKS</p>
+                                <p className="text-[9px] font-mono text-gray-400 mt-4 uppercase">ID: DKS-EXP-{user.uid.substring(0, 10).toUpperCase()}</p>
+                            </div>
+                            <div className="p-8 bg-gray-50 rounded-[2rem] border border-gray-100 space-y-6">
+                                <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Prestige & Titres</p>
+                                <div className="flex flex-wrap gap-2">
+                                    {careerStats.badges.map((b, i) => (
+                                        <div key={i} className="px-3 py-1 bg-white border border-gray-200 rounded-lg text-[9px] font-black uppercase italic">{b.label}</div>
+                                    ))}
+                                    {careerStats.badges.length === 0 && <p className="text-xs italic text-gray-400">En cours d'acquisition...</p>}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-6 mb-12">
+                            {[
+                                { l: "Tickets SAV résolus", v: careerStats.stats.sav, c: "text-blue-600" },
+                                { l: "Sessions Academy", v: careerStats.stats.academy, c: "text-purple-600" },
+                                { l: "Notes Labo publiées", v: careerStats.stats.logs, c: "text-orange-600" }
+                            ].map((stat, i) => (
+                                <div key={i} className="p-6 text-center border-2 border-gray-50 rounded-2xl">
+                                    <p className="text-[8px] font-black uppercase text-gray-400 tracking-widest mb-1">{stat.l}</p>
+                                    <p className={cn("text-4xl font-black italic", stat.c)}>{stat.v}</p>
+                                </div>
+                            ))}
+                        </div>
+
+                        <section className="mb-12">
+                            <h3 className="text-sm font-black uppercase italic border-b-2 border-black pb-2 mb-6 flex items-center gap-2">
+                                <Zap size={16} /> Synthèse des Compétences
+                            </h3>
+                            <div className="bg-gray-50 p-10 rounded-[3rem] border border-gray-100 flex flex-col items-center">
+                                <p className="text-[10px] text-gray-400 font-medium italic mb-8 max-w-md text-center">
+                                    L'équilibre ci-dessous reflète l'implication de l'expert dans les différents pôles de productivité du Hub (SAV, Formation, Documentation).
+                                </p>
+                                <div className="w-full h-40 grid grid-cols-5 gap-4">
+                                    {careerStats.radarData.map((d, i) => (
+                                        <div key={i} className="flex flex-col items-center gap-4">
+                                            <div className="flex-1 w-full bg-gray-200 rounded-full relative overflow-hidden flex items-end">
+                                                <div className="w-full bg-black" style={{ height: `${d.A}%` }} />
+                                            </div>
+                                            <p className="text-[8px] font-black uppercase text-gray-400">{d.subject}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </section>
+
+                        <section className="mb-12">
+                            <h3 className="text-sm font-black uppercase italic border-b-2 border-black pb-2 mb-6 flex items-center gap-2">
+                                <HistoryIcon size={16} /> Derniers Accomplissements
+                            </h3>
+                            <div className="space-y-4">
+                                {academySessions?.slice(0, 2).map((s) => (
+                                    <div key={s.id} className="p-4 bg-gray-50 rounded-xl flex items-center justify-between border border-gray-100">
+                                        <div className="flex items-center gap-3">
+                                            <GraduationCap size={16} className="text-purple-600" />
+                                            <div>
+                                                <p className="text-[10px] font-bold uppercase">{s.serviceTitle}</p>
+                                                <p className="text-[8px] text-gray-400 uppercase">Formation complétée</p>
+                                            </div>
+                                        </div>
+                                        <p className="text-[10px] font-bold">{s.scheduledDate}</p>
+                                    </div>
+                                ))}
+                                {logs?.slice(0, 2).map((l) => (
+                                    <div key={l.id} className="p-4 bg-gray-50 rounded-xl flex items-center justify-between border border-gray-100">
+                                        <div className="flex items-center gap-3">
+                                            <BookText size={16} className="text-orange-600" />
+                                            <div className="flex-1">
+                                                <p className="text-[10px] font-bold uppercase line-clamp-1">"{l.content}"</p>
+                                                <p className="text-[8px] text-gray-400 uppercase">Note Technique Labo</p>
+                                            </div>
+                                        </div>
+                                        <p className="text-[10px] font-bold text-gray-300">{l.createdAt?.toDate?.().toLocaleDateString()}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        </section>
+
+                        <footer className="mt-20 pt-10 border-t border-gray-100 flex justify-between items-end">
+                            <div className="flex items-center gap-6">
+                                <QrCode size={60} className="opacity-10" />
+                                <p className="text-[8px] font-bold text-gray-400 uppercase leading-relaxed max-w-[250px]">
+                                    Ce document fait foi de l'historique de carrière de l'agent au sein du Double King Hub. <br />
+                                    Certification de compétence technique certifiée DKS-HR-2024.
+                                </p>
+                            </div>
+                            <div className="text-right space-y-4">
+                                <div className="h-16 w-32 border-2 border-gray-100 rounded-lg flex items-center justify-center italic text-gray-200 text-[8px] uppercase font-black">Visa Direction Technique</div>
+                                <p className="text-[8px] font-bold text-gray-300 uppercase tracking-widest">Solutions RH Expert v3.0</p>
+                            </div>
+                        </footer>
+                    </div>
+                )}
+            </div>
         </div>
     );
 }
