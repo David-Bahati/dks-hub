@@ -41,7 +41,8 @@ import {
   Share2,
   ShieldCheck,
   FileText,
-  CreditCard
+  CreditCard,
+  FlaskConical
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -91,6 +92,7 @@ const navConfig = [
   { href: "/dashboard/calendar", icon: CalendarIcon, label: "Agenda Hub", roles: ["Admin", "Seller", "Cashier"] },
   { href: "/dashboard/products", icon: Package, label: "Produits / Stock", roles: ["Admin", "Seller"] },
   { href: "/dashboard/categories", icon: Tags, label: "Catégories", roles: ["Admin", "Seller"] },
+  { href: "/dashboard/maintenance", icon: FlaskConical, label: "Stocks Labo", roles: ["Admin", "Seller"] },
   { href: "/dashboard/quotes", icon: FileText, label: "Devis Pro", roles: ["Admin", "Seller", "customer"] },
   { href: "/dashboard/subscriptions", icon: CreditCard, label: "Contrats Sercices", roles: ["Admin", "Seller", "Cashier", "customer"] },
   { href: "/dashboard/orders", icon: ShoppingBag, label: "Commandes / Factures", roles: ["Admin", "Seller", "Cashier", "customer"] },
@@ -422,7 +424,7 @@ function DashboardPage() {
                 </CardContent>
             </Card>
 
-            {/* FLUX D'ACTIVITÉ / NOTIFICATIONS */}
+            {/* FLUX d'ACTIVITÉ / NOTIFICATIONS */}
             <Card className="lg:col-span-3 glossy-card border-none rounded-[2.5rem] overflow-hidden flex flex-col">
                 <CardHeader className="py-6 px-8 border-b border-white/5 bg-white/[0.02]">
                   <CardTitle className="text-lg font-bold uppercase italic flex items-center gap-3">

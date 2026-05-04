@@ -30,6 +30,16 @@ export type Product = {
   purchasePrice?: number;
 };
 
+export type Consumable = {
+  id: string;
+  name: string;
+  category: string;
+  quantity: number;
+  unit: string;
+  minThreshold: number;
+  updatedAt: any;
+};
+
 export type OrderItem = {
   id?: string;
   productId?: string;
