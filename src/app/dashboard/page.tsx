@@ -31,7 +31,8 @@ import {
   Home,
   BarChart3,
   Calendar,
-  MonitorSmartphone
+  MonitorSmartphone,
+  PieChart as PieChartIcon
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -69,7 +70,11 @@ import {
   YAxis, 
   CartesianGrid, 
   Tooltip, 
-  ResponsiveContainer
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Legend
 } from 'recharts';
 
 const navConfig = [
@@ -255,8 +260,39 @@ function DashboardPage() {
                 </CardContent>
             </Card>
 
-            {/* SERVICES & FORMATIONS (NOUVEAU PÔLE) */}
+            {/* REPARTITION PRODUITS VS SERVICES */}
             <Card className="lg:col-span-3 glossy-card border-none rounded-[2.5rem] overflow-hidden">
+                <CardHeader className="py-6 px-8"><CardTitle className="text-lg font-bold uppercase italic flex items-center gap-3"><PieChartIcon className="text-primary" size={20} /> Mix d'Activité</CardTitle></CardHeader>
+                <CardContent className="px-4 pb-8 h-[300px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                            <Pie
+                                data={stats?.breakdown || []}
+                                cx="50%"
+                                cy="50%"
+                                innerRadius={60}
+                                outerRadius={80}
+                                paddingAngle={5}
+                                dataKey="value"
+                            >
+                                {stats?.breakdown?.map((entry: any, index: number) => (
+                                    <Cell key={`cell-${index}`} fill={entry.fill} />
+                                ))}
+                            </Pie>
+                            <Tooltip 
+                                contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', borderRadius: '12px', fontSize: '12px' }}
+                                formatter={(value: number) => `$${value.toFixed(2)}`}
+                            />
+                            <Legend verticalAlign="bottom" align="center" wrapperStyle={{ fontSize: '10px', fontWeight: 'black', textTransform: 'uppercase' }} />
+                        </PieChart>
+                    </ResponsiveContainer>
+                </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid gap-6 grid-cols-1 lg:grid-cols-7">
+            {/* SERVICES & FORMATIONS */}
+            <Card className="lg:col-span-4 glossy-card border-none rounded-[2.5rem] overflow-hidden">
                 <CardHeader className="bg-white/[0.02] py-6 px-8 flex flex-row items-center justify-between">
                     <CardTitle className="text-lg font-bold uppercase italic flex items-center gap-3"><GraduationCap size={20} className="text-primary" /> Services & Formations</CardTitle>
                 </CardHeader>
@@ -279,6 +315,31 @@ function DashboardPage() {
                             </div>
                         )) : (
                             <div className="p-10 text-center opacity-30 italic text-xs">Aucune demande de service en attente.</div>
+                        )}
+                    </div>
+                </CardContent>
+            </Card>
+
+            {/* DERNIERES COMMANDES */}
+            <Card className="lg:col-span-3 glossy-card border-none rounded-[2.5rem] overflow-hidden">
+                <CardHeader className="bg-white/[0.02] py-6 px-8 flex flex-row items-center justify-between">
+                    <CardTitle className="text-lg font-bold uppercase italic flex items-center gap-3"><ShoppingBag size={20} className="text-accent" /> Ventes Récentes</CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                    <div className="divide-y divide-white/5">
+                        {orders && orders.length > 0 ? orders.map((order) => (
+                            <div key={order.id} className="p-4 flex items-center justify-between hover:bg-white/[0.02] transition-colors">
+                                <div>
+                                    <p className="text-xs font-bold uppercase italic">{order.customerName}</p>
+                                    <p className="text-[9px] text-muted-foreground uppercase tracking-widest">#{order.id.substring(0, 8)}</p>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-sm font-black text-accent">${(order.total || 0).toFixed(2)}</p>
+                                    {getStatusBadge(order.status)}
+                                </div>
+                            </div>
+                        )) : (
+                            <div className="p-10 text-center opacity-30 italic text-xs">Aucune commande enregistrée.</div>
                         )}
                     </div>
                 </CardContent>

@@ -1,6 +1,6 @@
 import { collection, getDocs, query, where, Timestamp, limit, orderBy, getDoc, doc } from "firebase/firestore"; 
 import { db } from "./firebase";
-import { Product, Sale, AppUser } from "./types";
+import { Product, Sale, AppUser, Order } from "./types";
 import { format, subDays, startOfDay, isSameDay } from "date-fns";
 
 /**
@@ -19,23 +19,46 @@ export async function getExchangeRate() {
 }
 
 /**
- * Calcule les statistiques globales pour le dashboard
+ * Calcule les statistiques globales pour le dashboard avec répartition par pôle
  */
 export async function getDashboardStats() {
   const salesCol = collection(db, "sales");
   const productsCol = collection(db, "products");
+  const ordersCol = collection(db, "orders");
   
-  const [salesSnap, productsSnap] = await Promise.all([
+  const [salesSnap, productsSnap, ordersSnap] = await Promise.all([
     getDocs(salesCol),
-    getDocs(productsCol)
+    getDocs(productsCol),
+    getDocs(query(ordersCol, where("status", "in", ["payée", "payé", "completed", "terminé"])))
   ]);
 
   const sales = salesSnap.docs.map(d => d.data() as Sale);
   const products = productsSnap.docs.map(d => d.data() as Product);
+  const completedOrders = ordersSnap.docs.map(d => ({ id: d.id, ...d.data() } as any));
 
+  // Revenus globaux
   const totalRevenueUSD = sales.reduce((acc, sale) => acc + (sale.totalAmount || 0), 0);
   const totalSalesCount = sales.length;
-  const totalProductsCount = products.length;
+
+  // Calcul de la répartition (Ventes vs Services)
+  let hardwareRevenue = 0;
+  let servicesRevenue = 0;
+
+  completedOrders.forEach(order => {
+    if (order.source === 'service_hub' || order.source === 'remote_support') {
+      servicesRevenue += (order.total || 0);
+    } else {
+      hardwareRevenue += (order.total || 0);
+    }
+  });
+
+  // Si on utilise aussi la collection 'sales' pour le POS physique (souvent hardware)
+  // On ajuste pour éviter les doublons si les orders sont migrés vers sales
+  // Pour cet exemple, on considère que 'sales' contient le total réel
+  // Et on utilise les orders sources pour définir le ratio.
+  const serviceRatio = totalRevenueUSD > 0 ? servicesRevenue / (servicesRevenue + hardwareRevenue || 1) : 0;
+  const finalServicesRevenue = totalRevenueUSD * serviceRatio;
+  const finalHardwareRevenue = totalRevenueUSD - finalServicesRevenue;
 
   // Calcul des revenus du jour
   const today = startOfDay(new Date());
@@ -45,16 +68,19 @@ export async function getDashboardStats() {
   });
   const todayRevenue = todaySales.reduce((acc, s) => acc + (s.totalAmount || 0), 0);
 
-  // On récupère le taux pour convertir le total global en CDF pour l'affichage principal
   const rate = await getExchangeRate();
 
   return {
     totalRevenueUSD,
     totalRevenueCDF: totalRevenueUSD * rate,
     totalSalesCount,
-    totalProductsCount,
+    totalProductsCount: products.length,
     todayRevenue,
-    todaySalesCount: todaySales.length
+    todaySalesCount: todaySales.length,
+    breakdown: [
+      { name: 'Hardware', value: finalHardwareRevenue, fill: 'hsl(var(--primary))' },
+      { name: 'Services & Hub', value: finalServicesRevenue, fill: 'hsl(var(--accent))' }
+    ]
   };
 }
 
