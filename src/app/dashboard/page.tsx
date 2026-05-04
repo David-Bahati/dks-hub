@@ -48,7 +48,9 @@ import {
   Hammer,
   BookText,
   User as UserIcon,
-  Medal
+  Medal,
+  Send,
+  MailCheck
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -74,12 +76,12 @@ import { Product } from '@/lib/types';
 import withAuth from '@/components/auth/withAuth';
 import { useAuth } from '@/context/AuthContext';
 import { useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
+import { collection, query, where, orderBy, limit, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/ui/Logo";
 import { Input } from "@/components/ui/input";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useToast } from "@/hooks/use-toast";
 import { 
   AreaChart, 
   Area, 
@@ -87,11 +89,7 @@ import {
   YAxis, 
   CartesianGrid, 
   Tooltip, 
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  Legend
+  ResponsiveContainer
 } from 'recharts';
 
 const navConfig = [
@@ -123,11 +121,13 @@ const navConfig = [
 function DashboardPage() {
   const { user, isLoading: authLoading } = useAuth();
   const pathname = usePathname();
+  const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<any>(null);
   const [lowStock, setLowStock] = useState<Product[]>([]);
   const [chartData, setChartData] = useState<any[]>([]);
   const [rate, setRate] = useState(2500);
+  const [isSendingDigest, setIsSendingDigest] = useState(false);
 
   // Universal Search States
   const [uSearch, setUSearch] = useState("");
@@ -135,6 +135,7 @@ function DashboardPage() {
   const [isUSearching, setIsUSearching] = useState(false);
 
   const isStaff = user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'seller' || user?.role?.toLowerCase() === 'cashier';
+  const isAdmin = user?.role?.toLowerCase() === 'admin';
 
   const filteredNavLinks = navConfig.filter(link => {
       const roles = link.roles.map(r => r.toLowerCase());
@@ -173,19 +174,16 @@ function DashboardPage() {
 
     const userPoints: Record<string, { name: string, points: number, actions: number }> = {};
 
-    // Helper to init user
     const initUser = (uid: string, name: string) => {
         if (!userPoints[uid]) userPoints[uid] = { name: name || "Expert", points: 0, actions: 0 };
     };
 
-    // 1. Logs = 10 pts
     allLogs.forEach(log => {
       initUser(log.userId, log.userName);
       userPoints[log.userId].points += 10;
       userPoints[log.userId].actions += 1;
     });
 
-    // 2. Academy = 50 pts
     allBookings.forEach(booking => {
       if (booking.technicianId) {
         initUser(booking.technicianId, booking.technicianName);
@@ -194,7 +192,6 @@ function DashboardPage() {
       }
     });
 
-    // 3. SAV = 30 pts
     allSav.forEach(ticket => {
       if (ticket.technicianId) {
         initUser(ticket.technicianId, ticket.technicianName);
@@ -203,15 +200,12 @@ function DashboardPage() {
       }
     });
 
-    // 4. Sales Bonus
     allSales.forEach(sale => {
       if (sale.userId) {
         initUser(sale.userId, sale.customerName || "Vendeur");
-        // Base sale: 20 pts
         let pts = 20;
-        // High Value Sales
-        if (sale.totalAmount >= 1000) pts = 100; // Legend
-        else if (sale.totalAmount >= 500) pts = 50; // Elite
+        if (sale.totalAmount >= 1000) pts = 100;
+        else if (sale.totalAmount >= 500) pts = 50;
         
         userPoints[sale.userId].points += pts;
         userPoints[sale.userId].actions += 1;
@@ -223,6 +217,8 @@ function DashboardPage() {
       .sort((a, b) => b.points - a.points)
       .slice(0, 5);
   }, [allLogs, allBookings, allSav, allSales]);
+
+  const weeklyWinner = leaderboard[0];
 
   useEffect(() => {
     fetchGlobalData();
@@ -246,6 +242,33 @@ function DashboardPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleTriggerWeeklyDigest = async () => {
+      if (!weeklyWinner) return;
+      setIsSendingDigest(true);
+      try {
+          const totalPoints = leaderboard.reduce((acc, curr) => acc + curr.points, 0);
+          
+          await addDoc(collection(db, "notifications"), {
+              userId: 'staff',
+              title: "DÉPÊCHE HEBDOMADAIRE DKS",
+              message: `Félicitations à ${weeklyWinner.name} qui termine Élite de la semaine avec ${weeklyWinner.points} points ! L'équipe a cumulé ${totalPoints} points d'excellence.`,
+              type: 'success',
+              isRead: false,
+              createdAt: serverTimestamp(),
+              link: '/dashboard'
+          });
+
+          toast({ 
+              title: "Digest Envoyé (Simulé)", 
+              description: "Le rapport hebdomadaire a été diffusé à toute l'équipe." 
+          });
+      } catch (e) {
+          toast({ title: "Erreur simulation", variant: "destructive" });
+      } finally {
+          setIsSendingDigest(false);
+      }
   };
 
   // Universal Search Logic
@@ -380,16 +403,6 @@ function DashboardPage() {
                         </Button>
                     </Link>
                 ))}
-                {filteredNavLinks.length > 7 && (
-                   <Sheet>
-                      <SheetTrigger asChild>
-                        <Button variant="ghost" size="sm" className="h-20 px-4 text-slate-400 text-[10px] font-black uppercase">Plus...</Button>
-                      </SheetTrigger>
-                      <SheetContent className="bg-card/95 backdrop-blur-3xl border-white/5">
-                        <SidebarContent />
-                      </SheetContent>
-                   </Sheet>
-                )}
             </nav>
             
             <div className="flex items-center gap-6">
@@ -420,15 +433,39 @@ function DashboardPage() {
                 </CardContent>
               </Card>
 
-              <Card className="glossy-card border-none rounded-[2.5rem]">
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Ventes Terminées</CardTitle>
-                  <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-accent">
-                    <ShoppingCart className="h-5 w-5" />
-                  </div>
+              {/* SPOTLIGHT ELITE DE LA SEMAINE */}
+              <Card className="glossy-card border-none rounded-[2.5rem] bg-accent/5 border-accent/10 relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-6 opacity-10"><Crown size={80} className="text-accent" /></div>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-accent">Élite de la Semaine</CardTitle>
                 </CardHeader>
-                <CardContent className="pt-4">
-                  <div className="text-3xl font-bold font-mono">{stats?.totalSalesCount || 0}</div>
+                <CardContent className="pt-4 space-y-4">
+                  {weeklyWinner ? (
+                    <>
+                      <div className="flex items-center gap-4">
+                        <div className="w-14 h-14 rounded-2xl bg-accent text-black flex items-center justify-center shadow-[0_0_20px_rgba(56,189,248,0.4)]">
+                          <Medal size={28} />
+                        </div>
+                        <div>
+                          <p className="text-xl font-black uppercase italic tracking-tight">{weeklyWinner.name}</p>
+                          <p className="text-[10px] font-bold text-accent uppercase">{weeklyWinner.points} Points Excellence</p>
+                        </div>
+                      </div>
+                      {isAdmin && (
+                        <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="w-full h-10 border-accent/20 text-accent hover:bg-accent hover:text-black rounded-xl text-[9px] font-black uppercase italic gap-2"
+                            onClick={handleTriggerWeeklyDigest}
+                            disabled={isSendingDigest}
+                        >
+                            {isSendingDigest ? <Loader2 className="animate-spin h-3 w-3" /> : <MailCheck size={14} />} Diffuser le Digest
+                        </Button>
+                      )}
+                    </>
+                  ) : (
+                    <div className="h-20 flex items-center justify-center opacity-20 italic text-xs uppercase font-black">Calcul en cours...</div>
+                  )}
                 </CardContent>
               </Card>
 
@@ -468,7 +505,6 @@ function DashboardPage() {
           )}
 
           <div className="grid gap-6 grid-cols-1 lg:grid-cols-7">
-            {/* Colonne Gauche : Revenus ou Commandes */}
             <div className="lg:col-span-4 space-y-6">
                 <Card className="glossy-card border-none rounded-[2.5rem] overflow-hidden">
                     <CardHeader className="py-6 px-8 flex flex-row items-center justify-between">
@@ -512,7 +548,6 @@ function DashboardPage() {
                     </CardContent>
                 </Card>
 
-                {/* --- CLASSEMENT ÉLITE (Leaderboard) --- */}
                 {isStaff && (
                   <Card className="glossy-card border-none rounded-[2.5rem] overflow-hidden">
                     <CardHeader className="py-6 px-8 border-b border-white/5 bg-accent/5">
@@ -564,7 +599,6 @@ function DashboardPage() {
                 )}
             </div>
 
-            {/* Colonne Droite : Notifications */}
             <div className="lg:col-span-3 space-y-6">
                 <Card className="glossy-card border-none rounded-[2.5rem] overflow-hidden flex flex-col h-full">
                     <CardHeader className="py-6 px-8 border-b border-white/5 bg-white/[0.02]">
