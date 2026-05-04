@@ -20,6 +20,7 @@ export type AppUser = {
   lastMiningAt?: any;
   miningPower?: number;
   completedMissionsToday?: string[];
+  lastBlockRarity?: 'common' | 'rare' | 'legendary';
 };
 
 export type TokenTransaction = {
@@ -37,6 +38,7 @@ export type TokenTransaction = {
   memo?: string;
   createdAt: any;
   direction?: 'sent' | 'received';
+  rarity?: 'common' | 'rare' | 'legendary';
 };
 
 export type Product = {

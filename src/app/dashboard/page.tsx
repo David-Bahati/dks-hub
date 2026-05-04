@@ -61,7 +61,8 @@ import {
   Pickaxe,
   Target,
   Flame,
-  Layout
+  Layout,
+  Gem
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -229,12 +230,30 @@ function DashboardPage() {
     if (!user || miningTimeLeft) return;
     setIsMining(true);
     try {
-        const reward = user.loyaltyLevel === 'Gold' ? 0.5 : user.loyaltyLevel === 'Silver' ? 0.2 : 0.1;
+        // Block Rarity Logic
+        const random = Math.random();
+        let rarity: 'common' | 'rare' | 'legendary' = 'common';
+        let multiplier = 1;
+        let rarityLabel = "Commun";
+
+        if (random < 0.05) { // 5% chance
+            rarity = 'legendary';
+            multiplier = 5;
+            rarityLabel = "LÉGENDAIRE";
+        } else if (random < 0.20) { // 15% chance
+            rarity = 'rare';
+            multiplier = 2;
+            rarityLabel = "RARE";
+        }
+
+        const baseReward = user.loyaltyLevel === 'Gold' ? 0.5 : user.loyaltyLevel === 'Silver' ? 0.2 : 0.1;
+        const reward = baseReward * multiplier;
         const txId = `PI-MINING-${Math.random().toString(36).substring(2, 12).toUpperCase()}`;
 
         await updateDoc(doc(db, "users", user.uid), {
             lastMiningAt: serverTimestamp(),
             tokenBalance: increment(reward),
+            lastBlockRarity: rarity,
             updatedAt: serverTimestamp()
         });
 
@@ -243,11 +262,28 @@ function DashboardPage() {
             userName: user.name,
             type: 'mining',
             tokenAmount: reward,
+            rarity: rarity,
             piTxId: txId,
+            memo: `Extraction Bloc ${rarityLabel} (${multiplier}x)`,
             createdAt: serverTimestamp()
         });
 
-        toast({ title: "Minage Réussi !", description: `Vous avez extrait ${reward} DKST du bloc Hub.` });
+        if (rarity === 'legendary') {
+            toast({ 
+                title: "JACKPOT LÉGENDAIRE !", 
+                description: `Vous avez découvert un bloc unique. Récompense x5 : ${reward} DKST !`,
+                className: "bg-yellow-500 text-black font-black"
+            });
+        } else if (rarity === 'rare') {
+            toast({ 
+                title: "Bloc Rare Découvert !", 
+                description: `Récompense x2 : ${reward} DKST ajoutés à votre wallet.`,
+                className: "bg-purple-500 text-white font-black"
+            });
+        } else {
+            toast({ title: "Minage Réussi", description: `Vous avez extrait ${reward} DKST du bloc standard.` });
+        }
+
     } catch (e) {
         toast({ title: "Erreur Minage", variant: "destructive" });
     } finally {
@@ -497,15 +533,30 @@ function DashboardPage() {
 
                       <div className="p-8 bg-black/60 backdrop-blur-3xl rounded-[2.5rem] border border-white/5 flex flex-col items-center gap-8 shadow-inner">
                           {miningTimeLeft ? (
-                              <div className="text-center space-y-4">
+                              <div className="text-center space-y-6">
                                   <p className="text-[10px] font-black uppercase text-accent tracking-[0.5em]">Session Active</p>
                                   <div className="flex items-center gap-6 justify-center">
                                       <div className="w-2 h-16 bg-accent rounded-full animate-[pulse_1.5s_infinite]" />
                                       <div className="text-6xl font-black text-white italic tracking-tighter font-mono">{miningTimeLeft}</div>
                                       <div className="w-2 h-16 bg-accent rounded-full animate-[pulse_1.5s_infinite] delay-300" />
                                   </div>
-                                  <div className="flex items-center gap-2 justify-center text-[10px] font-bold text-muted-foreground uppercase italic">
-                                      <Zap size={12} className="text-accent" /> Puissance: {user?.loyaltyLevel === 'Gold' ? '5.0' : user?.loyaltyLevel === 'Silver' ? '2.0' : '1.0'} GH/s
+                                  
+                                  {/* BLOCK RARITY DISPLAY */}
+                                  <div className="flex flex-col items-center gap-4">
+                                      <div className={cn(
+                                          "px-6 py-2 rounded-2xl border flex items-center gap-3 animate-in zoom-in-50 duration-500",
+                                          user?.lastBlockRarity === 'legendary' ? "bg-yellow-500/20 border-yellow-500 text-yellow-500" :
+                                          user?.lastBlockRarity === 'rare' ? "bg-purple-500/20 border-purple-500 text-purple-400" :
+                                          "bg-accent/10 border-accent/20 text-accent"
+                                      )}>
+                                          {user?.lastBlockRarity === 'legendary' ? <Crown size={16} /> : user?.lastBlockRarity === 'rare' ? <Gem size={16} /> : <Cpu size={16} />}
+                                          <span className="text-[10px] font-black uppercase tracking-widest italic">
+                                              Bloc {user?.lastBlockRarity === 'legendary' ? "LÉGENDAIRE" : user?.lastBlockRarity === 'rare' ? "RARE" : "COMMUN"} détecté
+                                          </span>
+                                      </div>
+                                      <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground uppercase italic">
+                                          <Zap size={12} className="text-accent" /> Puissance: {user?.loyaltyLevel === 'Gold' ? '5.0' : user?.loyaltyLevel === 'Silver' ? '2.0' : '1.0'} GH/s
+                                      </div>
                                   </div>
                               </div>
                           ) : (
@@ -521,6 +572,7 @@ function DashboardPage() {
                                   >
                                       {isMining ? <Loader2 className="animate-spin" /> : <><Flame size={28} /> Lancer le Cycle</>}
                                   </Button>
+                                  <p className="text-[8px] font-black uppercase tracking-widest text-white/20">Probabilité Bloc Légendaire : 5%</p>
                               </div>
                           )}
                       </div>

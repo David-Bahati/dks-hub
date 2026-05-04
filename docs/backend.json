@@ -20,6 +20,7 @@
         "lastMiningAt": { "type": "string", "format": "date-time" },
         "miningPower": { "type": "number" },
         "completedMissionsToday": { "type": "array", "items": { "type": "string" } },
+        "lastBlockRarity": { "type": "string", "enum": ["common", "rare", "legendary"] },
         "createdAt": { "type": "string", "format": "date-time" },
         "updatedAt": { "type": "string", "format": "date-time" }
       },
@@ -27,7 +28,7 @@
     },
     "TokenTransaction": {
       "title": "TokenTransaction",
-      "description": "Represents a point-to-token conversion or token usage on the Pi blockchain.",
+      "description": "Represents a point-to-token conversion, token usage on the Pi blockchain, or mining reward.",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
@@ -38,6 +39,7 @@
         "piTxId": { "type": "string", "description": "Pi Blockchain transaction hash" },
         "direction": { "type": "string", "enum": ["sent", "received"] },
         "memo": { "type": "string" },
+        "rarity": { "type": "string", "enum": ["common", "rare", "legendary"] },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["userId", "type", "tokenAmount", "createdAt"]
@@ -53,7 +55,7 @@
     },
     "/tokenTransactions/{txId}": {
       "schema": "TokenTransaction",
-      "description": "Prestige point conversions."
+      "description": "Prestige point conversions and mining events."
     }
   }
 }
