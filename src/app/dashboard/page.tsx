@@ -47,7 +47,8 @@ import {
   Trash2,
   Hammer,
   BookText,
-  User as UserIcon
+  User as UserIcon,
+  Medal
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -78,6 +79,7 @@ import { db } from '@/lib/firebase';
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/ui/Logo";
 import { Input } from "@/components/ui/input";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { 
   AreaChart, 
   Area, 
@@ -152,6 +154,52 @@ function DashboardPage() {
     return query(collection(db, "notifications"), where("userId", "in", [user.uid, 'staff']), orderBy("createdAt", "desc"), limit(6));
   }, [user?.uid, authLoading]);
   const { data: recentNotifs } = useCollection(notificationsQuery);
+
+  // --- LEADERBOARD LOGIC ---
+  const logsQuery = useMemoFirebase(() => query(collection(db, "technicianLogs")), []);
+  const { data: allLogs } = useCollection(logsQuery);
+
+  const bookingsQuery = useMemoFirebase(() => query(collection(db, "serviceBookings"), where("status", "==", "completed")), []);
+  const { data: allBookings } = useCollection(bookingsQuery);
+
+  const savQuery = useMemoFirebase(() => query(collection(db, "supportTickets"), where("status", "==", "completed")), []);
+  const { data: allSav } = useCollection(savQuery);
+
+  const leaderboard = useMemo(() => {
+    if (!allLogs || !allBookings || !allSav) return [];
+
+    const userPoints: Record<string, { name: string, points: number, actions: number, photo: string }> = {};
+
+    // 1. Logs = 10 pts
+    allLogs.forEach(log => {
+      if (!userPoints[log.userId]) userPoints[log.userId] = { name: log.userName, points: 0, actions: 0, photo: "" };
+      userPoints[log.userId].points += 10;
+      userPoints[log.userId].actions += 1;
+    });
+
+    // 2. Academy = 50 pts
+    allBookings.forEach(booking => {
+      if (booking.technicianId) {
+        if (!userPoints[booking.technicianId]) userPoints[booking.technicianId] = { name: booking.technicianName || "Expert", points: 0, actions: 0, photo: "" };
+        userPoints[booking.technicianId].points += 50;
+        userPoints[booking.technicianId].actions += 1;
+      }
+    });
+
+    // 3. SAV = 30 pts
+    allSav.forEach(ticket => {
+      if (ticket.technicianId) {
+        if (!userPoints[ticket.technicianId]) userPoints[ticket.technicianId] = { name: ticket.technicianName || "Expert", points: 0, actions: 0, photo: "" };
+        userPoints[ticket.technicianId].points += 30;
+        userPoints[ticket.technicianId].actions += 1;
+      }
+    });
+
+    return Object.entries(userPoints)
+      .map(([id, data]) => ({ id, ...data }))
+      .sort((a, b) => b.points - a.points)
+      .slice(0, 5);
+  }, [allLogs, allBookings, allSav]);
 
   useEffect(() => {
     fetchGlobalData();
@@ -397,79 +445,136 @@ function DashboardPage() {
           )}
 
           <div className="grid gap-6 grid-cols-1 lg:grid-cols-7">
-            <Card className="lg:col-span-4 glossy-card border-none rounded-[2.5rem] overflow-hidden">
-                <CardHeader className="py-6 px-8 flex flex-row items-center justify-between">
-                  <CardTitle className="text-lg font-bold uppercase italic flex items-center gap-3">
-                    {isStaff ? <BarChart3 className="text-accent" size={20} /> : <ShoppingBag className="text-accent" size={20} />}
-                    {isStaff ? 'Tendances Financières (7j)' : 'Mes Derniers Achats'}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="px-4 pb-8 h-[350px]">
-                    {isStaff ? (
-                      <ResponsiveContainer width="100%" height="100%">
-                          <AreaChart data={chartData}>
-                              <defs><linearGradient id="colorTotal" x1="0" x2="0" x2="0" y2="1"><stop offset="5%" stopColor="hsl(var(--accent))" stopOpacity={0.3}/><stop offset="95%" stopColor="hsl(var(--accent))" stopOpacity={0}/></linearGradient></defs>
-                              <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" vertical={false} />
-                              <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 10}} dy={10} />
-                              <Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', borderRadius: '12px', fontSize: '12px' }} itemStyle={{ color: 'hsl(var(--accent))' }} />
-                              <Area type="monotone" dataKey="total" stroke="hsl(var(--accent))" strokeWidth={3} fillOpacity={1} fill="url(#colorTotal)" />
-                          </AreaChart>
-                      </ResponsiveContainer>
-                    ) : (
-                      <div className="divide-y divide-white/5">
-                        {orders && orders.length > 0 ? orders.map((order) => (
-                            <div key={order.id} className="p-5 flex items-center justify-between hover:bg-white/[0.02] transition-colors rounded-2xl group">
-                                <div className="flex items-center gap-4">
-                                    <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-muted-foreground group-hover:text-accent transition-colors"><ShoppingBag size={20} /></div>
+            {/* Colonne Gauche : Revenus ou Commandes */}
+            <div className="lg:col-span-4 space-y-6">
+                <Card className="glossy-card border-none rounded-[2.5rem] overflow-hidden">
+                    <CardHeader className="py-6 px-8 flex flex-row items-center justify-between">
+                      <CardTitle className="text-lg font-bold uppercase italic flex items-center gap-3">
+                        {isStaff ? <BarChart3 className="text-accent" size={20} /> : <ShoppingBag className="text-accent" size={20} />}
+                        {isStaff ? 'Tendances Financières (7j)' : 'Mes Derniers Achats'}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="px-4 pb-8 h-[350px]">
+                        {isStaff ? (
+                          <ResponsiveContainer width="100%" height="100%">
+                              <AreaChart data={chartData}>
+                                  <defs><linearGradient id="colorTotal" x1="0" x2="0" x2="0" y2="1"><stop offset="5%" stopColor="hsl(var(--accent))" stopOpacity={0.3}/><stop offset="95%" stopColor="hsl(var(--accent))" stopOpacity={0}/></linearGradient></defs>
+                                  <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" vertical={false} />
+                                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 10}} dy={10} />
+                                  <Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', borderRadius: '12px', fontSize: '12px' }} itemStyle={{ color: 'hsl(var(--accent))' }} />
+                                  <Area type="monotone" dataKey="total" stroke="hsl(var(--accent))" strokeWidth={3} fillOpacity={1} fill="url(#colorTotal)" />
+                              </AreaChart>
+                          </ResponsiveContainer>
+                        ) : (
+                          <div className="divide-y divide-white/5">
+                            {orders && orders.length > 0 ? orders.map((order) => (
+                                <div key={order.id} className="p-5 flex items-center justify-between hover:bg-white/[0.02] transition-colors rounded-2xl group">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-muted-foreground group-hover:text-accent transition-colors"><ShoppingBag size={20} /></div>
+                                        <div>
+                                            <p className="font-bold text-sm">Commande #{order.id.substring(0, 8).toUpperCase()}</p>
+                                            <p className="text-[10px] text-muted-foreground uppercase">{order.createdAt?.toDate?.().toLocaleDateString() || 'Récemment'}</p>
+                                        </div>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="font-black text-accent text-lg">${order.total?.toFixed(2)}</p>
+                                        {getStatusBadge(order.status)}
+                                    </div>
+                                </div>
+                            )) : (
+                              <div className="h-full flex flex-col items-center justify-center opacity-30 italic"><ShoppingBag size={48} className="mb-4" /><p>Aucune commande enregistrée.</p></div>
+                            )}
+                          </div>
+                        )}
+                    </CardContent>
+                </Card>
+
+                {/* --- CLASSEMENT ÉLITE (Leaderboard) --- */}
+                {isStaff && (
+                  <Card className="glossy-card border-none rounded-[2.5rem] overflow-hidden">
+                    <CardHeader className="py-6 px-8 border-b border-white/5 bg-accent/5">
+                      <CardTitle className="text-lg font-bold uppercase italic flex items-center gap-3">
+                        <Trophy className="text-accent" size={20} /> Classement Élite (Mois)
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                       <div className="divide-y divide-white/5">
+                          {leaderboard.map((member, index) => (
+                            <div key={member.id} className="p-5 flex items-center justify-between hover:bg-white/5 transition-all group">
+                                <div className="flex items-center gap-5">
+                                    <div className="relative">
+                                      <div className={cn(
+                                        "w-12 h-12 rounded-2xl flex items-center justify-center font-black text-lg italic transition-transform group-hover:scale-110",
+                                        index === 0 ? "bg-yellow-500/20 text-yellow-500 shadow-[0_0_15px_rgba(234,179,8,0.3)]" : 
+                                        index === 1 ? "bg-slate-300/20 text-slate-300" :
+                                        index === 2 ? "bg-orange-600/20 text-orange-600" : "bg-white/5 text-muted-foreground"
+                                      )}>
+                                        {index === 0 ? <Crown size={20} /> : index + 1}
+                                      </div>
+                                      {index < 3 && (
+                                        <div className="absolute -top-2 -right-2">
+                                           <Medal size={16} className={cn(index === 0 ? "text-yellow-500" : index === 1 ? "text-slate-300" : "text-orange-600")} />
+                                        </div>
+                                      )}
+                                    </div>
                                     <div>
-                                        <p className="font-bold text-sm">Commande #{order.id.substring(0, 8).toUpperCase()}</p>
-                                        <p className="text-[10px] text-muted-foreground uppercase">{order.createdAt?.toDate?.().toLocaleDateString() || 'Récemment'}</p>
+                                        <p className="font-black text-sm uppercase italic tracking-tight">{member.name}</p>
+                                        <div className="flex items-center gap-3 mt-1">
+                                          <span className="text-[9px] font-bold text-muted-foreground uppercase flex items-center gap-1"><Zap size={10} className="text-accent"/> {member.actions} actions</span>
+                                          <span className="text-[9px] font-bold text-muted-foreground uppercase flex items-center gap-1"><Star size={10} className="text-yellow-500"/> Prestige: {member.points}</span>
+                                        </div>
                                     </div>
                                 </div>
                                 <div className="text-right">
-                                    <p className="font-black text-accent text-lg">${order.total?.toFixed(2)}</p>
-                                    {getStatusBadge(order.status)}
+                                    <Badge variant="outline" className={cn(
+                                      "border-none font-black text-xs italic",
+                                      index === 0 ? "text-yellow-500" : "text-accent/60"
+                                    )}>
+                                      {member.points} PTS
+                                    </Badge>
                                 </div>
                             </div>
-                        )) : (
-                          <div className="h-full flex flex-col items-center justify-center opacity-30 italic"><ShoppingBag size={48} className="mb-4" /><p>Aucune commande enregistrée.</p></div>
-                        )}
-                      </div>
-                    )}
-                </CardContent>
-            </Card>
+                          ))}
+                       </div>
+                    </CardContent>
+                  </Card>
+                )}
+            </div>
 
-            <Card className="lg:col-span-3 glossy-card border-none rounded-[2.5rem] overflow-hidden flex flex-col">
-                <CardHeader className="py-6 px-8 border-b border-white/5 bg-white/[0.02]">
-                  <CardTitle className="text-lg font-bold uppercase italic flex items-center gap-3">
-                    <Bell className="text-primary" size={20} /> Journal du Hub
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-0 flex-1 overflow-y-auto max-h-[350px] custom-scrollbar">
-                    <div className="divide-y divide-white/5">
-                        {recentNotifs && recentNotifs.length > 0 ? recentNotifs.map((notif) => (
-                            <div key={notif.id} className={cn("p-5 flex items-start gap-4 transition-colors hover:bg-white/5", !notif.isRead && "bg-accent/5 border-l-2 border-l-accent")}>
-                                <div className={cn(
-                                  "w-10 h-10 rounded-xl shrink-0 flex items-center justify-center",
-                                  notif.type === 'error' ? 'bg-red-500/10 text-red-500' : notif.type === 'success' ? 'bg-green-500/10 text-green-400' : 'bg-primary/10 text-primary'
-                                )}>
-                                    {notif.type === 'error' ? <AlertCircle size={18} /> : notif.type === 'success' ? <CheckCircle2 size={18} /> : <Zap size={18} />}
+            {/* Colonne Droite : Notifications */}
+            <div className="lg:col-span-3 space-y-6">
+                <Card className="glossy-card border-none rounded-[2.5rem] overflow-hidden flex flex-col h-full">
+                    <CardHeader className="py-6 px-8 border-b border-white/5 bg-white/[0.02]">
+                      <CardTitle className="text-lg font-bold uppercase italic flex items-center gap-3">
+                        <Bell className="text-primary" size={20} /> Journal du Hub
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-0 flex-1 overflow-y-auto max-h-[600px] custom-scrollbar">
+                        <div className="divide-y divide-white/5">
+                            {recentNotifs && recentNotifs.length > 0 ? recentNotifs.map((notif) => (
+                                <div key={notif.id} className={cn("p-5 flex items-start gap-4 transition-colors hover:bg-white/5", !notif.isRead && "bg-accent/5 border-l-2 border-l-accent")}>
+                                    <div className={cn(
+                                      "w-10 h-10 rounded-xl shrink-0 flex items-center justify-center",
+                                      notif.type === 'error' ? 'bg-red-500/10 text-red-500' : notif.type === 'success' ? 'bg-green-500/10 text-green-400' : 'bg-primary/10 text-primary'
+                                    )}>
+                                        {notif.type === 'error' ? <AlertCircle size={18} /> : notif.type === 'success' ? <CheckCircle2 size={18} /> : <Zap size={18} />}
+                                    </div>
+                                    <div className="space-y-1">
+                                        <p className="text-[11px] font-black uppercase tracking-tight">{notif.title}</p>
+                                        <p className="text-[10px] text-muted-foreground leading-snug line-clamp-2">{notif.message}</p>
+                                        <p className="text-[8px] font-bold uppercase opacity-30">{notif.createdAt?.toDate?.().toLocaleTimeString() || 'Maintenant'}</p>
+                                    </div>
                                 </div>
-                                <div className="space-y-1">
-                                    <p className="text-[11px] font-black uppercase tracking-tight">{notif.title}</p>
-                                    <p className="text-[10px] text-muted-foreground leading-snug line-clamp-2">{notif.message}</p>
-                                    <p className="text-[8px] font-bold uppercase opacity-30">{notif.createdAt?.toDate?.().toLocaleTimeString() || 'Maintenant'}</p>
-                                </div>
-                            </div>
-                        )) : (
-                          <div className="p-20 text-center opacity-20 italic text-xs">Aucune activité récente.</div>
-                        )}
+                            )) : (
+                              <div className="p-20 text-center opacity-20 italic text-xs">Aucune activité récente.</div>
+                            )}
+                        </div>
+                    </CardContent>
+                    <div className="p-4 border-t border-white/5 bg-black/20 text-center">
+                        <Link href="/dashboard/notifications" className="text-[10px] font-black uppercase italic text-accent hover:underline">Voir tout l'historique <ArrowRight size={10} className="inline ml-1"/></Link>
                     </div>
-                </CardContent>
-                <div className="p-4 border-t border-white/5 bg-black/20 text-center">
-                    <Link href="/dashboard/notifications" className="text-[10px] font-black uppercase italic text-accent hover:underline">Voir tout l'historique <ArrowRight size={10} className="inline ml-1"/></Link>
-                </div>
-            </Card>
+                </Card>
+            </div>
           </div>
       </main>
     </div>
