@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Navbar } from "@/components/layout/Navbar";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,18 +10,19 @@ import {
     Plus, 
     ArrowLeft, 
     Loader2, 
-    Search,
-    MessageCircle,
-    BadgeAlert,
-    Send,
-    User,
-    Clock,
-    Zap,
-    AlertTriangle,
-    CheckCircle2,
-    Trash2,
-    History,
-    StickyNote
+    Search, 
+    Send, 
+    Clock, 
+    Zap, 
+    CheckCircle2, 
+    Trash2, 
+    StickyNote,
+    Trophy,
+    Award,
+    Star,
+    ShieldCheck,
+    Cpu,
+    RefreshCw
 } from "lucide-react";
 import { db } from '@/lib/firebase';
 import { collection, addDoc, serverTimestamp, query, orderBy, deleteDoc, doc } from 'firebase/firestore';
@@ -36,6 +37,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from '@/lib/utils';
+import { Progress } from '@/components/ui/progress';
 
 function TechnicianLogbookPage() {
     const { user } = useAuth();
@@ -51,6 +53,55 @@ function TechnicianLogbookPage() {
     const { data: logs, isLoading } = useCollection(logsQuery);
 
     const isStaff = user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'seller' || user?.role?.toLowerCase() === 'cashier';
+
+    // Logic pour les badges et le prestige
+    const userStats = useMemo(() => {
+        if (!logs || !user) return null;
+        
+        // Calculer les stats globales par utilisateur pour la timeline
+        const allUsersStats: Record<string, { total: number, technical: number, handover: number }> = {};
+        
+        logs.forEach(log => {
+            if (!allUsersStats[log.userId]) {
+                allUsersStats[log.userId] = { total: 0, technical: 0, handover: 0 };
+            }
+            allUsersStats[log.userId].total++;
+            if (log.type === 'technical') allUsersStats[log.userId].technical++;
+            if (log.type === 'handover') allUsersStats[log.userId].handover++;
+        });
+
+        const myStats = allUsersStats[user.uid] || { total: 0, technical: 0, handover: 0 };
+
+        const getBadges = (stats: { total: number, technical: number, handover: number }) => {
+            const badges = [];
+            if (stats.total >= 50) badges.push({ id: 'keeper', label: 'Gardien du Savoir', icon: <ShieldCheck size={12} className="text-yellow-400" />, color: 'bg-yellow-400/10 text-yellow-400' });
+            else if (stats.total >= 20) badges.push({ id: 'diligent', label: 'Technicien Assidu', icon: <Award size={12} className="text-slate-300" />, color: 'bg-slate-300/10 text-slate-300' });
+            else if (stats.total >= 5) badges.push({ id: 'apprentice', label: 'Apprenti Noteur', icon: <Trophy size={12} className="text-orange-400" />, color: 'bg-orange-400/10 text-orange-400' });
+
+            if (stats.technical >= 15) badges.push({ id: 'diagnostic', label: 'Expert Diagnostic', icon: <Cpu size={12} className="text-cyan-400" />, color: 'bg-cyan-400/10 text-cyan-400' });
+            if (stats.handover >= 10) badges.push({ id: 'master_handoff', label: 'Maître Passation', icon: <RefreshCw size={12} className="text-purple-400" />, color: 'bg-purple-400/10 text-purple-400' });
+            
+            return badges;
+        };
+
+        const myBadges = getBadges(myStats);
+        
+        // Progression vers le prochain rang
+        let nextRankGoal = 5;
+        let rankLabel = "Nouveau";
+        if (myStats.total >= 50) { nextRankGoal = 100; rankLabel = "Gardien"; }
+        else if (myStats.total >= 20) { nextRankGoal = 50; rankLabel = "Assidu"; }
+        else if (myStats.total >= 5) { nextRankGoal = 20; rankLabel = "Apprenti"; }
+
+        return { 
+            myStats, 
+            myBadges, 
+            nextRankGoal, 
+            rankLabel,
+            allUsersStats,
+            getBadgesForUserId: (uid: string) => getBadges(allUsersStats[uid] || { total: 0, technical: 0, handover: 0 })
+        };
+    }, [logs, user]);
 
     const handleAddLog = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -118,6 +169,35 @@ function TechnicianLogbookPage() {
                             <p className="text-muted-foreground text-xs uppercase font-black opacity-40 mt-1">Observations techniques & Passations de service</p>
                         </div>
                     </div>
+
+                    {/* Dashboard de Prestige Technicien */}
+                    {userStats && (
+                        <Card className="bg-accent/5 border-accent/20 rounded-[2rem] p-6 flex flex-col md:flex-row items-center gap-8 shadow-xl shadow-accent/5">
+                            <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 rounded-2xl bg-accent text-black flex items-center justify-center shadow-lg shadow-accent/20">
+                                    <Star size={24} />
+                                </div>
+                                <div className="space-y-1">
+                                    <p className="text-[8px] font-black uppercase text-accent tracking-[0.2em]">Prestige Actuel</p>
+                                    <p className="text-sm font-black uppercase italic">{userStats.rankLabel}</p>
+                                </div>
+                            </div>
+                            <div className="w-full md:w-48 space-y-2">
+                                <div className="flex justify-between text-[8px] font-black uppercase opacity-40">
+                                    <span>Progression Grade</span>
+                                    <span>{userStats.myStats.total} / {userStats.nextRankGoal} notes</span>
+                                </div>
+                                <Progress value={(userStats.myStats.total / userStats.nextRankGoal) * 100} className="h-1.5 bg-white/5" indicatorClassName="bg-accent" />
+                            </div>
+                            <div className="flex gap-2">
+                                {userStats.myBadges.map(b => (
+                                    <Badge key={b.id} className={cn("border-none px-3 py-1 flex items-center gap-1.5 uppercase text-[8px] font-black", b.color)}>
+                                        {b.icon} {b.label}
+                                    </Badge>
+                                ))}
+                            </div>
+                        </Card>
+                    )}
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
@@ -165,10 +245,10 @@ function TechnicianLogbookPage() {
 
                         <div className="p-8 bg-white/5 rounded-[2.5rem] border border-white/10 space-y-4">
                             <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground flex items-center gap-2">
-                                <Zap size={12} className="text-accent" /> Conseils de rédaction
+                                <Zap size={12} className="text-accent" /> Valorisez votre Expertise
                             </h3>
                             <p className="text-[10px] leading-relaxed text-white/40 italic">
-                                "Soyez précis sur les numéros de série (S/N) et les codes d'erreur rencontrés. Pour les passations, notez clairement ce qui reste à finir pour l'équipe suivante."
+                                "Chaque note technique précise et chaque passation détaillée vous rapproche du grade de Gardien du Savoir. Vos badges sont visibles par toute l'équipe."
                             </p>
                         </div>
                     </div>
@@ -203,57 +283,69 @@ function TechnicianLogbookPage() {
                             {isLoading ? (
                                 <div className="py-20 flex justify-center"><Loader2 className="animate-spin text-accent h-10 w-10" /></div>
                             ) : filteredLogs && filteredLogs.length > 0 ? (
-                                filteredLogs.map((log) => (
-                                    <div key={log.id} className="relative group animate-in slide-in-from-left-4 duration-300">
-                                        <div className={cn(
-                                            "absolute -left-10 top-1 w-6 h-6 rounded-full border-4 border-background flex items-center justify-center transition-transform group-hover:scale-125 z-10",
-                                            log.type === 'incident' ? 'bg-red-500' : log.type === 'handover' ? 'bg-purple-500' : log.type === 'technical' ? 'bg-blue-500' : 'bg-accent'
-                                        )}>
-                                            <CheckCircle2 size={10} className="text-white" />
-                                        </div>
-                                        
-                                        <Card className="bg-white/5 border-white/5 rounded-[2rem] hover:bg-white/[0.08] transition-all overflow-hidden group">
-                                            <CardContent className="p-6">
-                                                <div className="flex justify-between items-start mb-4">
-                                                    <div className="flex items-center gap-3">
-                                                        {getTypeBadge(log.type)}
-                                                        <span className="text-[9px] font-black uppercase text-accent tracking-widest flex items-center gap-1.5 opacity-60">
-                                                            <Clock size={10} /> {log.createdAt?.toDate ? log.createdAt.toDate().toLocaleString('fr-FR', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }) : 'Récemment'}
-                                                        </span>
+                                filteredLogs.map((log) => {
+                                    const authorBadges = userStats?.getBadgesForUserId(log.userId) || [];
+                                    return (
+                                        <div key={log.id} className="relative group animate-in slide-in-from-left-4 duration-300">
+                                            <div className={cn(
+                                                "absolute -left-10 top-1 w-6 h-6 rounded-full border-4 border-background flex items-center justify-center transition-transform group-hover:scale-125 z-10",
+                                                log.type === 'incident' ? 'bg-red-500' : log.type === 'handover' ? 'bg-purple-500' : log.type === 'technical' ? 'bg-blue-500' : 'bg-accent'
+                                            )}>
+                                                <CheckCircle2 size={10} className="text-white" />
+                                            </div>
+                                            
+                                            <Card className="bg-white/5 border-white/5 rounded-[2rem] hover:bg-white/[0.08] transition-all overflow-hidden group">
+                                                <CardContent className="p-6">
+                                                    <div className="flex justify-between items-start mb-4">
+                                                        <div className="flex items-center gap-3">
+                                                            {getTypeBadge(log.type)}
+                                                            <span className="text-[9px] font-black uppercase text-accent tracking-widest flex items-center gap-1.5 opacity-60">
+                                                                <Clock size={10} /> {log.createdAt?.toDate ? log.createdAt.toDate().toLocaleString('fr-FR', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }) : 'Récemment'}
+                                                            </span>
+                                                        </div>
+                                                        {isStaff && (user?.uid === log.userId || user?.role === 'Admin') && (
+                                                            <Button 
+                                                                variant="ghost" 
+                                                                size="icon" 
+                                                                className="h-8 w-8 text-muted-foreground/20 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
+                                                                onClick={() => handleDeleteLog(log.id)}
+                                                            >
+                                                                <Trash2 size={14} />
+                                                            </Button>
+                                                        )}
                                                     </div>
-                                                    {isStaff && (user?.uid === log.userId || user?.role === 'Admin') && (
-                                                        <Button 
-                                                            variant="ghost" 
-                                                            size="icon" 
-                                                            className="h-8 w-8 text-muted-foreground/20 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
-                                                            onClick={() => handleDeleteLog(log.id)}
-                                                        >
-                                                            <Trash2 size={14} />
-                                                        </Button>
-                                                    )}
-                                                </div>
-                                                
-                                                <p className="text-sm text-white/90 font-medium leading-relaxed italic whitespace-pre-wrap mb-6">
-                                                    "{log.content}"
-                                                </p>
+                                                    
+                                                    <p className="text-sm text-white/90 font-medium leading-relaxed italic whitespace-pre-wrap mb-6">
+                                                        "{log.content}"
+                                                    </p>
 
-                                                <div className="flex items-center gap-3 border-t border-white/5 pt-4">
-                                                    <div className="w-8 h-8 rounded-xl bg-accent/10 flex items-center justify-center text-accent text-[10px] font-black italic">
-                                                        {log.userName?.substring(0, 1)}
+                                                    <div className="flex items-center justify-between border-t border-white/5 pt-4">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-8 h-8 rounded-xl bg-accent/10 flex items-center justify-center text-accent text-[10px] font-black italic">
+                                                                {log.userName?.substring(0, 1)}
+                                                            </div>
+                                                            <span className="text-[10px] font-black uppercase italic text-muted-foreground/60 tracking-wider">
+                                                                Expert: {log.userName}
+                                                            </span>
+                                                        </div>
+                                                        <div className="flex gap-1">
+                                                            {authorBadges.map((b, i) => (
+                                                                <div key={i} title={b.label} className="w-6 h-6 rounded-lg bg-white/5 flex items-center justify-center text-accent opacity-60 hover:opacity-100 transition-opacity">
+                                                                    {b.icon}
+                                                                </div>
+                                                            ))}
+                                                        </div>
                                                     </div>
-                                                    <span className="text-[10px] font-black uppercase italic text-muted-foreground/60 tracking-wider">
-                                                        Rédigé par: {log.userName}
-                                                    </span>
-                                                </div>
-                                            </CardContent>
-                                        </Card>
-                                    </div>
-                                ))
+                                                </CardContent>
+                                            </Card>
+                                        </div>
+                                    );
+                                })
                             ) : (
                                 <div className="py-32 text-center bg-white/[0.02] rounded-[3rem] border border-dashed border-white/5 flex flex-col items-center gap-6 opacity-30">
                                     <BookText size={80} strokeWidth={1} />
                                     <p className="text-xl font-black uppercase italic tracking-tighter">Journal vide</p>
-                                    <p className="text-[10px] max-w-xs uppercase font-black tracking-widest leading-relaxed">Commencez à noter les observations du labo pour une meilleure coordination.</p>
+                                    <p className="text-[10px] max-w-xs uppercase font-black tracking-widest leading-relaxed">Commencez à noter les observations du labo pour débloquer vos badges d'élite.</p>
                                 </div>
                             )}
                         </div>
