@@ -124,6 +124,20 @@ export type ServiceBooking = {
   technicianName?: string;
   notes?: string;
   createdAt: any;
+  hasReview?: boolean;
+};
+
+export type AcademyReview = {
+  id: string;
+  bookingId: string;
+  userId: string;
+  userName: string;
+  userPhoto?: string;
+  serviceId: string;
+  serviceTitle: string;
+  rating: number;
+  comment: string;
+  createdAt: any;
 };
 
 export type Sale = {

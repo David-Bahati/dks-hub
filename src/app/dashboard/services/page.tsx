@@ -28,7 +28,9 @@ import {
     Download,
     FileBadge,
     QrCode,
-    ShieldCheck
+    ShieldCheck,
+    MessageSquareText,
+    Send
 } from "lucide-react";
 import { db } from '@/lib/firebase';
 import { collection, query, orderBy, updateDoc, doc, addDoc, serverTimestamp, onSnapshot, where } from 'firebase/firestore';
@@ -44,6 +46,9 @@ import { cn } from "@/lib/utils";
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import { Logo } from '@/components/ui/Logo';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 
 // Mapping des prix pour la facturation automatique
 const SERVICE_PRICES: Record<string, number> = {
@@ -64,6 +69,13 @@ function ServiceManagementPage() {
     const [statusFilter, setStatusFilter] = useState("all");
     const [staffMembers, setStaffMembers] = useState<any[]>([]);
     
+    // Review States
+    const [isReviewSheetOpen, setIsReviewSheetOpen] = useState(false);
+    const [selectedBookingForReview, setSelectedBookingForReview] = useState<any>(null);
+    const [rating, setRating] = useState(5);
+    const [comment, setComment] = useState("");
+    const [isReviewSubmitting, setIsReviewSubmitting] = useState(false);
+
     // PDF Generation States
     const [selectedBookingForCert, setSelectedBookingForCert] = useState<any | null>(null);
     const [isGeneratingCert, setIsGeneratingCert] = useState(false);
@@ -128,6 +140,37 @@ function ServiceManagementPage() {
             if (newStatus !== 'completed') toast({ title: "Statut mis à jour" });
         } catch (error) {
             toast({ title: "Erreur", variant: "destructive" });
+        }
+    };
+
+    const handleSubmitReview = async () => {
+        if (!selectedBookingForReview || !user) return;
+        setIsReviewSubmitting(true);
+        try {
+            await addDoc(collection(db, "reviews"), {
+                bookingId: selectedBookingForReview.id,
+                userId: user.uid,
+                userName: user.name,
+                userPhoto: user.photoURL || null,
+                serviceId: selectedBookingForReview.serviceId,
+                serviceTitle: selectedBookingForReview.serviceTitle,
+                rating: rating,
+                comment: comment,
+                createdAt: serverTimestamp()
+            });
+
+            await updateDoc(doc(db, "serviceBookings", selectedBookingForReview.id), {
+                hasReview: true
+            });
+
+            toast({ title: "Merci pour votre avis !", description: "Votre témoignage aide la communauté DKS." });
+            setIsReviewSheetOpen(false);
+            setComment("");
+            setRating(5);
+        } catch (e) {
+            toast({ title: "Erreur", description: "Impossible d'envoyer l'avis.", variant: "destructive" });
+        } finally {
+            setIsReviewSubmitting(false);
         }
     };
 
@@ -291,15 +334,31 @@ function ServiceManagementPage() {
                                             </div>
                                         ) : (
                                             <div className="flex flex-col gap-2">
-                                                {booking.status === 'completed' && booking.category === 'formation' && (
-                                                    <Button 
-                                                        className="bg-accent text-black h-12 rounded-xl font-black uppercase italic text-[10px] gap-2 shadow-lg"
-                                                        onClick={() => handleDownloadCertificate(booking)}
-                                                        disabled={isGeneratingCert}
-                                                    >
-                                                        {isGeneratingCert ? <Loader2 className="animate-spin h-4 w-4" /> : <FileBadge size={16} />}
-                                                        Télécharger mon Diplôme
-                                                    </Button>
+                                                {booking.status === 'completed' && (
+                                                    <>
+                                                        {booking.category === 'formation' && (
+                                                            <Button 
+                                                                className="bg-accent text-black h-12 rounded-xl font-black uppercase italic text-[10px] gap-2 shadow-lg"
+                                                                onClick={() => handleDownloadCertificate(booking)}
+                                                                disabled={isGeneratingCert}
+                                                            >
+                                                                {isGeneratingCert ? <Loader2 className="animate-spin h-4 w-4" /> : <FileBadge size={16} />}
+                                                                Télécharger mon Diplôme
+                                                            </Button>
+                                                        )}
+                                                        {!booking.hasReview && (
+                                                            <Button 
+                                                                variant="outline"
+                                                                className="rounded-xl border-accent/20 text-accent hover:bg-accent/10 h-10 font-black uppercase italic text-[9px] gap-2"
+                                                                onClick={() => {
+                                                                    setSelectedBookingForReview(booking);
+                                                                    setIsReviewSheetOpen(true);
+                                                                }}
+                                                            >
+                                                                <MessageSquareText size={14} /> Laisser un avis
+                                                            </Button>
+                                                        )}
+                                                    </>
                                                 )}
                                                 <Button variant="outline" className="rounded-xl border-primary/20 text-primary hover:bg-primary/10 gap-2 h-12 font-black uppercase italic text-[10px]" asChild>
                                                     <a href={`https://wa.me/243823038945?text=Bonjour,%20je%20suis%20inscrit%20à%20l'Academy%20DKS%20pour%20le%20cursus%20${booking.serviceTitle}.`} target="_blank" rel="noopener noreferrer">
@@ -308,15 +367,14 @@ function ServiceManagementPage() {
                                                 </Button>
                                             </div>
                                         )}
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        ))
-                    ) : (
-                        <div className="py-32 text-center bg-white/5 rounded-[3rem] border border-dashed border-white/10 opacity-30 flex flex-col items-center gap-6">
-                            <GraduationCap size={80} strokeWidth={1} /><p className="text-xl font-black uppercase italic tracking-tighter">Aucun cursus actif</p>
-                        </div>
-                    )}
+                                    </CardContent>
+                                </Card>
+                            ))
+                        ) : (
+                            <div className="py-32 text-center bg-white/5 rounded-[3rem] border border-dashed border-white/10 opacity-30 flex flex-col items-center gap-6">
+                                <GraduationCap size={80} strokeWidth={1} /><p className="text-xl font-black uppercase italic tracking-tighter">Aucun cursus actif</p>
+                            </div>
+                        )}
                 </div>
             </main>
 
@@ -324,14 +382,9 @@ function ServiceManagementPage() {
             <div style={{ position: 'absolute', left: '-9999px', top: 0 }}>
                 {selectedBookingForCert && (
                     <div ref={certRef} className="bg-white text-black p-0 w-[1123px] h-[794px] font-serif relative overflow-hidden flex items-center justify-center">
-                        {/* Bordure Premium */}
                         <div className="absolute inset-0 border-[30px] border-double border-[#0f172a]" />
                         <div className="absolute inset-10 border-4 border-[#3b82f6]/20" />
-                        
-                        {/* Filigrane Logo */}
-                        <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none">
-                            <Logo size="xl" />
-                        </div>
+                        <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none"><Logo size="xl" /></div>
 
                         <div className="relative z-10 text-center w-full px-40 space-y-12">
                             <div className="flex flex-col items-center gap-6">
@@ -366,9 +419,7 @@ function ServiceManagementPage() {
                                     <p className="text-sm font-bold">{new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
                                 </div>
                                 <div className="flex flex-col items-center gap-4">
-                                    <div className="p-3 border-2 border-gray-100 rounded-2xl bg-gray-50/50">
-                                        <QrCode size={60} className="opacity-20" />
-                                    </div>
+                                    <div className="p-3 border-2 border-gray-100 rounded-2xl bg-gray-50/50"><QrCode size={60} className="opacity-20" /></div>
                                     <p className="text-[8px] font-bold text-gray-300 uppercase tracking-tighter">ID: DKS-CERT-{selectedBookingForCert.id.substring(0, 8).toUpperCase()}</p>
                                 </div>
                                 <div className="text-center space-y-2">
@@ -381,13 +432,71 @@ function ServiceManagementPage() {
                                 </div>
                             </div>
                         </div>
-                        
-                        {/* Décoration d'angle */}
                         <div className="absolute top-0 left-0 w-40 h-40 bg-[#3b82f6]/5 rounded-br-full" />
                         <div className="absolute bottom-0 right-0 w-40 h-40 bg-[#0f172a]/5 rounded-tl-full" />
                     </div>
                 )}
             </div>
+
+            {/* SHEET POUR LAISSER UN AVIS */}
+            <Sheet open={isReviewSheetOpen} onOpenChange={setIsReviewSheetOpen}>
+                <SheetContent side="right" className="bg-card/95 backdrop-blur-3xl border-white/10 w-full sm:max-w-md flex flex-col p-0">
+                    <SheetHeader className="p-10 bg-accent/10 border-b border-white/5">
+                        <div className="flex items-center gap-5 mb-4">
+                            <div className="w-16 h-16 rounded-2xl bg-accent/20 flex items-center justify-center text-accent shadow-xl shadow-accent/10">
+                                <MessageSquareText size={32} />
+                            </div>
+                            <div>
+                                <SheetTitle className="text-3xl font-black uppercase italic tracking-tighter text-accent">Votre Expérience</SheetTitle>
+                                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">DKS Academy Community</p>
+                            </div>
+                        </div>
+                        <Badge className="w-fit bg-accent text-black border-none uppercase font-black italic">{selectedBookingForReview?.serviceTitle}</Badge>
+                    </SheetHeader>
+
+                    <div className="flex-1 p-10 space-y-10 overflow-y-auto custom-scrollbar">
+                        <div className="space-y-6">
+                            <div className="space-y-4 text-center">
+                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Votre Note Élite</Label>
+                                <div className="flex justify-center gap-3">
+                                    {[1, 2, 3, 4, 5].map((s) => (
+                                        <button 
+                                            key={s} 
+                                            onClick={() => setRating(s)}
+                                            className={cn(
+                                                "w-12 h-12 rounded-xl flex items-center justify-center transition-all",
+                                                s <= rating ? "bg-accent/20 text-accent scale-110" : "bg-white/5 text-white/20"
+                                            )}
+                                        >
+                                            <Star size={24} fill={s <= rating ? "currentColor" : "none"} />
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="space-y-4">
+                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Témoignage (Optionnel)</Label>
+                                <Textarea 
+                                    placeholder="Racontez-nous comment cette formation a transformé vos compétences..." 
+                                    className="min-h-[150px] bg-background/50 border-white/5 rounded-2xl italic text-sm"
+                                    value={comment}
+                                    onChange={(e) => setComment(e.target.value)}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="pt-8">
+                            <Button 
+                                onClick={handleSubmitReview}
+                                disabled={isReviewSubmitting}
+                                className="w-full h-16 bg-accent text-black font-black uppercase italic rounded-2xl shadow-xl shadow-accent/20 text-lg gap-2"
+                            >
+                                {isReviewSubmitting ? <Loader2 className="animate-spin" /> : <><Send size={20} /> Partager mon Témoignage</>}
+                            </Button>
+                        </div>
+                    </div>
+                </SheetContent>
+            </Sheet>
         </div>
     );
 }

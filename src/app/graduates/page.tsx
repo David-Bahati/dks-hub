@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useMemo } from 'react';
@@ -16,13 +17,17 @@ import {
     Sparkles, 
     Globe,
     Cpu,
-    BookOpen
+    BookOpen,
+    MessageSquareText,
+    Star,
+    Quote
 } from "lucide-react";
 import { db } from '@/lib/firebase';
-import { collection, query, where, orderBy } from 'firebase/firestore';
+import { collection, query, where, orderBy, limit } from 'firebase/firestore';
 import { useCollection, useMemoFirebase } from '@/firebase';
 import { cn } from '@/lib/utils';
 import { Logo } from '@/components/ui/Logo';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 export default function GraduatesDirectoryPage() {
     const [searchTerm, setSearchTerm] = useState("");
@@ -39,6 +44,16 @@ export default function GraduatesDirectoryPage() {
     }, []);
 
     const { data: graduates, isLoading } = useCollection(graduatesQuery);
+
+    // Fetch reviews for testimonials wall
+    const reviewsQuery = useMemoFirebase(() => {
+        return query(
+            collection(db, "reviews"),
+            orderBy("createdAt", "desc"),
+            limit(6)
+        );
+    }, []);
+    const { data: reviews, isLoading: reviewsLoading } = useCollection(reviewsQuery);
 
     const filteredGraduates = useMemo(() => {
         if (!graduates) return [];
@@ -70,8 +85,53 @@ export default function GraduatesDirectoryPage() {
                 </div>
             </section>
 
+            {/* TESTIMONIALS WALL */}
+            {reviews && reviews.length > 0 && (
+                <section className="container max-w-7xl mx-auto px-6 mb-32">
+                    <div className="flex items-center gap-6 mb-12">
+                        <h2 className="text-[10px] font-black uppercase tracking-[0.4em] text-accent flex items-center gap-2">
+                           <MessageSquareText size={14} /> Témoignages d'Élite
+                        </h2>
+                        <div className="h-px flex-1 bg-accent/10" />
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                        {reviews.map((rev) => (
+                            <Card key={rev.id} className="bg-white/[0.03] border-white/5 rounded-[2rem] p-8 relative overflow-hidden group">
+                                <Quote className="absolute -top-4 -right-4 w-20 h-20 text-accent/5 rotate-12" />
+                                <div className="relative z-10 space-y-6">
+                                    <div className="flex gap-1">
+                                        {[...Array(5)].map((_, i) => (
+                                            <Star key={i} size={12} className={cn(i < rev.rating ? "text-accent fill-accent" : "text-white/10")} />
+                                        ))}
+                                    </div>
+                                    <p className="text-sm italic leading-relaxed text-white/80 line-clamp-4">"{rev.comment || "Une expérience exceptionnelle avec les experts de Double King Shop."}"</p>
+                                    <div className="flex items-center gap-4 pt-4 border-t border-white/5">
+                                        <Avatar className="h-10 w-10 border border-accent/20">
+                                            <AvatarImage src={rev.userPhoto} />
+                                            <AvatarFallback className="bg-accent/10 text-accent font-bold text-xs">{rev.userName?.substring(0, 1)}</AvatarFallback>
+                                        </Avatar>
+                                        <div>
+                                            <p className="text-xs font-black uppercase italic text-white">{rev.userName}</p>
+                                            <p className="text-[8px] font-bold uppercase text-accent/60 tracking-widest">{rev.serviceTitle}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </Card>
+                        ))}
+                    </div>
+                </section>
+            )}
+
             {/* DIRECTORY CONTROLS */}
             <section className="container max-w-7xl mx-auto px-6 mb-16">
+                <div className="flex items-center gap-6 mb-12">
+                    <h2 className="text-[10px] font-black uppercase tracking-[0.4em] text-primary flex items-center gap-2">
+                       <User size={14} /> Registre des Experts
+                    </h2>
+                    <div className="h-px flex-1 bg-primary/10" />
+                </div>
+
                 <div className="flex flex-col md:flex-row gap-6 items-center">
                     <div className="relative flex-1 w-full">
                         <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-muted-foreground" size={20} />
