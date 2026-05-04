@@ -1,22 +1,32 @@
+
 "use client";
 
-import { LogOut, LayoutDashboard, ShoppingCart, Home, Trash2, User, Sparkles, Loader2, GraduationCap, Wrench, Laptop, Layout } from 'lucide-react';
+import { LogOut, LayoutDashboard, ShoppingCart, Home, Trash2, User, Sparkles, Loader2, GraduationCap, Wrench, Laptop, Layout, Bell } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from "@/components/ui/button";
 import { useAuth } from '@/context/AuthContext';
 import { useCart } from '@/context/CartContext';
-import { auth } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import { signOut } from 'firebase/auth';
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Badge } from '@/components/ui/badge';
 import { Logo } from '@/components/ui/Logo';
+import { useCollection, useMemoFirebase } from '@/firebase';
+import { collection, query, where } from 'firebase/firestore';
 
 export function Navbar() {
     const { user, isLoading: authLoading } = useAuth();
     const { cartItems, cartCount, totalPrice, removeFromCart } = useCart();
     const router = useRouter();
     const pathname = usePathname();
+
+    // Fetch unread notifications for badge
+    const notificationsQuery = useMemoFirebase(() => {
+        if (!user?.uid) return null;
+        return query(collection(db, "notifications"), where("userId", "==", user.uid), where("isRead", "==", false));
+    }, [user?.uid]);
+    const { data: unreadNotifs } = useCollection(notificationsQuery);
 
     const handleLogout = async () => {
         try {
@@ -35,7 +45,7 @@ export function Navbar() {
         { label: 'Services', href: '/services', show: true, icon: GraduationCap },
         { label: 'Portfolio', href: '/portfolio', show: true, icon: Layout },
         { label: 'Dashboard', href: '/dashboard', show: isStaff, icon: LayoutDashboard },
-        { label: 'Mon Compte', href: '/dashboard', show: !isStaff && !!user, icon: User },
+        { label: 'Mon Hub', href: '/dashboard', show: !isStaff && !!user, icon: User },
     ];
 
     return (
@@ -57,6 +67,18 @@ export function Navbar() {
                 </nav>
 
                 <div className="flex items-center gap-4">
+                    {/* NOTIFICATIONS BADGE */}
+                    {user && (
+                        <Link href="/dashboard/notifications">
+                            <Button variant="ghost" size="icon" className="relative h-12 w-12 rounded-2xl hover:bg-white/5 transition-all text-muted-foreground hover:text-accent">
+                                <Bell size={20} />
+                                {unreadNotifs && unreadNotifs.length > 0 && (
+                                    <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full animate-ping" />
+                                )}
+                            </Button>
+                        </Link>
+                    )}
+
                     <Sheet>
                         <SheetTrigger asChild>
                             <Button variant="ghost" size="icon" className="relative h-12 w-12 rounded-2xl hover:bg-white/5 transition-all">

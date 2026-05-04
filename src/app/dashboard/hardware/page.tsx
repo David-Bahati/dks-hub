@@ -16,7 +16,9 @@ import {
     History,
     Wrench,
     AlertTriangle,
-    BadgeAlert
+    BadgeAlert,
+    Clock,
+    Zap
 } from "lucide-react";
 import { db } from '@/lib/firebase';
 import { collection, addDoc, serverTimestamp, query, where, orderBy } from 'firebase/firestore';
@@ -35,7 +37,7 @@ import {
     DialogFooter 
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { cn } from '@/lib/utils';
 
 function HardwareParkPage() {
     const { user } = useAuth();
@@ -49,12 +51,21 @@ function HardwareParkPage() {
         const isStaff = role === 'admin' || role === 'seller' || role === 'cashier';
         
         if (isStaff) {
-            return query(collection(db, "hardwareAssets"), orderBy("userId"));
+            return query(collection(db, "hardwareAssets"), orderBy("createdAt", "desc"));
         }
         return query(collection(db, "hardwareAssets"), where("userId", "==", user.uid));
     }, [user?.uid, user?.role]);
 
     const { data: assets, isLoading } = useCollection(assetsQuery);
+
+    const checkMaintenanceStatus = (lastDate: any) => {
+        if (!lastDate?.toDate) return { status: 'ok', label: 'Optimum' };
+        const sixMonthsAgo = new Date();
+        sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+        const date = lastDate.toDate();
+        if (date < sixMonthsAgo) return { status: 'warning', label: 'Maintenance Requise' };
+        return { status: 'ok', label: 'Santé OK' };
+    };
 
     const handleAddAsset = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -96,7 +107,7 @@ function HardwareParkPage() {
                         </Link>
                         <div>
                             <h1 className="text-4xl font-black uppercase italic tracking-tighter">Mon Parc <span className="text-accent">Hardware</span></h1>
-                            <p className="text-muted-foreground font-light mt-1">Suivez la maintenance et la santé de votre matériel technologique.</p>
+                            <p className="text-muted-foreground font-light mt-1">Suivez la santé et prévoyez la maintenance de votre matériel.</p>
                         </div>
                     </div>
                     
@@ -105,54 +116,78 @@ function HardwareParkPage() {
                     </Button>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                     {isLoading ? (
                         <div className="col-span-full py-20 flex justify-center"><Loader2 className="animate-spin text-accent h-12 w-12" /></div>
                     ) : assets && assets.length > 0 ? (
-                        assets.map((asset) => (
-                            <Card key={asset.id} className="glossy-card border-none rounded-[2.5rem] overflow-hidden group">
-                                <CardHeader className="p-8 pb-4">
-                                    <div className="flex justify-between items-start">
-                                        <div className="w-14 h-14 rounded-2xl bg-white/5 flex items-center justify-center text-accent">
-                                            <Laptop size={28} />
+                        assets.map((asset) => {
+                            const health = checkMaintenanceStatus(asset.lastMaintenance);
+                            return (
+                                <Card key={asset.id} className="glossy-card border-none rounded-[2.5rem] overflow-hidden group relative">
+                                    <div className={cn(
+                                        "absolute top-0 left-0 w-full h-1",
+                                        health.status === 'warning' ? "bg-orange-500" : "bg-accent/20"
+                                    )} />
+                                    
+                                    <CardHeader className="p-8 pb-4">
+                                        <div className="flex justify-between items-start">
+                                            <div className="w-14 h-14 rounded-2xl bg-white/5 flex items-center justify-center text-accent">
+                                                <Laptop size={28} />
+                                            </div>
+                                            <div className="text-right">
+                                                <Badge className={cn(
+                                                    "border-none uppercase text-[8px] font-black px-3",
+                                                    health.status === 'warning' ? 'bg-orange-500/10 text-orange-400 animate-pulse' : 'bg-green-500/10 text-green-400'
+                                                )}>
+                                                    {health.label}
+                                                </Badge>
+                                                <p className="text-[7px] font-bold uppercase text-muted-foreground mt-1">Status: {asset.status}</p>
+                                            </div>
                                         </div>
-                                        <Badge className={asset.status === 'repair_needed' ? 'bg-destructive/20 text-destructive border-none uppercase text-[8px] font-black' : 'bg-green-500/10 text-green-400 border-none uppercase text-[8px] font-black'}>
-                                            {asset.status === 'excellent' ? 'Optimum' : asset.status.replace('_', ' ')}
-                                        </Badge>
+                                        <div className="mt-6">
+                                            <h3 className="text-xl font-black uppercase italic">{asset.brand} {asset.model}</h3>
+                                            <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">S/N: {asset.serialNumber || 'NON SPÉCIFIÉ'}</p>
+                                        </div>
+                                    </CardHeader>
+                                    <CardContent className="px-8 pb-8 space-y-6">
+                                        <div className="p-4 bg-black/20 rounded-2xl border border-white/5 space-y-2">
+                                            <p className="text-[9px] font-black uppercase text-muted-foreground flex items-center gap-2">
+                                                <Zap size={10} className="text-accent" /> Configuration Expert
+                                            </p>
+                                            <p className="text-xs font-medium text-white/80 line-clamp-2">{asset.specs || 'Détails non fournis.'}</p>
+                                        </div>
+                                        
+                                        {health.status === 'warning' && (
+                                            <div className="p-3 bg-orange-500/5 border border-orange-500/10 rounded-xl flex items-center gap-3">
+                                                <AlertTriangle size={14} className="text-orange-400" />
+                                                <p className="text-[9px] font-bold text-orange-400/80 uppercase">Dépoussiérage recommandé (6 mois+)</p>
+                                            </div>
+                                        )}
+
+                                        <div className="flex items-center gap-4 text-[9px] font-black uppercase italic text-muted-foreground/40">
+                                            <span className="flex items-center gap-1"><Clock size={10} /> Dernier check: {asset.lastMaintenance?.toDate ? asset.lastMaintenance.toDate().toLocaleDateString() : 'Inconnu'}</span>
+                                        </div>
+                                    </CardContent>
+                                    <div className="p-4 bg-white/5 flex gap-2">
+                                        <Button variant="ghost" className="flex-1 rounded-xl h-10 font-black uppercase italic text-[9px] hover:bg-accent hover:text-black" asChild>
+                                            <Link href="/dashboard/support">
+                                                <Wrench size={12} className="mr-2" /> Réparation
+                                            </Link>
+                                        </Button>
+                                        <Button variant="ghost" className="flex-1 rounded-xl h-10 font-black uppercase italic text-[9px] hover:bg-primary hover:text-white" asChild>
+                                            <Link href="/services">
+                                                <ShieldCheck size={12} className="mr-2" /> Upgrade Hub
+                                            </Link>
+                                        </Button>
                                     </div>
-                                    <div className="mt-6">
-                                        <h3 className="text-xl font-black uppercase italic">{asset.brand} {asset.model}</h3>
-                                        <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">S/N: {asset.serialNumber || 'NON SPÉCIFIÉ'}</p>
-                                    </div>
-                                </CardHeader>
-                                <CardContent className="px-8 pb-8 space-y-4">
-                                    <div className="p-4 bg-black/20 rounded-2xl border border-white/5 space-y-2">
-                                        <p className="text-[9px] font-black uppercase text-muted-foreground">Configuration</p>
-                                        <p className="text-xs font-medium text-white/80 line-clamp-2">{asset.specs || 'Aucun détail technique fourni.'}</p>
-                                    </div>
-                                    <div className="flex items-center gap-4 text-[9px] font-black uppercase italic text-muted-foreground/40">
-                                        <span className="flex items-center gap-1"><History size={10} /> Mis à jour {asset.lastMaintenance?.toDate ? asset.lastMaintenance.toDate().toLocaleDateString() : 'Récemment'}</span>
-                                    </div>
-                                </CardContent>
-                                <div className="p-4 bg-white/5 flex gap-2">
-                                    <Button variant="ghost" className="flex-1 rounded-xl h-10 font-black uppercase italic text-[9px] hover:bg-accent hover:text-black" asChild>
-                                        <Link href="/dashboard/support">
-                                            <Wrench size={12} className="mr-2" /> Réparation
-                                        </Link>
-                                    </Button>
-                                    <Button variant="ghost" className="flex-1 rounded-xl h-10 font-black uppercase italic text-[9px] hover:bg-primary hover:text-white" asChild>
-                                        <Link href="/services">
-                                            <ShieldCheck size={12} className="mr-2" /> Upgrade
-                                        </Link>
-                                    </Button>
-                                </div>
-                            </Card>
-                        ))
+                                </Card>
+                            );
+                        })
                     ) : (
                         <div className="col-span-full py-32 text-center bg-white/5 rounded-[3rem] border border-dashed border-white/10 opacity-30 flex flex-col items-center gap-6">
                             <BadgeAlert size={80} strokeWidth={1} />
                             <p className="text-xl font-black uppercase italic tracking-tighter">Votre parc tech est vide</p>
-                            <p className="text-sm max-w-sm">Enregistrez vos PC pour recevoir des conseils d'entretien personnalisés.</p>
+                            <p className="text-sm max-w-sm">Enregistrez vos appareils pour un suivi technique professionnel.</p>
                         </div>
                     )}
                 </div>
@@ -161,31 +196,31 @@ function HardwareParkPage() {
             <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
                 <DialogContent className="glossy-card border-none rounded-[2.5rem]">
                     <DialogHeader>
-                        <DialogTitle className="text-2xl font-black uppercase italic tracking-tighter">Enregistrer un Appareil</DialogTitle>
+                        <DialogTitle className="text-2xl font-black uppercase italic tracking-tighter">Ajouter au Hub Hardware</DialogTitle>
                     </DialogHeader>
                     <form onSubmit={handleAddAsset} className="space-y-6 py-4">
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Marque</Label>
-                                <Input name="brand" placeholder="Ex: ASUS, MacBook..." required className="h-12 bg-background/50 border-white/10 rounded-xl" />
+                                <Input name="brand" placeholder="Ex: ASUS, Razer..." required className="h-12 bg-background/50 border-white/10 rounded-xl" />
                             </div>
                             <div className="space-y-2">
                                 <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Modèle</Label>
-                                <Input name="model" placeholder="Ex: ROG Strix, Air M2..." required className="h-12 bg-background/50 border-white/10 rounded-xl" />
+                                <Input name="model" placeholder="Ex: Zephyrus G14" required className="h-12 bg-background/50 border-white/10 rounded-xl" />
                             </div>
                         </div>
                         <div className="space-y-2">
                             <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Numéro de Série</Label>
-                            <Input name="serialNumber" placeholder="Optionnel" className="h-12 bg-background/50 border-white/10 rounded-xl" />
+                            <Input name="serialNumber" placeholder="Indispensable pour la garantie" className="h-12 bg-background/50 border-white/10 rounded-xl font-mono" />
                         </div>
                         <div className="space-y-2">
-                            <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Spécifications (RAM, CPU, SSD...)</Label>
-                            <Input name="specs" placeholder="Ex: 16GB RAM, 512GB SSD..." className="h-12 bg-background/50 border-white/10 rounded-xl" />
+                            <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Spécifications (RAM, GPU, CPU...)</Label>
+                            <Input name="specs" placeholder="Ex: 32GB RAM, RTX 3080..." className="h-12 bg-background/50 border-white/10 rounded-xl" />
                         </div>
                         <DialogFooter>
                             <Button type="button" variant="ghost" onClick={() => setIsModalOpen(false)} className="font-bold uppercase text-[10px]">Annuler</Button>
                             <Button type="submit" disabled={isSubmitting} className="bg-accent text-black font-black uppercase italic rounded-xl px-10 h-14 shadow-xl">
-                                {isSubmitting ? <Loader2 className="animate-spin" /> : "Ajouter à mon Hub"}
+                                {isSubmitting ? <Loader2 className="animate-spin" /> : "Enregistrer dans mon Hub"}
                             </Button>
                         </DialogFooter>
                     </form>

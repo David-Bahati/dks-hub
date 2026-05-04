@@ -32,7 +32,10 @@ import {
   BarChart3,
   Calendar,
   MonitorSmartphone,
-  PieChart as PieChartIcon
+  PieChart as PieChartIcon,
+  Bell,
+  CheckCircle2,
+  AlertCircle
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -97,7 +100,6 @@ function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<any>(null);
   const [lowStock, setLowStock] = useState<Product[]>([]);
-  const [recentSales, setRecentSales] = useState<any[]>([]);
   const [chartData, setChartData] = useState<any[]>([]);
   const [rate, setRate] = useState(2500);
 
@@ -114,16 +116,13 @@ function DashboardPage() {
     if (isStaff) return query(collection(db, "orders"), orderBy("createdAt", "desc"), limit(10));
     return query(collection(db, "orders"), where("userId", "==", user.uid), orderBy("createdAt", "desc"), limit(5));
   }, [user?.uid, authLoading, isStaff]);
-  
   const { data: orders } = useCollection(ordersQuery);
 
-  const bookingsQuery = useMemoFirebase(() => {
+  const notificationsQuery = useMemoFirebase(() => {
     if (authLoading || !user?.uid) return null;
-    if (isStaff) return query(collection(db, "serviceBookings"), orderBy("createdAt", "desc"), limit(5));
-    return query(collection(db, "serviceBookings"), where("userId", "==", user.uid), orderBy("createdAt", "desc"), limit(3));
+    return query(collection(db, "notifications"), where("userId", "==", isStaff ? 'staff' : user.uid), orderBy("createdAt", "desc"), limit(6));
   }, [user?.uid, authLoading, isStaff]);
-
-  const { data: bookings } = useCollection(bookingsQuery);
+  const { data: recentNotifs } = useCollection(notificationsQuery);
 
   useEffect(() => {
     fetchGlobalData();
@@ -132,16 +131,14 @@ function DashboardPage() {
   const fetchGlobalData = async () => {
     setLoading(true);
     try {
-      const [dashboardStats, lowStockItems, recent, exchangeRate, revenueData] = await Promise.all([
+      const [dashboardStats, lowStockItems, exchangeRate, revenueData] = await Promise.all([
         getDashboardStats(),
         getLowStockItems(),
-        getRecentSales(),
         getExchangeRate(),
         getRevenueChartData()
       ]);
       setStats(dashboardStats);
       setLowStock(lowStockItems);
-      setRecentSales(recent);
       setRate(exchangeRate);
       setChartData(revenueData);
     } catch (error) {
@@ -163,7 +160,7 @@ function DashboardPage() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-background gap-4">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground">Synchronisation Double King Hub...</p>
+        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground">Initialisation du Hub Elite...</p>
       </div>
     );
   }
@@ -193,7 +190,13 @@ function DashboardPage() {
           </Sheet>
 
         <div className="flex-1 flex items-center justify-between">
-            <div className="flex items-center gap-6"><Logo size="sm" /><h2 className="text-lg md:text-xl tracking-tighter"><span className="font-light text-slate-400 uppercase">Hub Central</span> <span className="font-bold text-white uppercase italic">{user?.role}</span></h2></div>
+            <div className="flex items-center gap-6">
+              <Logo size="sm" />
+              <h2 className="text-lg md:text-xl tracking-tighter uppercase">
+                <span className="font-light text-slate-400">Hub</span> <span className="font-bold text-white italic">{isStaff ? 'Staff' : 'Personnel'}</span>
+              </h2>
+            </div>
+            
             <nav className="hidden xl:flex items-center gap-1">
                 {filteredNavLinks.map((link) => (
                     <Link key={link.href} href={link.href}>
@@ -204,146 +207,178 @@ function DashboardPage() {
                     </Link>
                 ))}
             </nav>
+            
             <div className="flex items-center gap-6">
-                <Button variant="ghost" size="icon" onClick={fetchGlobalData} className="h-10 w-10 text-slate-400 hover:text-accent hover:bg-accent/10 rounded-xl transition-all group"><RefreshCw size={18} className={cn("transition-transform duration-700", loading ? "animate-spin" : "group-hover:rotate-180")} /></Button>
+                <Button variant="ghost" size="icon" onClick={fetchGlobalData} className="h-10 w-10 text-slate-400 hover:text-accent hover:bg-accent/10 rounded-xl transition-all group">
+                  <RefreshCw size={18} className={cn("transition-transform duration-700", loading ? "animate-spin" : "group-hover:rotate-180")} />
+                </Button>
             </div>
         </div>
       </header>
 
-      <main className="flex-1 p-4 md:p-8 space-y-8 pb-24">
-          {/* STATS BOUTIQUE (TOUJOURS EN HAUT) */}
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-             <Card className="lg:col-span-2 glossy-card border-none rounded-[2.5rem] relative overflow-hidden group">
-              <div className="absolute -top-12 -right-12 w-48 h-48 bg-accent/5 rounded-full blur-3xl group-hover:bg-accent/20 transition-all duration-700" />
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <div className="space-y-1"><CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Revenu Global Boutique</CardTitle></div>
-                <div className="w-12 h-12 rounded-2xl bg-accent/10 flex items-center justify-center text-accent"><DollarSign className="h-6 w-6" /></div>
-              </CardHeader>
-              <CardContent className="pt-4">
-                <div className="text-5xl font-bold font-mono tracking-tighter text-white">
-                  {new Intl.NumberFormat('fr-FR').format(stats?.totalRevenueCDF || 0)} 
-                  <span className="text-xl font-light opacity-30 ml-2">CDF</span>
-                </div>
-                <div className="mt-4 flex items-center gap-4">
-                  <Badge variant="outline" className="border-white/5 bg-white/5 px-3 py-1 font-mono text-slate-400">
+      <main className="flex-1 p-4 md:p-8 space-y-8 pb-24 max-w-[1600px] mx-auto w-full">
+          {/* STATS RAPIDES (Staff) */}
+          {isStaff && (
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+              <Card className="lg:col-span-2 glossy-card border-none rounded-[2.5rem] relative overflow-hidden group">
+                <div className="absolute -top-12 -right-12 w-48 h-48 bg-accent/5 rounded-full blur-3xl" />
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Volume d'Affaires Global</CardTitle>
+                  <div className="w-12 h-12 rounded-2xl bg-accent/10 flex items-center justify-center text-accent"><DollarSign className="h-6 w-6" /></div>
+                </CardHeader>
+                <CardContent className="pt-4">
+                  <div className="text-5xl font-bold font-mono tracking-tighter text-white">
+                    {new Intl.NumberFormat('fr-FR').format(stats?.totalRevenueCDF || 0)} 
+                    <span className="text-xl font-light opacity-30 ml-2">CDF</span>
+                  </div>
+                  <Badge variant="outline" className="mt-4 border-white/5 bg-white/5 px-3 py-1 font-mono text-slate-400">
                     ≈ {new Intl.NumberFormat('fr-FR').format(stats?.totalRevenueUSD || 0)} USD
                   </Badge>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
 
-             <Card className="glossy-card border-none rounded-[2.5rem] group">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Ventes Boutique</CardTitle><div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-accent"><ShoppingCart className="h-5 w-5" /></div></CardHeader>
-              <CardContent className="pt-4"><div className="text-3xl font-bold font-mono">{stats?.totalSalesCount || 0}</div><p className="text-[10px] text-slate-400 mt-2 uppercase font-black">Commandes terminées</p></CardContent>
-            </Card>
+              <Card className="glossy-card border-none rounded-[2.5rem]">
+                <CardHeader className="flex flex-row items-center justify-between pb-2"><CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Ventes Terminées</CardTitle><div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-accent"><ShoppingCart className="h-5 w-5" /></div></CardHeader>
+                <CardContent className="pt-4"><div className="text-3xl font-bold font-mono">{stats?.totalSalesCount || 0}</div></CardContent>
+              </Card>
 
-             <Card className="glossy-card border-none rounded-[2.5rem] group">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Stock Critique</CardTitle><div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary"><Package className="h-5 w-5" /></div></CardHeader>
-              <CardContent className="pt-4"><div className="text-3xl font-bold font-mono">{lowStock.length}</div><p className="text-[10px] text-primary mt-2 uppercase font-black">Articles à réapprovisionner</p></CardContent>
+              <Card className="glossy-card border-none rounded-[2.5rem]">
+                <CardHeader className="flex flex-row items-center justify-between pb-2"><CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Articles Critiques</CardTitle><div className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center text-red-500"><Package className="h-5 w-5" /></div></CardHeader>
+                <CardContent className="pt-4"><div className="text-3xl font-bold font-mono">{lowStock.length}</div></CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* VUE CLIENT (Hero Card) */}
+          {!isStaff && (
+            <Card className="bg-primary/10 border-primary/20 rounded-[3rem] p-10 relative overflow-hidden mb-12">
+               <div className="absolute top-0 right-0 p-12 opacity-5"><Logo size="xl" /></div>
+               <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-10">
+                  <div className="space-y-6 text-center md:text-left">
+                      <Badge className="bg-primary text-white border-none px-4 py-1.5 font-black uppercase italic">Membre Privilège DKS</Badge>
+                      <h1 className="text-4xl md:text-6xl font-black uppercase italic tracking-tighter leading-tight text-white">BIENVENUE DANS <br />VOTRE <span className="text-primary">HUB CENTRAL</span></h1>
+                      <div className="flex flex-wrap gap-4 justify-center md:justify-start">
+                          <Link href="/services"><Button className="h-14 px-8 rounded-2xl bg-white text-primary font-black uppercase italic shadow-xl">Nouvelle Demande Service</Button></Link>
+                          <Link href="/"><Button variant="outline" className="h-14 px-8 rounded-2xl border-white/10 font-black uppercase italic">Aller à la Boutique</Button></Link>
+                      </div>
+                  </div>
+                  <div className="bg-black/40 backdrop-blur-3xl p-8 rounded-[2.5rem] border border-white/5 min-w-[300px] text-center">
+                      <p className="text-[10px] font-black uppercase opacity-40 mb-2">Points Fidélité Cumulés</p>
+                      <p className="text-6xl font-black text-primary italic">{(orders?.length || 0) * 100}</p>
+                      <p className="text-[9px] font-bold uppercase mt-4 text-muted-foreground">Progression vers Membre Gold</p>
+                  </div>
+               </div>
             </Card>
-          </div>
+          )}
 
           <div className="grid gap-6 grid-cols-1 lg:grid-cols-7">
-            {/* GRAPHIQUE DES VENTES BOUTIQUE */}
+            {/* GRAPHIQUE OU HISTORIQUE PRINCIPAL */}
             <Card className="lg:col-span-4 glossy-card border-none rounded-[2.5rem] overflow-hidden">
-                <CardHeader className="py-6 px-8"><CardTitle className="text-lg font-bold uppercase italic flex items-center gap-3"><BarChart3 className="text-accent" size={20} /> Tendances Ventes (7j)</CardTitle></CardHeader>
-                <CardContent className="px-4 pb-8 h-[300px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={chartData}>
-                            <defs><linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="hsl(var(--accent))" stopOpacity={0.3}/><stop offset="95%" stopColor="hsl(var(--accent))" stopOpacity={0}/></linearGradient></defs>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" vertical={false} />
-                            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 10}} dy={10} />
-                            <Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', borderRadius: '12px', fontSize: '12px' }} itemStyle={{ color: 'hsl(var(--accent))' }} />
-                            <Area type="monotone" dataKey="total" stroke="hsl(var(--accent))" strokeWidth={3} fillOpacity={1} fill="url(#colorTotal)" />
-                        </AreaChart>
-                    </ResponsiveContainer>
-                </CardContent>
-            </Card>
-
-            {/* REPARTITION PRODUITS VS SERVICES */}
-            <Card className="lg:col-span-3 glossy-card border-none rounded-[2.5rem] overflow-hidden">
-                <CardHeader className="py-6 px-8"><CardTitle className="text-lg font-bold uppercase italic flex items-center gap-3"><PieChartIcon className="text-primary" size={20} /> Mix d'Activité</CardTitle></CardHeader>
-                <CardContent className="px-4 pb-8 h-[300px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                            <Pie
-                                data={stats?.breakdown || []}
-                                cx="50%"
-                                cy="50%"
-                                innerRadius={60}
-                                outerRadius={80}
-                                paddingAngle={5}
-                                dataKey="value"
-                            >
-                                {stats?.breakdown?.map((entry: any, index: number) => (
-                                    <Cell key={`cell-${index}`} fill={entry.fill} />
-                                ))}
-                            </Pie>
-                            <Tooltip 
-                                contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', borderRadius: '12px', fontSize: '12px' }}
-                                formatter={(value: number) => `$${value.toFixed(2)}`}
-                            />
-                            <Legend verticalAlign="bottom" align="center" wrapperStyle={{ fontSize: '10px', fontWeight: 'black', textTransform: 'uppercase' }} />
-                        </PieChart>
-                    </ResponsiveContainer>
-                </CardContent>
-            </Card>
-          </div>
-
-          <div className="grid gap-6 grid-cols-1 lg:grid-cols-7">
-            {/* SERVICES & FORMATIONS */}
-            <Card className="lg:col-span-4 glossy-card border-none rounded-[2.5rem] overflow-hidden">
-                <CardHeader className="bg-white/[0.02] py-6 px-8 flex flex-row items-center justify-between">
-                    <CardTitle className="text-lg font-bold uppercase italic flex items-center gap-3"><GraduationCap size={20} className="text-primary" /> Services & Formations</CardTitle>
+                <CardHeader className="py-6 px-8 flex flex-row items-center justify-between">
+                  <CardTitle className="text-lg font-bold uppercase italic flex items-center gap-3">
+                    {isStaff ? <BarChart3 className="text-accent" size={20} /> : <ShoppingBag className="text-accent" size={20} />}
+                    {isStaff ? 'Tendances Financières (7j)' : 'Mes Derniers Achats'}
+                  </CardTitle>
                 </CardHeader>
-                <CardContent className="p-0">
-                    <div className="divide-y divide-white/5">
-                        {bookings && bookings.length > 0 ? bookings.map((booking) => (
-                            <div key={booking.id} className="p-4 flex items-center justify-between hover:bg-white/[0.02] transition-colors">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
-                                        {booking.category === 'formation' ? <GraduationCap size={18} /> : <Wrench size={18} />}
-                                    </div>
-                                    <div>
-                                        <p className="text-xs font-bold truncate max-w-[150px]">{booking.serviceTitle}</p>
-                                        <p className="text-[9px] text-muted-foreground uppercase">{booking.customerName}</p>
-                                    </div>
-                                </div>
-                                <div className="text-right">
-                                    {getStatusBadge(booking.status)}
-                                </div>
-                            </div>
-                        )) : (
-                            <div className="p-10 text-center opacity-30 italic text-xs">Aucune demande de service en attente.</div>
-                        )}
-                    </div>
-                </CardContent>
-            </Card>
-
-            {/* DERNIERES COMMANDES */}
-            <Card className="lg:col-span-3 glossy-card border-none rounded-[2.5rem] overflow-hidden">
-                <CardHeader className="bg-white/[0.02] py-6 px-8 flex flex-row items-center justify-between">
-                    <CardTitle className="text-lg font-bold uppercase italic flex items-center gap-3"><ShoppingBag size={20} className="text-accent" /> Ventes Récentes</CardTitle>
-                </CardHeader>
-                <CardContent className="p-0">
-                    <div className="divide-y divide-white/5">
+                <CardContent className="px-4 pb-8 h-[350px]">
+                    {isStaff ? (
+                      <ResponsiveContainer width="100%" height="100%">
+                          <AreaChart data={chartData}>
+                              <defs><linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="hsl(var(--accent))" stopOpacity={0.3}/><stop offset="95%" stopColor="hsl(var(--accent))" stopOpacity={0}/></linearGradient></defs>
+                              <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" vertical={false} />
+                              <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 10}} dy={10} />
+                              <Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', borderRadius: '12px', fontSize: '12px' }} itemStyle={{ color: 'hsl(var(--accent))' }} />
+                              <Area type="monotone" dataKey="total" stroke="hsl(var(--accent))" strokeWidth={3} fillOpacity={1} fill="url(#colorTotal)" />
+                          </AreaChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="divide-y divide-white/5">
                         {orders && orders.length > 0 ? orders.map((order) => (
-                            <div key={order.id} className="p-4 flex items-center justify-between hover:bg-white/[0.02] transition-colors">
-                                <div>
-                                    <p className="text-xs font-bold uppercase italic">{order.customerName}</p>
-                                    <p className="text-[9px] text-muted-foreground uppercase tracking-widest">#{order.id.substring(0, 8)}</p>
+                            <div key={order.id} className="p-5 flex items-center justify-between hover:bg-white/[0.02] transition-colors rounded-2xl group">
+                                <div className="flex items-center gap-4">
+                                    <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-muted-foreground group-hover:text-accent transition-colors"><ShoppingBag size={20} /></div>
+                                    <div>
+                                        <p className="font-bold text-sm">Commande #{order.id.substring(0, 8).toUpperCase()}</p>
+                                        <p className="text-[10px] text-muted-foreground uppercase">{order.createdAt?.toDate?.().toLocaleDateString() || 'Récemment'}</p>
+                                    </div>
                                 </div>
                                 <div className="text-right">
-                                    <p className="text-sm font-black text-accent">${(order.total || 0).toFixed(2)}</p>
+                                    <p className="font-black text-accent text-lg">${order.total?.toFixed(2)}</p>
                                     {getStatusBadge(order.status)}
                                 </div>
                             </div>
                         )) : (
-                            <div className="p-10 text-center opacity-30 italic text-xs">Aucune commande enregistrée.</div>
+                          <div className="h-full flex flex-col items-center justify-center opacity-30 italic"><ShoppingBag size={48} className="mb-4" /><p>Aucune commande enregistrée.</p></div>
+                        )}
+                      </div>
+                    )}
+                </CardContent>
+            </Card>
+
+            {/* FLUX D'ACTIVITÉ / NOTIFICATIONS (Nouveau) */}
+            <Card className="lg:col-span-3 glossy-card border-none rounded-[2.5rem] overflow-hidden flex flex-col">
+                <CardHeader className="py-6 px-8 border-b border-white/5 bg-white/[0.02]">
+                  <CardTitle className="text-lg font-bold uppercase italic flex items-center gap-3">
+                    <Bell className="text-primary" size={20} /> Journal du Hub
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-0 flex-1 overflow-y-auto max-h-[350px] custom-scrollbar">
+                    <div className="divide-y divide-white/5">
+                        {recentNotifs && recentNotifs.length > 0 ? recentNotifs.map((notif) => (
+                            <div key={notif.id} className={cn("p-5 flex items-start gap-4 transition-colors hover:bg-white/5", !notif.isRead && "bg-accent/5 border-l-2 border-l-accent")}>
+                                <div className={cn(
+                                  "w-10 h-10 rounded-xl shrink-0 flex items-center justify-center",
+                                  notif.type === 'error' ? 'bg-red-500/10 text-red-500' : notif.type === 'success' ? 'bg-green-500/10 text-green-500' : 'bg-primary/10 text-primary'
+                                )}>
+                                    {notif.type === 'error' ? <AlertCircle size={18} /> : notif.type === 'success' ? <CheckCircle2 size={18} /> : <Zap size={18} />}
+                                </div>
+                                <div className="space-y-1">
+                                    <p className="text-[11px] font-black uppercase tracking-tight">{notif.title}</p>
+                                    <p className="text-[10px] text-muted-foreground leading-snug line-clamp-2">{notif.message}</p>
+                                    <p className="text-[8px] font-bold uppercase opacity-30">{notif.createdAt?.toDate?.().toLocaleTimeString() || 'Maintenant'}</p>
+                                </div>
+                            </div>
+                        )) : (
+                          <div className="p-20 text-center opacity-20 italic text-xs">Aucune activité récente.</div>
                         )}
                     </div>
                 </CardContent>
+                <div className="p-4 border-t border-white/5 bg-black/20 text-center">
+                    <Link href="/dashboard/notifications" className="text-[10px] font-black uppercase italic text-accent hover:underline">Voir tout l'historique <ArrowRight size={10} className="inline ml-1"/></Link>
+                </div>
             </Card>
+          </div>
+
+          {/* SECTION DU BAS : RÉCAP RÉCENT */}
+          <div className="grid gap-6 grid-cols-1 lg:grid-cols-7">
+              <Card className="lg:col-span-4 glossy-card border-none rounded-[2.5rem] overflow-hidden">
+                <CardHeader className="py-6 px-8 flex items-center justify-between flex-row">
+                    <CardTitle className="text-lg font-bold uppercase italic flex items-center gap-3"><MonitorSmartphone className="text-primary" size={20} /> Prestations en cours</CardTitle>
+                    <Link href="/dashboard/services"><Button variant="ghost" size="sm" className="h-8 rounded-lg text-[9px] font-black uppercase bg-white/5">Gérer</Button></Link>
+                </CardHeader>
+                <CardContent className="p-0">
+                    {/* On réutilise les ordres ou bookings selon le role */}
+                    <div className="divide-y divide-white/5">
+                        {/* Simulation d'un affichage de service rapide */}
+                        <div className="p-5 flex items-center justify-between opacity-30 italic text-xs text-center w-full">Chargez les modules de services pour plus de détails...</div>
+                    </div>
+                </CardContent>
+              </Card>
+
+              <Card className="lg:col-span-3 glossy-card border-none rounded-[2.5rem] overflow-hidden">
+                  <CardHeader className="py-6 px-8"><CardTitle className="text-lg font-bold uppercase italic flex items-center gap-3"><PieChartIcon className="text-accent" size={20} /> Mix d'Activité</CardTitle></CardHeader>
+                  <CardContent className="px-4 pb-8 h-[250px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                              <Pie data={stats?.breakdown || []} cx="50%" cy="50%" innerRadius={50} outerRadius={70} paddingAngle={5} dataKey="value">
+                                  {stats?.breakdown?.map((entry: any, index: number) => <Cell key={`cell-${index}`} fill={entry.fill} />)}
+                              </Pie>
+                              <Tooltip contentStyle={{ backgroundColor: '#0f172a', border: 'none', borderRadius: '12px', fontSize: '10px' }} />
+                              <Legend verticalAlign="bottom" align="center" wrapperStyle={{ fontSize: '9px', textTransform: 'uppercase' }} />
+                          </PieChart>
+                      </ResponsiveContainer>
+                  </CardContent>
+              </Card>
           </div>
       </main>
     </div>
