@@ -17,20 +17,38 @@ import {
   SheetContent, 
   SheetHeader, 
   SheetTitle, 
-  SheetFooter 
 } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { useToast } from '@/hooks/use-toast';
+import { Badge } from "@/components/ui/badge";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import * as z from "zod";
+
+const customerSchema = z.object({
+  name: z.string().min(3, "Nom complet requis (3 caractères min)"),
+  email: z.string().email("Format d'e-mail invalide"),
+  phone: z.string().min(6, "Numéro de téléphone requis"),
+});
 
 function CustomersPage() {
   const [customers, setCustomers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
+
+  const form = useForm<z.infer<typeof customerSchema>>({
+    resolver: zodResolver(customerSchema),
+    defaultValues: {
+      name: "",
+      email: "",
+      phone: "",
+    },
+  });
 
   useEffect(() => {
     const q = query(collection(db, "users"), where("role", "in", ["customer", "Customer"]));
@@ -50,40 +68,34 @@ function CustomersPage() {
     return () => unsubscribe();
   }, []);
 
-  const handleSaveCustomer = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    const formData = new FormData(e.currentTarget);
+  async function onSubmit(values: z.infer<typeof customerSchema>) {
     const customerData = {
-      displayName: formData.get('name') as string,
-      name: formData.get('name') as string,
-      email: formData.get('email') as string,
-      phoneNumber: formData.get('phone') as string,
-      whatsapp: formData.get('phone') as string,
+      displayName: values.name,
+      name: values.name,
+      email: values.email,
+      phoneNumber: values.phone,
+      whatsapp: values.phone,
       role: 'customer',
       loyaltyLevel: 'Bronze',
       points: 0,
-      updatedAt: serverTimestamp()
+      updatedAt: serverTimestamp(),
+      createdAt: serverTimestamp()
     };
 
     const colRef = collection(db, "users");
-    addDoc(colRef, {
-      ...customerData,
-      createdAt: serverTimestamp()
-    })
-    .then(() => {
-      toast({ title: "Client ajouté", description: "Le nouveau client a été enregistré dans le Hub." });
+    try {
+      await addDoc(colRef, customerData);
+      toast({ title: "Client ajouté", description: "Le nouveau membre Elite DKS est enregistré." });
       setIsSheetOpen(false);
-    })
-    .catch(async (error) => {
+      form.reset();
+    } catch (error) {
       errorEmitter.emit('permission-error', new FirestorePermissionError({
         path: colRef.path,
         operation: 'create',
         requestResourceData: customerData
       }));
-    })
-    .finally(() => setIsSubmitting(false));
-  };
+    }
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -176,29 +188,58 @@ function CustomersPage() {
             <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Identification Hub Technologique</p>
           </SheetHeader>
           
-          <form onSubmit={handleSaveCustomer} className="flex-1 p-8 space-y-8 overflow-y-auto">
-            <div className="space-y-6">
-               <div className="space-y-2">
-                <Label htmlFor="name" className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Nom complet & Prénom</Label>
-                <Input id="name" name="name" required className="h-14 bg-background/50 border-white/5 rounded-2xl focus:border-accent text-lg font-bold" placeholder="Ex: John Bahati" />
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="flex-1 p-8 space-y-8 overflow-y-auto">
+              <div className="space-y-6">
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Nom complet & Prénom</FormLabel>
+                      <FormControl>
+                        <Input {...field} className="h-14 bg-background/50 border-white/5 rounded-2xl focus:border-accent text-lg font-bold" placeholder="Ex: John Bahati" />
+                      </FormControl>
+                      <FormMessage className="text-[10px]" />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Adresse e-mail officielle</FormLabel>
+                      <FormControl>
+                        <Input {...field} type="email" className="h-14 bg-background/50 border-white/5 rounded-2xl focus:border-accent" placeholder="contact@exemple.com" />
+                      </FormControl>
+                      <FormMessage className="text-[10px]" />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="phone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Numéro WhatsApp / Mobile</FormLabel>
+                      <FormControl>
+                        <Input {...field} className="h-14 bg-background/50 border-white/5 rounded-2xl focus:border-accent" placeholder="+243 823 000 000" />
+                      </FormControl>
+                      <p className="text-[8px] text-muted-foreground uppercase font-black italic mt-2 opacity-40">Nécessaire pour les alertes de maintenance.</p>
+                      <FormMessage className="text-[10px]" />
+                    </FormItem>
+                  )}
+                />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="email" className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Adresse e-mail officielle</Label>
-                <Input id="email" name="email" type="email" required className="h-14 bg-background/50 border-white/5 rounded-2xl focus:border-accent" placeholder="contact@exemple.com" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="phone" className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Numéro WhatsApp / Mobile</Label>
-                <Input id="phone" name="phone" className="h-14 bg-background/50 border-white/5 rounded-2xl focus:border-accent" placeholder="+243 823 000 000" />
-                <p className="text-[8px] text-muted-foreground uppercase font-black italic mt-2 opacity-40">Nécessaire pour les alertes de maintenance hardware.</p>
-              </div>
-            </div>
 
-            <div className="pt-8">
-              <Button type="submit" disabled={isSubmitting} className="w-full h-16 bg-accent text-black font-black uppercase italic rounded-2xl shadow-xl shadow-accent/20">
-                {isSubmitting ? <Loader2 className="animate-spin" /> : "Créer le profil DKS Elite"}
-              </Button>
-            </div>
-          </form>
+              <div className="pt-8">
+                <Button type="submit" disabled={form.formState.isSubmitting} className="w-full h-16 bg-accent text-black font-black uppercase italic rounded-2xl shadow-xl shadow-accent/20">
+                  {form.formState.isSubmitting ? <Loader2 className="animate-spin" /> : "Créer le profil DKS Elite"}
+                </Button>
+              </div>
+            </form>
+          </Form>
         </SheetContent>
       </Sheet>
     </div>

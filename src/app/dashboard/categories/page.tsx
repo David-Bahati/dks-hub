@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { Navbar } from "@/components/layout/Navbar";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Tags, Edit2, Trash2, Loader2, ArrowLeft } from "lucide-react";
+import { Plus, Edit2, Trash2, Loader2, ArrowLeft } from "lucide-react";
 import { db } from '@/lib/firebase';
 import { collection, addDoc, deleteDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import withAuth from '@/components/auth/withAuth';
@@ -20,63 +20,80 @@ import {
 } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from '@/hooks/use-toast';
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import * as z from "zod";
+
+const categorySchema = z.object({
+  name: z.string().min(3, "Le nom de catégorie est trop court"),
+  icon: z.string().default("📦"),
+});
 
 function CategoriesPage() {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<any>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
   const categoriesQuery = useMemoFirebase(() => collection(db, "categories"), []);
   const { data: categories, isLoading } = useCollection(categoriesQuery);
 
+  const form = useForm<z.infer<typeof categorySchema>>({
+    resolver: zodResolver(categorySchema),
+    defaultValues: {
+      name: "",
+      icon: "📦",
+    },
+  });
+
   const handleOpenSheet = (category: any = null) => {
     setEditingCategory(category);
+    if (category) {
+      form.reset({
+        name: category.name,
+        icon: category.icon || "📦",
+      });
+    } else {
+      form.reset({
+        name: "",
+        icon: "📦",
+      });
+    }
     setIsSheetOpen(true);
   };
 
-  const handleSaveCategory = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    const formData = new FormData(e.currentTarget);
-    const name = formData.get('name') as string;
-    const icon = formData.get('icon') as string || "📦";
-
+  async function onSubmit(values: z.infer<typeof categorySchema>) {
     const categoryData = {
-      name,
-      icon,
-      slug: name.toLowerCase().replace(/\s+/g, '-'),
+      ...values,
+      slug: values.name.toLowerCase().replace(/\s+/g, '-'),
       updatedAt: serverTimestamp()
     };
 
     try {
       if (editingCategory) {
         await updateDoc(doc(db, "categories", editingCategory.id), categoryData);
-        toast({ title: "Catégorie mise à jour", description: `La catégorie ${name} a été modifiée.` });
+        toast({ title: "Catégorie mise à jour", description: `La famille ${values.name} a été modifiée.` });
       } else {
         await addDoc(collection(db, "categories"), {
           ...categoryData,
           createdAt: serverTimestamp()
         });
-        toast({ title: "Catégorie créée", description: `La catégorie ${name} est prête.` });
+        toast({ title: "Catégorie créée", description: `La famille ${values.name} est prête.` });
       }
       setIsSheetOpen(false);
     } catch (error) {
-      console.error(error);
-      toast({ title: "Erreur", description: "Impossible d'enregistrer.", variant: "destructive" });
-    } finally {
-      setIsSubmitting(false);
+      toast({ title: "Erreur", description: "Impossible d'enregistrer la catégorie.", variant: "destructive" });
     }
-  };
+  }
 
   const handleDelete = async (id: string) => {
-    if (window.confirm("Supprimer cette catégorie ?")) {
+    if (window.confirm("Supprimer cette catégorie ? Cela n'affectera pas les produits déjà créés.")) {
       try {
         await deleteDoc(doc(db, "categories", id));
         toast({ title: "Catégorie supprimée" });
       } catch (error) {
-        toast({ title: "Erreur", description: "Impossible de supprimer.", variant: "destructive" });
+        toast({ title: "Erreur", variant: "destructive" });
       }
     }
   };
@@ -121,12 +138,8 @@ function CategoriesPage() {
                     </div>
                 </CardHeader>
                 <CardContent className="px-8 pb-8 flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Button variant="ghost" size="icon" className="h-10 w-10 text-white hover:bg-white/10" onClick={() => handleOpenSheet(cat)}>
-                        <Edit2 size={16}/>
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-10 w-10 text-destructive hover:bg-destructive/10" onClick={() => handleDelete(cat.id)}>
-                        <Trash2 size={16}/>
-                    </Button>
+                    <button onClick={() => handleOpenSheet(cat)} className="p-2 hover:text-accent transition-colors"><Edit2 size={16}/></button>
+                    <button onClick={() => handleDelete(cat.id)} className="p-2 hover:text-destructive transition-colors"><Trash2 size={16}/></button>
                 </CardContent>
                 </Card>
             )) : (
@@ -146,35 +159,45 @@ function CategoriesPage() {
                 </SheetTitle>
                 <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Architecture de Boutique</p>
             </SheetHeader>
-            <form onSubmit={handleSaveCategory} className="flex-1 p-8 space-y-8 overflow-y-auto">
-                <div className="space-y-6">
-                    <div className="space-y-2">
-                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Nom de la famille</Label>
-                        <Input 
-                          name="name" 
-                          defaultValue={editingCategory?.name}
-                          placeholder="Ex: Processeurs" 
-                          required 
-                          className="h-14 bg-background/50 border-white/5 rounded-2xl focus:border-accent text-lg font-bold" 
-                        />
-                    </div>
-                    <div className="space-y-2">
-                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Icône représentative (Emoji)</Label>
-                        <Input 
-                          name="icon" 
-                          defaultValue={editingCategory?.icon}
-                          placeholder="Ex: 💻" 
-                          className="h-14 bg-background/50 border-white/5 rounded-2xl text-2xl text-center focus:border-accent" 
-                        />
-                        <p className="text-[9px] text-muted-foreground italic mt-2">Utilisez les emojis standard de votre clavier pour illustrer la catégorie.</p>
-                    </div>
-                </div>
-                <div className="pt-8">
-                    <Button type="submit" disabled={isSubmitting} className="w-full h-16 bg-accent text-black font-black uppercase italic rounded-2xl shadow-xl shadow-accent/10">
-                        {isSubmitting ? <Loader2 className="animate-spin" /> : editingCategory ? "Appliquer les changements" : "Valider la création"}
-                    </Button>
-                </div>
-            </form>
+            
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="flex-1 p-8 space-y-8 overflow-y-auto">
+                  <div className="space-y-6">
+                      <FormField
+                        control={form.control}
+                        name="name"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Nom de la famille</FormLabel>
+                            <FormControl>
+                              <Input {...field} placeholder="Ex: Processeurs" className="h-14 bg-background/50 border-white/5 rounded-2xl focus:border-accent text-lg font-bold" />
+                            </FormControl>
+                            <FormMessage className="text-[10px]" />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="icon"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Icône représentative (Emoji)</FormLabel>
+                            <FormControl>
+                              <Input {...field} placeholder="Ex: 💻" className="h-14 bg-background/50 border-white/5 rounded-2xl text-2xl text-center focus:border-accent" />
+                            </FormControl>
+                            <p className="text-[9px] text-muted-foreground italic mt-2">Utilisez les emojis pour illustrer la catégorie.</p>
+                            <FormMessage className="text-[10px]" />
+                          </FormItem>
+                        )}
+                      />
+                  </div>
+                  <div className="pt-8">
+                      <Button type="submit" disabled={form.formState.isSubmitting} className="w-full h-16 bg-accent text-black font-black uppercase italic rounded-2xl shadow-xl shadow-accent/10">
+                          {form.formState.isSubmitting ? <Loader2 className="animate-spin" /> : editingCategory ? "Appliquer les changements" : "Valider la création"}
+                      </Button>
+                  </div>
+              </form>
+            </Form>
         </SheetContent>
       </Sheet>
     </div>

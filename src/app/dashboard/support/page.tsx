@@ -8,20 +8,17 @@ import { Button } from "@/components/ui/button";
 import { 
     Wrench, 
     Clock, 
-    CheckCircle2, 
     ArrowLeft, 
     Loader2, 
     Plus, 
     Search,
     MessageCircle,
     BadgeAlert,
-    ExternalLink,
     Send,
     User as UserIcon,
     Image as ImageIcon,
     Upload,
     X,
-    Maximize2
 } from "lucide-react";
 import { db } from '@/lib/firebase';
 import { collection, addDoc, serverTimestamp, doc, updateDoc, query, orderBy, onSnapshot } from 'firebase/firestore';
@@ -37,17 +34,22 @@ import {
     SheetContent, 
     SheetHeader, 
     SheetTitle,
-    SheetFooter 
 } from "@/components/ui/sheet";
-import { 
-    Dialog, 
-    DialogContent 
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from '@/lib/utils';
 import { SupportMessage } from '@/lib/types';
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import * as z from "zod";
+
+const ticketSchema = z.object({
+  productName: z.string().min(3, "Veuillez préciser le matériel (min 3 car.)"),
+  priority: z.string().min(1, "Veuillez choisir une priorité"),
+  description: z.string().min(10, "Décrivez votre panne plus précisément (min 10 car.)"),
+});
 
 function SupportPage() {
     const { user } = useAuth();
@@ -55,7 +57,6 @@ function SupportPage() {
     const [isSheetOpen, setIsSheetOpen] = useState(false);
     const [isChatOpen, setIsChatOpen] = useState(false);
     const [selectedTicket, setSelectedTicket] = useState<any>(null);
-    const [isSubmitting, setIsSubmitting] = useState(false);
     const [search, setSearch] = useState("");
     const [chatMessages, setChatMessages] = useState<SupportMessage[]>([]);
     const [newMessage, setNewMessage] = useState("");
@@ -72,6 +73,15 @@ function SupportPage() {
     const { data: tickets, isLoading } = useCollection(ticketsQuery);
 
     const isStaff = user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'seller' || user?.role?.toLowerCase() === 'cashier';
+
+    const form = useForm<z.infer<typeof ticketSchema>>({
+      resolver: zodResolver(ticketSchema),
+      defaultValues: {
+        productName: "",
+        priority: "medium",
+        description: "",
+      },
+    });
 
     useEffect(() => {
         if (isChatOpen && selectedTicket) {
@@ -91,7 +101,7 @@ function SupportPage() {
         const file = e.target.files?.[0];
         if (!file) return;
         if (file.size > 2 * 1024 * 1024) {
-            toast({ title: "Fichier trop lourd", description: "Max 2Mo.", variant: "destructive" });
+            toast({ title: "Fichier trop lourd", description: "Max 2Mo pour le Hub.", variant: "destructive" });
             return;
         }
         const reader = new FileReader();
@@ -102,44 +112,37 @@ function SupportPage() {
         reader.readAsDataURL(file);
     };
 
-    const handleCreateTicket = async (e: React.FormEvent<HTMLFormElement>) => {
-        e.preventDefault();
-        setIsSubmitting(true);
-        const formData = new FormData(e.currentTarget);
-        
-        try {
-            const ticketData = {
-                userId: user?.uid,
-                customerName: user?.name || "Client DKS",
-                productName: formData.get('productName'),
-                issueDescription: formData.get('description'),
-                status: 'pending',
-                priority: formData.get('priority'),
-                imageUrl: ticketImage,
-                createdAt: serverTimestamp(),
-                updatedAt: serverTimestamp()
-            };
+    async function onSubmit(values: z.infer<typeof ticketSchema>) {
+      try {
+          const ticketData = {
+              ...values,
+              userId: user?.uid,
+              customerName: user?.name || "Client DKS",
+              status: 'pending',
+              imageUrl: ticketImage,
+              createdAt: serverTimestamp(),
+              updatedAt: serverTimestamp()
+          };
 
-            await addDoc(collection(db, "supportTickets"), ticketData);
-            await addDoc(collection(db, "notifications"), {
-                userId: 'staff',
-                title: "SAV: Nouveau Dossier",
-                message: `${user?.name} a ouvert une demande pour ${formData.get('productName')}.`,
-                type: 'warning',
-                isRead: false,
-                createdAt: serverTimestamp(),
-                link: '/dashboard/support'
-            });
+          await addDoc(collection(db, "supportTickets"), ticketData);
+          await addDoc(collection(db, "notifications"), {
+              userId: 'staff',
+              title: "SAV: Nouveau Dossier",
+              message: `${user?.name} a ouvert une demande pour ${values.productName}.`,
+              type: 'warning',
+              isRead: false,
+              createdAt: serverTimestamp(),
+              link: '/dashboard/support'
+          });
 
-            toast({ title: "Ticket ouvert", description: "Expertise technique DKS activée." });
-            setTicketImage(null);
-            setIsSheetOpen(false);
-        } catch (error) {
-            toast({ title: "Erreur", variant: "destructive" });
-        } finally {
-            setIsSubmitting(false);
-        }
-    };
+          toast({ title: "Ticket ouvert", description: "Expertise technique DKS activée." });
+          setTicketImage(null);
+          setIsSheetOpen(false);
+          form.reset();
+      } catch (error) {
+          toast({ title: "Erreur", description: "Impossible d'ouvrir le ticket.", variant: "destructive" });
+      }
+    }
 
     const updateTicketStatus = async (ticketId: string, newStatus: string, ticketUserId: string) => {
         try {
@@ -294,30 +297,58 @@ function SupportPage() {
                         <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Centre Expertise Bunia</p>
                     </SheetHeader>
                     
-                    <form onSubmit={handleCreateTicket} className="flex-1 p-8 space-y-8 overflow-y-auto">
+                    <Form {...form}>
+                      <form onSubmit={form.handleSubmit(onSubmit)} className="flex-1 p-8 space-y-8 overflow-y-auto">
                         <div className="space-y-6">
-                            <div className="space-y-2">
-                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Matériel & Modèle</Label>
-                                <Input name="productName" placeholder="Ex: Laptop Razer Blade 15, RTX 3080..." required className="h-14 bg-background/50 border-white/5 rounded-2xl" />
-                            </div>
-                            <div className="space-y-2">
-                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Priorité Intervention</Label>
-                                <Select name="priority" defaultValue="medium">
-                                    <SelectTrigger className="h-14 bg-background/50 border-white/5 rounded-2xl">
-                                        <SelectValue />
-                                    </SelectTrigger>
+                            <FormField
+                              control={form.control}
+                              name="productName"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Matériel & Modèle</FormLabel>
+                                  <FormControl>
+                                    <Input {...field} placeholder="Ex: Laptop Razer Blade 15, RTX 3080..." className="h-14 bg-background/50 border-white/5 rounded-2xl" />
+                                  </FormControl>
+                                  <FormMessage className="text-[10px]" />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name="priority"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Priorité Intervention</FormLabel>
+                                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <FormControl>
+                                      <SelectTrigger className="h-14 bg-background/50 border-white/5 rounded-2xl">
+                                          <SelectValue />
+                                      </SelectTrigger>
+                                    </FormControl>
                                     <SelectContent className="bg-card border-white/10">
                                         <SelectItem value="low" className="text-[10px] font-black uppercase">Standard</SelectItem>
                                         <SelectItem value="medium" className="text-[10px] font-black uppercase">Important</SelectItem>
                                         <SelectItem value="high" className="text-[10px] font-black uppercase text-orange-400">Urgent</SelectItem>
                                         <SelectItem value="urgent" className="text-[10px] font-black uppercase text-red-500">Critique / Bloquant</SelectItem>
                                     </SelectContent>
-                                </Select>
-                            </div>
-                            <div className="space-y-2">
-                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Description de la panne</Label>
-                                <Textarea name="description" placeholder="Détaillez le problème technique..." required className="min-h-[120px] bg-background/50 border-white/5 rounded-2xl" />
-                            </div>
+                                  </Select>
+                                  <FormMessage className="text-[10px]" />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name="description"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Description de la panne</FormLabel>
+                                  <FormControl>
+                                    <Textarea {...field} placeholder="Détaillez le problème technique..." className="min-h-[120px] bg-background/50 border-white/5 rounded-2xl" />
+                                  </FormControl>
+                                  <FormMessage className="text-[10px]" />
+                                </FormItem>
+                              )}
+                            />
                             <div className="space-y-2">
                                 <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Photo de l'état (Optionnel)</Label>
                                 <div onClick={() => ticketFileInputRef.current?.click()} className="aspect-video rounded-3xl border-2 border-dashed border-white/10 hover:border-accent/50 bg-black/20 flex flex-col items-center justify-center cursor-pointer transition-all overflow-hidden relative group">
@@ -325,7 +356,7 @@ function SupportPage() {
                                         <>
                                             <img src={ticketImage} className="w-full h-full object-cover" />
                                             <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"><Upload className="text-white" /></div>
-                                            <Button type="button" variant="destructive" size="icon" className="absolute top-4 right-4 h-8 w-8 rounded-full" onClick={(e) => { e.stopPropagation(); setTicketImage(null); }}><X size={14} /></Button>
+                                            <button type="button" className="absolute top-4 right-4 bg-destructive text-white p-2 rounded-full" onClick={(e) => { e.stopPropagation(); setTicketImage(null); }}><X size={14} /></button>
                                         </>
                                     ) : (
                                         <>
@@ -338,17 +369,18 @@ function SupportPage() {
                             </div>
                         </div>
                         <div className="pt-8">
-                            <Button type="submit" disabled={isSubmitting} className="w-full h-16 bg-primary text-white font-black uppercase italic rounded-2xl shadow-xl shadow-primary/20">
-                                {isSubmitting ? <Loader2 className="animate-spin" /> : "Soumettre aux Experts DKS"}
+                            <Button type="submit" disabled={form.formState.isSubmitting} className="w-full h-16 bg-primary text-white font-black uppercase italic rounded-2xl shadow-xl shadow-primary/20 text-lg">
+                                {form.formState.isSubmitting ? <Loader2 className="animate-spin" /> : "Soumettre aux Experts DKS"}
                             </Button>
                         </div>
-                    </form>
+                      </form>
+                    </Form>
                 </SheetContent>
             </Sheet>
 
-            {/* Chat Live - Conservé en Dialog car c'est une interface de message temps-réel, mais stabilisée */}
+            {/* Chat Live Interface */}
             <Dialog open={isChatOpen} onOpenChange={setIsChatOpen}>
-                <DialogContent className="glossy-card border-none rounded-[2.5rem] sm:max-w-2xl h-[85vh] flex flex-col p-0 overflow-hidden shadow-[0_0_100px_rgba(0,0,0,0.5)]">
+                <DialogContent className="glossy-card border-none rounded-[2.5rem] sm:max-w-2xl h-[85vh] flex flex-col p-0 overflow-hidden">
                     <div className="bg-accent/10 p-6 border-b border-white/5 flex justify-between items-center">
                         <div className="flex items-center gap-4">
                             <div className="w-12 h-12 rounded-2xl bg-accent/20 flex items-center justify-center text-accent">

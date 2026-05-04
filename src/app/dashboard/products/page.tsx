@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useRef } from 'react';
+import { useState, useMemo } from 'react';
 import withAuth from '@/components/auth/withAuth';
 import { Navbar } from "@/components/layout/Navbar";
 import { Button } from "@/components/ui/button";
@@ -32,25 +32,37 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { db } from '@/lib/firebase';
 import { collection, doc, serverTimestamp, setDoc, addDoc, deleteDoc } from 'firebase/firestore';
 import { Product } from '@/lib/types';
-import { PlusCircle, Edit, Trash2, Eye, EyeOff, Loader2, ArrowLeft, Sparkles, Image as ImageIcon } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, Eye, EyeOff, Loader2, ArrowLeft, Sparkles } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useCollection, useMemoFirebase } from '@/firebase';
 import Link from 'next/link';
 import { generateProductDescription } from '@/ai/flows/generate-product-description';
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import * as z from "zod";
+
+const productSchema = z.object({
+  name: z.string().min(3, "Le nom doit contenir au moins 3 caractères"),
+  category: z.string().min(1, "Veuillez choisir une catégorie"),
+  purchasePrice: z.coerce.number().min(0, "Le prix d'achat ne peut pas être négatif"),
+  sellingPrice: z.coerce.number().min(0, "Le prix de vente ne peut pas être négatif"),
+  stockQuantity: z.coerce.number().int().min(0, "Le stock doit être un nombre entier"),
+  description: z.string().min(10, "La description doit être plus détaillée"),
+  isPublished: z.boolean().default(true),
+  imageUrl: z.string().optional(),
+}).refine((data) => data.sellingPrice >= data.purchasePrice, {
+  message: "Le prix de vente doit être supérieur ou égal au prix d'achat",
+  path: ["sellingPrice"],
+});
 
 function ProductsPage() {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-  const [isPublished, setIsPublished] = useState(true);
   const [isGeneratingDesc, setIsGeneratingDesc] = useState(false);
-  const [aiDescription, setAiDescription] = useState("");
-  const [imageUrl, setImageUrl] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("");
-  
-  const nameRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   const productsQuery = useMemoFirebase(() => collection(db, "products"), []);
@@ -59,33 +71,59 @@ function ProductsPage() {
   const categoriesQuery = useMemoFirebase(() => collection(db, "categories"), []);
   const { data: categories } = useCollection(categoriesQuery);
 
+  const form = useForm<z.infer<typeof productSchema>>({
+    resolver: zodResolver(productSchema),
+    defaultValues: {
+      name: "",
+      category: "",
+      purchasePrice: 0,
+      sellingPrice: 0,
+      stockQuantity: 0,
+      description: "",
+      isPublished: true,
+      imageUrl: "",
+    },
+  });
+
   const openSheet = (product: Product | null = null) => {
     setEditingProduct(product);
-    setIsPublished(product ? product.isPublished : true);
-    setAiDescription(product ? product.description : "");
-    setImageUrl(product ? product.imageUrl : "");
-    setSelectedCategory(product ? product.category : "");
+    if (product) {
+      form.reset({
+        name: product.name,
+        category: product.category,
+        purchasePrice: product.purchasePrice || 0,
+        sellingPrice: product.sellingPrice,
+        stockQuantity: product.stockQuantity,
+        description: product.description,
+        isPublished: product.isPublished,
+        imageUrl: product.imageUrl,
+      });
+    } else {
+      form.reset({
+        name: "",
+        category: "",
+        purchasePrice: 0,
+        sellingPrice: 0,
+        stockQuantity: 0,
+        description: "",
+        isPublished: true,
+        imageUrl: "",
+      });
+    }
     setIsSheetOpen(true);
   };
 
-  const closeSheet = () => {
-    setEditingProduct(null);
-    setAiDescription("");
-    setImageUrl("");
-    setSelectedCategory("");
-    setIsSheetOpen(false);
-  };
-
   const handleAiGenerateDesc = async () => {
-    const productName = nameRef.current?.value;
+    const productName = form.getValues("name");
+    const category = form.getValues("category");
     if (!productName) {
-        toast({ title: "Nom requis", description: "Entrez un nom de produit.", variant: "destructive" });
+        toast({ title: "Nom requis", description: "Entrez un nom de produit pour l'IA.", variant: "destructive" });
         return;
     }
     setIsGeneratingDesc(true);
     try {
-        const desc = await generateProductDescription({ productName, category: selectedCategory });
-        setAiDescription(desc);
+        const desc = await generateProductDescription({ productName, category });
+        form.setValue("description", desc);
     } catch (error) {
         toast({ title: "Erreur IA", variant: "destructive" });
     } finally {
@@ -93,24 +131,11 @@ function ProductsPage() {
     }
   };
 
-  const handleSave = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-    
-    const sellingPrice = parseFloat(formData.get('sellingPrice') as string);
-    const purchasePrice = parseFloat(formData.get('purchasePrice') as string || "0");
-    const stockQuantity = parseInt(formData.get('stockQuantity') as string);
-
+  async function onSubmit(values: z.infer<typeof productSchema>) {
     const productData = {
-      name: formData.get('name') as string,
-      description: aiDescription,
-      category: selectedCategory,
-      sellingPrice,
-      price: sellingPrice,
-      purchasePrice,
-      stockQuantity,
-      imageUrl: imageUrl || `https://picsum.photos/seed/${Math.floor(Math.random() * 1000)}/600/400`,
-      isPublished: isPublished,
+      ...values,
+      price: values.sellingPrice, // Compatibilité panier
+      imageUrl: values.imageUrl || `https://picsum.photos/seed/${Math.floor(Math.random() * 1000)}/600/400`,
       updatedAt: serverTimestamp()
     };
 
@@ -118,26 +143,29 @@ function ProductsPage() {
       if (editingProduct) {
         const docRef = doc(db, "products", editingProduct.id);
         await setDoc(docRef, productData, { merge: true });
-        toast({ title: "Produit mis à jour" });
+        toast({ title: "Produit mis à jour", description: "Les changements ont été enregistrés." });
       } else {
         const colRef = collection(db, "products");
         await addDoc(colRef, {
           ...productData,
           createdAt: serverTimestamp()
         });
-        toast({ title: "Produit créé" });
+        toast({ title: "Produit créé", description: "L'article est ajouté au stock." });
       }
-      closeSheet();
+      setIsSheetOpen(false);
     } catch (e) {
-      toast({ title: "Erreur", variant: "destructive" });
+      toast({ title: "Erreur", description: "Impossible de sauvegarder en base.", variant: "destructive" });
     }
-  };
+  }
 
   const handleDelete = async (id: string) => {
-    if(window.confirm("Supprimer cet article ?")){
-        const docRef = doc(db, "products", id);
-        await deleteDoc(docRef);
-        toast({ title: "Produit supprimé", variant: "destructive" });
+    if(window.confirm("Supprimer définitivement cet article ?")){
+        try {
+            await deleteDoc(doc(db, "products", id));
+            toast({ title: "Produit supprimé", variant: "destructive" });
+        } catch (e) {
+            toast({ title: "Erreur", variant: "destructive" });
+        }
     }
   };
 
@@ -157,12 +185,12 @@ function ProductsPage() {
                 <p className="text-muted-foreground text-xs uppercase font-bold opacity-40">Inventaire Hardware Premium</p>
              </div>
           </div>
-          <Button onClick={() => openSheet()} className="bg-primary hover:bg-primary/90 gap-2 font-black uppercase italic rounded-2xl h-12 px-6 shadow-xl">
+          <Button onClick={() => openSheet()} className="bg-primary hover:bg-primary/90 gap-2 font-black uppercase italic rounded-xl h-12 px-6 shadow-xl">
             <PlusCircle size={20} /> Ajouter un Produit
           </Button>
         </div>
 
-        <div className="glossy-card border-none rounded-[2rem] overflow-hidden shadow-2xl">
+        <div className="glossy-card border-none rounded-[2.5rem] overflow-hidden shadow-2xl">
           <Table>
             <TableHeader className="bg-white/5">
               <TableRow className="border-white/5 hover:bg-transparent">
@@ -200,8 +228,8 @@ function ProductsPage() {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Button variant="ghost" size="icon" onClick={() => openSheet(product)} className="h-8 w-8 hover:bg-accent/20"><Edit className="h-4 w-4" /></Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleDelete(product.id)} className="h-8 w-8 text-destructive hover:bg-destructive/20"><Trash2 className="h-4 w-4" /></Button>
+                        <button onClick={() => openSheet(product)} className="p-2 hover:text-accent transition-colors"><Edit size={16}/></button>
+                        <button onClick={() => handleDelete(product.id)} className="p-2 hover:text-destructive transition-colors"><Trash2 size={16}/></button>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -222,74 +250,132 @@ function ProductsPage() {
             <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Catalogue Elite DKS</p>
           </SheetHeader>
 
-          <form onSubmit={handleSave} className="flex-1 overflow-y-auto p-8 space-y-8 custom-scrollbar">
-            <div className="space-y-6">
-                <div className="grid grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Nom du produit</Label>
-                        <Input ref={nameRef} name="name" defaultValue={editingProduct?.name} required className="h-12 bg-background/50 border-white/5 rounded-xl focus:border-accent" />
-                    </div>
-                    <div className="space-y-2">
-                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Catégorie</Label>
-                        <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                            <SelectTrigger className="h-12 bg-background/50 border-white/5 rounded-xl">
-                                <SelectValue placeholder="Choisir" />
-                            </SelectTrigger>
-                            <SelectContent className="bg-card border-white/10">
-                                {categories?.map((cat: any) => (
-                                    <SelectItem key={cat.id} value={cat.name} className="font-bold uppercase text-xs">{cat.name}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-                </div>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="flex-1 overflow-y-auto p-8 space-y-8 custom-scrollbar">
+              <div className="space-y-6">
+                  <div className="grid grid-cols-2 gap-6">
+                      <FormField
+                        control={form.control}
+                        name="name"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Nom du produit</FormLabel>
+                            <FormControl>
+                              <Input {...field} className="h-12 bg-background/50 border-white/5 rounded-xl focus:border-accent" />
+                            </FormControl>
+                            <FormMessage className="text-[10px]" />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="category"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Catégorie</FormLabel>
+                            <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                                <FormControl>
+                                  <SelectTrigger className="h-12 bg-background/50 border-white/5 rounded-xl">
+                                      <SelectValue placeholder="Choisir" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent className="bg-card border-white/10">
+                                    {categories?.map((cat: any) => (
+                                        <SelectItem key={cat.id} value={cat.name} className="font-bold uppercase text-xs">{cat.name}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            <FormMessage className="text-[10px]" />
+                          </FormItem>
+                        )}
+                      />
+                  </div>
 
-                <div className="grid grid-cols-3 gap-4">
-                    <div className="space-y-2">
-                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Prix Achat ($)</Label>
-                        <Input name="purchasePrice" type="number" step="0.01" defaultValue={editingProduct?.purchasePrice} required className="h-12 bg-background/50 border-white/5 rounded-xl" />
-                    </div>
-                    <div className="space-y-2">
-                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Prix Vente ($)</Label>
-                        <Input name="sellingPrice" type="number" step="0.01" defaultValue={editingProduct?.sellingPrice} required className="h-12 bg-background/50 border-white/5 rounded-xl text-accent font-black" />
-                    </div>
-                    <div className="space-y-2">
-                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Quantité Stock</Label>
-                        <Input name="stockQuantity" type="number" defaultValue={editingProduct?.stockQuantity} required className="h-12 bg-background/50 border-white/5 rounded-xl" />
-                    </div>
-                </div>
+                  <div className="grid grid-cols-3 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="purchasePrice"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Prix Achat ($)</FormLabel>
+                            <FormControl>
+                              <Input type="number" step="0.01" {...field} className="h-12 bg-background/50 border-white/5 rounded-xl" />
+                            </FormControl>
+                            <FormMessage className="text-[10px]" />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="sellingPrice"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Prix Vente ($)</FormLabel>
+                            <FormControl>
+                              <Input type="number" step="0.01" {...field} className="h-12 bg-background/50 border-white/5 rounded-xl text-accent font-black" />
+                            </FormControl>
+                            <FormMessage className="text-[10px]" />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="stockQuantity"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Quantité Stock</FormLabel>
+                            <FormControl>
+                              <Input type="number" {...field} className="h-12 bg-background/50 border-white/5 rounded-xl" />
+                            </FormControl>
+                            <FormMessage className="text-[10px]" />
+                          </FormItem>
+                        )}
+                      />
+                  </div>
 
-                <div className="space-y-2">
-                    <div className="flex justify-between items-center mb-2">
-                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Description Technique</Label>
-                        <Button type="button" size="sm" variant="ghost" onClick={handleAiGenerateDesc} disabled={isGeneratingDesc} className="h-8 bg-accent/10 text-accent hover:bg-accent hover:text-black rounded-lg text-[9px] font-black uppercase italic gap-2">
-                            {isGeneratingDesc ? <Loader2 className="animate-spin h-3 w-3" /> : <Sparkles className="h-3 w-3" />} Rédiger par IA
-                        </Button>
-                    </div>
-                    <Textarea 
-                        value={aiDescription} 
-                        onChange={(e) => setAiDescription(e.target.value)} 
-                        className="min-h-[150px] bg-background/50 border-white/5 rounded-2xl focus:border-accent text-sm leading-relaxed" 
-                        placeholder="Spécifications, performances, avantages..."
-                        required 
-                    />
-                </div>
+                  <FormField
+                    control={form.control}
+                    name="description"
+                    render={({ field }) => (
+                      <FormItem>
+                        <div className="flex justify-between items-center mb-2">
+                          <FormLabel className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Description Technique</FormLabel>
+                          <Button type="button" size="sm" variant="ghost" onClick={handleAiGenerateDesc} disabled={isGeneratingDesc} className="h-8 bg-accent/10 text-accent hover:bg-accent hover:text-black rounded-lg text-[9px] font-black uppercase italic gap-2">
+                              {isGeneratingDesc ? <Loader2 className="animate-spin h-3 w-3" /> : <Sparkles className="h-3 w-3" />} Rédiger par IA
+                          </Button>
+                        </div>
+                        <FormControl>
+                          <Textarea {...field} className="min-h-[150px] bg-background/50 border-white/5 rounded-2xl focus:border-accent text-sm" />
+                        </FormControl>
+                        <FormMessage className="text-[10px]" />
+                      </FormItem>
+                    )}
+                  />
 
-                <div className="p-6 rounded-3xl bg-white/5 border border-white/5 flex items-center justify-between">
-                    <div className="space-y-1">
-                        <p className="font-bold text-sm uppercase italic">Publication publique</p>
-                        <p className="text-[10px] text-muted-foreground uppercase font-black opacity-40 tracking-widest">Rendre l'article visible en boutique</p>
-                    </div>
-                    <Switch checked={isPublished} onCheckedChange={setIsPublished} className="data-[state=checked]:bg-accent" />
-                </div>
-            </div>
+                  <FormField
+                    control={form.control}
+                    name="isPublished"
+                    render={({ field }) => (
+                      <FormItem className="p-6 rounded-3xl bg-white/5 border border-white/5 flex items-center justify-between space-y-0">
+                        <div className="space-y-1">
+                            <FormLabel className="font-bold text-sm uppercase italic">Publication publique</FormLabel>
+                            <p className="text-[10px] text-muted-foreground uppercase font-black opacity-40 tracking-widest">Visible en boutique</p>
+                        </div>
+                        <FormControl>
+                          <Switch checked={field.value} onCheckedChange={field.onChange} className="data-[state=checked]:bg-accent" />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+              </div>
 
-            <SheetFooter className="pt-6 border-t border-white/5">
-                <Button type="submit" className="w-full h-16 bg-accent text-black font-black uppercase italic rounded-2xl shadow-xl shadow-accent/10 text-lg">
-                    {editingProduct ? 'Appliquer les modifications' : 'Enregistrer dans le Stock'}
-                </Button>
-            </SheetFooter>
-          </form>
+              <SheetFooter className="pt-6 border-t border-white/5">
+                  <Button type="submit" disabled={form.formState.isSubmitting} className="w-full h-16 bg-accent text-black font-black uppercase italic rounded-2xl shadow-xl shadow-accent/10 text-lg">
+                      {form.formState.isSubmitting ? <Loader2 className="animate-spin" /> : editingProduct ? 'Appliquer les modifications' : 'Enregistrer dans le Stock'}
+                  </Button>
+              </SheetFooter>
+            </form>
+          </Form>
         </SheetContent>
       </Sheet>
     </div>
