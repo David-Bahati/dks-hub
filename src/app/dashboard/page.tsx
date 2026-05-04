@@ -45,7 +45,8 @@ import {
   FlaskConical,
   PackagePlus,
   Trash2,
-  Hammer
+  Hammer,
+  BookText
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -97,6 +98,7 @@ const navConfig = [
   { href: "/dashboard/categories", icon: Tags, label: "Catégories", roles: ["Admin", "Seller"] },
   { href: "/dashboard/maintenance", icon: FlaskConical, label: "Stocks Labo", roles: ["Admin", "Seller"] },
   { href: "/dashboard/maintenance/tools", icon: Hammer, label: "Parc Outils", roles: ["Admin", "Seller"] },
+  { href: "/dashboard/maintenance/logs", icon: BookText, label: "Journal Labo", roles: ["Admin", "Seller"] },
   { href: "/dashboard/maintenance/procurement", icon: PackagePlus, label: "Besoin Réappro", roles: ["Admin", "Seller"] },
   { href: "/dashboard/maintenance/stats", icon: BarChart3, label: "Analytique Labo", roles: ["Admin", "Seller"] },
   { href: "/dashboard/maintenance/waste", icon: Trash2, label: "Contrôle Gaspillage", roles: ["Admin", "Seller"] },
@@ -268,7 +270,7 @@ function DashboardPage() {
             <div className="flex items-center gap-6">
               <Logo size="sm" />
               <div className="relative hidden lg:block group">
-                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-accent transition-colors" size={16} />
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within/input:text-accent transition-colors" size={16} />
                   <Input 
                     placeholder="Commande, Client, S/N..." 
                     className="w-80 h-11 pl-12 bg-white/5 border-white/5 rounded-2xl focus:border-accent text-xs font-bold uppercase transition-all"
@@ -404,7 +406,7 @@ function DashboardPage() {
                     {isStaff ? (
                       <ResponsiveContainer width="100%" height="100%">
                           <AreaChart data={chartData}>
-                              <defs><linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="hsl(var(--accent))" stopOpacity={0.3}/><stop offset="95%" stopColor="hsl(var(--accent))" stopOpacity={0}/></linearGradient></defs>
+                              <defs><linearGradient id="colorTotal" x1="0" x2="0" x2="0" y2="1"><stop offset="5%" stopColor="hsl(var(--accent))" stopOpacity={0.3}/><stop offset="95%" stopColor="hsl(var(--accent))" stopOpacity={0}/></linearGradient></defs>
                               <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" vertical={false} />
                               <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 10}} dy={10} />
                               <Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', borderRadius: '12px', fontSize: '12px' }} itemStyle={{ color: 'hsl(var(--accent))' }} />

@@ -52,6 +52,15 @@ export type LabTool = {
   updatedAt: any;
 };
 
+export type TechnicianLog = {
+  id: string;
+  userId: string;
+  userName: string;
+  content: string;
+  type: 'info' | 'technical' | 'incident' | 'handover';
+  createdAt: any;
+};
+
 export type ConsumptionLog = {
   id: string;
   consumableId: string;

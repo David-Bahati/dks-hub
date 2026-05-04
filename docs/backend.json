@@ -139,19 +139,19 @@
       },
       "required": ["name", "status", "usageCount", "usageThreshold"]
     },
-    "ConsumptionLog": {
-      "title": "ConsumptionLog",
-      "description": "Journalise l'utilisation ou le réapprovisionnement des consommables labo.",
+    "TechnicianLog": {
+      "title": "TechnicianLog",
+      "description": "Journal de bord quotidien du laboratoire pour les observations techniques et passations.",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
-        "consumableId": { "type": "string" },
-        "consumableName": { "type": "string" },
-        "quantity": { "type": "number" },
-        "type": { "type": "string", "enum": ["usage", "restock"] },
         "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "content": { "type": "string" },
+        "type": { "type": "string", "enum": ["info", "technical", "incident", "handover"] },
         "createdAt": { "type": "string", "format": "date-time" }
-      }
+      },
+      "required": ["userId", "userName", "content", "type", "createdAt"]
     }
   },
   "auth": {
@@ -190,9 +190,9 @@
       "schema": "LabTool",
       "description": "Lab tools tracking."
     },
-    "/consumptionLogs/{logId}": {
-      "schema": "ConsumptionLog",
-      "description": "Lab consumables logs."
+    "/technicianLogs/{logId}": {
+      "schema": "TechnicianLog",
+      "description": "Lab daily logbook."
     }
   }
 }
