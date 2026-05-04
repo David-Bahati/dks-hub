@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Navbar } from "@/components/layout/Navbar";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,12 @@ import {
     Minus,
     PackageSearch,
     History,
-    BarChart3
+    BarChart3,
+    Scan,
+    Camera,
+    X,
+    Zap,
+    Maximize
 } from "lucide-react";
 import { db } from '@/lib/firebase';
 import { collection, addDoc, deleteDoc, doc, updateDoc, serverTimestamp, query, orderBy, increment } from 'firebase/firestore';
@@ -39,20 +44,54 @@ import {
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 
 function MaintenanceInventoryPage() {
     const { user } = useAuth();
     const { toast } = useToast();
     const [search, setSearch] = useState("");
     const [isSheetOpen, setIsSheetOpen] = useState(false);
+    const [isScannerOpen, setIsScannerOpen] = useState(false);
     const [editingItem, setEditingItem] = useState<any>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [hasCameraPermission, setHasCameraPermission] = useState(false);
+    const videoRef = useRef<HTMLVideoElement>(null);
 
     const inventoryQuery = useMemoFirebase(() => {
         return query(collection(db, "consumables"), orderBy("name", "asc"));
     }, []);
 
     const { data: items, isLoading } = useCollection(inventoryQuery);
+
+    // Camera Logic
+    useEffect(() => {
+        if (isScannerOpen) {
+            const getCameraPermission = async () => {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+                    setHasCameraPermission(true);
+                    if (videoRef.current) {
+                        videoRef.current.srcObject = stream;
+                    }
+                } catch (error) {
+                    console.error('Error accessing camera:', error);
+                    setHasCameraPermission(false);
+                    toast({
+                        variant: 'destructive',
+                        title: 'Accès Caméra Refusé',
+                        description: 'Veuillez autoriser la caméra pour utiliser le scanner.',
+                    });
+                }
+            };
+            getCameraPermission();
+        } else {
+            // Stop stream when closing
+            if (videoRef.current && videoRef.current.srcObject) {
+                const stream = videoRef.current.srcObject as MediaStream;
+                stream.getTracks().forEach(track => track.stop());
+            }
+        }
+    }, [isScannerOpen, toast]);
 
     const handleSaveItem = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -92,7 +131,6 @@ function MaintenanceInventoryPage() {
                 updatedAt: serverTimestamp()
             });
 
-            // Log consumption if delta is negative
             await addDoc(collection(db, "consumptionLogs"), {
                 consumableId: item.id,
                 consumableName: item.name,
@@ -103,9 +141,17 @@ function MaintenanceInventoryPage() {
                 createdAt: serverTimestamp()
             });
 
+            if (delta < 0) {
+                toast({ title: "Consommation enregistrée", description: `-1 ${item.unit} de ${item.name}` });
+            }
         } catch (error) {
             toast({ title: "Erreur", variant: "destructive" });
         }
+    };
+
+    const handleMockScan = (item: any) => {
+        updateQuantity(item, -1);
+        setIsScannerOpen(false);
     };
 
     const handleDelete = async (id: string) => {
@@ -128,7 +174,7 @@ function MaintenanceInventoryPage() {
                 <div className="flex flex-col md:flex-row justify-between items-start gap-8 mb-12">
                     <div className="flex items-start gap-5">
                         <Link href="/dashboard">
-                            <Button variant="outline" className="h-14 w-14 rounded-2xl border-white/10 hover:bg-accent/10 hover:text-accent p-0">
+                            <Button variant="outline" className="h-14 w-14 rounded-2xl border-white/10 hover:bg-accent/10 hover:text-accent p-0 transition-all">
                                 <ArrowLeft size={24} />
                             </Button>
                         </Link>
@@ -138,9 +184,15 @@ function MaintenanceInventoryPage() {
                         </div>
                     </div>
                     
-                    <div className="flex gap-3">
+                    <div className="flex flex-wrap gap-3">
+                        <Button 
+                            onClick={() => setIsScannerOpen(true)} 
+                            className="bg-accent text-black hover:bg-accent/90 h-14 px-8 rounded-2xl font-black uppercase italic gap-3 shadow-xl shadow-accent/20"
+                        >
+                            <Scan size={20} /> Scanner Ressource
+                        </Button>
                         <Link href="/dashboard/maintenance/stats">
-                            <Button variant="outline" className="h-14 px-6 rounded-2xl border-white/10 font-black uppercase italic gap-3">
+                            <Button variant="outline" className="h-14 px-6 rounded-2xl border-white/10 font-black uppercase italic gap-3 hover:bg-white/5 transition-all">
                                 <BarChart3 size={20} /> Statistiques
                             </Button>
                         </Link>
@@ -228,6 +280,81 @@ function MaintenanceInventoryPage() {
                     )}
                 </div>
             </main>
+
+            {/* SCANNER BARCODE OVERLAY */}
+            {isScannerOpen && (
+                <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-3xl flex flex-col items-center justify-center p-6 animate-in fade-in duration-300">
+                    <div className="absolute top-6 right-6">
+                        <Button variant="ghost" size="icon" onClick={() => setIsScannerOpen(false)} className="h-14 w-14 rounded-full bg-white/5 hover:bg-white/10 text-white">
+                            <X size={32} />
+                        </Button>
+                    </div>
+
+                    <div className="w-full max-w-2xl space-y-8">
+                        <div className="text-center space-y-2">
+                            <Badge className="bg-accent text-black font-black uppercase italic px-4 py-1">Mode Scan Actif</Badge>
+                            <h2 className="text-3xl font-black uppercase italic tracking-tighter">Lecteur <span className="text-accent">Optique Hub</span></h2>
+                        </div>
+
+                        <div className="relative aspect-video rounded-[3rem] overflow-hidden border-4 border-accent/20 shadow-[0_0_50px_rgba(56,189,248,0.1)]">
+                            <video ref={videoRef} className="w-full h-full object-cover" autoPlay muted playsInline />
+                            
+                            {/* Scanner Overlays */}
+                            <div className="absolute inset-0 flex items-center justify-center">
+                                <div className="w-64 h-64 border-2 border-accent rounded-3xl relative">
+                                    <div className="absolute inset-0 bg-accent/5 animate-pulse" />
+                                    <div className="absolute top-1/2 left-0 w-full h-0.5 bg-accent shadow-[0_0_15px_rgba(56,189,248,0.8)] animate-[scan_2s_ease-in-out_infinite]" />
+                                    
+                                    {/* Corners */}
+                                    <div className="absolute -top-1 -left-1 w-8 h-8 border-t-4 border-l-4 border-accent rounded-tl-xl" />
+                                    <div className="absolute -top-1 -right-1 w-8 h-8 border-t-4 border-r-4 border-accent rounded-tr-xl" />
+                                    <div className="absolute -bottom-1 -left-1 w-8 h-8 border-b-4 border-l-4 border-accent rounded-bl-xl" />
+                                    <div className="absolute -bottom-1 -right-1 w-8 h-8 border-b-4 border-r-4 border-accent rounded-br-xl" />
+                                </div>
+                            </div>
+
+                            {!hasCameraPermission && (
+                                <div className="absolute inset-0 bg-background/80 flex flex-col items-center justify-center p-10 text-center">
+                                    <Camera size={48} className="text-muted-foreground mb-4 opacity-20" />
+                                    <Alert variant="destructive" className="bg-red-500/10 border-red-500/20 text-red-500 max-w-sm rounded-2xl">
+                                        <AlertTitle className="font-black uppercase italic text-xs">Accès Caméra Requis</AlertTitle>
+                                        <AlertDescription className="text-[10px] font-bold uppercase opacity-80">
+                                            Autorisez l'accès à la caméra pour scanner vos ressources de laboratoire.
+                                        </AlertDescription>
+                                    </Alert>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="p-6 bg-white/5 rounded-3xl border border-white/5 space-y-4">
+                                <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest text-center">Ressources en attente de détection</p>
+                                <div className="max-h-[200px] overflow-y-auto space-y-2 custom-scrollbar pr-2">
+                                    {items?.slice(0, 4).map(item => (
+                                        <Button 
+                                            key={item.id} 
+                                            variant="ghost" 
+                                            className="w-full justify-between h-12 bg-white/[0.02] hover:bg-accent/10 hover:text-accent rounded-xl px-4 border border-white/5"
+                                            onClick={() => handleMockScan(item)}
+                                        >
+                                            <span className="text-[10px] font-black uppercase italic">{item.name}</span>
+                                            <span className="text-[9px] font-mono opacity-40">SORTIE DIRECTE</span>
+                                        </Button>
+                                    ))}
+                                </div>
+                            </div>
+                            <div className="p-8 bg-accent/10 rounded-[2.5rem] border border-accent/20 flex flex-col items-center justify-center text-center space-y-4">
+                                <div className="w-16 h-16 rounded-2xl bg-accent/20 flex items-center justify-center text-accent">
+                                    <Maximize size={32} />
+                                </div>
+                                <p className="text-xs font-medium text-white/80 leading-relaxed italic">
+                                    Placez le code-barres de la ressource dans le cadre pour une identification automatique.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
                 <SheetContent side="right" className="bg-card/95 backdrop-blur-3xl border-white/10 w-full sm:max-w-md flex flex-col p-0">

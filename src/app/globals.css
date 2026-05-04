@@ -114,4 +114,8 @@ html {
 .btn-primary-hover:hover::after {
   @apply translate-x-0;
 }
-    
+
+@keyframes scan {
+  0%, 100% { top: 0%; }
+  50% { top: 100%; }
+}
