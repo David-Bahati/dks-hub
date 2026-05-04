@@ -25,7 +25,10 @@ import {
     Package,
     PlusCircle,
     CheckCircle2,
-    Trash2
+    Trash2,
+    Receipt,
+    FileText,
+    QrCode
 } from "lucide-react";
 import { db } from '@/lib/firebase';
 import { collection, addDoc, serverTimestamp, doc, updateDoc, query, orderBy, onSnapshot, increment } from 'firebase/firestore';
@@ -43,7 +46,7 @@ import {
     SheetTitle,
     SheetFooter,
 } from "@/components/ui/sheet";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -52,6 +55,8 @@ import { SupportMessage, UsedPart, Product } from '@/lib/types';
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
 
 const ticketSchema = z.object({
   productName: z.string().min(3, "Veuillez préciser le matériel (min 3 car.)"),
@@ -65,14 +70,20 @@ function SupportPage() {
     const [isSheetOpen, setIsSheetOpen] = useState(false);
     const [isChatOpen, setIsChatOpen] = useState(false);
     const [isPartsSheetOpen, setIsPartsSheetOpen] = useState(false);
+    const [isBillingDialogOpen, setIsBillingDialogOpen] = useState(false);
     const [selectedTicket, setSelectedTicket] = useState<any>(null);
     const [search, setSearch] = useState("");
     const [partSearch, setPartSearch] = useState("");
     const [chatMessages, setChatMessages] = useState<SupportMessage[]>([]);
     const [usedParts, setUsedParts] = useState<UsedPart[]>([]);
     const [newMessage, setNewMessage] = useState("");
+    const [laborCost, setLaborCost] = useState("15");
     const [ticketImage, setTicketImage] = useState<string | null>(null);
     const [chatImage, setChatImage] = useState<string | null>(null);
+    
+    // PDF States
+    const [isGeneratingInvoice, setIsGeneratingInvoice] = useState(false);
+    const invoiceRef = useRef<HTMLDivElement>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
     const ticketFileInputRef = useRef<HTMLInputElement>(null);
     const chatFileInputRef = useRef<HTMLInputElement>(null);
@@ -210,6 +221,60 @@ function SupportPage() {
             toast({ title: "Pièce ajoutée", description: `Le stock de ${product.name} a été mis à jour.` });
         } catch (error) {
             toast({ title: "Erreur Stock", variant: "destructive" });
+        }
+    };
+
+    const handleFinalBilling = async () => {
+        if (!selectedTicket) return;
+        setIsGeneratingInvoice(true);
+
+        const partsTotal = usedParts.reduce((acc, p) => acc + (p.unitPrice * p.quantity), 0);
+        const labor = parseFloat(laborCost);
+        const grandTotal = partsTotal + labor;
+
+        try {
+            // 1. Create final order for cashier
+            await addDoc(collection(db, "orders"), {
+                userId: selectedTicket.userId,
+                customerName: selectedTicket.customerName,
+                items: [
+                    { name: `Main d'œuvre SAV: ${selectedTicket.productName}`, quantity: 1, price: labor },
+                    ...usedParts.map(p => ({ name: `Pièce: ${p.name}`, quantity: p.quantity, price: p.unitPrice }))
+                ],
+                total: grandTotal,
+                status: "pending_payment",
+                paymentMethod: "CASH",
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp(),
+                source: 'sav_repair',
+                sourceId: selectedTicket.id
+            });
+
+            // 2. Update ticket status
+            await updateDoc(doc(db, "supportTickets", selectedTicket.id), {
+                status: 'completed',
+                updatedAt: serverTimestamp()
+            });
+
+            // 3. Generate PDF
+            setTimeout(async () => {
+                if (invoiceRef.current) {
+                    const canvas = await html2canvas(invoiceRef.current, { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
+                    const imgData = canvas.toDataURL('image/png');
+                    const pdf = new jsPDF({ orientation: 'portrait', unit: 'px', format: [canvas.width / 2, canvas.height / 2] });
+                    pdf.addImage(imgData, 'PNG', 0, 0, canvas.width / 2, canvas.height / 2);
+                    pdf.save(`FACTURE_SAV_DKS_${selectedTicket.id.substring(0, 8).toUpperCase()}.pdf`);
+                }
+                
+                toast({ title: "Clôture réussie", description: "Facture générée et commande envoyée en caisse." });
+                setIsBillingDialogOpen(false);
+                setIsChatOpen(false);
+                setIsGeneratingInvoice(false);
+            }, 500);
+
+        } catch (error) {
+            toast({ title: "Erreur Facturation", variant: "destructive" });
+            setIsGeneratingInvoice(false);
         }
     };
 
@@ -466,14 +531,25 @@ function SupportPage() {
                         </div>
                         <div className="flex gap-2">
                              {isStaff && (
-                                <Button 
-                                    variant="outline" 
-                                    size="sm" 
-                                    className="h-10 rounded-xl border-accent/20 text-accent font-black uppercase text-[9px] gap-2 hover:bg-accent hover:text-black"
-                                    onClick={() => setIsPartsSheetOpen(true)}
-                                >
-                                    <Cpu size={14} /> Pièces
-                                </Button>
+                                <>
+                                    <Button 
+                                        variant="outline" 
+                                        size="sm" 
+                                        className="h-10 rounded-xl border-accent/20 text-accent font-black uppercase text-[9px] gap-2 hover:bg-accent hover:text-black"
+                                        onClick={() => setIsPartsSheetOpen(true)}
+                                    >
+                                        <Cpu size={14} /> Pièces
+                                    </Button>
+                                    {selectedTicket?.status !== 'completed' && (
+                                        <Button 
+                                            size="sm" 
+                                            className="h-10 rounded-xl bg-green-500 text-white font-black uppercase text-[9px] gap-2 hover:bg-green-600 shadow-lg"
+                                            onClick={() => setIsBillingDialogOpen(true)}
+                                        >
+                                            <Receipt size={14} /> Facturer & Clôturer
+                                        </Button>
+                                    )}
+                                </>
                              )}
                              <Button variant="ghost" size="icon" onClick={() => setIsChatOpen(false)} className="rounded-full hover:bg-white/5 text-white/40"><X size={20}/></Button>
                         </div>
@@ -490,7 +566,7 @@ function SupportPage() {
                                     {usedParts.map((part) => (
                                         <div key={part.id} className="flex justify-between items-center bg-black/20 p-2 rounded-xl border border-white/5">
                                             <span className="text-[11px] font-bold text-white uppercase">{part.name}</span>
-                                            <Badge variant="outline" className="text-[9px] font-black border-accent/20 text-accent">STOCK DÉDUIT</Badge>
+                                            <Badge variant="outline" className="text-[9px] font-black border-accent/20 text-accent">${part.unitPrice}</span>
                                         </div>
                                     ))}
                                 </div>
@@ -547,6 +623,54 @@ function SupportPage() {
                 </DialogContent>
             </Dialog>
 
+            {/* BILLING CONFIRMATION DIALOG */}
+            <Dialog open={isBillingDialogOpen} onOpenChange={setIsBillingDialogOpen}>
+                <DialogContent className="bg-card border-white/10 text-foreground rounded-[2.5rem] sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="text-2xl font-black uppercase italic tracking-tighter text-center">Clôture Financière</DialogTitle>
+                    </DialogHeader>
+                    <div className="py-6 space-y-6">
+                        <div className="space-y-2">
+                            <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Frais de Main-d'œuvre ($)</Label>
+                            <Input 
+                                type="number" 
+                                value={laborCost} 
+                                onChange={(e) => setLaborCost(e.target.value)} 
+                                className="h-14 bg-background/50 border-white/10 rounded-xl text-xl font-black text-accent"
+                            />
+                        </div>
+                        
+                        <div className="p-6 bg-white/5 rounded-3xl border border-white/5 space-y-4">
+                            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground italic">Résumé des coûts</p>
+                            <div className="flex justify-between text-sm">
+                                <span>Main d'œuvre</span>
+                                <span className="font-bold">${laborCost}</span>
+                            </div>
+                            <div className="flex justify-between text-sm">
+                                <span>Pièces ({usedParts.length})</span>
+                                <span className="font-bold">${usedParts.reduce((acc, p) => acc + (p.unitPrice * p.quantity), 0).toFixed(2)}</span>
+                            </div>
+                            <div className="pt-4 border-t border-white/10 flex justify-between items-end">
+                                <span className="text-xs font-black uppercase">Total à payer</span>
+                                <span className="text-3xl font-black text-accent">
+                                    ${(parseFloat(laborCost || "0") + usedParts.reduce((acc, p) => acc + (p.unitPrice * p.quantity), 0)).toFixed(2)}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    <DialogFooter className="gap-3">
+                        <Button variant="ghost" onClick={() => setIsBillingDialogOpen(false)} className="rounded-xl font-bold uppercase text-[10px]">Annuler</Button>
+                        <Button 
+                            className="bg-accent text-black font-black uppercase italic rounded-xl px-8"
+                            onClick={handleFinalBilling}
+                            disabled={isGeneratingInvoice}
+                        >
+                            {isGeneratingInvoice ? <Loader2 className="animate-spin" /> : <><CheckCircle2 className="mr-2" size={16} /> Valider & Facturer</>}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
             {/* Spare Parts Selection Sheet */}
             <Sheet open={isPartsSheetOpen} onOpenChange={setIsPartsSheetOpen}>
                 <SheetContent side="right" className="bg-card/95 backdrop-blur-3xl border-white/10 w-full sm:max-w-md flex flex-col p-0">
@@ -595,6 +719,106 @@ function SupportPage() {
                     </div>
                 </SheetContent>
             </Sheet>
+
+            {/* MODÈLE DE FACTURE SAV PDF (HIDDEN) */}
+            <div style={{ position: 'absolute', left: '-9999px', top: 0 }}>
+                {selectedTicket && (
+                    <div ref={invoiceRef} className="bg-white text-black p-16 w-[800px] font-sans">
+                        <header className="flex justify-between items-start border-b-4 border-black pb-10 mb-12">
+                            <div className="space-y-4">
+                                <div className="bg-black text-white px-6 py-2 inline-block font-black text-3xl italic tracking-tighter">DKS SAV</div>
+                                <div className="text-sm font-bold uppercase tracking-widest text-gray-500">Expertise & Réparation</div>
+                                <div className="text-[11px] leading-relaxed mt-4 font-medium">
+                                    <p>Immeuble Bahati, Bunia, RDC</p>
+                                    <p>Tél: +243 823 038 945</p>
+                                    <p>Support Elite: support@dks-shop.com</p>
+                                </div>
+                            </div>
+                            <div className="text-right">
+                                <h2 className="text-5xl font-black uppercase italic tracking-tighter mb-2">FACTURE SAV</h2>
+                                <p className="text-xs font-bold text-gray-400 uppercase tracking-[0.2em]">Dossier: #{selectedTicket.id.substring(0, 10).toUpperCase()}</p>
+                                <div className="mt-8">
+                                    <p className="text-[10px] font-black uppercase text-gray-400">Date de clôture</p>
+                                    <p className="text-lg font-bold">{new Date().toLocaleDateString('fr-FR')}</p>
+                                </div>
+                            </div>
+                        </header>
+
+                        <div className="grid grid-cols-2 gap-20 mb-12">
+                            <div className="space-y-4">
+                                <h3 className="text-[10px] font-black uppercase text-gray-400 border-b pb-2 tracking-widest">Client</h3>
+                                <div className="space-y-1">
+                                    <p className="text-xl font-black uppercase italic">{selectedTicket.customerName}</p>
+                                    <p className="text-sm text-gray-600">Matériel: {selectedTicket.productName}</p>
+                                </div>
+                            </div>
+                            <div className="space-y-4">
+                                <h3 className="text-[10px] font-black uppercase text-gray-400 border-b pb-2 tracking-widest">Garantie Intervention</h3>
+                                <div className="space-y-1">
+                                    <p className="text-sm font-bold">Durée : <span className="uppercase text-green-600">30 JOURS (Pièces & MO)</span></p>
+                                    <p className="text-[10px] leading-relaxed text-gray-500 italic">La garantie ne couvre pas les chocs ou l'oxydation.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <table className="w-full mb-12">
+                            <thead>
+                                <tr className="bg-gray-100 text-[10px] font-black uppercase tracking-widest">
+                                    <th className="text-left p-4">Description de l'intervention / Composant</th>
+                                    <th className="text-center p-4">Qté</th>
+                                    <th className="text-right p-4">Prix Unitaire</th>
+                                    <th className="text-right p-4">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody className="text-sm">
+                                <tr className="border-b border-gray-100">
+                                    <td className="p-4 font-bold uppercase italic">Main-d'œuvre technique (Diagnostic + Réparation)</td>
+                                    <td className="p-4 text-center">1</td>
+                                    <td className="p-4 text-right">${parseFloat(laborCost).toFixed(2)}</td>
+                                    <td className="p-4 text-right font-black">${parseFloat(laborCost).toFixed(2)}</td>
+                                </tr>
+                                {usedParts.map((part, idx) => (
+                                    <tr key={idx} className="border-b border-gray-100">
+                                        <td className="p-4 font-bold uppercase italic">Composant: {part.name}</td>
+                                        <td className="p-4 text-center">{part.quantity}</td>
+                                        <td className="p-4 text-right">${part.unitPrice.toFixed(2)}</td>
+                                        <td className="p-4 text-right font-black">${(part.unitPrice * part.quantity).toFixed(2)}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+
+                        <div className="flex justify-end">
+                            <div className="w-80 space-y-4">
+                                <div className="flex justify-between items-end border-b-2 border-black pb-4">
+                                    <span className="text-lg font-black uppercase italic">TOTAL À RÉGLER</span>
+                                    <span className="text-4xl font-black tracking-tighter">
+                                        ${(parseFloat(laborCost || "0") + usedParts.reduce((acc, p) => acc + (p.unitPrice * p.quantity), 0)).toFixed(2)}
+                                    </span>
+                                </div>
+                                <div className="pt-4">
+                                    <p className="text-[9px] font-black uppercase text-gray-400 mb-2">Note Technique</p>
+                                    <p className="text-[10px] italic text-gray-600">"{selectedTicket.issueDescription}" résolu avec succès.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <footer className="mt-20 pt-10 border-t border-gray-100 flex justify-between items-center">
+                            <div className="flex items-center gap-6">
+                                <QrCode size={60} className="opacity-20" />
+                                <p className="text-[9px] font-bold text-gray-400 uppercase leading-relaxed max-w-[250px]">
+                                    Cette facture SAV fait foi pour la garantie d'intervention. <br />
+                                    Merci d'avoir choisi l'expertise DKS.
+                                </p>
+                            </div>
+                            <div className="text-right space-y-4">
+                                <div className="h-16 w-32 border-2 border-gray-100 rounded-lg flex items-center justify-center italic text-gray-300 text-[8px] uppercase font-black">Cachet Labo DKS</div>
+                                <p className="text-[8px] font-bold text-gray-300 uppercase tracking-widest">Solutions Lab Hub v3.0</p>
+                            </div>
+                        </footer>
+                    </div>
+                )}
+            </div>
         </div>
     );
 }
