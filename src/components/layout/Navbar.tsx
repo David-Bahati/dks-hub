@@ -1,7 +1,6 @@
-
 "use client";
 
-import { LogOut, LayoutDashboard, ShoppingCart, Home, Trash2, User, Sparkles, Loader2, GraduationCap, Wrench, Laptop, Layout, Bell } from 'lucide-react';
+import { LogOut, LayoutDashboard, ShoppingCart, Home, Trash2, User, Sparkles, Loader2, GraduationCap, Wrench, Laptop, Layout, Bell, Award } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from "@/components/ui/button";
@@ -42,7 +41,8 @@ export function Navbar() {
 
     const navItems = [
         { label: 'Boutique', href: '/', show: true, icon: Home },
-        { label: 'Services', href: '/services', show: true, icon: GraduationCap },
+        { label: 'Academy', href: '/services', show: true, icon: GraduationCap },
+        { label: 'Certifiés', href: '/graduates', show: true, icon: Award },
         { label: 'Portfolio', href: '/portfolio', show: true, icon: Layout },
         { label: 'Dashboard', href: '/dashboard', show: isStaff, icon: LayoutDashboard },
         { label: 'Mon Hub', href: '/dashboard', show: !isStaff && !!user, icon: User },
