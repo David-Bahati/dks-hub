@@ -54,7 +54,9 @@ import {
   Download,
   QrCode,
   Coins,
-  Wallet
+  Wallet,
+  Gift,
+  Award
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -80,7 +82,7 @@ import { Product } from '@/lib/types';
 import withAuth from '@/components/auth/withAuth';
 import { useAuth } from '@/context/AuthContext';
 import { useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, where, orderBy, limit, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, orderBy, limit, getDocs, addDoc, serverTimestamp, doc, updateDoc, increment } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/ui/Logo";
@@ -152,12 +154,17 @@ function DashboardPage() {
       return roles.includes(userRole);
   });
 
+  // Basic Queries
   const ordersQuery = useMemoFirebase(() => {
     if (authLoading || !user?.uid) return null;
-    if (isStaff) return query(collection(db, "orders"), orderBy("createdAt", "desc"), limit(10));
-    return query(collection(db, "orders"), where("userId", "==", user.uid), orderBy("createdAt", "desc"), limit(5));
-  }, [user?.uid, authLoading, isStaff]);
-  const { data: orders } = useCollection(ordersQuery);
+    return query(collection(db, "orders"), orderBy("createdAt", "desc"));
+  }, [user?.uid, authLoading]);
+  const { data: allOrders } = useCollection(ordersQuery);
+
+  const customersQuery = useMemoFirebase(() => {
+    return query(collection(db, "users"), where("role", "==", "customer"));
+  }, []);
+  const { data: allCustomers } = useCollection(customersQuery);
 
   const notificationsQuery = useMemoFirebase(() => {
     if (authLoading || !user?.uid) return null;
@@ -177,6 +184,7 @@ function DashboardPage() {
   const salesQuery = useMemoFirebase(() => query(collection(db, "sales")), []);
   const { data: allSales } = useCollection(salesQuery);
 
+  // Staff Leaderboard Logic
   const leaderboard = useMemo(() => {
     if (!allLogs || !allBookings || !allSav || !allSales) return [];
 
@@ -226,7 +234,29 @@ function DashboardPage() {
       .slice(0, 5);
   }, [allLogs, allBookings, allSav, allSales]);
 
+  // Customer Loyalty Leaderboard Logic
+  const customerLeaderboard = useMemo(() => {
+    if (!allCustomers || !allOrders) return [];
+
+    return allCustomers.map(cust => {
+      const custOrders = allOrders?.filter(o => o.userId === cust.id && ["payée", "payé", "completed"].includes(o.status.toLowerCase())) || [];
+      const orderPoints = custOrders.length * 100;
+      const referralPoints = (cust.referralCount || 0) * 500;
+      const totalPoints = orderPoints + referralPoints;
+
+      return {
+        id: cust.id,
+        name: cust.name || cust.displayName || "Client Élite",
+        points: totalPoints,
+        orders: custOrders.length,
+        referrals: cust.referralCount || 0,
+        level: cust.loyaltyLevel || 'Bronze'
+      };
+    }).sort((a, b) => b.points - a.points).slice(0, 5);
+  }, [allCustomers, allOrders]);
+
   const weeklyWinner = leaderboard[0];
+  const topCustomer = customerLeaderboard[0];
 
   useEffect(() => {
     fetchGlobalData();
@@ -250,6 +280,31 @@ function DashboardPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleRewardCustomer = async (cust: any) => {
+      if (!isAdmin) return;
+      try {
+          const rewardAmount = 10; // 10 DKST reward
+          await updateDoc(doc(db, "users", cust.id), {
+              tokenBalance: increment(rewardAmount),
+              updatedAt: serverTimestamp()
+          });
+
+          await addDoc(collection(db, "notifications"), {
+              userId: cust.id,
+              title: "RÉCOMPENSE ÉLITE !",
+              message: `Félicitations ! En tant que membre actif de la communauté, Double King Shop vous offre ${rewardAmount} DKST.`,
+              type: 'success',
+              isRead: false,
+              createdAt: serverTimestamp(),
+              link: '/dashboard/wallet'
+          });
+
+          toast({ title: "Client Récompensé", description: `${rewardAmount} DKST envoyés à ${cust.name}.` });
+      } catch (e) {
+          toast({ title: "Erreur récompense", variant: "destructive" });
+      }
   };
 
   const handleTriggerWeeklyDigest = async () => {
@@ -376,7 +431,7 @@ function DashboardPage() {
     </nav>
   );
 
-  const customerPoints = (orders?.length || 0) * 100 + (user?.referralCount || 0) * 500;
+  const myCustomerPoints = (allOrders?.filter(o => o.userId === user?.uid && ["payée", "payé", "completed"].includes(o.status.toLowerCase())).length || 0) * 100 + (user?.referralCount || 0) * 500;
 
   return (
     <div className="flex min-h-screen w-full flex-col bg-background">
@@ -541,7 +596,7 @@ function DashboardPage() {
                         </div>
                         <div className="bg-black/40 backdrop-blur-3xl p-8 rounded-[2.5rem] border border-white/5 min-w-[300px] text-center">
                             <p className="text-[10px] font-black uppercase opacity-40 mb-2">Points Fidélité Cumulés</p>
-                            <p className="text-6xl font-black text-primary italic">{customerPoints}</p>
+                            <p className="text-6xl font-black text-primary italic">{myCustomerPoints}</p>
                             <p className="text-[9px] font-bold uppercase mt-4 text-muted-foreground">Grade Actuel: {user?.loyaltyLevel || 'Bronze'}</p>
                         </div>
                     </div>
@@ -589,7 +644,7 @@ function DashboardPage() {
                           </ResponsiveContainer>
                         ) : (
                           <div className="divide-y divide-white/5">
-                            {orders && orders.length > 0 ? orders.map((order) => (
+                            {allOrders?.filter(o => o.userId === user?.uid).slice(0, 5).map((order) => (
                                 <div key={order.id} className="p-5 flex items-center justify-between hover:bg-white/[0.02] transition-colors rounded-2xl group">
                                     <div className="flex items-center gap-4">
                                         <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-muted-foreground group-hover:text-accent transition-colors"><ShoppingBag size={20} /></div>
@@ -603,7 +658,7 @@ function DashboardPage() {
                                         {getStatusBadge(order.status)}
                                     </div>
                                 </div>
-                            )) : (
+                            )) || (
                               <div className="h-full flex flex-col items-center justify-center opacity-30 italic"><ShoppingBag size={48} className="mb-4" /><p>Aucune commande enregistrée.</p></div>
                             )}
                           </div>
@@ -611,55 +666,88 @@ function DashboardPage() {
                     </CardContent>
                 </Card>
 
-                {isStaff && (
+                {/* DOUBLE LEADERBOARD : STAFF & CUSTOMERS */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* STAFF LEADERBOARD */}
                   <Card className="glossy-card border-none rounded-[2.5rem] overflow-hidden">
                     <CardHeader className="py-6 px-8 border-b border-white/5 bg-accent/5">
-                      <CardTitle className="text-lg font-bold uppercase italic flex items-center gap-3">
-                        <Trophy className="text-accent" size={20} /> Classement Élite (Prestige Global)
+                      <CardTitle className="text-sm font-black uppercase italic flex items-center gap-3">
+                        <Trophy className="text-accent" size={16} /> Équipe Hub
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="p-0">
                        <div className="divide-y divide-white/5">
                           {leaderboard.map((member, index) => (
-                            <div key={member.id} className="p-5 flex items-center justify-between hover:bg-white/5 transition-all group">
-                                <div className="flex items-center gap-5">
-                                    <div className="relative">
-                                      <div className={cn(
-                                        "w-12 h-12 rounded-2xl flex items-center justify-center font-black text-lg italic transition-transform group-hover:scale-110",
-                                        index === 0 ? "bg-yellow-500/20 text-yellow-500 shadow-[0_0_15px_rgba(234,179,8,0.3)]" : 
-                                        index === 1 ? "bg-slate-300/20 text-slate-300" :
-                                        index === 2 ? "bg-orange-600/20 text-orange-600" : "bg-white/5 text-muted-foreground"
-                                      )}>
-                                        {index === 0 ? <Crown size={20} /> : index + 1}
-                                      </div>
-                                      {index < 3 && (
-                                        <div className="absolute -top-2 -right-2">
-                                           <Medal size={16} className={cn(index === 0 ? "text-yellow-500" : index === 1 ? "text-slate-300" : "text-orange-600")} />
-                                        </div>
-                                      )}
+                            <div key={member.id} className="p-4 flex items-center justify-between hover:bg-white/5 transition-all group">
+                                <div className="flex items-center gap-3">
+                                    <div className={cn(
+                                      "w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm italic",
+                                      index === 0 ? "bg-yellow-500/20 text-yellow-500" : "bg-white/5 text-muted-foreground"
+                                    )}>
+                                      {index === 0 ? <Crown size={16} /> : index + 1}
                                     </div>
                                     <div>
-                                        <p className="font-black text-sm uppercase italic tracking-tight">{member.name}</p>
-                                        <div className="flex items-center gap-3 mt-1">
-                                          <span className="text-[9px] font-bold text-muted-foreground uppercase flex items-center gap-1"><Zap size={10} className="text-accent"/> {member.actions} actions</span>
-                                          <span className="text-[9px] font-bold text-muted-foreground uppercase flex items-center gap-1"><Star size={10} className="text-yellow-500"/> Prestige: {member.points}</span>
-                                        </div>
+                                        <p className="font-black text-xs uppercase italic truncate max-w-[100px]">{member.name}</p>
+                                        <p className="text-[8px] font-bold text-muted-foreground uppercase">{member.points} PTS</p>
                                     </div>
                                 </div>
-                                <div className="text-right">
-                                    <Badge variant="outline" className={cn(
-                                      "border-none font-black text-xs italic",
-                                      index === 0 ? "text-yellow-500" : "text-accent/60"
-                                    )}>
-                                      {member.points} PTS
-                                    </Badge>
-                                </div>
+                                <Badge variant="outline" className="border-none font-black text-[9px] italic text-accent/60">
+                                  {member.actions} ACT.
+                                </Badge>
                             </div>
                           ))}
                        </div>
                     </CardContent>
                   </Card>
-                )}
+
+                  {/* CUSTOMER LOYALTY LEADERBOARD */}
+                  <Card className="glossy-card border-none rounded-[2.5rem] overflow-hidden">
+                    <CardHeader className="py-6 px-8 border-b border-white/5 bg-primary/5">
+                      <CardTitle className="text-sm font-black uppercase italic flex items-center gap-3">
+                        <Users className="text-primary" size={16} /> Élite Communauté
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                       <div className="divide-y divide-white/5">
+                          {customerLeaderboard.map((cust, index) => (
+                            <div key={cust.id} className="p-4 flex items-center justify-between hover:bg-white/5 transition-all group">
+                                <div className="flex items-center gap-3">
+                                    <div className={cn(
+                                      "w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm italic",
+                                      index === 0 ? "bg-primary/20 text-primary" : "bg-white/5 text-muted-foreground"
+                                    )}>
+                                      {index === 0 ? <Star size={16} /> : index + 1}
+                                    </div>
+                                    <div>
+                                        <p className="font-black text-xs uppercase italic truncate max-w-[100px]">{cust.name}</p>
+                                        <p className="text-[8px] font-bold text-muted-foreground uppercase">{cust.points} PTS • {cust.level}</p>
+                                    </div>
+                                </div>
+                                {isAdmin ? (
+                                    <Button 
+                                        variant="ghost" 
+                                        size="icon" 
+                                        className="h-8 w-8 text-primary hover:bg-primary/10 rounded-lg opacity-0 group-hover:opacity-100"
+                                        onClick={() => handleRewardCustomer(cust)}
+                                    >
+                                        <Gift size={14} />
+                                    </Button>
+                                ) : (
+                                    <Badge variant="outline" className="border-none font-black text-[9px] italic text-primary/60">
+                                      {cust.orders} CMD.
+                                    </Badge>
+                                )}
+                            </div>
+                          ))}
+                       </div>
+                    </CardContent>
+                    {isAdmin && (
+                        <div className="p-3 bg-primary/5 text-center">
+                            <p className="text-[8px] font-black uppercase text-primary/40 italic">Offrir des jetons aux clients fidèles</p>
+                        </div>
+                    )}
+                  </Card>
+                </div>
             </div>
 
             <div className="lg:col-span-3 space-y-6">
