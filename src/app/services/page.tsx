@@ -19,7 +19,9 @@ import {
     Star,
     Award,
     BookOpen,
-    Users
+    Users,
+    ShieldCheck,
+    Building2
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -38,6 +40,7 @@ import { db } from '@/lib/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { cn } from "@/lib/utils";
 
 const ACADEMY_COURSES = [
@@ -98,7 +101,7 @@ export default function ServicesCataloguePage() {
 
     const handleOpenBooking = (service: any) => {
         if (!user) { 
-            toast({ title: "Accès Membre Requis", description: "Veuillez vous connecter pour postuler à nos cursus." }); 
+            toast({ title: "Accès Membre Requis", description: "Veuillez vous connecter pour accéder à nos services." }); 
             router.push('/login'); 
             return; 
         }
@@ -155,6 +158,39 @@ export default function ServicesCataloguePage() {
                         Formations certifiantes et infrastructures réseaux de nouvelle génération à Bunia.
                     </p>
                 </div>
+            </section>
+
+            {/* SECTION AUDIT TECHNIQUE - NEW */}
+            <section className="container max-w-7xl mx-auto px-6 mb-32">
+                <Card className="bg-accent/10 border-accent/20 rounded-[4rem] p-12 relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 p-12 opacity-5 scale-150 rotate-12 group-hover:rotate-0 transition-transform duration-1000"><Building2 size={240} /></div>
+                    <div className="relative z-10 flex flex-col lg:flex-row items-center gap-12">
+                        <div className="flex-1 space-y-8">
+                            <Badge className="bg-accent text-black font-black uppercase tracking-[0.3em] px-4 py-1.5 italic">OFFRE CORPORATE</Badge>
+                            <h2 className="text-5xl md:text-7xl font-black uppercase italic tracking-tighter leading-[0.9] text-white">
+                                AUDIT TECHNIQUE <br /><span className="text-accent">INFRASTRUCTURE</span>
+                            </h2>
+                            <p className="text-lg text-muted-foreground max-w-2xl leading-relaxed font-medium">
+                                Votre entreprise fait face à des lenteurs réseaux ou des failles de sécurité ? Nos experts certifiés interviennent pour un audit complet de vos systèmes à Bunia.
+                            </p>
+                            <div className="flex flex-wrap gap-4">
+                                <div className="flex items-center gap-2 bg-white/5 px-4 py-2 rounded-xl border border-white/10 text-[10px] font-black uppercase tracking-widest text-accent">
+                                    <ShieldCheck size={14}/> Diagnostic Sécurité
+                                </div>
+                                <div className="flex items-center gap-2 bg-white/5 px-4 py-2 rounded-xl border border-white/10 text-[10px] font-black uppercase tracking-widest text-accent">
+                                    <Globe size={14}/> Optimisation Starlink
+                                </div>
+                            </div>
+                        </div>
+                        <div className="shrink-0">
+                            <Link href="/services/audit">
+                                <Button className="h-24 px-12 rounded-[2rem] bg-accent text-black font-black uppercase italic text-xl shadow-[0_0_50px_rgba(56,189,248,0.3)] hover:scale-105 active:scale-95 transition-all">
+                                    Demander un Audit <ArrowRight size={28} className="ml-3" />
+                                </Button>
+                            </Link>
+                        </div>
+                    </div>
+                </Card>
             </section>
 
             {/* SECTION ACADEMY (LES FORMATIONS) */}

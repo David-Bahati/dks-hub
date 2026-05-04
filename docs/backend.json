@@ -86,17 +86,26 @@
         "lastMaintenance": { "type": "string", "format": "date-time" }
       }
     },
-    "MaintenanceLog": {
-      "title": "MaintenanceLog",
-      "description": "Une entrée dans l'historique technique d'un appareil.",
+    "TechnicalAudit": {
+      "title": "TechnicalAudit",
+      "description": "A professional technical audit request for business infrastructure.",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
-        "type": { "type": "string", "enum": ["repair", "upgrade", "checkup", "cleaning"] },
+        "userId": { "type": "string" },
+        "businessName": { "type": "string" },
+        "contactPerson": { "type": "string" },
+        "phone": { "type": "string" },
+        "location": { "type": "string" },
+        "needs": { "type": "array" },
         "description": { "type": "string" },
-        "technicianName": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" }
-      }
+        "status": { "type": "string", "enum": ["pending", "scheduled", "completed", "cancelled"] },
+        "scheduledDate": { "type": "string", "format": "date-time" },
+        "reportUrl": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "businessName", "phone", "status", "createdAt"]
     }
   },
   "auth": {
@@ -123,9 +132,9 @@
       "schema": "HardwareAsset",
       "description": "Client hardware park."
     },
-    "/hardwareAssets/{assetId}/logs/{logId}": {
-      "schema": "MaintenanceLog",
-      "description": "Detailed history for a specific hardware device."
+    "/audits/{auditId}": {
+      "schema": "TechnicalAudit",
+      "description": "Business infrastructure audits."
     }
   }
 }

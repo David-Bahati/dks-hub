@@ -127,6 +127,22 @@ export type ServiceBooking = {
   hasReview?: boolean;
 };
 
+export type TechnicalAudit = {
+  id: string;
+  userId: string;
+  businessName: string;
+  contactPerson: string;
+  phone: string;
+  location: string;
+  needs: string[];
+  description: string;
+  status: 'pending' | 'scheduled' | 'completed' | 'cancelled';
+  scheduledDate?: any;
+  reportUrl?: string;
+  createdAt: any;
+  updatedAt: any;
+};
+
 export type AcademyReview = {
   id: string;
   bookingId: string;
