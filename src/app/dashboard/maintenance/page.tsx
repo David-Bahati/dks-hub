@@ -23,7 +23,10 @@ import {
     Camera,
     X,
     Zap,
-    Maximize
+    Maximize,
+    ArrowUpCircle,
+    ArrowDownCircle,
+    Box
 } from "lucide-react";
 import { db } from '@/lib/firebase';
 import { collection, addDoc, deleteDoc, doc, updateDoc, serverTimestamp, query, orderBy, increment } from 'firebase/firestore';
@@ -52,6 +55,7 @@ function MaintenanceInventoryPage() {
     const [search, setSearch] = useState("");
     const [isSheetOpen, setIsSheetOpen] = useState(false);
     const [isScannerOpen, setIsScannerOpen] = useState(false);
+    const [scannerMode, setScannerMode] = useState<'usage' | 'restock'>('usage');
     const [editingItem, setEditingItem] = useState<any>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [hasCameraPermission, setHasCameraPermission] = useState(false);
@@ -142,7 +146,9 @@ function MaintenanceInventoryPage() {
             });
 
             if (delta < 0) {
-                toast({ title: "Consommation enregistrée", description: `-1 ${item.unit} de ${item.name}` });
+                toast({ title: "Sortie de stock", description: `-1 ${item.unit} de ${item.name}` });
+            } else {
+                toast({ title: "Arrivage enregistré", description: `+1 ${item.unit} de ${item.name}`, variant: "default" });
             }
         } catch (error) {
             toast({ title: "Erreur", variant: "destructive" });
@@ -150,8 +156,9 @@ function MaintenanceInventoryPage() {
     };
 
     const handleMockScan = (item: any) => {
-        updateQuantity(item, -1);
-        setIsScannerOpen(false);
+        const delta = scannerMode === 'usage' ? -1 : 1;
+        updateQuantity(item, delta);
+        // On reste ouvert pour le multi-scan
     };
 
     const handleDelete = async (id: string) => {
@@ -186,19 +193,22 @@ function MaintenanceInventoryPage() {
                     
                     <div className="flex flex-wrap gap-3">
                         <Button 
-                            onClick={() => setIsScannerOpen(true)} 
+                            onClick={() => { setScannerMode('usage'); setIsScannerOpen(true); }} 
                             className="bg-accent text-black hover:bg-accent/90 h-14 px-8 rounded-2xl font-black uppercase italic gap-3 shadow-xl shadow-accent/20"
                         >
                             <Scan size={20} /> Scanner Ressource
+                        </Button>
+                        <Button 
+                            onClick={() => { setScannerMode('restock'); setIsScannerOpen(true); }} 
+                            className="bg-primary text-white hover:bg-primary/90 h-14 px-8 rounded-2xl font-black uppercase italic gap-3 shadow-xl shadow-primary/20"
+                        >
+                            <Box size={20} /> Réception Livraison
                         </Button>
                         <Link href="/dashboard/maintenance/stats">
                             <Button variant="outline" className="h-14 px-6 rounded-2xl border-white/10 font-black uppercase italic gap-3 hover:bg-white/5 transition-all">
                                 <BarChart3 size={20} /> Statistiques
                             </Button>
                         </Link>
-                        <Button onClick={() => { setEditingItem(null); setIsSheetOpen(true); }} className="bg-primary hover:bg-primary/90 h-14 px-8 rounded-2xl font-black uppercase italic gap-3 shadow-xl">
-                            <Plus size={20} /> Nouvel Article
-                        </Button>
                     </div>
                 </div>
 
@@ -290,66 +300,141 @@ function MaintenanceInventoryPage() {
                         </Button>
                     </div>
 
-                    <div className="w-full max-w-2xl space-y-8">
-                        <div className="text-center space-y-2">
-                            <Badge className="bg-accent text-black font-black uppercase italic px-4 py-1">Mode Scan Actif</Badge>
-                            <h2 className="text-3xl font-black uppercase italic tracking-tighter">Lecteur <span className="text-accent">Optique Hub</span></h2>
-                        </div>
-
-                        <div className="relative aspect-video rounded-[3rem] overflow-hidden border-4 border-accent/20 shadow-[0_0_50px_rgba(56,189,248,0.1)]">
-                            <video ref={videoRef} className="w-full h-full object-cover" autoPlay muted playsInline />
-                            
-                            {/* Scanner Overlays */}
-                            <div className="absolute inset-0 flex items-center justify-center">
-                                <div className="w-64 h-64 border-2 border-accent rounded-3xl relative">
-                                    <div className="absolute inset-0 bg-accent/5 animate-pulse" />
-                                    <div className="absolute top-1/2 left-0 w-full h-0.5 bg-accent shadow-[0_0_15px_rgba(56,189,248,0.8)] animate-[scan_2s_ease-in-out_infinite]" />
-                                    
-                                    {/* Corners */}
-                                    <div className="absolute -top-1 -left-1 w-8 h-8 border-t-4 border-l-4 border-accent rounded-tl-xl" />
-                                    <div className="absolute -top-1 -right-1 w-8 h-8 border-t-4 border-r-4 border-accent rounded-tr-xl" />
-                                    <div className="absolute -bottom-1 -left-1 w-8 h-8 border-b-4 border-l-4 border-accent rounded-bl-xl" />
-                                    <div className="absolute -bottom-1 -right-1 w-8 h-8 border-b-4 border-r-4 border-accent rounded-br-xl" />
+                    <div className="w-full max-w-4xl space-y-8">
+                        <div className="flex flex-col md:flex-row justify-between items-center gap-6">
+                            <div className="text-center md:text-left space-y-2">
+                                <div className="flex items-center gap-4 justify-center md:justify-start">
+                                    <Badge className={cn(
+                                        "font-black uppercase italic px-4 py-1",
+                                        scannerMode === 'usage' ? "bg-orange-500 text-white" : "bg-green-500 text-white"
+                                    )}>
+                                        {scannerMode === 'usage' ? "MODE CONSOMMATION" : "MODE RÉCEPTION LIVRAISON"}
+                                    </Badge>
+                                    <Badge variant="outline" className="border-white/20 text-white/40 uppercase font-black text-[9px] tracking-widest">Multi-Scan Actif</Badge>
                                 </div>
+                                <h2 className="text-3xl font-black uppercase italic tracking-tighter">
+                                    Lecteur <span className="text-accent">Optique Hub</span>
+                                </h2>
                             </div>
 
-                            {!hasCameraPermission && (
-                                <div className="absolute inset-0 bg-background/80 flex flex-col items-center justify-center p-10 text-center">
-                                    <Camera size={48} className="text-muted-foreground mb-4 opacity-20" />
-                                    <Alert variant="destructive" className="bg-red-500/10 border-red-500/20 text-red-500 max-w-sm rounded-2xl">
-                                        <AlertTitle className="font-black uppercase italic text-xs">Accès Caméra Requis</AlertTitle>
-                                        <AlertDescription className="text-[10px] font-bold uppercase opacity-80">
-                                            Autorisez l'accès à la caméra pour scanner vos ressources de laboratoire.
-                                        </AlertDescription>
-                                    </Alert>
-                                </div>
-                            )}
+                            <div className="flex bg-white/5 p-1.5 rounded-2xl border border-white/5">
+                                <button 
+                                    onClick={() => setScannerMode('usage')}
+                                    className={cn(
+                                        "px-6 h-12 rounded-xl font-black uppercase italic text-[10px] flex items-center gap-2 transition-all",
+                                        scannerMode === 'usage' ? "bg-orange-500 text-white shadow-lg" : "text-white/40 hover:text-white"
+                                    )}
+                                >
+                                    <ArrowDownCircle size={14} /> Sortie Stock
+                                </button>
+                                <button 
+                                    onClick={() => setScannerMode('restock')}
+                                    className={cn(
+                                        "px-6 h-12 rounded-xl font-black uppercase italic text-[10px] flex items-center gap-2 transition-all",
+                                        scannerMode === 'restock' ? "bg-green-500 text-white shadow-lg" : "text-white/40 hover:text-white"
+                                    )}
+                                >
+                                    <ArrowUpCircle size={14} /> Entrée Livraison
+                                </button>
+                            </div>
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div className="p-6 bg-white/5 rounded-3xl border border-white/5 space-y-4">
-                                <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest text-center">Ressources en attente de détection</p>
-                                <div className="max-h-[200px] overflow-y-auto space-y-2 custom-scrollbar pr-2">
-                                    {items?.slice(0, 4).map(item => (
-                                        <Button 
-                                            key={item.id} 
-                                            variant="ghost" 
-                                            className="w-full justify-between h-12 bg-white/[0.02] hover:bg-accent/10 hover:text-accent rounded-xl px-4 border border-white/5"
-                                            onClick={() => handleMockScan(item)}
-                                        >
-                                            <span className="text-[10px] font-black uppercase italic">{item.name}</span>
-                                            <span className="text-[9px] font-mono opacity-40">SORTIE DIRECTE</span>
-                                        </Button>
-                                    ))}
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                            <div className="lg:col-span-7 relative aspect-video rounded-[3rem] overflow-hidden border-4 border-white/5 shadow-[0_0_50px_rgba(255,255,255,0.05)]">
+                                <video ref={videoRef} className="w-full h-full object-cover" autoPlay muted playsInline />
+                                
+                                {/* Scanner Overlays */}
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                    <div className={cn(
+                                        "w-64 h-64 border-2 rounded-3xl relative transition-colors duration-500",
+                                        scannerMode === 'usage' ? "border-orange-500" : "border-green-500"
+                                    )}>
+                                        <div className={cn(
+                                            "absolute inset-0 animate-pulse",
+                                            scannerMode === 'usage' ? "bg-orange-500/5" : "bg-green-500/5"
+                                        )} />
+                                        <div className={cn(
+                                            "absolute top-1/2 left-0 w-full h-0.5 shadow-[0_0_15px_rgba(255,255,255,0.8)] animate-[scan_2s_ease-in-out_infinite]",
+                                            scannerMode === 'usage' ? "bg-orange-500" : "bg-green-500"
+                                        )} />
+                                        
+                                        {/* Corners */}
+                                        <div className={cn("absolute -top-1 -left-1 w-8 h-8 border-t-4 border-l-4 rounded-tl-xl", scannerMode === 'usage' ? "border-orange-500" : "border-green-500")} />
+                                        <div className={cn("absolute -top-1 -right-1 w-8 h-8 border-t-4 border-r-4 rounded-tr-xl", scannerMode === 'usage' ? "border-orange-500" : "border-green-500")} />
+                                        <div className={cn("absolute -bottom-1 -left-1 w-8 h-8 border-b-4 border-l-4 rounded-bl-xl", scannerMode === 'usage' ? "border-orange-500" : "border-green-500")} />
+                                        <div className={cn("absolute -bottom-1 -right-1 w-8 h-8 border-b-4 border-r-4 rounded-br-xl", scannerMode === 'usage' ? "border-orange-500" : "border-green-500")} />
+                                    </div>
                                 </div>
+
+                                {!hasCameraPermission && (
+                                    <div className="absolute inset-0 bg-background/80 flex flex-col items-center justify-center p-10 text-center">
+                                        <Camera size={48} className="text-muted-foreground mb-4 opacity-20" />
+                                        <Alert variant="destructive" className="bg-red-500/10 border-red-500/20 text-red-500 max-w-sm rounded-2xl">
+                                            <AlertTitle className="font-black uppercase italic text-xs">Accès Caméra Requis</AlertTitle>
+                                            <AlertDescription className="text-[10px] font-bold uppercase opacity-80">
+                                                Autorisez l'accès à la caméra pour scanner vos ressources de laboratoire.
+                                            </AlertDescription>
+                                        </Alert>
+                                    </div>
+                                )}
                             </div>
-                            <div className="p-8 bg-accent/10 rounded-[2.5rem] border border-accent/20 flex flex-col items-center justify-center text-center space-y-4">
-                                <div className="w-16 h-16 rounded-2xl bg-accent/20 flex items-center justify-center text-accent">
-                                    <Maximize size={32} />
+
+                            <div className="lg:col-span-5 space-y-6">
+                                <div className="p-8 bg-white/5 rounded-[2.5rem] border border-white/5 space-y-6">
+                                    <div className="space-y-1">
+                                        <p className="text-[10px] font-black uppercase text-muted-foreground tracking-[0.2em] flex items-center gap-2">
+                                            <Plus size={12} className="text-accent" /> Sélection Directe (Simulée)
+                                        </p>
+                                        <p className="text-[9px] text-white/30 italic uppercase">Cliquez pour simuler la détection d'un code-barres</p>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 gap-2 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
+                                        {items?.map(item => (
+                                            <Button 
+                                                key={item.id} 
+                                                variant="ghost" 
+                                                className={cn(
+                                                    "w-full justify-between h-14 bg-white/[0.02] hover:bg-white/[0.05] rounded-2xl px-5 border border-white/5 transition-all group",
+                                                    scannerMode === 'usage' ? "hover:border-orange-500/30" : "hover:border-green-500/30"
+                                                )}
+                                                onClick={() => handleMockScan(item)}
+                                            >
+                                                <div className="text-left">
+                                                    <p className="text-[10px] font-black uppercase italic group-hover:text-white transition-colors">{item.name}</p>
+                                                    <p className="text-[8px] font-mono opacity-40 uppercase">Stock: {item.quantity} {item.unit}</p>
+                                                </div>
+                                                <div className={cn(
+                                                    "w-8 h-8 rounded-lg flex items-center justify-center",
+                                                    scannerMode === 'usage' ? "bg-orange-500/10 text-orange-500" : "bg-green-500/10 text-green-500"
+                                                )}>
+                                                    {scannerMode === 'usage' ? <Minus size={14}/> : <Plus size={14}/>}
+                                                </div>
+                                            </Button>
+                                        ))}
+                                    </div>
                                 </div>
-                                <p className="text-xs font-medium text-white/80 leading-relaxed italic">
-                                    Placez le code-barres de la ressource dans le cadre pour une identification automatique.
-                                </p>
+
+                                <div className={cn(
+                                    "p-8 rounded-[2.5rem] border transition-all duration-500 flex flex-col items-center justify-center text-center space-y-4 shadow-xl",
+                                    scannerMode === 'usage' ? "bg-orange-500/5 border-orange-500/20" : "bg-green-500/5 border-green-500/20"
+                                )}>
+                                    <div className={cn(
+                                        "w-16 h-16 rounded-2xl flex items-center justify-center",
+                                        scannerMode === 'usage' ? "bg-orange-500/20 text-orange-500" : "bg-green-500/20 text-green-500"
+                                    )}>
+                                        {scannerMode === 'usage' ? <ArrowDownCircle size={32} /> : <Box size={32} />}
+                                    </div>
+                                    <div className="space-y-1">
+                                        <p className="text-xs font-bold text-white/90 uppercase tracking-widest italic">
+                                            {scannerMode === 'usage' ? "DÉBIT DE STOCK IMMÉDIAT" : "CRÉDIT DE RÉCEPTION"}
+                                        </p>
+                                        <p className="text-[9px] text-muted-foreground uppercase leading-relaxed max-w-[200px] mx-auto font-black opacity-60">
+                                            {scannerMode === 'usage' 
+                                                ? "Le scan déduit automatiquement une unité pour vos interventions." 
+                                                : "Le scan ajoute une unité pour enregistrer vos nouvelles livraisons."}
+                                        </p>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
