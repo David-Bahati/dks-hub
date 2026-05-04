@@ -70,6 +70,21 @@ export type Quote = {
     updatedAt: any;
 };
 
+export type Subscription = {
+  id: string;
+  userId: string;
+  customerName: string;
+  serviceTitle: string;
+  planType: 'monthly' | 'quarterly' | 'yearly';
+  amount: number;
+  status: 'active' | 'past_due' | 'cancelled' | 'pending';
+  nextBillingDate: any;
+  startDate: any;
+  notes?: string;
+  createdAt: any;
+  updatedAt: any;
+};
+
 export type SupportTicket = {
   id: string;
   userId: string;
