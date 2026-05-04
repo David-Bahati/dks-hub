@@ -146,6 +146,8 @@ export type SupportTicket = {
   imageUrl?: string;
   subscriptionId?: string; // Lien optionnel vers un contrat
   subscriptionTitle?: string;
+  technicianId?: string; // Track who handled it
+  technicianName?: string;
   createdAt: any;
   updatedAt: any;
 };
