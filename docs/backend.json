@@ -107,6 +107,22 @@
       },
       "required": ["userId", "businessName", "phone", "status", "createdAt"]
     },
+    "Consumable": {
+      "title": "Consumable",
+      "description": "Lab maintenance resources like thermal paste, solder, etc.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "category": { "type": "string" },
+        "quantity": { "type": "number" },
+        "unit": { "type": "string" },
+        "minThreshold": { "type": "number" },
+        "unitCost": { "type": "number", "description": "Unit cost for stock valuation" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "quantity", "unit", "minThreshold"]
+    },
     "ConsumptionLog": {
       "title": "ConsumptionLog",
       "description": "Journalise l'utilisation ou le réapprovisionnement des consommables labo.",
@@ -149,6 +165,10 @@
     "/audits/{auditId}": {
       "schema": "TechnicalAudit",
       "description": "Business infrastructure audits."
+    },
+    "/consumables/{consumableId}": {
+      "schema": "Consumable",
+      "description": "Lab consumables."
     },
     "/consumptionLogs/{logId}": {
       "schema": "ConsumptionLog",

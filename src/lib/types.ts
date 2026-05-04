@@ -37,6 +37,7 @@ export type Consumable = {
   quantity: number;
   unit: string;
   minThreshold: number;
+  unitCost: number; // For stock valuation
   updatedAt: any;
 };
 

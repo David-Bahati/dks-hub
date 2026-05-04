@@ -16,7 +16,8 @@ import {
     Printer,
     QrCode,
     Zap,
-    FlaskConical
+    FlaskConical,
+    DollarSign
 } from "lucide-react";
 import { db } from '@/lib/firebase';
 import { collection, query, orderBy } from 'firebase/firestore';
@@ -43,8 +44,19 @@ function ProcurementPage() {
 
     const procurementList = useMemo(() => {
         if (!items) return [];
-        return items.filter(item => item.quantity <= item.minThreshold);
+        return items.filter(item => item.quantity <= item.minThreshold).map(item => {
+            const qtyToOrder = Math.ceil(item.minThreshold * 3);
+            return {
+                ...item,
+                qtyToOrder,
+                estimatedCost: qtyToOrder * (item.unitCost || 0)
+            };
+        });
     }, [items]);
+
+    const totalEstimatedBudget = useMemo(() => {
+        return procurementList.reduce((acc, item) => acc + item.estimatedCost, 0);
+    }, [procurementList]);
 
     const handleDownloadOrder = async () => {
         if (!reportRef.current || procurementList.length === 0) return;
@@ -76,18 +88,24 @@ function ProcurementPage() {
                         </Link>
                         <div>
                             <h1 className="text-4xl font-black uppercase italic tracking-tighter">Besoins <span className="text-accent">Réappro</span></h1>
-                            <p className="text-muted-foreground text-xs uppercase font-black opacity-40 mt-1">Génération automatique de bons de commande fournisseurs</p>
+                            <p className="text-muted-foreground text-xs uppercase font-black opacity-40 mt-1">Génération de bons de commande & estimation budgétaire</p>
                         </div>
                     </div>
                     
                     {procurementList.length > 0 && (
-                        <Button 
-                            onClick={handleDownloadOrder} 
-                            disabled={isGenerating}
-                            className="bg-primary text-white hover:bg-primary/90 h-14 px-8 rounded-2xl font-black uppercase italic gap-3 shadow-xl shadow-primary/10"
-                        >
-                            {isGenerating ? <Loader2 className="animate-spin" /> : <><FileDown size={20} /> Exporter Bon de Commande</>}
-                        </Button>
+                        <div className="flex gap-4">
+                            <Card className="bg-accent/10 border-accent/20 px-6 py-2 rounded-2xl flex flex-col justify-center">
+                                <p className="text-[8px] font-black uppercase opacity-60">Budget Estimé</p>
+                                <p className="text-2xl font-black text-accent">${totalEstimatedBudget.toLocaleString()}</p>
+                            </Card>
+                            <Button 
+                                onClick={handleDownloadOrder} 
+                                disabled={isGenerating}
+                                className="bg-primary text-white hover:bg-primary/90 h-14 px-8 rounded-2xl font-black uppercase italic gap-3 shadow-xl shadow-primary/10"
+                            >
+                                {isGenerating ? <Loader2 className="animate-spin" /> : <><FileDown size={20} /> Exporter Bon PDF</>}
+                            </Button>
+                        </div>
                     )}
                 </div>
 
@@ -105,18 +123,24 @@ function ProcurementPage() {
                                     <div className="flex-1 space-y-2 text-center md:text-left">
                                         <div className="flex items-center justify-center md:justify-start gap-3">
                                             <h3 className="text-2xl font-black uppercase italic tracking-tight">{item.name}</h3>
-                                            <Badge variant="outline" className="bg-red-500/10 text-red-400 border-none uppercase text-[8px] font-black px-2">Stock Critique</Badge>
+                                            <Badge variant="outline" className="bg-red-500/10 text-red-400 border-none uppercase text-[8px] font-black px-2">Critique</Badge>
                                         </div>
                                         <div className="flex flex-wrap items-center justify-center md:justify-start gap-6 text-[10px] font-black uppercase italic text-muted-foreground/60 tracking-widest">
-                                            <span className="flex items-center gap-2"><Zap size={12} className="text-accent" /> Famille: {item.category}</span>
-                                            <span className="flex items-center gap-2"><PackagePlus size={12} /> Stock Actuel: {item.quantity} {item.unit}</span>
-                                            <span className="flex items-center gap-2 text-red-400"><AlertTriangle size={12} /> Seuil: {item.minThreshold} {item.unit}</span>
+                                            <span className="flex items-center gap-2"><Zap size={12} className="text-accent" /> {item.category}</span>
+                                            <span className="flex items-center gap-2"><DollarSign size={12} /> Coût Unitaire: ${item.unitCost}</span>
+                                            <span className="flex items-center gap-2"> Stock: {item.quantity} {item.unit}</span>
                                         </div>
                                     </div>
 
-                                    <div className="text-center md:text-right shrink-0 bg-black/20 p-6 rounded-3xl border border-white/5">
-                                        <p className="text-[9px] font-black uppercase text-muted-foreground mb-1 tracking-widest">Réappro suggéré</p>
-                                        <p className="text-3xl font-black text-white italic">+{Math.ceil(item.minThreshold * 3)} <span className="text-sm font-light opacity-40 not-italic">{item.unit}</span></p>
+                                    <div className="flex items-center gap-8 shrink-0">
+                                        <div className="text-center md:text-right bg-black/20 p-6 rounded-3xl border border-white/5 min-w-[150px]">
+                                            <p className="text-[9px] font-black uppercase text-muted-foreground mb-1 tracking-widest">Réappro suggéré</p>
+                                            <p className="text-3xl font-black text-white italic">+{item.qtyToOrder} <span className="text-sm font-light opacity-40 not-italic">{item.unit}</span></p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-[9px] font-black uppercase text-accent mb-1 tracking-widest">Coût Estimé</p>
+                                            <p className="text-2xl font-black text-white">${item.estimatedCost.toLocaleString()}</p>
+                                        </div>
                                     </div>
                                 </CardContent>
                             </Card>
@@ -156,15 +180,15 @@ function ProcurementPage() {
                         </header>
 
                         <div className="p-8 bg-gray-50 rounded-2xl mb-12 border border-gray-100">
-                            <h3 className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-4">Résumé Logistique</h3>
+                            <h3 className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-4">Résumé Logistique & Financier</h3>
                             <div className="grid grid-cols-3 gap-10">
                                 <div>
                                     <p className="text-[8px] font-bold text-gray-400 uppercase">Articles à réappro.</p>
                                     <p className="text-2xl font-black">{procurementList.length}</p>
                                 </div>
                                 <div>
-                                    <p className="text-[8px] font-bold text-gray-400 uppercase">Priorité</p>
-                                    <p className="text-2xl font-black text-red-600 italic uppercase">URGENT</p>
+                                    <p className="text-[8px] font-bold text-gray-400 uppercase">Budget Estimé</p>
+                                    <p className="text-2xl font-black text-blue-600">${totalEstimatedBudget.toLocaleString()}</p>
                                 </div>
                                 <div>
                                     <p className="text-[8px] font-bold text-gray-400 uppercase">Destination</p>
@@ -176,10 +200,10 @@ function ProcurementPage() {
                         <table className="w-full mb-12">
                             <thead>
                                 <tr className="bg-black text-white text-[10px] font-black uppercase tracking-widest">
-                                    <th className="text-left p-4">Désignation Consommable</th>
-                                    <th className="text-center p-4">Stock Actuel</th>
-                                    <th className="text-center p-4">Seuil Sécu.</th>
-                                    <th className="text-right p-4">Qté à Commander</th>
+                                    <th className="text-left p-4">Désignation</th>
+                                    <th className="text-center p-4">Qté</th>
+                                    <th className="text-right p-4">Coût Unit.</th>
+                                    <th className="text-right p-4">Total Ligne</th>
                                 </tr>
                             </thead>
                             <tbody className="text-sm">
@@ -189,9 +213,9 @@ function ProcurementPage() {
                                             <p className="font-bold uppercase italic">{item.name}</p>
                                             <p className="text-[9px] text-gray-400 uppercase mt-1">Catégorie: {item.category}</p>
                                         </td>
-                                        <td className="p-4 text-center text-red-600 font-bold">{item.quantity} {item.unit}</td>
-                                        <td className="p-4 text-center font-medium text-gray-400">{item.minThreshold} {item.unit}</td>
-                                        <td className="p-4 text-right font-black text-xl italic">{Math.ceil(item.minThreshold * 3)} {item.unit}</td>
+                                        <td className="p-4 text-center font-bold">{item.qtyToOrder} {item.unit}</td>
+                                        <td className="p-4 text-right font-medium text-gray-400">${item.unitCost?.toFixed(2)}</td>
+                                        <td className="p-4 text-right font-black text-lg italic">${item.estimatedCost.toFixed(2)}</td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -202,7 +226,7 @@ function ProcurementPage() {
                                 <Zap size={16} className="text-black" /> Note Logistique
                             </h3>
                             <p className="text-[11px] leading-relaxed text-gray-600 font-medium italic">
-                                "Ce document est généré par le système intelligent DKS Hub. Les quantités suggérées correspondent à 3 fois le seuil critique pour garantir une autonomie de 90 jours au laboratoire de Bunia."
+                                "Ce document est généré par le système intelligent DKS Hub. Les quantités suggérées correspondent à 3 fois le seuil critique pour garantir une autonomie de 90 jours au laboratoire de Bunia. Les prix sont basés sur les derniers coûts unitaires enregistrés."
                             </p>
                         </section>
 
@@ -215,7 +239,7 @@ function ProcurementPage() {
                                 </p>
                             </div>
                             <div className="text-right space-y-4">
-                                <div className="h-16 w-32 border-2 border-gray-100 rounded-lg flex items-center justify-center italic text-gray-300 text-[8px] uppercase font-black">Visa Logistique</div>
+                                <div className="h-16 w-32 border-2 border-gray-100 rounded-lg flex items-center justify-center italic text-gray-300 text-[8px] uppercase font-black">Visa Direction</div>
                                 <p className="text-[8px] font-bold text-gray-300 uppercase tracking-widest">Solutions Lab Hub v3.0</p>
                             </div>
                         </footer>

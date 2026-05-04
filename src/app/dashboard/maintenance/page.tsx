@@ -31,7 +31,8 @@ import {
     Printer,
     Download,
     QrCode,
-    ShoppingCart
+    ShoppingCart,
+    DollarSign
 } from "lucide-react";
 import { db } from '@/lib/firebase';
 import { collection, addDoc, deleteDoc, doc, updateDoc, serverTimestamp, query, orderBy, increment } from 'firebase/firestore';
@@ -129,6 +130,7 @@ function MaintenanceInventoryPage() {
             quantity: parseFloat(formData.get('quantity') as string),
             unit: formData.get('unit'),
             minThreshold: parseFloat(formData.get('minThreshold') as string),
+            unitCost: parseFloat(formData.get('unitCost') as string || "0"),
             updatedAt: serverTimestamp()
         };
 
@@ -298,14 +300,16 @@ function MaintenanceInventoryPage() {
                                                 <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">{item.category}</p>
                                             </div>
                                         </div>
-                                        <Button 
-                                            variant="ghost" 
-                                            size="icon" 
-                                            className="h-10 w-10 rounded-xl hover:bg-accent/10 hover:text-accent opacity-0 group-hover:opacity-100 transition-all"
-                                            onClick={() => { setSelectedItemForLabel(item); setIsLabelDialogOpen(true); }}
-                                        >
-                                            <Barcode size={20} />
-                                        </Button>
+                                        <div className="flex gap-2">
+                                            <Button 
+                                                variant="ghost" 
+                                                size="icon" 
+                                                className="h-10 w-10 rounded-xl hover:bg-accent/10 hover:text-accent opacity-0 group-hover:opacity-100 transition-all"
+                                                onClick={() => { setSelectedItemForLabel(item); setIsLabelDialogOpen(true); }}
+                                            >
+                                                <Barcode size={20} />
+                                            </Button>
+                                        </div>
                                     </div>
                                 </CardHeader>
 
@@ -316,6 +320,7 @@ function MaintenanceInventoryPage() {
                                             <p className={cn("text-4xl font-black italic", item.quantity <= item.minThreshold ? "text-red-500" : "text-accent")}>
                                                 {item.quantity} <span className="text-lg font-light opacity-60 not-italic">{item.unit}</span>
                                             </p>
+                                            <p className="text-[9px] font-bold text-muted-foreground/60 uppercase tracking-widest">Valeur: ${(item.unitCost * item.quantity).toFixed(2)}</p>
                                         </div>
                                         <div className="flex flex-col gap-2">
                                             <button onClick={() => updateQuantity(item, 1)} className="w-10 h-10 rounded-xl bg-white/5 hover:bg-accent hover:text-black flex items-center justify-center transition-all"><Plus size={16}/></button>
@@ -573,8 +578,11 @@ function MaintenanceInventoryPage() {
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
-                                    <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Quantité Initiale</Label>
-                                    <Input name="quantity" type="number" step="0.1" defaultValue={editingItem?.quantity} required className="h-12 bg-background/50 border-white/5 rounded-xl text-accent font-black" />
+                                    <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Coût Unitaire ($)</Label>
+                                    <div className="relative">
+                                        <DollarSign size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-accent" />
+                                        <Input name="unitCost" type="number" step="0.01" defaultValue={editingItem?.unitCost} required className="h-12 pl-10 bg-background/50 border-white/5 rounded-xl text-accent font-black" />
+                                    </div>
                                 </div>
                                 <div className="space-y-2">
                                     <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Unité (ml, g, u...)</Label>
@@ -582,9 +590,15 @@ function MaintenanceInventoryPage() {
                                 </div>
                             </div>
 
-                            <div className="space-y-2">
-                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Seuil de Réapprovisionnement</Label>
-                                <Input name="minThreshold" type="number" step="0.1" defaultValue={editingItem?.minThreshold || 5} required className="h-12 bg-background/50 border-white/5 rounded-xl font-black text-red-400" />
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Quantité Initiale</Label>
+                                    <Input name="quantity" type="number" step="0.1" defaultValue={editingItem?.quantity} required className="h-12 bg-background/50 border-white/5 rounded-xl text-white font-black" />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Seuil Alerte</Label>
+                                    <Input name="minThreshold" type="number" step="0.1" defaultValue={editingItem?.minThreshold || 5} required className="h-12 bg-background/50 border-white/5 rounded-xl font-black text-red-400" />
+                                </div>
                             </div>
                         </div>
 
