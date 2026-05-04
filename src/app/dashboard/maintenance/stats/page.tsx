@@ -16,7 +16,9 @@ import {
     Activity,
     AlertCircle,
     DollarSign,
-    PieChart as PieChartIcon
+    PieChart as PieChartIcon,
+    Trash2,
+    ArrowRight
 } from "lucide-react";
 import { db } from '@/lib/firebase';
 import { collection, query, orderBy, limit } from 'firebase/firestore';
@@ -88,16 +90,24 @@ function MaintenanceStatsPage() {
         <div className="min-h-screen bg-background text-foreground pb-20">
             <Navbar />
             <main className="max-w-7xl mx-auto px-4 py-12">
-                <div className="flex items-start gap-5 mb-12">
-                    <Link href="/dashboard/maintenance">
-                        <Button variant="outline" className="h-14 w-14 rounded-2xl border-white/10 hover:bg-accent/10 hover:text-accent p-0">
-                            <ArrowLeft size={24} />
+                <div className="flex flex-col md:flex-row justify-between items-start gap-8 mb-12">
+                    <div className="flex items-start gap-5">
+                        <Link href="/dashboard/maintenance">
+                            <Button variant="outline" className="h-14 w-14 rounded-2xl border-white/10 hover:bg-accent/10 hover:text-accent p-0">
+                                <ArrowLeft size={24} />
+                            </Button>
+                        </Link>
+                        <div>
+                            <h1 className="text-4xl font-black uppercase italic tracking-tighter">Analytique <span className="text-accent">Consommables</span></h1>
+                            <p className="text-muted-foreground text-xs uppercase font-black opacity-40 mt-1">Intelligence de consommation & valorisation financière</p>
+                        </div>
+                    </div>
+                    
+                    <Link href="/dashboard/maintenance/waste">
+                        <Button className="h-14 px-8 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500 hover:text-white font-black uppercase italic gap-3 transition-all">
+                            <Trash2 size={20} /> Analyse du Gaspillage <ArrowRight size={16} />
                         </Button>
                     </Link>
-                    <div>
-                        <h1 className="text-4xl font-black uppercase italic tracking-tighter">Analytique <span className="text-accent">Consommables</span></h1>
-                        <p className="text-muted-foreground text-xs uppercase font-black opacity-40 mt-1">Intelligence de consommation & valorisation financière</p>
-                    </div>
                 </div>
 
                 {loadingLogs || loadingInventory ? (

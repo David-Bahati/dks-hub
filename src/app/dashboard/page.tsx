@@ -43,7 +43,8 @@ import {
   FileText,
   CreditCard,
   FlaskConical,
-  PackagePlus
+  PackagePlus,
+  Trash2
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -96,6 +97,7 @@ const navConfig = [
   { href: "/dashboard/maintenance", icon: FlaskConical, label: "Stocks Labo", roles: ["Admin", "Seller"] },
   { href: "/dashboard/maintenance/procurement", icon: PackagePlus, label: "Besoin Réappro", roles: ["Admin", "Seller"] },
   { href: "/dashboard/maintenance/stats", icon: BarChart3, label: "Analytique Labo", roles: ["Admin", "Seller"] },
+  { href: "/dashboard/maintenance/waste", icon: Trash2, label: "Contrôle Gaspillage", roles: ["Admin", "Seller"] },
   { href: "/dashboard/quotes", icon: FileText, label: "Devis Pro", roles: ["Admin", "Seller", "customer"] },
   { href: "/dashboard/subscriptions", icon: CreditCard, label: "Contrats Services", roles: ["Admin", "Seller", "Cashier", "customer"] },
   { href: "/dashboard/orders", icon: ShoppingBag, label: "Commandes / Factures", roles: ["Admin", "Seller", "Cashier", "customer"] },
@@ -237,14 +239,14 @@ function DashboardPage() {
   }
 
   const SidebarContent = () => (
-    <nav className="grid gap-1 p-6">
+    <nav className="grid gap-1 p-6 overflow-y-auto custom-scrollbar h-full">
       <div className="mb-8 px-4"><Logo size="sm" showText /></div>
       {filteredNavLinks.map(link => (
         <Link key={link.href} href={link.href} className={cn("group flex items-center gap-3 px-4 py-3 rounded-2xl transition-all text-sm font-bold", pathname === link.href ? 'bg-accent/10 text-accent' : 'text-slate-400 hover:bg-white/5 hover:text-white')}>
           <link.icon className={cn("h-4 w-4", pathname === link.href ? 'text-accent' : '')} />{link.label}
         </Link>
       ))}
-      <div className="mt-10 pt-10 border-t border-white/5 px-4">
+      <div className="mt-10 pt-10 border-t border-white/5 px-4 pb-20">
         <Link href="/"><Button variant="outline" className="w-full justify-start rounded-xl border-white/5 gap-3 h-12 text-xs font-black uppercase italic"><Home size={16} /> Retour Boutique</Button></Link>
       </div>
     </nav>
@@ -293,7 +295,7 @@ function DashboardPage() {
             </div>
             
             <nav className="hidden xl:flex items-center gap-1">
-                {filteredNavLinks.map((link) => (
+                {filteredNavLinks.slice(0, 7).map((link) => (
                     <Link key={link.href} href={link.href}>
                         <Button variant="ghost" size="sm" className={cn("group rounded-none h-20 px-4 gap-2.5 font-medium transition-all text-[10px] relative", pathname === link.href ? 'text-accent' : 'text-slate-400 hover:text-white')}>
                             <link.icon className={cn("h-4 w-4 transition-transform group-hover:translate-x-0.5", pathname === link.href ? 'text-accent' : '')} /><span>{link.label}</span>
@@ -301,6 +303,16 @@ function DashboardPage() {
                         </Button>
                     </Link>
                 ))}
+                {filteredNavLinks.length > 7 && (
+                   <Sheet>
+                      <SheetTrigger asChild>
+                        <Button variant="ghost" size="sm" className="h-20 px-4 text-slate-400 text-[10px] font-black uppercase">Plus...</Button>
+                      </SheetTrigger>
+                      <SheetContent className="bg-card/95 backdrop-blur-3xl border-white/5">
+                        <SidebarContent />
+                      </SheetContent>
+                   </Sheet>
+                )}
             </nav>
             
             <div className="flex items-center gap-6">
