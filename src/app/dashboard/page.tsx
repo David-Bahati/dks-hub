@@ -165,14 +165,22 @@ function DashboardPage() {
   const savQuery = useMemoFirebase(() => query(collection(db, "supportTickets"), where("status", "==", "completed")), []);
   const { data: allSav } = useCollection(savQuery);
 
-  const leaderboard = useMemo(() => {
-    if (!allLogs || !allBookings || !allSav) return [];
+  const salesQuery = useMemoFirebase(() => query(collection(db, "sales")), []);
+  const { data: allSales } = useCollection(salesQuery);
 
-    const userPoints: Record<string, { name: string, points: number, actions: number, photo: string }> = {};
+  const leaderboard = useMemo(() => {
+    if (!allLogs || !allBookings || !allSav || !allSales) return [];
+
+    const userPoints: Record<string, { name: string, points: number, actions: number }> = {};
+
+    // Helper to init user
+    const initUser = (uid: string, name: string) => {
+        if (!userPoints[uid]) userPoints[uid] = { name: name || "Expert", points: 0, actions: 0 };
+    };
 
     // 1. Logs = 10 pts
     allLogs.forEach(log => {
-      if (!userPoints[log.userId]) userPoints[log.userId] = { name: log.userName, points: 0, actions: 0, photo: "" };
+      initUser(log.userId, log.userName);
       userPoints[log.userId].points += 10;
       userPoints[log.userId].actions += 1;
     });
@@ -180,7 +188,7 @@ function DashboardPage() {
     // 2. Academy = 50 pts
     allBookings.forEach(booking => {
       if (booking.technicianId) {
-        if (!userPoints[booking.technicianId]) userPoints[booking.technicianId] = { name: booking.technicianName || "Expert", points: 0, actions: 0, photo: "" };
+        initUser(booking.technicianId, booking.technicianName);
         userPoints[booking.technicianId].points += 50;
         userPoints[booking.technicianId].actions += 1;
       }
@@ -189,9 +197,24 @@ function DashboardPage() {
     // 3. SAV = 30 pts
     allSav.forEach(ticket => {
       if (ticket.technicianId) {
-        if (!userPoints[ticket.technicianId]) userPoints[ticket.technicianId] = { name: ticket.technicianName || "Expert", points: 0, actions: 0, photo: "" };
+        initUser(ticket.technicianId, ticket.technicianName);
         userPoints[ticket.technicianId].points += 30;
         userPoints[ticket.technicianId].actions += 1;
+      }
+    });
+
+    // 4. Sales Bonus
+    allSales.forEach(sale => {
+      if (sale.userId) {
+        initUser(sale.userId, sale.customerName || "Vendeur");
+        // Base sale: 20 pts
+        let pts = 20;
+        // High Value Sales
+        if (sale.totalAmount >= 1000) pts = 100; // Legend
+        else if (sale.totalAmount >= 500) pts = 50; // Elite
+        
+        userPoints[sale.userId].points += pts;
+        userPoints[sale.userId].actions += 1;
       }
     });
 
@@ -199,7 +222,7 @@ function DashboardPage() {
       .map(([id, data]) => ({ id, ...data }))
       .sort((a, b) => b.points - a.points)
       .slice(0, 5);
-  }, [allLogs, allBookings, allSav]);
+  }, [allLogs, allBookings, allSav, allSales]);
 
   useEffect(() => {
     fetchGlobalData();
@@ -494,7 +517,7 @@ function DashboardPage() {
                   <Card className="glossy-card border-none rounded-[2.5rem] overflow-hidden">
                     <CardHeader className="py-6 px-8 border-b border-white/5 bg-accent/5">
                       <CardTitle className="text-lg font-bold uppercase italic flex items-center gap-3">
-                        <Trophy className="text-accent" size={20} /> Classement Élite (Mois)
+                        <Trophy className="text-accent" size={20} /> Classement Élite (Prestige Global)
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="p-0">

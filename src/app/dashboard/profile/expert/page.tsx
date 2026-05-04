@@ -25,7 +25,9 @@ import {
     FileDown,
     QrCode,
     User as UserIcon,
-    ShieldAlert
+    ShieldAlert,
+    ShoppingCart,
+    TrendingUp
 } from "lucide-react";
 import { db } from '@/lib/firebase';
 import { collection, query, where, orderBy } from 'firebase/firestore';
@@ -55,7 +57,7 @@ function ExpertProfilePage() {
     const [isGenerating, setIsGenerating] = useState(false);
     const reportRef = useRef<HTMLDivElement>(null);
 
-    // Fetch User Logs for Prestige
+    // Fetch User Logs
     const logsQuery = useMemoFirebase(() => {
         if (!user?.uid) return null;
         return query(collection(db, "technicianLogs"), where("userId", "==", user.uid), orderBy("createdAt", "desc"));
@@ -69,11 +71,18 @@ function ExpertProfilePage() {
     }, [user?.uid]);
     const { data: academySessions, isLoading: loadingAcademy } = useCollection(academyQuery);
 
-    // Fetch SAV tickets handled
+    // Fetch SAV tickets
     const savQuery = useMemoFirebase(() => {
         return query(collection(db, "supportTickets"), where("status", "==", "completed"));
     }, []);
     const { data: savTickets, isLoading: loadingSAV } = useCollection(savQuery);
+
+    // Fetch Sales
+    const salesQuery = useMemoFirebase(() => {
+        if (!user?.uid) return null;
+        return query(collection(db, "sales"), where("userId", "==", user.uid));
+    }, [user?.uid]);
+    const { data: sales, isLoading: loadingSales } = useCollection(salesQuery);
 
     const careerStats = useMemo(() => {
         if (!user || !logs) return null;
@@ -81,32 +90,36 @@ function ExpertProfilePage() {
         const myLogs = logs || [];
         const myAcademy = academySessions || [];
         const mySAVCount = savTickets?.filter(t => t.technicianId === user.uid).length || 0;
+        const mySales = sales || [];
+        const myTotalSalesAmount = mySales.reduce((acc, s) => acc + (s.totalAmount || 0), 0);
 
         const stats = {
             logs: myLogs.length,
             academy: myAcademy.length,
             sav: mySAVCount,
-            totalActions: myLogs.length + myAcademy.length + mySAVCount
+            sales: mySales.length,
+            totalSalesAmount: myTotalSalesAmount,
+            totalActions: myLogs.length + myAcademy.length + mySAVCount + mySales.length
         };
 
         const badges = [];
         if (stats.totalActions >= 100) badges.push({ id: 'legend', label: 'Légende DKS', icon: <Crown size={14} />, color: 'bg-yellow-500/20 text-yellow-500' });
         else if (stats.totalActions >= 50) badges.push({ id: 'expert', label: 'Expert Senior', icon: <ShieldCheck size={14} />, color: 'bg-accent/20 text-accent' });
-        else if (stats.totalActions >= 10) badges.push({ id: 'confirmed', label: 'Technicien Confirmé', icon: <Trophy size={14} />, color: 'bg-blue-500/20 text-blue-500' });
-
+        
+        if (stats.sales >= 20) badges.push({ id: 'closer', label: 'Top Closer', icon: <TrendingUp size={14} />, color: 'bg-green-500/20 text-green-400' });
         if (stats.academy >= 5) badges.push({ id: 'mentor', label: 'Mentor Academy', icon: <GraduationCap size={14} />, color: 'bg-primary/20 text-primary' });
         if (stats.logs >= 30) badges.push({ id: 'keeper', label: 'Gardien du Savoir', icon: <BookText size={14} />, color: 'bg-orange-500/20 text-orange-500' });
 
         const radarData = [
             { subject: 'SAV', A: Math.min(100, stats.sav * 10), fullMark: 100 },
             { subject: 'Academy', A: Math.min(100, stats.academy * 20), fullMark: 100 },
-            { subject: 'Logistique', A: Math.min(100, stats.logs * 2), fullMark: 100 },
-            { subject: 'Réactivité', A: 85, fullMark: 100 },
+            { subject: 'Documentation', A: Math.min(100, stats.logs * 2), fullMark: 100 },
+            { subject: 'Commercial', A: Math.min(100, stats.sales * 5), fullMark: 100 },
             { subject: 'Qualité', A: 95, fullMark: 100 },
         ];
 
         return { stats, badges, radarData };
-    }, [user, logs, academySessions, savTickets]);
+    }, [user, logs, academySessions, savTickets, sales]);
 
     const handleExportReport = async () => {
         if (!reportRef.current) return;
@@ -125,7 +138,7 @@ function ExpertProfilePage() {
         }
     };
 
-    if (loadingLogs || loadingAcademy || loadingSAV) {
+    if (loadingLogs || loadingAcademy || loadingSAV || loadingSales) {
         return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin text-accent" /></div>;
     }
 
@@ -170,7 +183,7 @@ function ExpertProfilePage() {
                                 <h3 className="text-3xl font-black uppercase italic tracking-tight">{user?.name}</h3>
                                 <p className="text-xs text-muted-foreground font-bold uppercase mt-2 opacity-60">ID EXPERT: DKS-{user?.uid.substring(0, 8).toUpperCase()}</p>
                                 
-                                <div className="mt-10 pt-10 border-t border-white/5 grid grid-cols-3 gap-4">
+                                <div className="mt-10 pt-10 border-t border-white/5 grid grid-cols-2 gap-y-8">
                                     <div className="text-center">
                                         <p className="text-2xl font-black text-white">{careerStats?.stats.sav}</p>
                                         <p className="text-[8px] font-black uppercase opacity-40">Tickets SAV</p>
@@ -182,6 +195,10 @@ function ExpertProfilePage() {
                                     <div className="text-center">
                                         <p className="text-2xl font-black text-orange-500">{careerStats?.stats.logs}</p>
                                         <p className="text-[8px] font-black uppercase opacity-40">Notes Labo</p>
+                                    </div>
+                                    <div className="text-center">
+                                        <p className="text-2xl font-black text-green-400">{careerStats?.stats.sales}</p>
+                                        <p className="text-[8px] font-black uppercase opacity-40">Ventes Conclues</p>
                                     </div>
                                 </div>
                             </div>
@@ -231,16 +248,16 @@ function ExpertProfilePage() {
                                     <div className="flex items-center gap-4">
                                         <div className="w-12 h-12 rounded-2xl bg-accent text-black flex items-center justify-center"><Target size={24} /></div>
                                         <div>
-                                            <p className="text-[8px] font-black uppercase opacity-40">Prochain Objectif</p>
-                                            <p className="text-sm font-black uppercase italic">Maître Instructeur Academy</p>
+                                            <p className="text-[8px] font-black uppercase opacity-40">Volume Commercial</p>
+                                            <p className="text-sm font-black uppercase italic">Ventes Elite: {careerStats?.stats.totalSalesAmount.toLocaleString()}$</p>
                                         </div>
                                     </div>
                                     <div className="space-y-2">
                                         <div className="flex justify-between text-[8px] font-black uppercase">
-                                            <span>Progression</span>
-                                            <span>{careerStats?.stats.academy} / 10 sessions</span>
+                                            <span>Progression Closer</span>
+                                            <span>{careerStats?.stats.sales} / 20 ventes</span>
                                         </div>
-                                        <Progress value={(careerStats?.stats.academy || 0) / 10 * 100} className="h-2 bg-white/5" indicatorClassName="bg-accent" />
+                                        <Progress value={(careerStats?.stats.sales || 0) / 20 * 100} className="h-2 bg-white/5" indicatorClassName="bg-accent" />
                                     </div>
                                 </Card>
 
@@ -248,13 +265,13 @@ function ExpertProfilePage() {
                                     <div className="flex items-center gap-4">
                                         <div className="w-12 h-12 rounded-2xl bg-primary text-white flex items-center justify-center"><Zap size={24} /></div>
                                         <div>
-                                            <p className="text-[8px] font-black uppercase opacity-40">Spécialité Hardware</p>
-                                            <p className="text-sm font-black uppercase italic">Architecte Réseaux Starlink</p>
+                                            <p className="text-[8px] font-black uppercase opacity-40">Pôle Technique</p>
+                                            <p className="text-sm font-black uppercase italic">Expert Infrastructure & SAV</p>
                                         </div>
                                     </div>
                                     <div className="flex gap-2">
-                                        <Badge variant="outline" className="text-[8px] font-black uppercase border-primary/20 text-primary">Certifié Ubiquiti</Badge>
-                                        <Badge variant="outline" className="text-[8px] font-black uppercase border-primary/20 text-primary">Expert VPN</Badge>
+                                        <Badge variant="outline" className="text-[8px] font-black uppercase border-primary/20 text-primary">Réseaux</Badge>
+                                        <Badge variant="outline" className="text-[8px] font-black uppercase border-primary/20 text-primary">Hardware 8K</Badge>
                                     </div>
                                 </Card>
                             </div>
@@ -268,7 +285,7 @@ function ExpertProfilePage() {
                             </CardHeader>
                             <div className="p-10">
                                 <div className="relative space-y-10 pl-8 before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-0.5 before:bg-white/5">
-                                    {academySessions?.slice(0, 3).map((session) => (
+                                    {academySessions?.slice(0, 2).map((session) => (
                                         <div key={session.id} className="relative group">
                                             <div className="absolute -left-10 top-0 w-6 h-6 rounded-full border-4 border-background bg-primary flex items-center justify-center">
                                                 <GraduationCap size={10} className="text-white" />
@@ -280,19 +297,19 @@ function ExpertProfilePage() {
                                             </div>
                                         </div>
                                     ))}
-                                    {logs?.slice(0, 3).map((log) => (
-                                        <div key={log.id} className="relative group">
-                                            <div className="absolute -left-10 top-0 w-6 h-6 rounded-full border-4 border-background bg-orange-500 flex items-center justify-center">
-                                                <BookText size={10} className="text-white" />
+                                    {sales?.slice(0, 2).map((sale) => (
+                                        <div key={sale.id} className="relative group">
+                                            <div className="absolute -left-10 top-0 w-6 h-6 rounded-full border-4 border-background bg-green-500 flex items-center justify-center">
+                                                <ShoppingCart size={10} className="text-white" />
                                             </div>
                                             <div>
-                                                <p className="text-[9px] font-black uppercase text-orange-500 mb-1">Rapport de Savoir Publié</p>
-                                                <h5 className="font-bold text-sm uppercase italic line-clamp-1">"{log.content}"</h5>
-                                                <p className="text-xs text-muted-foreground mt-1">{log.createdAt?.toDate?.().toLocaleDateString()}</p>
+                                                <p className="text-[9px] font-black uppercase text-green-500 mb-1">Vente Conclue</p>
+                                                <h5 className="font-bold text-sm uppercase italic">Transaction #{sale.id.substring(0,8)}</h5>
+                                                <p className="text-xs text-muted-foreground mt-1">Montant: {sale.totalAmount}$ • Client: {sale.customerName}</p>
                                             </div>
                                         </div>
                                     ))}
-                                    {(!academySessions?.length && !logs?.length) && (
+                                    {(!academySessions?.length && !sales?.length) && (
                                         <p className="text-center py-10 opacity-20 italic font-black uppercase text-[10px] tracking-widest">Aucun historique récent.</p>
                                     )}
                                 </div>
@@ -344,15 +361,16 @@ function ExpertProfilePage() {
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-3 gap-6 mb-12">
+                        <div className="grid grid-cols-4 gap-4 mb-12">
                             {[
-                                { l: "Tickets SAV résolus", v: careerStats.stats.sav, c: "text-blue-600" },
-                                { l: "Sessions Academy", v: careerStats.stats.academy, c: "text-purple-600" },
-                                { l: "Notes Labo publiées", v: careerStats.stats.logs, c: "text-orange-600" }
+                                { l: "Tickets SAV", v: careerStats.stats.sav, c: "text-blue-600" },
+                                { l: "Academy", v: careerStats.stats.academy, c: "text-purple-600" },
+                                { l: "Logs Labo", v: careerStats.stats.logs, c: "text-orange-600" },
+                                { l: "Ventes (Qty)", v: careerStats.stats.sales, c: "text-green-600" }
                             ].map((stat, i) => (
                                 <div key={i} className="p-6 text-center border-2 border-gray-50 rounded-2xl">
                                     <p className="text-[8px] font-black uppercase text-gray-400 tracking-widest mb-1">{stat.l}</p>
-                                    <p className={cn("text-4xl font-black italic", stat.c)}>{stat.v}</p>
+                                    <p className={cn("text-3xl font-black italic", stat.c)}>{stat.v}</p>
                                 </div>
                             ))}
                         </div>
@@ -362,9 +380,6 @@ function ExpertProfilePage() {
                                 <Zap size={16} /> Synthèse des Compétences
                             </h3>
                             <div className="bg-gray-50 p-10 rounded-[3rem] border border-gray-100 flex flex-col items-center">
-                                <p className="text-[10px] text-gray-400 font-medium italic mb-8 max-w-md text-center">
-                                    L'équilibre ci-dessous reflète l'implication de l'expert dans les différents pôles de productivité du Hub (SAV, Formation, Documentation).
-                                </p>
                                 <div className="w-full h-40 grid grid-cols-5 gap-4">
                                     {careerStats.radarData.map((d, i) => (
                                         <div key={i} className="flex flex-col items-center gap-4">
@@ -375,38 +390,6 @@ function ExpertProfilePage() {
                                         </div>
                                     ))}
                                 </div>
-                            </div>
-                        </section>
-
-                        <section className="mb-12">
-                            <h3 className="text-sm font-black uppercase italic border-b-2 border-black pb-2 mb-6 flex items-center gap-2">
-                                <HistoryIcon size={16} /> Derniers Accomplissements
-                            </h3>
-                            <div className="space-y-4">
-                                {academySessions?.slice(0, 2).map((s) => (
-                                    <div key={s.id} className="p-4 bg-gray-50 rounded-xl flex items-center justify-between border border-gray-100">
-                                        <div className="flex items-center gap-3">
-                                            <GraduationCap size={16} className="text-purple-600" />
-                                            <div>
-                                                <p className="text-[10px] font-bold uppercase">{s.serviceTitle}</p>
-                                                <p className="text-[8px] text-gray-400 uppercase">Formation complétée</p>
-                                            </div>
-                                        </div>
-                                        <p className="text-[10px] font-bold">{s.scheduledDate}</p>
-                                    </div>
-                                ))}
-                                {logs?.slice(0, 2).map((l) => (
-                                    <div key={l.id} className="p-4 bg-gray-50 rounded-xl flex items-center justify-between border border-gray-100">
-                                        <div className="flex items-center gap-3">
-                                            <BookText size={16} className="text-orange-600" />
-                                            <div className="flex-1">
-                                                <p className="text-[10px] font-bold uppercase line-clamp-1">"{l.content}"</p>
-                                                <p className="text-[8px] text-gray-400 uppercase">Note Technique Labo</p>
-                                            </div>
-                                        </div>
-                                        <p className="text-[10px] font-bold text-gray-300">{l.createdAt?.toDate?.().toLocaleDateString()}</p>
-                                    </div>
-                                ))}
                             </div>
                         </section>
 
