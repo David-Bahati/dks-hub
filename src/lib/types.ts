@@ -55,37 +55,6 @@ export type Product = {
   purchasePrice?: number;
 };
 
-export type Consumable = {
-  id: string;
-  name: string;
-  category: string;
-  quantity: number;
-  unit: string;
-  minThreshold: number;
-  unitCost: number; // For stock valuation
-  updatedAt: any;
-};
-
-export type LabTool = {
-  id: string;
-  name: string;
-  serialNumber?: string;
-  status: 'excellent' | 'good' | 'warning' | 'service_needed';
-  usageCount: number;
-  usageThreshold: number;
-  lastMaintenance: any;
-  updatedAt: any;
-};
-
-export type TechnicianLog = {
-  id: string;
-  userId: string;
-  userName: string;
-  content: string;
-  type: 'info' | 'technical' | 'incident' | 'handover';
-  createdAt: any;
-};
-
 export type DailyMission = {
     id: string;
     title: string;

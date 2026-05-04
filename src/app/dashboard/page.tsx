@@ -62,7 +62,8 @@ import {
   Target,
   Flame,
   Layout,
-  Gem
+  Gem,
+  ArrowUpCircle
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -88,7 +89,7 @@ import { Product, DailyMission } from '@/lib/types';
 import withAuth from '@/components/auth/withAuth';
 import { useAuth } from '@/context/AuthContext';
 import { useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, where, orderBy, limit, getDocs, addDoc, serverTimestamp, doc, updateDoc, increment } from 'firebase/firestore';
+import { collection, query, where, orderBy, limit, getDocs, addDoc, serverTimestamp, doc, updateDoc, increment, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/ui/Logo";
@@ -172,6 +173,21 @@ function DashboardPage() {
       return roles.includes(userRole);
   });
 
+  // Queries for Mining Pool
+  const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const activeMinersQuery = useMemoFirebase(() => {
+    return query(collection(db, "users"), where("lastMiningAt", ">=", Timestamp.fromDate(yesterday)));
+  }, []);
+  const { data: activeMiners } = useCollection(activeMinersQuery);
+
+  const poolStats = useMemo(() => {
+    const count = activeMiners?.length || 0;
+    const totalPower = (activeMiners?.reduce((acc, u) => acc + (u.miningPower || 1), 0) || 0);
+    // Multiplier de chance basé sur le pool (max 2x)
+    const luckMultiplier = Math.min(2, 1 + (count / 10));
+    return { count, totalPower, luckMultiplier };
+  }, [activeMiners]);
+
   // Basic Queries
   const ordersQuery = useMemoFirebase(() => {
     if (authLoading || !user?.uid) return null;
@@ -180,7 +196,7 @@ function DashboardPage() {
   const { data: allOrders } = useCollection(ordersQuery);
 
   const customersQuery = useMemoFirebase(() => {
-    return query(collection(db, "users"), where("role", "==", "customer"));
+    return query(collection(db, "users"), where("role", "in", ["customer", "Customer"]));
   }, []);
   const { data: allCustomers } = useCollection(customersQuery);
 
@@ -230,17 +246,22 @@ function DashboardPage() {
     if (!user || miningTimeLeft) return;
     setIsMining(true);
     try {
-        // Block Rarity Logic
+        // Block Rarity Logic enhanced by Pool Power
         const random = Math.random();
         let rarity: 'common' | 'rare' | 'legendary' = 'common';
         let multiplier = 1;
         let rarityLabel = "Commun";
 
-        if (random < 0.05) { // 5% chance
+        // Probabilités de base : 5% Légendaire, 15% Rare
+        // On multiplie ces probabilités par le pool luckMultiplier (ex: 5% * 1.5 = 7.5%)
+        const legendaryThreshold = 0.05 * poolStats.luckMultiplier;
+        const rareThreshold = 0.20 * poolStats.luckMultiplier;
+
+        if (random < legendaryThreshold) {
             rarity = 'legendary';
             multiplier = 5;
             rarityLabel = "LÉGENDAIRE";
-        } else if (random < 0.20) { // 15% chance
+        } else if (random < rareThreshold) {
             rarity = 'rare';
             multiplier = 2;
             rarityLabel = "RARE";
@@ -248,12 +269,13 @@ function DashboardPage() {
 
         const baseReward = user.loyaltyLevel === 'Gold' ? 0.5 : user.loyaltyLevel === 'Silver' ? 0.2 : 0.1;
         const reward = baseReward * multiplier;
-        const txId = `PI-MINING-${Math.random().toString(36).substring(2, 12).toUpperCase()}`;
+        const txId = `PI-POOL-MINING-${Math.random().toString(36).substring(2, 12).toUpperCase()}`;
 
         await updateDoc(doc(db, "users", user.uid), {
             lastMiningAt: serverTimestamp(),
             tokenBalance: increment(reward),
             lastBlockRarity: rarity,
+            miningPower: increment(0.1), // Augmente sa puissance à chaque minage
             updatedAt: serverTimestamp()
         });
 
@@ -264,14 +286,14 @@ function DashboardPage() {
             tokenAmount: reward,
             rarity: rarity,
             piTxId: txId,
-            memo: `Extraction Bloc ${rarityLabel} (${multiplier}x)`,
+            memo: `Extraction Bloc ${rarityLabel} (${multiplier}x) - Pool Bonus incl.`,
             createdAt: serverTimestamp()
         });
 
         if (rarity === 'legendary') {
             toast({ 
                 title: "JACKPOT LÉGENDAIRE !", 
-                description: `Vous avez découvert un bloc unique. Récompense x5 : ${reward} DKST !`,
+                description: `Boosté par le Hub : Vous avez extrait ${reward} DKST !`,
                 className: "bg-yellow-500 text-black font-black"
             });
         } else if (rarity === 'rare') {
@@ -364,7 +386,7 @@ function DashboardPage() {
   const customerLeaderboard = useMemo(() => {
     if (!allCustomers || !allOrders) return [];
     return allCustomers.map(cust => {
-      const custOrders = allOrders?.filter(o => o.userId === cust.id && ["payée", "payé", "completed"].includes(o.status.toLowerCase())) || [];
+      const custOrders = allOrders?.filter(o => o.userId === cust.id && ["payée", "payé", "completed", "terminé"].includes(o.status.toLowerCase())) || [];
       const orderPoints = custOrders.length * 100;
       const referralPoints = (cust.referralCount || 0) * 500;
       const totalPoints = orderPoints + referralPoints;
@@ -456,7 +478,7 @@ function DashboardPage() {
     </nav>
   );
 
-  const myCustomerPoints = (allOrders?.filter(o => o.userId === user?.uid && ["payée", "payé", "completed"].includes(o.status.toLowerCase())).length || 0) * 100 + (user?.referralCount || 0) * 500;
+  const myCustomerPoints = (allOrders?.filter(o => o.userId === user?.uid && ["payée", "payé", "completed", "terminé"].includes(o.status.toLowerCase())).length || 0) * 100 + (user?.referralCount || 0) * 500;
 
   return (
     <div className="flex min-h-screen w-full flex-col bg-background">
@@ -502,7 +524,7 @@ function DashboardPage() {
             
             <div className="flex items-center gap-4">
                 <Link href="/dashboard/wallet">
-                    <Badge className="bg-accent/20 text-accent border-accent/20 h-10 px-4 rounded-xl gap-2 font-black italic cursor-pointer hover:bg-accent/30 transition-all">
+                    <Badge className="bg-accent/20 text-accent border-accent/20 h-10 px-4 rounded-xl gap-2 font-black italic cursor-pointer hover:bg-accent/30 transition-all hidden sm:flex">
                         <Coins size={16} /> {user?.tokenBalance?.toFixed(2) || 0} DKST
                     </Badge>
                 </Link>
@@ -555,7 +577,7 @@ function DashboardPage() {
                                           </span>
                                       </div>
                                       <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground uppercase italic">
-                                          <Zap size={12} className="text-accent" /> Puissance: {user?.loyaltyLevel === 'Gold' ? '5.0' : user?.loyaltyLevel === 'Silver' ? '2.0' : '1.0'} GH/s
+                                          <Zap size={12} className="text-accent" /> Puissance: {(user?.miningPower || 1.0).toFixed(1)} GH/s
                                       </div>
                                   </div>
                               </div>
@@ -572,16 +594,58 @@ function DashboardPage() {
                                   >
                                       {isMining ? <Loader2 className="animate-spin" /> : <><Flame size={28} /> Lancer le Cycle</>}
                                   </Button>
-                                  <p className="text-[8px] font-black uppercase tracking-widest text-white/20">Probabilité Bloc Légendaire : 5%</p>
+                                  <p className="text-[8px] font-black uppercase tracking-widest text-white/20">Probabilité Légendaire Boostée par le Hub : {(5 * poolStats.luckMultiplier).toFixed(1)}%</p>
                               </div>
                           )}
                       </div>
                   </div>
               </Card>
 
-              {/* DAILY MISSIONS TABLEAU */}
+              {/* MINING POOL & MISSIONS TABLEAU */}
               <div className="lg:col-span-7 space-y-6">
-                  <div className="flex items-center justify-between px-4">
+                  {/* HUB MINING POOL CARD */}
+                  <Card className="bg-white/5 border border-white/10 rounded-[2.5rem] p-8 relative overflow-hidden group">
+                      <div className="absolute -bottom-12 -right-12 w-48 h-48 bg-primary/10 rounded-full blur-3xl" />
+                      <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-8">
+                          <div className="flex items-center gap-6">
+                              <div className="w-16 h-16 rounded-3xl bg-primary/20 flex items-center justify-center text-primary shadow-[0_0_20px_rgba(59,130,246,0.3)]">
+                                  <Users size={32} />
+                              </div>
+                              <div>
+                                  <h3 className="text-2xl font-black uppercase italic tracking-tight text-white">Hub Mining <span className="text-primary">Pool</span></h3>
+                                  <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Puissance Collective • Bunia Mainnet</p>
+                              </div>
+                          </div>
+
+                          <div className="flex items-center gap-10">
+                              <div className="text-center">
+                                  <p className="text-3xl font-black text-white italic">{poolStats.count}</p>
+                                  <p className="text-[8px] font-black uppercase text-muted-foreground">Mineurs Actifs</p>
+                              </div>
+                              <div className="text-center">
+                                  <div className="flex items-center gap-2 text-primary">
+                                      <TrendingUp size={16} />
+                                      <p className="text-3xl font-black italic">{poolStats.totalPower.toFixed(1)}</p>
+                                  </div>
+                                  <p className="text-[8px] font-black uppercase text-muted-foreground">TH/s Global</p>
+                              </div>
+                              <div className="bg-primary/10 border border-primary/20 px-5 py-3 rounded-2xl text-center">
+                                  <p className="text-[8px] font-black uppercase text-primary mb-1">Hub Luck Bonus</p>
+                                  <p className="text-xl font-black text-primary italic">+{((poolStats.luckMultiplier - 1) * 100).toFixed(0)}%</p>
+                              </div>
+                          </div>
+                      </div>
+                      
+                      <div className="mt-8 space-y-2">
+                          <div className="flex justify-between text-[8px] font-black uppercase text-white/40 tracking-widest px-1">
+                              <span>Activité Réseau DKS</span>
+                              <span>Optimisation Rareté Actale</span>
+                          </div>
+                          <Progress value={(poolStats.count / 20) * 100} className="h-1.5 bg-white/5" indicatorClassName="bg-primary" />
+                      </div>
+                  </Card>
+
+                  <div className="flex items-center justify-between px-4 mt-6">
                       <div className="flex items-center gap-4">
                           <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary"><Target size={20} /></div>
                           <h2 className="text-xl font-black uppercase italic tracking-tight">Objectifs <span className="text-primary">du Jour</span></h2>
@@ -768,7 +832,7 @@ function DashboardPage() {
                   <Card className="glossy-card border-none rounded-[2.5rem] overflow-hidden">
                     <CardHeader className="py-6 px-8 border-b border-white/5 bg-accent/5">
                       <CardTitle className="text-sm font-black uppercase italic flex items-center gap-3">
-                        <Trophy className="text-accent" size={16} /> Équipe Hub
+                        <Trophy className="text-accent" size={16} /> Équipe Hub (Staff)
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="p-0">
@@ -800,7 +864,7 @@ function DashboardPage() {
                   <Card className="glossy-card border-none rounded-[2.5rem] overflow-hidden">
                     <CardHeader className="py-6 px-8 border-b border-white/5 bg-primary/5">
                       <CardTitle className="text-sm font-black uppercase italic flex items-center gap-3">
-                        <Users className="text-primary" size={16} /> Élite Communauté
+                        <Users className="text-primary" size={16} /> Élite Communauté (Clients)
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="p-0">
