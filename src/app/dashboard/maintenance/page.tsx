@@ -26,7 +26,11 @@ import {
     Maximize,
     ArrowUpCircle,
     ArrowDownCircle,
-    Box
+    Box,
+    Barcode,
+    Printer,
+    Download,
+    QrCode
 } from "lucide-react";
 import { db } from '@/lib/firebase';
 import { collection, addDoc, deleteDoc, doc, updateDoc, serverTimestamp, query, orderBy, increment } from 'firebase/firestore';
@@ -44,10 +48,20 @@ import {
     SheetTitle,
     SheetFooter 
 } from "@/components/ui/sheet";
+import { 
+    Dialog, 
+    DialogContent, 
+    DialogHeader, 
+    DialogTitle,
+    DialogFooter 
+} from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
+import { Logo } from '@/components/ui/Logo';
 
 function MaintenanceInventoryPage() {
     const { user } = useAuth();
@@ -55,11 +69,16 @@ function MaintenanceInventoryPage() {
     const [search, setSearch] = useState("");
     const [isSheetOpen, setIsSheetOpen] = useState(false);
     const [isScannerOpen, setIsScannerOpen] = useState(false);
+    const [isLabelDialogOpen, setIsLabelDialogOpen] = useState(false);
     const [scannerMode, setScannerMode] = useState<'usage' | 'restock'>('usage');
     const [editingItem, setEditingItem] = useState<any>(null);
+    const [selectedItemForLabel, setSelectedItemForLabel] = useState<any>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isGeneratingLabel, setIsGeneratingLabel] = useState(false);
     const [hasCameraPermission, setHasCameraPermission] = useState(false);
+    
     const videoRef = useRef<HTMLVideoElement>(null);
+    const labelRef = useRef<HTMLDivElement>(null);
 
     const inventoryQuery = useMemoFirebase(() => {
         return query(collection(db, "consumables"), orderBy("name", "asc"));
@@ -155,10 +174,26 @@ function MaintenanceInventoryPage() {
         }
     };
 
+    const handleDownloadLabel = async () => {
+        if (!labelRef.current || !selectedItemForLabel) return;
+        setIsGeneratingLabel(true);
+        try {
+            const canvas = await html2canvas(labelRef.current, { scale: 3, useCORS: true, backgroundColor: "#ffffff" });
+            const imgData = canvas.toDataURL('image/png');
+            const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [100, 60] });
+            pdf.addImage(imgData, 'PNG', 0, 0, 100, 60);
+            pdf.save(`LABEL_DKS_${selectedItemForLabel.name.replace(/\s+/g, '_')}.pdf`);
+            toast({ title: "Étiquette générée", description: "Le PDF est prêt pour l'impression thermique." });
+        } catch (error) {
+            toast({ title: "Erreur PDF", variant: "destructive" });
+        } finally {
+            setIsGeneratingLabel(false);
+        }
+    };
+
     const handleMockScan = (item: any) => {
         const delta = scannerMode === 'usage' ? -1 : 1;
         updateQuantity(item, delta);
-        // On reste ouvert pour le multi-scan
     };
 
     const handleDelete = async (id: string) => {
@@ -204,11 +239,13 @@ function MaintenanceInventoryPage() {
                         >
                             <Box size={20} /> Réception Livraison
                         </Button>
-                        <Link href="/dashboard/maintenance/stats">
-                            <Button variant="outline" className="h-14 px-6 rounded-2xl border-white/10 font-black uppercase italic gap-3 hover:bg-white/5 transition-all">
-                                <BarChart3 size={20} /> Statistiques
-                            </Button>
-                        </Link>
+                        <Button 
+                            onClick={() => { setEditingItem(null); setIsSheetOpen(true); }}
+                            variant="outline"
+                            className="h-14 px-6 rounded-2xl border-white/10 font-black uppercase italic gap-3 hover:bg-white/5 transition-all"
+                        >
+                            <Plus size={20} /> Nouvel Article
+                        </Button>
                     </div>
                 </div>
 
@@ -238,21 +275,31 @@ function MaintenanceInventoryPage() {
                                 )}
                                 
                                 <CardHeader className="p-8 pb-4">
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-accent">
-                                            <FlaskConical size={24} />
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-accent">
+                                                <FlaskConical size={24} />
+                                            </div>
+                                            <div>
+                                                <CardTitle className="text-xl font-black uppercase italic truncate max-w-[150px]">{item.name}</CardTitle>
+                                                <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">{item.category}</p>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <CardTitle className="text-xl font-black uppercase italic truncate">{item.name}</CardTitle>
-                                            <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">{item.category}</p>
-                                        </div>
+                                        <Button 
+                                            variant="ghost" 
+                                            size="icon" 
+                                            className="h-10 w-10 rounded-xl hover:bg-accent/10 hover:text-accent opacity-0 group-hover:opacity-100 transition-all"
+                                            onClick={() => { setSelectedItemForLabel(item); setIsLabelDialogOpen(true); }}
+                                        >
+                                            <Barcode size={20} />
+                                        </Button>
                                     </div>
                                 </CardHeader>
 
                                 <CardContent className="p-8 space-y-6">
                                     <div className="flex justify-between items-end bg-black/20 p-6 rounded-[2rem] border border-white/5">
                                         <div className="space-y-1">
-                                            <p className="text-[10px] font-black uppercase opacity-40">Quantité en réserve</p>
+                                            <p className="text-[10px] font-black uppercase opacity-40">Réserve Labo</p>
                                             <p className={cn("text-4xl font-black italic", item.quantity <= item.minThreshold ? "text-red-500" : "text-accent")}>
                                                 {item.quantity} <span className="text-lg font-light opacity-60 not-italic">{item.unit}</span>
                                             </p>
@@ -385,7 +432,7 @@ function MaintenanceInventoryPage() {
                                         <p className="text-[10px] font-black uppercase text-muted-foreground tracking-[0.2em] flex items-center gap-2">
                                             <Plus size={12} className="text-accent" /> Sélection Directe (Simulée)
                                         </p>
-                                        <p className="text-[9px] text-white/30 italic uppercase">Cliquez pour simuler la détection d'un code-barres</p>
+                                        <p className="text-[9px] text-white/30 italic uppercase">Cliquer pour simuler le scan d'une étiquette</p>
                                     </div>
 
                                     <div className="grid grid-cols-1 gap-2 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
@@ -413,39 +460,81 @@ function MaintenanceInventoryPage() {
                                         ))}
                                     </div>
                                 </div>
-
-                                <div className={cn(
-                                    "p-8 rounded-[2.5rem] border transition-all duration-500 flex flex-col items-center justify-center text-center space-y-4 shadow-xl",
-                                    scannerMode === 'usage' ? "bg-orange-500/5 border-orange-500/20" : "bg-green-500/5 border-green-500/20"
-                                )}>
-                                    <div className={cn(
-                                        "w-16 h-16 rounded-2xl flex items-center justify-center",
-                                        scannerMode === 'usage' ? "bg-orange-500/20 text-orange-500" : "bg-green-500/20 text-green-500"
-                                    )}>
-                                        {scannerMode === 'usage' ? <ArrowDownCircle size={32} /> : <Box size={32} />}
-                                    </div>
-                                    <div className="space-y-1">
-                                        <p className="text-xs font-bold text-white/90 uppercase tracking-widest italic">
-                                            {scannerMode === 'usage' ? "DÉBIT DE STOCK IMMÉDIAT" : "CRÉDIT DE RÉCEPTION"}
-                                        </p>
-                                        <p className="text-[9px] text-muted-foreground uppercase leading-relaxed max-w-[200px] mx-auto font-black opacity-60">
-                                            {scannerMode === 'usage' 
-                                                ? "Le scan déduit automatiquement une unité pour vos interventions." 
-                                                : "Le scan ajoute une unité pour enregistrer vos nouvelles livraisons."}
-                                        </p>
-                                    </div>
-                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
             )}
 
+            {/* LABEL PRINT DIALOG */}
+            <Dialog open={isLabelDialogOpen} onOpenChange={setIsLabelDialogOpen}>
+                <DialogContent className="bg-card border-white/10 text-foreground rounded-[2.5rem] sm:max-w-xl overflow-hidden p-0">
+                    <DialogHeader className="p-8 bg-accent/10 border-b border-white/5">
+                        <DialogTitle className="text-2xl font-black uppercase italic tracking-tighter">Générateur d'Étiquette</DialogTitle>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Format Thermique Standard (100x60mm)</p>
+                    </DialogHeader>
+                    
+                    <div className="p-10 flex flex-col items-center justify-center space-y-10 bg-black/20">
+                        {/* Étiquette Réelle */}
+                        <div ref={labelRef} className="w-[400px] h-[240px] bg-white text-black p-8 rounded-lg shadow-2xl relative overflow-hidden flex flex-col justify-between font-sans">
+                            <div className="flex justify-between items-start">
+                                <div className="space-y-4">
+                                    <div className="bg-black text-white px-4 py-1.5 inline-block font-black text-xl italic tracking-tighter rounded-md">DKS SOLUTIONS</div>
+                                    <div>
+                                        <p className="text-[8px] font-black uppercase text-gray-400 tracking-widest">Ressource Labo</p>
+                                        <h3 className="text-2xl font-black uppercase italic leading-none mt-1">{selectedItemForLabel?.name}</h3>
+                                    </div>
+                                </div>
+                                <Logo size="sm" />
+                            </div>
+
+                            <div className="flex justify-between items-end border-t border-gray-100 pt-6">
+                                <div className="space-y-3">
+                                    <div>
+                                        <p className="text-[8px] font-black uppercase text-gray-400">Famille</p>
+                                        <p className="text-xs font-bold uppercase">{selectedItemForLabel?.category}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-[8px] font-black uppercase text-gray-400">Conditionnement</p>
+                                        <p className="text-xs font-bold uppercase">1 {selectedItemForLabel?.unit}</p>
+                                    </div>
+                                </div>
+                                <div className="flex flex-col items-center gap-2">
+                                    <div className="p-2 border-2 border-black rounded-lg bg-gray-50">
+                                        <QrCode size={60} />
+                                    </div>
+                                    <p className="text-[7px] font-black text-gray-300 uppercase tracking-tighter">ID: {selectedItemForLabel?.id.substring(0, 10).toUpperCase()}</p>
+                                </div>
+                            </div>
+                            
+                            <div className="absolute top-0 right-0 w-16 h-16 bg-gray-50 rounded-bl-full -z-10" />
+                        </div>
+
+                        <div className="w-full flex gap-4">
+                            <Button 
+                                onClick={handleDownloadLabel} 
+                                disabled={isGeneratingLabel}
+                                className="flex-1 h-14 bg-accent text-black font-black uppercase italic rounded-2xl gap-3 shadow-xl shadow-accent/10"
+                            >
+                                {isGeneratingLabel ? <Loader2 className="animate-spin" /> : <><Download size={18} /> Télécharger PDF</>}
+                            </Button>
+                            <Button 
+                                variant="outline" 
+                                onClick={() => window.print()}
+                                className="flex-1 h-14 border-white/10 rounded-2xl font-black uppercase italic gap-3 text-xs"
+                            >
+                                <Printer size={18} /> Imprimer Directement
+                            </Button>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
             <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
                 <SheetContent side="right" className="bg-card/95 backdrop-blur-3xl border-white/10 w-full sm:max-w-md flex flex-col p-0">
                     <SheetHeader className="p-8 bg-accent/10 border-b border-white/5">
                         <SheetTitle className="text-2xl font-black uppercase italic tracking-tighter">
-                            {editingItem ? 'Modifier Ressource' : 'Nouvel Consommable'}
+                            {editingItem ? 'Modifier Ressource' : 'Nouveau Consommable'}
                         </SheetTitle>
                         <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Gestion Labo Interne</p>
                     </SheetHeader>
@@ -486,7 +575,6 @@ function MaintenanceInventoryPage() {
                             <div className="space-y-2">
                                 <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Seuil de Réapprovisionnement</Label>
                                 <Input name="minThreshold" type="number" step="0.1" defaultValue={editingItem?.minThreshold || 5} required className="h-12 bg-background/50 border-white/5 rounded-xl font-black text-red-400" />
-                                <p className="text-[8px] font-bold text-muted-foreground uppercase opacity-40 italic">Une alerte sera générée en dessous de ce niveau.</p>
                             </div>
                         </div>
 
