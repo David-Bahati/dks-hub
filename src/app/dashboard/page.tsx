@@ -183,7 +183,6 @@ function DashboardPage() {
   const poolStats = useMemo(() => {
     const count = activeMiners?.length || 0;
     const totalPower = (activeMiners?.reduce((acc, u) => acc + (u.miningPower || 1), 0) || 0);
-    // Multiplier de chance basé sur le pool (max 2x)
     const luckMultiplier = Math.min(2, 1 + (count / 10));
     return { count, totalPower, luckMultiplier };
   }, [activeMiners]);
@@ -246,14 +245,11 @@ function DashboardPage() {
     if (!user || miningTimeLeft) return;
     setIsMining(true);
     try {
-        // Block Rarity Logic enhanced by Pool Power
         const random = Math.random();
         let rarity: 'common' | 'rare' | 'legendary' = 'common';
         let multiplier = 1;
         let rarityLabel = "Commun";
 
-        // Probabilités de base : 5% Légendaire, 15% Rare
-        // On multiplie ces probabilités par le pool luckMultiplier (ex: 5% * 1.5 = 7.5%)
         const legendaryThreshold = 0.05 * poolStats.luckMultiplier;
         const rareThreshold = 0.20 * poolStats.luckMultiplier;
 
@@ -275,7 +271,7 @@ function DashboardPage() {
             lastMiningAt: serverTimestamp(),
             tokenBalance: increment(reward),
             lastBlockRarity: rarity,
-            miningPower: increment(0.1), // Augmente sa puissance à chaque minage
+            miningPower: increment(0.1),
             updatedAt: serverTimestamp()
         });
 
@@ -290,10 +286,47 @@ function DashboardPage() {
             createdAt: serverTimestamp()
         });
 
+        // LEGENDARY REDISTRIBUTION LOGIC
+        if (rarity === 'legendary' && activeMiners && activeMiners.length > 1) {
+            const shareAmount = 0.05; // Fixed small system bonus for others
+            const others = activeMiners.filter(u => u.id !== user.uid);
+            
+            others.forEach(async (other) => {
+                // Update their balance
+                updateDoc(doc(db, "users", other.id), {
+                    tokenBalance: increment(shareAmount),
+                    updatedAt: serverTimestamp()
+                });
+                
+                // Log transaction for them
+                addDoc(collection(db, "tokenTransactions"), {
+                    userId: other.id,
+                    userName: other.name,
+                    type: 'mining',
+                    tokenAmount: shareAmount,
+                    rarity: 'common',
+                    piTxId: `POOL-SHARE-${txId.substring(0, 10)}`,
+                    memo: `Part de Bloc Légendaire trouvé par ${user.name} !`,
+                    createdAt: serverTimestamp()
+                });
+
+                // Notify them
+                addDoc(collection(db, "notifications"), {
+                    userId: other.id,
+                    title: "Bonus de Pool !",
+                    message: `${user.name} a découvert un bloc LÉGENDAIRE. Vous recevez une part de ${shareAmount} DKST !`,
+                    type: 'success',
+                    isRead: false,
+                    createdAt: serverTimestamp(),
+                    link: '/dashboard/wallet'
+                });
+            });
+        }
+
         if (rarity === 'legendary') {
             toast({ 
                 title: "JACKPOT LÉGENDAIRE !", 
-                description: `Boosté par le Hub : Vous avez extrait ${reward} DKST !`,
+                description: `Récompense partagée avec le pool : Vous avez extrait ${reward} DKST !`,
                 className: "bg-yellow-500 text-black font-black"
             });
         } else if (rarity === 'rare') {
@@ -536,9 +569,7 @@ function DashboardPage() {
       </header>
 
       <main className="flex-1 p-4 md:p-8 space-y-8 pb-24 max-w-[1600px] mx-auto w-full">
-          {/* MINING & MISSIONS SECTION */}
           <div className="grid gap-6 grid-cols-1 lg:grid-cols-12">
-              {/* CLOUD MINING INTERFACE */}
               <Card className="lg:col-span-5 bg-gradient-to-br from-accent/10 via-background to-black border-accent/20 rounded-[3rem] p-10 relative overflow-hidden group shadow-2xl">
                   <div className="absolute top-0 right-0 p-8 opacity-5 scale-150 rotate-45 group-hover:rotate-0 transition-transform duration-1000"><Pickaxe size={200} className="text-accent" /></div>
                   <div className="relative z-10 space-y-8">
@@ -563,7 +594,6 @@ function DashboardPage() {
                                       <div className="w-2 h-16 bg-accent rounded-full animate-[pulse_1.5s_infinite] delay-300" />
                                   </div>
                                   
-                                  {/* BLOCK RARITY DISPLAY */}
                                   <div className="flex flex-col items-center gap-4">
                                       <div className={cn(
                                           "px-6 py-2 rounded-2xl border flex items-center gap-3 animate-in zoom-in-50 duration-500",
@@ -601,9 +631,7 @@ function DashboardPage() {
                   </div>
               </Card>
 
-              {/* MINING POOL & MISSIONS TABLEAU */}
               <div className="lg:col-span-7 space-y-6">
-                  {/* HUB MINING POOL CARD */}
                   <Card className="bg-white/5 border border-white/10 rounded-[2.5rem] p-8 relative overflow-hidden group">
                       <div className="absolute -bottom-12 -right-12 w-48 h-48 bg-primary/10 rounded-full blur-3xl" />
                       <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-8">
@@ -639,7 +667,7 @@ function DashboardPage() {
                       <div className="mt-8 space-y-2">
                           <div className="flex justify-between text-[8px] font-black uppercase text-white/40 tracking-widest px-1">
                               <span>Activité Réseau DKS</span>
-                              <span>Optimisation Rareté Actale</span>
+                              <span>Partage de Bloc Légendaire Actif</span>
                           </div>
                           <Progress value={(poolStats.count / 20) * 100} className="h-1.5 bg-white/5" indicatorClassName="bg-primary" />
                       </div>
@@ -828,7 +856,6 @@ function DashboardPage() {
                 </Card>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* STAFF LEADERBOARD */}
                   <Card className="glossy-card border-none rounded-[2.5rem] overflow-hidden">
                     <CardHeader className="py-6 px-8 border-b border-white/5 bg-accent/5">
                       <CardTitle className="text-sm font-black uppercase italic flex items-center gap-3">
@@ -860,7 +887,6 @@ function DashboardPage() {
                     </CardContent>
                   </Card>
 
-                  {/* CUSTOMER LOYALTY LEADERBOARD */}
                   <Card className="glossy-card border-none rounded-[2.5rem] overflow-hidden">
                     <CardHeader className="py-6 px-8 border-b border-white/5 bg-primary/5">
                       <CardTitle className="text-sm font-black uppercase italic flex items-center gap-3">
