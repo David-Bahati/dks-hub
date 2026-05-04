@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -9,12 +10,12 @@ import { Button } from "@/components/ui/button";
 import { UserPlus, Edit, Trash2, ArrowLeft, Shield, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogFooter 
-} from "@/components/ui/dialog";
+  Sheet, 
+  SheetContent, 
+  SheetHeader, 
+  SheetTitle, 
+  SheetFooter 
+} from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -30,15 +31,10 @@ import { useToast } from '@/hooks/use-toast';
 const getRoleBadge = (role: string) => {
   const r = role?.toLowerCase();
   switch (r) {
-    case 'admin':
-      return "bg-red-500/10 text-red-400 border-none";
-    case 'seller':
-    case 'manager':
-      return "bg-blue-500/10 text-blue-400 border-none";
-    case 'cashier':
-      return "bg-green-500/10 text-green-400 border-none";
-    default:
-      return "bg-gray-500/10 text-gray-400 border-none";
+    case 'admin': return "bg-red-500/10 text-red-400 border-none px-2";
+    case 'seller': return "bg-blue-500/10 text-blue-400 border-none px-2";
+    case 'cashier': return "bg-green-500/10 text-green-400 border-none px-2";
+    default: return "bg-gray-500/10 text-gray-400 border-none px-2";
   }
 };
 
@@ -48,7 +44,7 @@ function UsersPage() {
   const { toast } = useToast();
   const [users, setUsers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingUser, setEditingUser] = useState<any | null>(null);
   const [role, setRole] = useState("Seller");
@@ -60,38 +56,27 @@ function UsersPage() {
     }
 
     const q = collection(db, "users");
-    
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const usersData: any[] = [];
       snapshot.forEach(doc => {
         const data = doc.data();
-        // Ne montrer que le staff (pas les clients) dans cet annuaire
-        const userRole = data.role?.toLowerCase();
-        if (userRole && userRole !== 'customer') {
+        if (data.role?.toLowerCase() !== 'customer') {
           usersData.push({ id: doc.id, ...data });
         }
       });
       setUsers(usersData);
       setIsLoading(false);
     }, (error: any) => {
-      errorEmitter.emit('permission-error', new FirestorePermissionError({
-        path: 'users',
-        operation: 'list'
-      }));
+      errorEmitter.emit('permission-error', new FirestorePermissionError({ path: 'users', operation: 'list' }));
       setIsLoading(false);
     });
     return () => unsubscribe();
   }, [currentUser, router]);
 
-  const openModal = (user: any | null = null) => {
+  const openSheet = (user: any | null = null) => {
     setEditingUser(user);
     setRole(user ? user.role : "Seller");
-    setIsModalOpen(true);
-  };
-
-  const closeModal = () => {
-    setEditingUser(null);
-    setIsModalOpen(false);
+    setIsSheetOpen(true);
   };
 
   const handleSave = (e: React.FormEvent<HTMLFormElement>) => {
@@ -109,49 +94,15 @@ function UsersPage() {
     if (editingUser) {
       const userRef = doc(db, "users", editingUser.id);
       updateDoc(userRef, userData)
-        .then(() => {
-          toast({ title: "Membre mis à jour" });
-          closeModal();
-        })
-        .catch(async (error) => {
-          errorEmitter.emit('permission-error', new FirestorePermissionError({
-            path: userRef.path,
-            operation: 'update',
-            requestResourceData: userData
-          }));
-        })
+        .then(() => { toast({ title: "Membre mis à jour" }); setIsSheetOpen(false); })
+        .catch(async (error) => { errorEmitter.emit('permission-error', new FirestorePermissionError({ path: userRef.path, operation: 'update', requestResourceData: userData })); })
         .finally(() => setIsSubmitting(false));
     } else {
       const colRef = collection(db, "users");
-      addDoc(colRef, {
-        ...userData,
-        createdAt: serverTimestamp()
-      })
-      .then(() => {
-        toast({ title: "Nouveau membre ajouté" });
-        closeModal();
-      })
-      .catch(async (error) => {
-        errorEmitter.emit('permission-error', new FirestorePermissionError({
-          path: colRef.path,
-          operation: 'create',
-          requestResourceData: userData
-        }));
-      })
-      .finally(() => setIsSubmitting(false));
-    }
-  };
-
-  const handleDelete = (id: string) => {
-    if (window.confirm("Supprimer ce membre du personnel ?")) {
-      const userRef = doc(db, "users", id);
-      deleteDoc(userRef).catch(async (error) => {
-        errorEmitter.emit('permission-error', new FirestorePermissionError({
-          path: userRef.path,
-          operation: 'delete'
-        }));
-      });
-      toast({ title: "Membre supprimé", variant: "destructive" });
+      addDoc(colRef, { ...userData, createdAt: serverTimestamp() })
+        .then(() => { toast({ title: "Nouveau membre ajouté" }); setIsSheetOpen(false); })
+        .catch(async (error) => { errorEmitter.emit('permission-error', new FirestorePermissionError({ path: colRef.path, operation: 'create', requestResourceData: userData })); })
+        .finally(() => setIsSubmitting(false));
     }
   };
 
@@ -168,88 +119,91 @@ function UsersPage() {
              </Link>
              <div>
                 <h1 className="text-3xl font-bold font-headline uppercase tracking-tighter italic">Équipe & <span className="text-accent">Staff</span></h1>
-                <p className="text-muted-foreground">Gérez les accès et les comptes de votre personnel.</p>
+                <p className="text-muted-foreground text-xs uppercase font-black opacity-40">Gestion des privilèges administratifs</p>
              </div>
           </div>
-          <Button onClick={() => openModal()} className="bg-primary hover:bg-primary/90 gap-2 neon-glow font-bold h-12 px-6 rounded-xl uppercase italic">
+          <Button onClick={() => openSheet()} className="bg-primary hover:bg-primary/90 gap-2 font-black uppercase italic h-12 px-6 rounded-2xl shadow-xl">
             <UserPlus size={18} /> Ajouter un Membre
           </Button>
         </div>
 
-        <Card className="glossy-card border-none rounded-[2rem]">
-          <CardHeader>
-            <CardTitle className="text-lg font-black uppercase italic flex items-center gap-2">
-                <Shield className="text-accent" size={20} /> Liste du Personnel
+        <Card className="glossy-card border-none rounded-[2.5rem] overflow-hidden shadow-2xl">
+          <CardHeader className="p-8 border-b border-white/5 bg-white/[0.02]">
+            <CardTitle className="text-lg font-black uppercase italic flex items-center gap-3">
+                <Shield className="text-accent" size={22} /> Liste du Personnel
             </CardTitle>
           </CardHeader>
-          <CardContent>
-             <div className="space-y-4">
+          <CardContent className="p-0">
+             <div className="divide-y divide-white/5">
               {isLoading ? (
-                <div className="flex justify-center py-10">
-                    <Loader2 className="animate-spin text-accent" />
-                </div>
+                <div className="flex justify-center py-20"><Loader2 className="animate-spin text-accent" /></div>
               ) : users.length > 0 ? (
                 users.map(user => (
-                  <div key={user.id} className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5 hover:bg-white/10 transition-colors">
-                    <div>
-                      <p className="font-bold">{user.displayName || user.name}</p>
-                      <p className="text-xs text-muted-foreground">{user.email}</p>
-                    </div>
+                  <div key={user.id} className="flex items-center justify-between p-6 hover:bg-white/5 transition-colors group">
                     <div className="flex items-center gap-4">
-                        <Badge className={getRoleBadge(user.role)}>{user.role}</Badge>
-                        <div className="flex gap-1">
-                            <Button variant="ghost" size="icon" onClick={() => openModal(user)} className="h-10 w-10 hover:bg-white/10"><Edit size={16}/></Button>
-                            <Button variant="ghost" size="icon" onClick={() => handleDelete(user.id)} className="h-10 w-10 text-destructive hover:bg-destructive/10"><Trash2 size={16}/></Button>
+                        <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center font-black text-accent">{user.name?.substring(0, 1)}</div>
+                        <div>
+                            <p className="font-bold text-sm">{user.displayName || user.name}</p>
+                            <p className="text-[10px] text-muted-foreground uppercase font-black tracking-widest">{user.email}</p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-6">
+                        <Badge className={cn("uppercase text-[9px] font-black h-5", getRoleBadge(user.role))}>{user.role}</Badge>
+                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button variant="ghost" size="icon" onClick={() => openSheet(user)} className="h-8 w-8 hover:bg-white/10"><Edit size={16}/></Button>
+                            <Button variant="ghost" size="icon" onClick={() => { if(window.confirm("Supprimer ?")) deleteDoc(doc(db, "users", user.id)); }} className="h-8 w-8 text-destructive hover:bg-destructive/10"><Trash2 size={16}/></Button>
                         </div>
                     </div>
                   </div>
                 ))
               ) : (
-                <p className="text-center text-muted-foreground py-10 italic">Aucun membre du personnel enregistré.</p>
+                <p className="text-center text-muted-foreground py-20 italic uppercase font-black text-[10px] tracking-widest">Aucun personnel enregistré.</p>
               )}
             </div>
           </CardContent>
         </Card>
       </main>
 
-       <Dialog open={isModalOpen} onOpenChange={closeModal}>
-        <DialogContent className="glossy-card border-none rounded-[2rem]">
-          <DialogHeader>
-            <DialogTitle className="text-xl font-black uppercase italic">{editingUser ? 'Modifier un Membre' : 'Ajouter un Nouveau Membre'}</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleSave}>
-            <div className="grid gap-6 py-4">
+      <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
+        <SheetContent side="right" className="bg-card/95 backdrop-blur-3xl border-white/10 w-full sm:max-w-md flex flex-col p-0">
+          <SheetHeader className="p-8 bg-primary/10 border-b border-white/5">
+            <SheetTitle className="text-2xl font-black uppercase italic tracking-tighter">
+                {editingUser ? 'Modifier' : 'Ajouter'} un Membre Staff
+            </SheetTitle>
+            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Architecture de Contrôle Hub</p>
+          </SheetHeader>
+          <form onSubmit={handleSave} className="flex-1 p-8 space-y-8 overflow-y-auto">
+            <div className="space-y-6">
                <div className="space-y-2">
-                <Label htmlFor="displayName" className="text-[10px] font-black uppercase tracking-widest opacity-60">Nom complet</Label>
-                <Input id="displayName" name="displayName" defaultValue={editingUser?.displayName || editingUser?.name} required className="h-12 bg-background/50 border-white/10 rounded-xl" />
+                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Nom complet</Label>
+                <Input name="displayName" defaultValue={editingUser?.displayName || editingUser?.name} required className="h-14 bg-background/50 border-white/5 rounded-2xl font-bold" />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-[10px] font-black uppercase tracking-widest opacity-60">Adresse e-mail</Label>
-                <Input id="email" name="email" type="email" defaultValue={editingUser?.email} required className="h-12 bg-background/50 border-white/10 rounded-xl" />
+                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Email Professionnel</Label>
+                <Input name="email" type="email" defaultValue={editingUser?.email} required className="h-14 bg-background/50 border-white/5 rounded-2xl" />
               </div>
               <div className="space-y-2">
-                 <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Rôle</Label>
+                 <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Rôle & Permissions</Label>
                  <Select value={role} onValueChange={setRole}>
-                    <SelectTrigger className="h-12 bg-background/50 border-white/10 rounded-xl">
-                        <SelectValue placeholder="Sélectionner un rôle" />
+                    <SelectTrigger className="h-14 bg-background/50 border-white/5 rounded-2xl">
+                        <SelectValue placeholder="Choisir un rôle" />
                     </SelectTrigger>
                     <SelectContent className="bg-card border-white/10">
-                        <SelectItem value="Admin" className="font-bold">Administrateur</SelectItem>
-                        <SelectItem value="Seller" className="font-bold">Vendeur</SelectItem>
-                        <SelectItem value="Cashier" className="font-bold">Caissier</SelectItem>
+                        <SelectItem value="Admin" className="font-black uppercase text-[10px] text-red-400">Administrateur (Tout accès)</SelectItem>
+                        <SelectItem value="Seller" className="font-black uppercase text-[10px] text-blue-400">Vendeur (Stock & Ventes)</SelectItem>
+                        <SelectItem value="Cashier" className="font-black uppercase text-[10px] text-green-400">Caissier (Caisse & Reçus)</SelectItem>
                     </SelectContent>
                  </Select>
               </div>
             </div>
-            <DialogFooter className="gap-2">
-              <Button type="button" variant="ghost" onClick={closeModal} className="font-bold uppercase text-[10px]">Annuler</Button>
-              <Button type="submit" disabled={isSubmitting} className="bg-accent text-accent-foreground font-black uppercase italic rounded-xl px-8 h-12">
-                {isSubmitting ? <Loader2 className="animate-spin" /> : "Sauvegarder"}
+            <div className="pt-8">
+              <Button type="submit" disabled={isSubmitting} className="w-full h-16 bg-primary text-white font-black uppercase italic rounded-2xl shadow-xl shadow-primary/20">
+                {isSubmitting ? <Loader2 className="animate-spin" /> : "Appliquer les privilèges"}
               </Button>
-            </DialogFooter>
+            </div>
           </form>
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

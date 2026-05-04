@@ -11,13 +11,19 @@ import { collection, addDoc, deleteDoc, doc, updateDoc, serverTimestamp } from '
 import withAuth from '@/components/auth/withAuth';
 import Link from 'next/link';
 import { useCollection, useMemoFirebase } from '@/firebase';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { 
+    Sheet, 
+    SheetContent, 
+    SheetHeader, 
+    SheetTitle, 
+    SheetFooter 
+} from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from '@/hooks/use-toast';
 
 function CategoriesPage() {
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<any>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
@@ -25,9 +31,9 @@ function CategoriesPage() {
   const categoriesQuery = useMemoFirebase(() => collection(db, "categories"), []);
   const { data: categories, isLoading } = useCollection(categoriesQuery);
 
-  const handleOpenModal = (category: any = null) => {
+  const handleOpenSheet = (category: any = null) => {
     setEditingCategory(category);
-    setIsModalOpen(true);
+    setIsSheetOpen(true);
   };
 
   const handleSaveCategory = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -55,17 +61,17 @@ function CategoriesPage() {
         });
         toast({ title: "Catégorie créée", description: `La catégorie ${name} est prête.` });
       }
-      setIsModalOpen(false);
+      setIsSheetOpen(false);
     } catch (error) {
       console.error(error);
-      toast({ title: "Erreur", description: "Impossible d'enregistrer la catégorie.", variant: "destructive" });
+      toast({ title: "Erreur", description: "Impossible d'enregistrer.", variant: "destructive" });
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (window.confirm("Supprimer cette catégorie ? Cela n'affectera pas les produits existants mais ils perdront leur lien visuel.")) {
+    if (window.confirm("Supprimer cette catégorie ?")) {
       try {
         await deleteDoc(doc(db, "categories", id));
         toast({ title: "Catégorie supprimée" });
@@ -88,11 +94,11 @@ function CategoriesPage() {
              </Link>
              <div>
                 <h1 className="text-3xl font-bold font-headline uppercase tracking-tighter italic">Gestion des <span className="text-accent">Catégories</span></h1>
-                <p className="text-muted-foreground">Organisez vos produits informatiques par familles.</p>
+                <p className="text-muted-foreground text-xs uppercase font-black opacity-40">Organisation du Stock Hardware</p>
              </div>
           </div>
           
-          <Button onClick={() => handleOpenModal()} className="bg-primary hover:bg-primary/90 gap-2 neon-glow font-black uppercase italic rounded-xl h-12 px-6">
+          <Button onClick={() => handleOpenSheet()} className="bg-primary hover:bg-primary/90 gap-2 font-black uppercase italic rounded-xl h-12 px-6 shadow-xl">
               <Plus size={18} /> Nouvelle Catégorie
           </Button>
         </div>
@@ -104,73 +110,73 @@ function CategoriesPage() {
         ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {categories && categories.length > 0 ? categories.map((cat: any) => (
-                <Card key={cat.id} className="glossy-card border-none hover:border-accent/50 transition-all rounded-[2rem]">
-                <CardHeader className="flex flex-row items-center justify-between">
-                    <div className="flex items-center gap-3">
-                    <span className="text-2xl">{cat.icon || "📦"}</span>
-                    <CardTitle className="text-xl font-bold italic uppercase">{cat.name}</CardTitle>
+                <Card key={cat.id} className="glossy-card border-none hover:border-accent/50 transition-all rounded-[2.5rem] group">
+                <CardHeader className="flex flex-row items-center justify-between p-8">
+                    <div className="flex items-center gap-4">
+                        <div className="w-14 h-14 rounded-2xl bg-white/5 flex items-center justify-center text-3xl group-hover:scale-110 transition-transform">{cat.icon || "📦"}</div>
+                        <div>
+                            <CardTitle className="text-xl font-black italic uppercase tracking-tight">{cat.name}</CardTitle>
+                            <p className="text-[8px] font-black uppercase text-muted-foreground tracking-[0.2em] mt-1">Slug: {cat.slug}</p>
+                        </div>
                     </div>
-                    <Tags className="text-accent h-5 w-5 opacity-50" />
                 </CardHeader>
-                <CardContent>
-                    <div className="flex justify-between items-center">
-                    <p className="text-sm text-muted-foreground italic uppercase text-[10px] font-bold">Slug: {cat.slug}</p>
-                    <div className="flex gap-2">
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-white hover:bg-white/10" onClick={() => handleOpenModal(cat)}>
-                            <Edit2 size={14}/>
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={() => handleDelete(cat.id)}>
-                            <Trash2 size={14}/>
-                        </Button>
-                    </div>
-                    </div>
+                <CardContent className="px-8 pb-8 flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Button variant="ghost" size="icon" className="h-10 w-10 text-white hover:bg-white/10" onClick={() => handleOpenSheet(cat)}>
+                        <Edit2 size={16}/>
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-10 w-10 text-destructive hover:bg-destructive/10" onClick={() => handleDelete(cat.id)}>
+                        <Trash2 size={16}/>
+                    </Button>
                 </CardContent>
                 </Card>
             )) : (
-                <div className="col-span-full py-20 text-center bg-white/5 rounded-[2.5rem] border border-dashed border-white/10">
-                    <p className="text-muted-foreground italic">Aucune catégorie trouvée. Créez-en une pour commencer.</p>
+                <div className="col-span-full py-32 text-center bg-white/5 rounded-[3rem] border border-dashed border-white/10">
+                    <p className="text-muted-foreground italic font-light uppercase text-xs tracking-widest">Aucune catégorie définie.</p>
                 </div>
             )}
             </div>
         )}
       </main>
 
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="glossy-card border-none rounded-[2rem]">
-            <DialogHeader>
-                <DialogTitle className="text-xl font-black uppercase italic">
-                    {editingCategory ? 'Modifier la Catégorie' : 'Créer une Catégorie'}
-                </DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSaveCategory} className="space-y-6 py-4">
-                <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Nom de la catégorie</Label>
-                    <Input 
-                      name="name" 
-                      defaultValue={editingCategory?.name}
-                      placeholder="Ex: Processeurs" 
-                      required 
-                      className="h-12 bg-background/50 border-white/10 rounded-xl" 
-                    />
+      <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
+        <SheetContent side="right" className="bg-card/95 backdrop-blur-3xl border-white/10 w-full sm:max-w-md flex flex-col p-0">
+            <SheetHeader className="p-8 bg-accent/10 border-b border-white/5">
+                <SheetTitle className="text-2xl font-black uppercase italic tracking-tighter">
+                    {editingCategory ? 'Modifier' : 'Créer'} une Catégorie
+                </SheetTitle>
+                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Architecture de Boutique</p>
+            </SheetHeader>
+            <form onSubmit={handleSaveCategory} className="flex-1 p-8 space-y-8 overflow-y-auto">
+                <div className="space-y-6">
+                    <div className="space-y-2">
+                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Nom de la famille</Label>
+                        <Input 
+                          name="name" 
+                          defaultValue={editingCategory?.name}
+                          placeholder="Ex: Processeurs" 
+                          required 
+                          className="h-14 bg-background/50 border-white/5 rounded-2xl focus:border-accent text-lg font-bold" 
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Icône représentative (Emoji)</Label>
+                        <Input 
+                          name="icon" 
+                          defaultValue={editingCategory?.icon}
+                          placeholder="Ex: 💻" 
+                          className="h-14 bg-background/50 border-white/5 rounded-2xl text-2xl text-center focus:border-accent" 
+                        />
+                        <p className="text-[9px] text-muted-foreground italic mt-2">Utilisez les emojis standard de votre clavier pour illustrer la catégorie.</p>
+                    </div>
                 </div>
-                <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Emoji / Icône</Label>
-                    <Input 
-                      name="icon" 
-                      defaultValue={editingCategory?.icon}
-                      placeholder="Ex: 💻" 
-                      className="h-12 bg-background/50 border-white/10 rounded-xl" 
-                    />
-                </div>
-                <DialogFooter className="gap-2">
-                    <Button type="button" variant="ghost" onClick={() => setIsModalOpen(false)} className="font-bold uppercase text-[10px]">Annuler</Button>
-                    <Button type="submit" disabled={isSubmitting} className="bg-accent text-accent-foreground font-black uppercase italic rounded-xl px-8 h-12">
-                        {isSubmitting ? <Loader2 className="animate-spin" /> : editingCategory ? "Mettre à jour" : "Créer"}
+                <div className="pt-8">
+                    <Button type="submit" disabled={isSubmitting} className="w-full h-16 bg-accent text-black font-black uppercase italic rounded-2xl shadow-xl shadow-accent/10">
+                        {isSubmitting ? <Loader2 className="animate-spin" /> : editingCategory ? "Appliquer les changements" : "Valider la création"}
                     </Button>
-                </DialogFooter>
+                </div>
             </form>
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

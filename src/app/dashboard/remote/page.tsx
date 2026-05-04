@@ -9,11 +9,9 @@ import {
     MonitorSmartphone, 
     Loader2, 
     ArrowLeft, 
-    Plus, 
     CheckCircle2, 
     XCircle, 
     ExternalLink, 
-    Copy,
     Activity,
     Clock,
     Terminal,
@@ -32,12 +30,18 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { 
+    Sheet, 
+    SheetContent, 
+    SheetHeader, 
+    SheetTitle,
+    SheetFooter 
+} from "@/components/ui/sheet";
 
 function RemoteSupportPage() {
     const { user } = useAuth();
     const { toast } = useToast();
-    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isSheetOpen, setIsSheetOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     const sessionsQuery = useMemoFirebase(() => {
@@ -69,16 +73,16 @@ function RemoteSupportPage() {
 
             await addDoc(collection(db, "notifications"), {
                 userId: 'staff',
-                title: "URGENT: Demande Support à Distance",
-                message: `${user?.name} demande une prise en main via ${formData.get('software')}.`,
+                title: "ALERTE: Support à Distance",
+                message: `${user?.name} demande une prise en main immédiate (${formData.get('software')}).`,
                 type: 'warning',
                 isRead: false,
                 createdAt: serverTimestamp(),
                 link: '/dashboard/remote'
             });
 
-            toast({ title: "Demande envoyée", description: "Veuillez garder votre logiciel ouvert. Un expert va se connecter." });
-            setIsModalOpen(false);
+            toast({ title: "Signal envoyé", description: "Gardez votre logiciel ouvert, un expert DKS se connecte." });
+            setIsSheetOpen(false);
         } catch (error) {
             toast({ title: "Erreur", variant: "destructive" });
         } finally {
@@ -93,13 +97,12 @@ function RemoteSupportPage() {
                 updatedAt: serverTimestamp()
             });
 
-            // LOGIQUE DE FACTURATION AUTOMATIQUE
             if (newStatus === 'completed') {
                 await addDoc(collection(db, "orders"), {
                     userId: session.userId,
                     customerName: session.customerName,
                     items: [{ 
-                        name: `Support à Distance: ${session.issueDescription.substring(0, 30)}...`, 
+                        name: `Support Direct: ${session.issueDescription.substring(0, 30)}...`, 
                         quantity: 1, 
                         price: 15 
                     }],
@@ -111,14 +114,13 @@ function RemoteSupportPage() {
                     source: 'remote_support',
                     sourceId: session.id
                 });
-                
-                toast({ title: "Session terminée", description: "Une facture de 15$ a été générée pour le client." });
+                toast({ title: "Session clôturée", description: "Facture de 15$ générée." });
             }
 
             await addDoc(collection(db, "notifications"), {
                 userId: session.userId,
                 title: "Statut Prise en Main",
-                message: `L'expert DKS a mis à jour votre session : ${newStatus.toUpperCase()}.${newStatus === 'completed' ? ' Une facture a été générée.' : ''}`,
+                message: `Mise à jour : ${newStatus.toUpperCase()}.`,
                 type: 'info',
                 isRead: false,
                 createdAt: serverTimestamp(),
@@ -134,7 +136,7 @@ function RemoteSupportPage() {
     const getStatusBadge = (status: string) => {
         switch (status) {
             case 'pending': return <Badge className="bg-orange-500/10 text-orange-400 border-none uppercase text-[9px] font-black animate-pulse">En attente</Badge>;
-            case 'active': return <Badge className="bg-green-500/10 text-green-400 border-none uppercase text-[9px] font-black">Session Active</Badge>;
+            case 'active': return <Badge className="bg-green-500/10 text-green-400 border-none uppercase text-[9px] font-black">Expert en Ligne</Badge>;
             case 'completed': return <Badge className="bg-white/5 text-muted-foreground border-none uppercase text-[9px] font-black">Terminé & Facturé</Badge>;
             case 'cancelled': return <Badge className="bg-destructive/10 text-destructive border-none uppercase text-[9px] font-black">Annulé</Badge>;
             default: return <Badge>{status}</Badge>;
@@ -155,14 +157,14 @@ function RemoteSupportPage() {
                             </Button>
                         </Link>
                         <div>
-                            <h1 className="text-4xl font-black uppercase italic tracking-tighter">Support <span className="text-accent">À Distance</span></h1>
-                            <p className="text-muted-foreground font-light mt-1">Résolution immédiate de vos soucis logiciels partout à Bunia.</p>
+                            <h1 className="text-4xl font-black uppercase italic tracking-tighter">Support <span className="text-accent">Direct</span></h1>
+                            <p className="text-muted-foreground text-xs uppercase font-black opacity-40 mt-1">Prise en main logicielle immédiate à Bunia</p>
                         </div>
                     </div>
                     
                     {!isStaff && (
-                        <Button onClick={() => setIsModalOpen(true)} className="bg-accent text-black hover:bg-accent/90 h-14 px-8 rounded-2xl font-black uppercase italic gap-3 shadow-xl shadow-accent/20">
-                            <MonitorSmartphone size={20} /> Nouvelle Session Directe
+                        <Button onClick={() => setIsSheetOpen(true)} className="bg-accent text-black hover:bg-accent/90 h-14 px-8 rounded-2xl font-black uppercase italic gap-3 shadow-xl shadow-accent/20">
+                            <MonitorSmartphone size={20} /> Lancer une session
                         </Button>
                     )}
                 </div>
@@ -175,21 +177,20 @@ function RemoteSupportPage() {
                             <Card key={session.id} className="glossy-card border-none rounded-[2.5rem] overflow-hidden group">
                                 <CardContent className="p-8 flex flex-col lg:flex-row items-center gap-8">
                                     <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center shrink-0">
-                                        <Activity className={session.status === 'active' ? 'text-green-400 animate-pulse' : 'text-slate-500'} size={28} />
+                                        <Activity className={session.status === 'active' ? 'text-green-400 animate-pulse' : 'text-white/20'} size={28} />
                                     </div>
                                     
-                                    <div className="flex-1 space-y-2 text-center md:text-left">
-                                        <div className="flex flex-wrap justify-center md:justify-start items-center gap-3">
+                                    <div className="flex-1 space-y-3 text-center md:text-left">
+                                        <div className="flex flex-wrap justify-center md:justify-start items-center gap-4">
                                             <h3 className="text-xl font-black uppercase italic tracking-tight">{session.customerName}</h3>
                                             {getStatusBadge(session.status)}
-                                            <Badge variant="outline" className="border-white/10 text-[9px] uppercase font-bold text-accent">ID: {session.remoteId}</Badge>
                                         </div>
-                                        <div className="flex items-center justify-center md:justify-start gap-4 text-[10px] font-black uppercase italic text-muted-foreground/40">
-                                            <span className="flex items-center gap-2"><Terminal size={12} /> Logiciel: {session.software?.toUpperCase()}</span>
+                                        <div className="flex items-center justify-center md:justify-start gap-5 text-[9px] font-black uppercase italic text-muted-foreground/40 tracking-widest">
+                                            <span className="flex items-center gap-2"><Terminal size={12} className="text-accent" /> {session.software?.toUpperCase()}</span>
                                             <span>•</span>
-                                            <span className="flex items-center gap-2"><Clock size={12} /> Demandé le {session.createdAt?.toDate?.().toLocaleTimeString() || 'Récemment'}</span>
+                                            <span className="flex items-center gap-2"><Clock size={12} /> {session.createdAt?.toDate?.().toLocaleTimeString() || 'Récemment'}</span>
                                         </div>
-                                        <p className="text-sm text-muted-foreground mt-2 italic">" {session.issueDescription} "</p>
+                                        <p className="text-sm text-white/70 italic max-w-2xl">" {session.issueDescription} "</p>
                                     </div>
 
                                     <div className="flex flex-col gap-3 shrink-0 min-w-[220px]">
@@ -197,27 +198,21 @@ function RemoteSupportPage() {
                                             <>
                                                 {session.status !== 'completed' && session.status !== 'cancelled' && (
                                                     <Button className="bg-primary text-white rounded-xl h-12 font-black uppercase italic text-[10px] gap-2 shadow-lg" onClick={() => updateStatus(session, 'active')}>
-                                                        <ExternalLink size={14} /> Lancer la Connexion
+                                                        <ExternalLink size={14} /> Se Connecter
                                                     </Button>
                                                 )}
                                                 <div className="flex gap-2">
                                                     {session.status !== 'completed' && session.status !== 'cancelled' && (
                                                         <Button variant="outline" className="flex-1 rounded-xl border-white/10 text-[9px] font-black uppercase h-10 hover:bg-green-500/10 hover:text-green-400" onClick={() => updateStatus(session, 'completed')}>
-                                                            <Receipt size={12} className="mr-1" /> Fixé
-                                                        </Button>
-                                                    )}
-                                                    {session.status === 'pending' && (
-                                                        <Button variant="outline" className="flex-1 rounded-xl border-white/10 text-destructive/60 hover:text-destructive text-[9px] font-black h-10" onClick={() => updateStatus(session, 'cancelled')}>
-                                                            <XCircle size={12} className="mr-1" /> Annuler
+                                                            <Receipt size={12} className="mr-2" /> Clôturer
                                                         </Button>
                                                     )}
                                                 </div>
                                             </>
                                         ) : (
-                                            <div className="p-4 bg-black/20 rounded-2xl border border-white/5 text-center">
-                                                <p className="text-[8px] font-black uppercase text-muted-foreground mb-1">Votre accès expert</p>
-                                                <p className="text-lg font-mono font-black text-accent tracking-widest">{session.remoteId}</p>
-                                                <p className="text-[7px] font-bold uppercase text-white/40 mt-1">Gardez {session.software} ouvert</p>
+                                            <div className="p-5 bg-black/40 rounded-2xl border border-white/5 text-center">
+                                                <p className="text-[8px] font-black uppercase text-muted-foreground mb-2 tracking-[0.2em]">Votre ID Partagé</p>
+                                                <p className="text-xl font-mono font-black text-accent tracking-[0.3em]">{session.remoteId}</p>
                                             </div>
                                         )}
                                     </div>
@@ -228,61 +223,49 @@ function RemoteSupportPage() {
                         <div className="py-32 text-center bg-white/5 rounded-[3rem] border border-dashed border-white/10 opacity-30 flex flex-col items-center gap-6">
                             <MonitorSmartphone size={80} strokeWidth={1} />
                             <p className="text-xl font-black uppercase italic tracking-tighter">Aucune session active</p>
-                            <p className="text-xs max-w-sm leading-relaxed">Le support à distance permet une résolution rapide des problèmes logiciels sans déplacement.</p>
+                            <p className="text-xs max-w-sm uppercase font-black tracking-widest leading-relaxed">Le support à distance permet une résolution logicielle immédiate sans déplacement.</p>
                         </div>
                     )}
                 </div>
-
-                <Card className="mt-12 bg-accent/5 border-accent/20 rounded-[2.5rem] p-8 flex items-center gap-6">
-                    <div className="w-12 h-12 rounded-2xl bg-accent/10 flex items-center justify-center text-accent shrink-0">
-                        <ShieldAlert size={24} />
-                    </div>
-                    <div>
-                        <h4 className="font-black uppercase italic text-sm">Garantie de Sécurité DKS</h4>
-                        <p className="text-xs text-muted-foreground leading-relaxed">
-                            Nous ne nous connectons qu'avec votre autorisation. Vous pouvez couper la session à tout moment en fermant votre logiciel de prise en main.
-                        </p>
-                    </div>
-                </Card>
             </main>
 
-            <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-                <DialogContent className="glossy-card border-none rounded-[2.5rem]">
-                    <DialogHeader>
-                        <DialogTitle className="text-2xl font-black uppercase italic tracking-tighter">Demander une Prise en Main</DialogTitle>
-                    </DialogHeader>
-                    <form onSubmit={handleCreateSession} className="space-y-6 py-4">
-                        <div className="grid grid-cols-2 gap-4">
+            <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
+                <SheetContent side="right" className="bg-card/95 backdrop-blur-3xl border-white/10 w-full sm:max-w-md flex flex-col p-0">
+                    <SheetHeader className="p-8 bg-accent/10 border-b border-white/5">
+                        <SheetTitle className="text-2xl font-black uppercase italic tracking-tighter">Nouvelle Demande Directe</SheetTitle>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Assistance Logicielle Instantanée</p>
+                    </SheetHeader>
+                    <form onSubmit={handleCreateSession} className="flex-1 p-8 space-y-8 overflow-y-auto">
+                        <div className="space-y-6">
                             <div className="space-y-2">
-                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Logiciel Utilisé</Label>
+                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Logiciel de Prise en Main</Label>
                                 <Select name="software" defaultValue="anydesk">
-                                    <SelectTrigger className="h-14 bg-background/50 border-white/10 rounded-xl">
+                                    <SelectTrigger className="h-14 bg-background/50 border-white/5 rounded-2xl">
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent className="bg-card border-white/10">
-                                        <SelectItem value="anydesk">AnyDesk</SelectItem>
-                                        <SelectItem value="teamviewer">TeamViewer</SelectItem>
+                                        <SelectItem value="anydesk" className="font-bold uppercase text-[10px]">AnyDesk (Recommandé)</SelectItem>
+                                        <SelectItem value="teamviewer" className="font-bold uppercase text-[10px]">TeamViewer</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
                             <div className="space-y-2">
-                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Votre ID / Adresse</Label>
-                                <Input name="remoteId" placeholder="Ex: 123 456 789" required className="h-14 bg-background/50 border-white/10 rounded-xl font-mono text-lg tracking-widest" />
+                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Identifiant / Adresse ID</Label>
+                                <Input name="remoteId" placeholder="Ex: 123 456 789" required className="h-14 bg-background/50 border-white/5 rounded-2xl font-mono text-xl tracking-widest text-accent text-center" />
+                            </div>
+                            <div className="space-y-2">
+                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Nature du Problème</Label>
+                                <Textarea name="description" placeholder="Ex: Erreur installation driver, lenteur système..." required className="min-h-[120px] bg-background/50 border-white/5 rounded-2xl text-sm" />
                             </div>
                         </div>
-                        <div className="space-y-2">
-                            <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Problème rencontré</Label>
-                            <Textarea name="description" placeholder="Décrivez brièvement ce que vous souhaitez que l'expert règle..." required className="min-h-[100px] bg-background/50 border-white/10 rounded-xl" />
-                        </div>
-                        <DialogFooter>
-                            <Button type="button" variant="ghost" onClick={() => setIsModalOpen(false)} className="font-bold uppercase text-[10px]">Annuler</Button>
-                            <Button type="submit" disabled={isSubmitting} className="bg-accent text-black font-black uppercase italic rounded-xl px-10 h-14 shadow-xl flex-1">
-                                {isSubmitting ? <Loader2 className="animate-spin" /> : "Lancer l'alerte Expert"}
+                        <div className="pt-8">
+                            <Button type="submit" disabled={isSubmitting} className="w-full h-16 bg-accent text-black font-black uppercase italic rounded-2xl shadow-xl shadow-accent/20">
+                                {isSubmitting ? <Loader2 className="animate-spin" /> : "Lancer l'Alerte Expert DKS"}
                             </Button>
-                        </DialogFooter>
+                        </div>
                     </form>
-                </DialogContent>
-            </Dialog>
+                </SheetContent>
+            </Sheet>
         </div>
     );
 }
