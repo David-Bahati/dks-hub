@@ -20,7 +20,8 @@ import {
     CheckCircle2,
     XCircle,
     UserCheck,
-    Zap
+    Zap,
+    PlusCircle
 } from "lucide-react";
 import { db } from '@/lib/firebase';
 import { collection, query, orderBy, updateDoc, doc, addDoc, serverTimestamp } from 'firebase/firestore';
@@ -165,6 +166,11 @@ function AuditsManagementPage() {
                                     </div>
 
                                     <div className="flex flex-col gap-3 shrink-0 min-w-[240px]">
+                                        <Link href="/dashboard/quotes">
+                                            <Button className="w-full h-12 bg-accent text-black rounded-xl font-black uppercase italic text-[10px] gap-2 shadow-lg">
+                                                <PlusCircle size={14} /> Transformer en Devis
+                                            </Button>
+                                        </Link>
                                         <Select value={audit.status} onValueChange={(val) => updateAuditStatus(audit.id, val, audit.userId, audit.businessName)}>
                                             <SelectTrigger className="h-12 bg-white/5 border-white/10 rounded-xl font-black uppercase italic text-[10px]">
                                                 <SelectValue placeholder="Suivi Mission" />
@@ -176,8 +182,8 @@ function AuditsManagementPage() {
                                                 <SelectItem value="cancelled" className="text-[10px] font-black uppercase opacity-40">Annuler / Refuser</SelectItem>
                                             </SelectContent>
                                         </Select>
-                                        <Button className="h-12 bg-primary text-white rounded-xl font-black uppercase italic text-[10px] gap-2 shadow-lg">
-                                            <FileText size={14} /> Préparer le Rapport
+                                        <Button variant="outline" className="h-12 border-white/10 text-white rounded-xl font-black uppercase italic text-[10px] gap-2">
+                                            <FileText size={14} /> Rapport de Visite
                                         </Button>
                                     </div>
                                 </CardContent>

@@ -54,6 +54,22 @@ export type Order = {
   piValue?: number;
 };
 
+export type Quote = {
+    id: string;
+    userId: string;
+    customerName: string;
+    customerEmail?: string;
+    businessName?: string;
+    items: OrderItem[];
+    total: number;
+    status: 'draft' | 'sent' | 'approved' | 'rejected' | 'expired';
+    expiryDate: any;
+    auditId?: string; // Link to an audit if needed
+    notes?: string;
+    createdAt: any;
+    updatedAt: any;
+};
+
 export type SupportTicket = {
   id: string;
   userId: string;
