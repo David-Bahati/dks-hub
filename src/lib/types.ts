@@ -94,6 +94,8 @@ export type SupportTicket = {
   status: 'pending' | 'diagnosing' | 'repairing' | 'ready' | 'completed';
   priority: 'low' | 'medium' | 'high' | 'urgent';
   imageUrl?: string;
+  subscriptionId?: string; // Lien optionnel vers un contrat
+  subscriptionTitle?: string;
   createdAt: any;
   updatedAt: any;
 };

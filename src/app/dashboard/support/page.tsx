@@ -19,6 +19,8 @@ import {
     Image as ImageIcon,
     Upload,
     X,
+    ShieldAlert,
+    Zap
 } from "lucide-react";
 import { db } from '@/lib/firebase';
 import { collection, addDoc, serverTimestamp, doc, updateDoc, query, orderBy, onSnapshot } from 'firebase/firestore';
@@ -235,7 +237,18 @@ function SupportPage() {
                         <div className="py-20 flex justify-center"><Loader2 className="animate-spin text-accent h-12 w-12" /></div>
                     ) : filteredTickets && filteredTickets.length > 0 ? (
                         filteredTickets.map((ticket) => (
-                            <Card key={ticket.id} className="glossy-card border-none rounded-[2.5rem] overflow-hidden group transition-all">
+                            <Card key={ticket.id} className={cn(
+                                "glossy-card border-none rounded-[2.5rem] overflow-hidden group transition-all relative",
+                                ticket.subscriptionId && "border-l-4 border-l-red-500 bg-red-500/[0.02]"
+                            )}>
+                                {ticket.subscriptionId && (
+                                    <div className="absolute top-0 right-0 p-4">
+                                        <Badge className="bg-red-500 text-white border-none uppercase text-[8px] font-black px-3 py-1 flex items-center gap-1 animate-pulse">
+                                            <Zap size={10} /> VIP CONTRAT
+                                        </Badge>
+                                    </div>
+                                )}
+                                
                                 <CardContent className="p-8 flex flex-col md:flex-row items-center gap-8">
                                     <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center text-accent shrink-0 overflow-hidden relative">
                                         {ticket.imageUrl ? <img src={ticket.imageUrl} className="w-full h-full object-cover" /> : <Wrench size={28} />}
@@ -252,13 +265,22 @@ function SupportPage() {
                                             <span className="flex items-center gap-2"><UserIcon size={12} className="text-accent" /> {ticket.customerName}</span>
                                             <span>•</span>
                                             <span className="flex items-center gap-2"><Clock size={12} /> {ticket.createdAt?.toDate?.().toLocaleDateString() || 'Récemment'}</span>
+                                            {ticket.subscriptionTitle && (
+                                                <>
+                                                    <span>•</span>
+                                                    <span className="flex items-center gap-2 text-red-400"><ShieldAlert size={12} /> {ticket.subscriptionTitle}</span>
+                                                </>
+                                            )}
                                         </div>
                                     </div>
 
                                     <div className="flex flex-col gap-3 shrink-0 min-w-[220px]">
                                         <Button 
                                             variant="outline" 
-                                            className="rounded-xl border-accent/20 text-accent hover:bg-accent hover:text-black gap-2 h-12 font-black uppercase italic text-[10px] transition-all"
+                                            className={cn(
+                                                "rounded-xl border-accent/20 text-accent hover:bg-accent hover:text-black gap-2 h-12 font-black uppercase italic text-[10px] transition-all",
+                                                ticket.subscriptionId && "border-red-500/20 text-red-500 hover:bg-red-500 hover:text-white"
+                                            )}
                                             onClick={() => { setSelectedTicket(ticket); setIsChatOpen(true); }}
                                         >
                                             <MessageCircle size={16} /> Entrer en Chat Live
@@ -290,6 +312,7 @@ function SupportPage() {
                 </div>
             </main>
 
+            {/* NEW TICKET SHEET */}
             <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
                 <SheetContent side="right" className="bg-card/95 backdrop-blur-3xl border-white/10 w-full sm:max-w-xl flex flex-col p-0">
                     <SheetHeader className="p-8 bg-primary/10 border-b border-white/5">

@@ -24,11 +24,14 @@ import {
     FileText,
     Download,
     QrCode,
-    BarChart3
+    BarChart3,
+    Wrench,
+    Send
 } from "lucide-react";
 import { db } from '@/lib/firebase';
 import { collection, query, orderBy, updateDoc, doc, addDoc, serverTimestamp, where } from 'firebase/firestore';
 import withAuth from '@/components/auth/withAuth';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useCollection, useMemoFirebase } from '@/firebase';
 import { useAuth } from "@/context/AuthContext";
@@ -38,6 +41,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from "@/components/ui/sheet";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { format, addMonths } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -48,8 +52,11 @@ import { Logo } from '@/components/ui/Logo';
 function SubscriptionsPage() {
     const { user } = useAuth();
     const { toast } = useToast();
+    const router = useRouter();
     const [search, setSearch] = useState("");
     const [isSheetOpen, setIsSheetOpen] = useState(false);
+    const [isPrioritySheetOpen, setIsPrioritySheetOpen] = useState(false);
+    const [selectedSubForTicket, setSelectedSubForTicket] = useState<any>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     
     // Reporting States
@@ -93,6 +100,48 @@ function SubscriptionsPage() {
             
             toast({ title: "Contrat activé", description: "Le service récurrent est désormais en place." });
             setIsSheetOpen(false);
+        } catch (error) {
+            toast({ title: "Erreur", variant: "destructive" });
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const handleCreatePriorityTicket = async (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        if (!selectedSubForTicket) return;
+        setIsSubmitting(true);
+        const formData = new FormData(e.currentTarget);
+
+        try {
+            const ticketData = {
+                userId: user?.uid,
+                customerName: user?.name || "Client DKS",
+                productName: selectedSubForTicket.serviceTitle,
+                issueDescription: formData.get('description'),
+                status: 'pending',
+                priority: 'urgent',
+                subscriptionId: selectedSubForTicket.id,
+                subscriptionTitle: selectedSubForTicket.serviceTitle,
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp()
+            };
+
+            await addDoc(collection(db, "supportTickets"), ticketData);
+
+            await addDoc(collection(db, "notifications"), {
+                userId: 'staff',
+                title: "ALERTE VIP: Support Prioritaire",
+                message: `${user?.name} demande une intervention urgente sous contrat (${selectedSubForTicket.serviceTitle}).`,
+                type: 'error',
+                isRead: false,
+                createdAt: serverTimestamp(),
+                link: '/dashboard/support'
+            });
+
+            toast({ title: "Alerte Prioritaire Envoyée", description: "Votre contrat garantit un traitement sous 2h." });
+            setIsPrioritySheetOpen(false);
+            router.push('/dashboard/support');
         } catch (error) {
             toast({ title: "Erreur", variant: "destructive" });
         } finally {
@@ -227,7 +276,18 @@ function SubscriptionsPage() {
                                             <p className="text-[10px] font-black uppercase text-muted-foreground mb-1">Redevance {sub.planType === 'monthly' ? 'Mensuelle' : 'Périodique'}</p>
                                             <p className="text-2xl font-black text-white">${sub.amount.toFixed(2)}</p>
                                         </div>
-                                        <div className="flex flex-col gap-2">
+                                        <div className="flex flex-col gap-2 min-w-[180px]">
+                                            {!isStaff && sub.status === 'active' && (
+                                                <Button 
+                                                    className="bg-red-500 hover:bg-red-600 text-white rounded-xl h-11 px-4 gap-2 font-black uppercase italic text-[10px] shadow-lg animate-pulse"
+                                                    onClick={() => {
+                                                        setSelectedSubForTicket(sub);
+                                                        setIsPrioritySheetOpen(true);
+                                                    }}
+                                                >
+                                                    <Wrench size={14} /> Support Prioritaire
+                                                </Button>
+                                            )}
                                             <Button 
                                                 variant="outline"
                                                 className="rounded-xl h-11 px-4 gap-2 font-black uppercase italic text-[10px] border-white/10 hover:bg-white/5"
@@ -258,6 +318,7 @@ function SubscriptionsPage() {
                 </div>
             </main>
 
+            {/* CREATE SUBSCRIPTION SHEET */}
             <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
                 <SheetContent side="right" className="bg-card/95 backdrop-blur-3xl border-white/10 w-full sm:max-w-md flex flex-col p-0">
                     <SheetHeader className="p-8 bg-accent/10 border-b border-white/5">
@@ -317,6 +378,44 @@ function SubscriptionsPage() {
                 </SheetContent>
             </Sheet>
 
+            {/* PRIORITY TICKET SHEET */}
+            <Sheet open={isPrioritySheetOpen} onOpenChange={setIsPrioritySheetOpen}>
+                <SheetContent side="right" className="bg-card/95 backdrop-blur-3xl border-white/10 w-full sm:max-w-md flex flex-col p-0">
+                    <SheetHeader className="p-8 bg-red-500/10 border-b border-white/5">
+                        <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 rounded-2xl bg-red-500/20 flex items-center justify-center text-red-500 shadow-[0_0_20px_rgba(239,68,68,0.3)]">
+                                <Zap size={24} />
+                            </div>
+                            <div>
+                                <SheetTitle className="text-2xl font-black uppercase italic tracking-tighter text-red-500">Alerte Support VIP</SheetTitle>
+                                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Lien Contrat : {selectedSubForTicket?.serviceTitle}</p>
+                            </div>
+                        </div>
+                    </SheetHeader>
+                    
+                    <form onSubmit={handleCreatePriorityTicket} className="flex-1 p-8 space-y-8 overflow-y-auto">
+                        <div className="space-y-6">
+                            <div className="p-4 bg-red-500/5 rounded-2xl border border-red-500/20">
+                                <p className="text-[10px] text-red-400 font-bold uppercase leading-relaxed italic">
+                                    En tant qu'abonné Elite, votre demande est traitée en priorité absolue. Un expert interviendra sous un délai garanti par votre contrat.
+                                </p>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Nature de l'urgence</Label>
+                                <Textarea name="description" placeholder="Détaillez le blocage technique rencontré..." required className="min-h-[150px] bg-background/50 border-white/5 rounded-2xl focus:border-red-500 text-sm italic" />
+                            </div>
+                        </div>
+
+                        <div className="pt-8">
+                            <Button type="submit" disabled={isSubmitting} className="w-full h-16 bg-red-500 text-white font-black uppercase italic rounded-2xl shadow-xl shadow-red-500/20 text-lg gap-2">
+                                {isSubmitting ? <Loader2 className="animate-spin" /> : <><Send size={20} /> Lancer l'Intervention Immédiate</>}
+                            </Button>
+                        </div>
+                    </form>
+                </SheetContent>
+            </Sheet>
+
             {/* MODÈLE DE BILAN PDF (HIDDEN) */}
             <div style={{ position: 'absolute', left: '-9999px', top: 0 }}>
                 {selectedSubForReport && (
@@ -345,7 +444,7 @@ function SubscriptionsPage() {
                             <div className="p-6 bg-gray-50 rounded-2xl space-y-4">
                                 <h3 className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Informations Client</h3>
                                 <div>
-                                    <p className="text-xl font-black uppercase italic">{selectedSubSubForReport?.customerName || selectedSubForReport.customerName}</p>
+                                    <p className="text-xl font-black uppercase italic">{selectedSubForReport.customerName}</p>
                                     <p className="text-sm font-bold text-blue-600 uppercase mt-1">{selectedSubForReport.serviceTitle}</p>
                                 </div>
                             </div>
@@ -425,7 +524,7 @@ function SubscriptionsPage() {
                         <footer className="mt-20 pt-10 border-t border-gray-100 flex justify-between items-end">
                             <div className="flex items-center gap-6">
                                 <QrCode size={60} className="opacity-20" />
-                                <p className="text-[8px] font-bold text-gray-400 uppercase leading-relaxed max-w-[200px]">
+                                <p className="text-[8px] font-bold text-gray-400 uppercase leading-relaxed max-w-[250px]">
                                     Document confidentiel produit par Double King Shop. <br />
                                     Certification ISO-DKS 2024.
                                 </p>
