@@ -123,6 +123,22 @@
       },
       "required": ["name", "quantity", "unit", "minThreshold"]
     },
+    "LabTool": {
+      "title": "LabTool",
+      "description": "Équipement de laboratoire nécessitant un suivi d'usure (ex: Fer à souder, Station air chaud).",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "serialNumber": { "type": "string" },
+        "status": { "type": "string", "enum": ["excellent", "good", "warning", "service_needed"] },
+        "usageCount": { "type": "number" },
+        "usageThreshold": { "type": "number" },
+        "lastMaintenance": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "status", "usageCount", "usageThreshold"]
+    },
     "ConsumptionLog": {
       "title": "ConsumptionLog",
       "description": "Journalise l'utilisation ou le réapprovisionnement des consommables labo.",
@@ -169,6 +185,10 @@
     "/consumables/{consumableId}": {
       "schema": "Consumable",
       "description": "Lab consumables."
+    },
+    "/labTools/{toolId}": {
+      "schema": "LabTool",
+      "description": "Lab tools tracking."
     },
     "/consumptionLogs/{logId}": {
       "schema": "ConsumptionLog",

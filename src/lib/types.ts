@@ -41,6 +41,17 @@ export type Consumable = {
   updatedAt: any;
 };
 
+export type LabTool = {
+  id: string;
+  name: string;
+  serialNumber?: string;
+  status: 'excellent' | 'good' | 'warning' | 'service_needed';
+  usageCount: number;
+  usageThreshold: number;
+  lastMaintenance: any;
+  updatedAt: any;
+};
+
 export type ConsumptionLog = {
   id: string;
   consumableId: string;
