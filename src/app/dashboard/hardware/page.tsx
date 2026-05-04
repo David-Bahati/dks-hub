@@ -160,7 +160,7 @@ function HardwareParkPage() {
                                         {health.status === 'warning' && (
                                             <div className="p-3 bg-orange-500/5 border border-orange-500/10 rounded-xl flex items-center gap-3">
                                                 <AlertTriangle size={14} className="text-orange-400" />
-                                                <p className="text-[9px] font-bold text-orange-400/80 uppercase">Dépoussiérage recommandé (6 mois+)</p>
+                                                <p className="text-[9px] font-bold text-orange-400/80 uppercase">Maintenance recommandée (6 mois+)</p>
                                             </div>
                                         )}
 

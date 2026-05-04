@@ -38,7 +38,8 @@ import {
     Crown,
     Star,
     Sparkles,
-    CheckCircle2
+    CheckCircle2,
+    QrCode
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -75,6 +76,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PI_CONVERSION_RATE, PI_MERCHANT_WALLET } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import { useTheme } from "next-themes";
+import { Logo } from "@/components/ui/Logo";
 
 export default function SettingsPage() {
     const { user } = useAuth();
@@ -102,7 +104,6 @@ export default function SettingsPage() {
     
     // System States
     const [exchangeRate, setExchangeRate] = useState("2500");
-    const [piValue, setPiValue] = useState(PI_CONVERSION_RATE.toString());
     const [isSavingSystem, setIsSavingSystem] = useState(false);
 
     useEffect(() => {
@@ -134,7 +135,6 @@ export default function SettingsPage() {
             const configSnap = await getDoc(configRef);
             if (configSnap.exists()) {
                 setExchangeRate(configSnap.data().exchangeRate?.toString() || "2500");
-                setPiValue(configSnap.data().piValue?.toString() || PI_CONVERSION_RATE.toString());
             }
         } catch (error) {
             console.error("Config fetch error:", error);
@@ -147,7 +147,7 @@ export default function SettingsPage() {
     const loyalty = useMemo(() => {
         const points = orderCount * 100;
         if (points >= 1000) return { label: "Membre Gold", level: 3, icon: <Crown size={24} className="text-yellow-400" />, color: "text-yellow-400", bg: "bg-yellow-400/10", border: "border-yellow-400/20", perks: ["Priorité SAV 24h", "Livraison Bunia Offerte", "Ateliers IA Gratuits"] };
-        if (points >= 500) return { label: "Membre Silver", level: 2, icon: <Star size={24} className="text-slate-300" />, color: "text-slate-300", bg: "bg-slate-300/10", border: "border-slate-300/20", perks: ["Priorité SAV 48h", "-10% sur Formations", "Diagnostic Diagnostic Offert"] };
+        if (points >= 500) return { label: "Membre Silver", level: 2, icon: <Star size={24} className="text-slate-300" />, color: "text-slate-300", bg: "bg-slate-300/10", border: "border-slate-300/20", perks: ["Priorité SAV 48h", "-10% sur Formations", "Diagnostic PC Offert"] };
         return { label: "Membre Bronze", level: 1, icon: <Trophy size={24} className="text-orange-400" />, color: "text-orange-400", bg: "bg-orange-400/10", border: "border-orange-400/20", perks: ["Accès au Hub Central", "Support par Ticket", "Historique Digital"] };
     }, [orderCount]);
 
@@ -276,8 +276,7 @@ export default function SettingsPage() {
                                 </Card>
 
                                 <Card className="glossy-card border-none rounded-[2.5rem] p-8 space-y-6">
-                                    <div className="flex items-center gap-3"><Globe size={18} className="text-accent" /><h4 className="text-[11px] font-black uppercase italic tracking-widest">Préférences Interface</h4></div>
-                                    
+                                    <div className="flex items-center gap-3"><Globe size={18} className="text-accent" /><h4 className="text-[11px] font-black uppercase italic tracking-widest">Interface</h4></div>
                                     <div className="space-y-4">
                                         <div className="flex items-center justify-between p-3 bg-white/5 rounded-2xl">
                                             <div className="flex items-center gap-3">
@@ -285,18 +284,6 @@ export default function SettingsPage() {
                                                 <span className="text-[10px] font-black uppercase">Mode Sombre</span>
                                             </div>
                                             <Switch checked={theme === 'dark'} onCheckedChange={(c) => setTheme(c ? 'dark' : 'light')} />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label className="text-[9px] font-black uppercase opacity-40 ml-1">Langue de l'interface</Label>
-                                            <Select value={language} onValueChange={setLanguage}>
-                                                <SelectTrigger className="h-12 bg-background/50 border-white/5 rounded-xl text-xs font-bold uppercase">
-                                                    <SelectValue />
-                                                </SelectTrigger>
-                                                <SelectContent className="bg-card border-white/10">
-                                                    <SelectItem value="fr" className="text-xs font-bold uppercase">Français (RDC)</SelectItem>
-                                                    <SelectItem value="en" className="text-xs font-bold uppercase">English (Global)</SelectItem>
-                                                </SelectContent>
-                                            </Select>
                                         </div>
                                     </div>
                                 </Card>
@@ -307,8 +294,8 @@ export default function SettingsPage() {
                                     <div className="flex items-center gap-4 mb-10">
                                         <User className="text-accent" size={24} />
                                         <div>
-                                            <h2 className="text-xl font-black uppercase italic tracking-tight">INFORMATIONS DE CONTACT</h2>
-                                            <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Utilisées pour vos factures DKS</p>
+                                            <h2 className="text-xl font-black uppercase italic tracking-tight">INFOS CONTACT</h2>
+                                            <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Pour vos factures officielles</p>
                                         </div>
                                     </div>
 
@@ -318,20 +305,17 @@ export default function SettingsPage() {
                                             <Input value={name} onChange={(e) => setName(e.target.value)} className="h-14 bg-background/50 border-white/5 rounded-2xl focus:border-accent text-sm" />
                                         </div>
                                         <div className="space-y-4">
-                                            <div className="flex justify-between items-center">
-                                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Numéro WhatsApp</Label>
-                                                <Badge className="bg-green-500/10 text-green-400 border-none text-[8px] h-4">VALIDÉ BUNIA</Badge>
-                                            </div>
+                                            <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Numéro WhatsApp</Label>
                                             <div className="relative">
                                                 <MessageCircle className="absolute left-5 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
                                                 <Input value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="+243..." className="h-14 pl-14 bg-background/50 border-white/5 rounded-2xl focus:border-accent" />
                                             </div>
                                         </div>
                                         <div className="md:col-span-2 space-y-4">
-                                            <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Adresse de livraison à Bunia</Label>
+                                            <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Adresse de livraison (Bunia)</Label>
                                             <div className="relative">
                                                 <MapPin className="absolute left-5 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
-                                                <Input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Quartier, Avenue, N° Maison..." className="h-14 pl-14 bg-background/50 border-white/5 rounded-2xl focus:border-accent" />
+                                                <Input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Quartier, Avenue, N°..." className="h-14 pl-14 bg-background/50 border-white/5 rounded-2xl focus:border-accent" />
                                             </div>
                                         </div>
                                     </div>
@@ -344,7 +328,7 @@ export default function SettingsPage() {
                         </div>
                     </TabsContent>
 
-                    {/* ONGLET FIDÉLITÉ (NOUVEAU) */}
+                    {/* ONGLET FIDÉLITÉ */}
                     <TabsContent value="loyalty" className="animate-in fade-in slide-in-from-bottom-4">
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                              <Card className={cn("border-none rounded-[3rem] p-10 relative overflow-hidden flex flex-col justify-between h-[500px]", loyalty.bg, loyalty.border)}>
@@ -442,7 +426,7 @@ export default function SettingsPage() {
                                         const credential = EmailAuthProvider.credential(user?.email || "", currentPassword);
                                         await reauthenticateWithCredential(auth.currentUser!, credential);
                                         await updatePassword(auth.currentUser!, newPassword);
-                                        toast({ title: "Sécurité mise à jour", description: "Votre nouveau mot de passe est actif." });
+                                        toast({ title: "Sécurité mise à jour" });
                                         setCurrentPassword(""); setNewPassword(""); setConfirmPassword("");
                                     } catch (e) { toast({ title: "Échec", description: "Vérifiez votre mot de passe actuel.", variant: "destructive" }); }
                                     setIsUpdatingPassword(false);
@@ -453,18 +437,15 @@ export default function SettingsPage() {
 
                              <Card className="glossy-card border-none rounded-[2.5rem] p-10 space-y-6">
                                 <div className="flex items-center gap-4"><ShieldAlert size={24} className="text-accent" /><h2 className="text-xl font-black uppercase italic tracking-tight">SESSIONS ACTIVES</h2></div>
-                                <div className="space-y-4">
-                                    <div className="p-5 bg-accent/5 border border-accent/20 rounded-2xl flex items-center justify-between">
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-accent"><Smartphone size={20} /></div>
-                                            <div>
-                                                <p className="text-xs font-black uppercase italic">Cet appareil</p>
-                                                <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-widest">Bunia, RDC • Actif maintenant</p>
-                                            </div>
+                                <div className="p-5 bg-accent/5 border border-accent/20 rounded-2xl flex items-center justify-between">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-accent"><Smartphone size={20} /></div>
+                                        <div>
+                                            <p className="text-xs font-black uppercase italic">Cet appareil</p>
+                                            <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-widest">Bunia, RDC • Actif maintenant</p>
                                         </div>
-                                        <Badge className="bg-accent text-black font-black text-[9px] px-2 h-5">EN LIGNE</Badge>
                                     </div>
-                                    <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-widest text-center mt-6">Utilisez uniquement le Pi Browser pour une sécurité maximale.</p>
+                                    <Badge className="bg-accent text-black font-black text-[9px] px-2 h-5">EN LIGNE</Badge>
                                 </div>
                              </Card>
                         </div>
@@ -488,7 +469,7 @@ export default function SettingsPage() {
                                     <Button onClick={async () => {
                                         setIsSavingSystem(true);
                                         await setDoc(doc(db, "system", "config"), { exchangeRate: parseInt(exchangeRate) }, { merge: true });
-                                        toast({ title: "Taux mis à jour", description: `1$ = ${exchangeRate} CDF` });
+                                        toast({ title: "Taux mis à jour" });
                                         setIsSavingSystem(false);
                                     }} disabled={isSavingSystem} className="w-full h-14 bg-accent text-black font-black uppercase italic rounded-xl shadow-lg shadow-accent/10">{isSavingSystem ? <Loader2 className="animate-spin" /> : "Mettre à jour la boutique"}</Button>
                                 </Card>
@@ -496,12 +477,6 @@ export default function SettingsPage() {
                                 <Card className="glossy-card border-none rounded-[2.5rem] p-10 space-y-8">
                                     <div className="flex items-center gap-4"><Wallet className="text-accent" size={22} /><h2 className="text-xl font-black uppercase italic tracking-tight">INTERFACE PI NETWORK</h2></div>
                                     <div className="space-y-6">
-                                        <div className="space-y-2">
-                                            <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Portefeuille Merchant (Sandbox)</Label>
-                                            <div className="p-4 bg-background/50 border border-white/5 rounded-2xl flex items-center justify-between group">
-                                                <code className="text-[10px] font-mono text-muted-foreground break-all">{PI_MERCHANT_WALLET || 'NON CONFIGURÉ'}</code>
-                                            </div>
-                                        </div>
                                         <div className="p-4 rounded-2xl bg-orange-500/5 border border-orange-500/20 flex gap-4">
                                             <AlertTriangle className="text-orange-500 shrink-0" size={18} />
                                             <div className="space-y-1">

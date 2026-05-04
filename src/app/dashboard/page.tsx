@@ -35,7 +35,9 @@ import {
   PieChart as PieChartIcon,
   Bell,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Search,
+  Command
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -55,17 +57,17 @@ import {
     getExchangeRate,
     getDashboardStats,
     getLowStockItems,
-    getRecentSales,
     getRevenueChartData
 } from '@/lib/data';
 import { Product } from '@/lib/types';
 import withAuth from '@/components/auth/withAuth';
 import { useAuth } from '@/context/AuthContext';
 import { useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, where, orderBy, limit } from 'firebase/firestore';
+import { collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/ui/Logo";
+import { Input } from "@/components/ui/input";
 import { 
   AreaChart, 
   Area, 
@@ -103,6 +105,11 @@ function DashboardPage() {
   const [chartData, setChartData] = useState<any[]>([]);
   const [rate, setRate] = useState(2500);
 
+  // Universal Search States
+  const [uSearch, setUSearch] = useState("");
+  const [uResults, setUResults] = useState<{type: string, title: string, id: string, link: string}[]>([]);
+  const [isUSearching, setIsUSearching] = useState(false);
+
   const isStaff = user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'seller' || user?.role?.toLowerCase() === 'cashier';
 
   const filteredNavLinks = navConfig.filter(link => {
@@ -120,8 +127,8 @@ function DashboardPage() {
 
   const notificationsQuery = useMemoFirebase(() => {
     if (authLoading || !user?.uid) return null;
-    return query(collection(db, "notifications"), where("userId", "==", isStaff ? 'staff' : user.uid), orderBy("createdAt", "desc"), limit(6));
-  }, [user?.uid, authLoading, isStaff]);
+    return query(collection(db, "notifications"), where("userId", "in", [user.uid, 'staff']), orderBy("createdAt", "desc"), limit(6));
+  }, [user?.uid, authLoading]);
   const { data: recentNotifs } = useCollection(notificationsQuery);
 
   useEffect(() => {
@@ -147,6 +154,59 @@ function DashboardPage() {
       setLoading(false);
     }
   };
+
+  // Universal Search Logic
+  useEffect(() => {
+    const delayDebounce = setTimeout(async () => {
+      if (uSearch.length < 3) {
+        setUResults([]);
+        return;
+      }
+
+      setIsUSearching(true);
+      const results: any[] = [];
+      const term = uSearch.toLowerCase();
+
+      try {
+        // Search in Orders
+        const ordersSnap = await getDocs(collection(db, "orders"));
+        ordersSnap.forEach(doc => {
+          const data = doc.data();
+          if (doc.id.toLowerCase().includes(term) || data.customerName?.toLowerCase().includes(term)) {
+            results.push({ type: 'Commande', title: `CMD #${doc.id.substring(0,8)} - ${data.customerName}`, id: doc.id, link: '/dashboard/orders' });
+          }
+        });
+
+        // Search in Hardware Assets (Serial Number)
+        const hardwareSnap = await getDocs(collection(db, "hardwareAssets"));
+        hardwareSnap.forEach(doc => {
+          const data = doc.data();
+          if (data.serialNumber?.toLowerCase().includes(term) || data.model?.toLowerCase().includes(term)) {
+            results.push({ type: 'Appareil', title: `${data.brand} ${data.model} (S/N: ${data.serialNumber})`, id: doc.id, link: '/dashboard/hardware' });
+          }
+        });
+
+        // Search in Users (Clients)
+        if (isStaff) {
+          const usersSnap = await getDocs(collection(db, "users"));
+          usersSnap.forEach(doc => {
+            const data = doc.data();
+            if (data.name?.toLowerCase().includes(term) || data.email?.toLowerCase().includes(term)) {
+              results.push({ type: 'Client', title: `${data.name} (${data.email})`, id: doc.id, link: '/dashboard/customers' });
+            }
+          });
+        }
+
+        setUResults(results.slice(0, 8));
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setIsUSearching(false);
+      }
+    }, 500);
+
+    return () => clearTimeout(delayDebounce);
+  }, [uSearch, isStaff]);
 
   const getStatusBadge = (status: string) => {
     const s = status?.toLowerCase();
@@ -192,9 +252,33 @@ function DashboardPage() {
         <div className="flex-1 flex items-center justify-between">
             <div className="flex items-center gap-6">
               <Logo size="sm" />
-              <h2 className="text-lg md:text-xl tracking-tighter uppercase">
-                <span className="font-light text-slate-400">Hub</span> <span className="font-bold text-white italic">{isStaff ? 'Staff' : 'Personnel'}</span>
-              </h2>
+              <div className="relative hidden lg:block group">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-accent transition-colors" size={16} />
+                  <Input 
+                    placeholder="Commande, Client, S/N..." 
+                    className="w-80 h-11 pl-12 bg-white/5 border-white/5 rounded-2xl focus:border-accent text-xs font-bold uppercase transition-all"
+                    value={uSearch}
+                    onChange={(e) => setUSearch(e.target.value)}
+                  />
+                  {uSearch && (
+                      <div className="absolute top-full left-0 right-0 mt-2 bg-card/95 backdrop-blur-3xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50 animate-in fade-in slide-in-from-top-2">
+                        {isUSearching ? (
+                            <div className="p-6 text-center"><Loader2 className="animate-spin h-5 w-5 mx-auto text-accent" /></div>
+                        ) : uResults.length > 0 ? (
+                            <div className="divide-y divide-white/5">
+                                {uResults.map((res, i) => (
+                                    <Link key={i} href={res.link} className="block p-4 hover:bg-accent/10 transition-colors">
+                                        <p className="text-[8px] font-black uppercase text-accent mb-1">{res.type}</p>
+                                        <p className="text-xs font-bold text-white truncate">{res.title}</p>
+                                    </Link>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="p-6 text-center text-[10px] uppercase font-black opacity-30 italic">Aucun résultat</div>
+                        )}
+                      </div>
+                  )}
+              </div>
             </div>
             
             <nav className="hidden xl:flex items-center gap-1">
@@ -265,7 +349,7 @@ function DashboardPage() {
                   <div className="bg-black/40 backdrop-blur-3xl p-8 rounded-[2.5rem] border border-white/5 min-w-[300px] text-center">
                       <p className="text-[10px] font-black uppercase opacity-40 mb-2">Points Fidélité Cumulés</p>
                       <p className="text-6xl font-black text-primary italic">{(orders?.length || 0) * 100}</p>
-                      <p className="text-[9px] font-bold uppercase mt-4 text-muted-foreground">Progression vers Membre Gold</p>
+                      <p className="text-[9px] font-bold uppercase mt-4 text-muted-foreground">Grade Actuel: {user?.loyaltyLevel || 'Bronze'}</p>
                   </div>
                </div>
             </Card>
@@ -315,7 +399,7 @@ function DashboardPage() {
                 </CardContent>
             </Card>
 
-            {/* FLUX D'ACTIVITÉ / NOTIFICATIONS (Nouveau) */}
+            {/* FLUX D'ACTIVITÉ / NOTIFICATIONS */}
             <Card className="lg:col-span-3 glossy-card border-none rounded-[2.5rem] overflow-hidden flex flex-col">
                 <CardHeader className="py-6 px-8 border-b border-white/5 bg-white/[0.02]">
                   <CardTitle className="text-lg font-bold uppercase italic flex items-center gap-3">
@@ -347,38 +431,6 @@ function DashboardPage() {
                     <Link href="/dashboard/notifications" className="text-[10px] font-black uppercase italic text-accent hover:underline">Voir tout l'historique <ArrowRight size={10} className="inline ml-1"/></Link>
                 </div>
             </Card>
-          </div>
-
-          {/* SECTION DU BAS : RÉCAP RÉCENT */}
-          <div className="grid gap-6 grid-cols-1 lg:grid-cols-7">
-              <Card className="lg:col-span-4 glossy-card border-none rounded-[2.5rem] overflow-hidden">
-                <CardHeader className="py-6 px-8 flex items-center justify-between flex-row">
-                    <CardTitle className="text-lg font-bold uppercase italic flex items-center gap-3"><MonitorSmartphone className="text-primary" size={20} /> Prestations en cours</CardTitle>
-                    <Link href="/dashboard/services"><Button variant="ghost" size="sm" className="h-8 rounded-lg text-[9px] font-black uppercase bg-white/5">Gérer</Button></Link>
-                </CardHeader>
-                <CardContent className="p-0">
-                    {/* On réutilise les ordres ou bookings selon le role */}
-                    <div className="divide-y divide-white/5">
-                        {/* Simulation d'un affichage de service rapide */}
-                        <div className="p-5 flex items-center justify-between opacity-30 italic text-xs text-center w-full">Chargez les modules de services pour plus de détails...</div>
-                    </div>
-                </CardContent>
-              </Card>
-
-              <Card className="lg:col-span-3 glossy-card border-none rounded-[2.5rem] overflow-hidden">
-                  <CardHeader className="py-6 px-8"><CardTitle className="text-lg font-bold uppercase italic flex items-center gap-3"><PieChartIcon className="text-accent" size={20} /> Mix d'Activité</CardTitle></CardHeader>
-                  <CardContent className="px-4 pb-8 h-[250px]">
-                      <ResponsiveContainer width="100%" height="100%">
-                          <PieChart>
-                              <Pie data={stats?.breakdown || []} cx="50%" cy="50%" innerRadius={50} outerRadius={70} paddingAngle={5} dataKey="value">
-                                  {stats?.breakdown?.map((entry: any, index: number) => <Cell key={`cell-${index}`} fill={entry.fill} />)}
-                              </Pie>
-                              <Tooltip contentStyle={{ backgroundColor: '#0f172a', border: 'none', borderRadius: '12px', fontSize: '10px' }} />
-                              <Legend verticalAlign="bottom" align="center" wrapperStyle={{ fontSize: '9px', textTransform: 'uppercase' }} />
-                          </PieChart>
-                      </ResponsiveContainer>
-                  </CardContent>
-              </Card>
           </div>
       </main>
     </div>
