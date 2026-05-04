@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Navbar } from "@/components/layout/Navbar";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,7 +20,11 @@ import {
     RefreshCw,
     PlusCircle,
     Zap,
-    Settings2
+    Settings2,
+    FileBadge,
+    Download,
+    QrCode,
+    Printer
 } from "lucide-react";
 import { db } from '@/lib/firebase';
 import { collection, addDoc, doc, updateDoc, serverTimestamp, query, orderBy, increment } from 'firebase/firestore';
@@ -41,14 +45,21 @@ import {
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
+import { Logo } from '@/components/ui/Logo';
 
 function ToolMaintenancePage() {
     const { user } = useAuth();
     const { toast } = useToast();
     const [isSheetOpen, setIsSheetOpen] = useState(false);
-    const [isLogSheetOpen, setIsLogSheetOpen] = useState(false);
     const [selectedTool, setSelectedTool] = useState<any>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    
+    // Certificate States
+    const [selectedToolForCert, setSelectedToolForCert] = useState<any | null>(null);
+    const [isGeneratingCert, setIsGeneratingCert] = useState(false);
+    const certRef = useRef<HTMLDivElement>(null);
 
     const toolsQuery = useMemoFirebase(() => {
         return query(collection(db, "labTools"), orderBy("name", "asc"));
@@ -127,6 +138,27 @@ function ToolMaintenancePage() {
         } catch (error) {
             toast({ title: "Erreur", variant: "destructive" });
         }
+    };
+
+    const handleDownloadCertificate = async (tool: any) => {
+        setSelectedToolForCert(tool);
+        setTimeout(async () => {
+            if (!certRef.current) return;
+            setIsGeneratingCert(true);
+            try {
+                const canvas = await html2canvas(certRef.current, { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
+                const imgData = canvas.toDataURL('image/png');
+                const pdf = new jsPDF({ orientation: 'landscape', unit: 'px', format: [canvas.width / 2, canvas.height / 2] });
+                pdf.addImage(imgData, 'PNG', 0, 0, canvas.width / 2, canvas.height / 2);
+                pdf.save(`CERTIF_CALIBRATION_DKS_${tool.name.replace(/\s+/g, '_')}.pdf`);
+                toast({ title: "Certificat généré", description: "Le document de conformité est prêt." });
+            } catch (error) {
+                toast({ title: "Erreur PDF", variant: "destructive" });
+            } finally {
+                setIsGeneratingCert(false);
+                setSelectedToolForCert(null);
+            }
+        }, 500);
     };
 
     const getStatusBadge = (status: string) => {
@@ -221,6 +253,17 @@ function ToolMaintenancePage() {
                                             </Button>
                                         </div>
                                         
+                                        <div className="flex gap-2">
+                                            <Button 
+                                                variant="ghost"
+                                                className="flex-1 rounded-xl h-10 border-white/5 bg-white/5 hover:bg-white/10 gap-2 font-black uppercase italic text-[8px]"
+                                                onClick={() => handleDownloadCertificate(tool)}
+                                                disabled={isGeneratingCert || tool.status !== 'excellent'}
+                                            >
+                                                {isGeneratingCert ? <Loader2 className="animate-spin h-3 w-3" /> : <FileBadge size={14} />} Certificat Calibration
+                                            </Button>
+                                        </div>
+
                                         {tool.status === 'service_needed' && (
                                             <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center gap-3">
                                                 <AlertTriangle size={14} className="text-red-500 animate-pulse" />
@@ -272,8 +315,74 @@ function ToolMaintenancePage() {
                     </form>
                 </SheetContent>
             </Sheet>
+
+            {/* CALIBRATION CERTIFICATE TEMPLATE (HIDDEN) */}
+            <div style={{ position: 'absolute', left: '-9999px', top: 0 }}>
+                {selectedToolForCert && (
+                    <div ref={certRef} className="bg-white text-black p-0 w-[1123px] h-[794px] font-serif relative overflow-hidden flex items-center justify-center">
+                        <div className="absolute inset-0 border-[40px] border-double border-[#1e293b]" />
+                        <div className="absolute inset-10 border-2 border-[#1e293b]/10" />
+                        
+                        <div className="relative z-10 text-center w-full px-40 space-y-12">
+                            <div className="flex flex-col items-center gap-6">
+                                <Logo size="lg" />
+                                <div className="space-y-1">
+                                    <h2 className="text-sm font-bold tracking-[0.4em] uppercase text-[#1e293b]">DKS SOLUTIONS LAB</h2>
+                                    <p className="text-[10px] font-medium uppercase tracking-[0.2em] opacity-40">Département Maintenance & Étalonnage • Bunia, RDC</p>
+                                </div>
+                            </div>
+
+                            <div className="space-y-4">
+                                <h1 className="text-6xl font-black uppercase italic tracking-tighter text-[#1e293b]">CERTIFICAT DE CALIBRATION</h1>
+                                <p className="text-xl font-light italic text-gray-500">CONFORMITÉ TECHNIQUE AUX NORMES DE PRÉCISION</p>
+                            </div>
+
+                            <div className="space-y-10 py-10 bg-gray-50/50 rounded-[3rem] border border-gray-100">
+                                <p className="text-lg font-medium text-gray-400">Nous certifions que l'équipement désigné ci-dessous est conforme</p>
+                                
+                                <div className="grid grid-cols-2 gap-10 text-left px-20">
+                                    <div className="space-y-2">
+                                        <p className="text-[10px] font-black uppercase text-gray-400">Désignation de l'actif</p>
+                                        <p className="text-2xl font-black uppercase italic text-[#1e293b]">{selectedToolForCert.name}</p>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <p className="text-[10px] font-black uppercase text-gray-400">Numéro de Série</p>
+                                        <p className="text-2xl font-mono font-bold">{selectedToolForCert.serialNumber || 'N/A'}</p>
+                                    </div>
+                                </div>
+
+                                <p className="text-lg font-medium text-gray-500 max-w-2xl mx-auto leading-relaxed italic">
+                                    L'outil a subi une révision complète, un nettoyage ultrasonique et un étalonnage des capteurs thermiques le {new Date().toLocaleDateString('fr-FR')}.
+                                </p>
+                            </div>
+
+                            <div className="grid grid-cols-3 items-end pt-12">
+                                <div className="text-center space-y-2">
+                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Validité technique</p>
+                                    <p className="text-sm font-bold uppercase">{selectedToolForCert.usageThreshold} Cycles d'utilisation</p>
+                                </div>
+                                <div className="flex flex-col items-center gap-4">
+                                    <div className="p-3 border-2 border-gray-100 rounded-2xl bg-white"><QrCode size={60} className="opacity-20" /></div>
+                                    <p className="text-[8px] font-bold text-gray-300 uppercase tracking-tighter">ID-TOOL: {selectedToolForCert.id.substring(0, 10).toUpperCase()}</p>
+                                </div>
+                                <div className="text-center space-y-4">
+                                    <div className="w-40 h-px bg-gray-200 mx-auto" />
+                                    <div className="flex flex-col items-center">
+                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Responsable Labo</p>
+                                        <p className="text-sm font-black italic">{user?.name || 'Expert DKS'}</p>
+                                        <ShieldCheck size={24} className="text-green-600 mt-2 opacity-30" />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="absolute top-0 right-0 w-40 h-40 bg-gray-50 rounded-bl-full -z-10" />
+                        <div className="absolute bottom-0 left-0 w-40 h-40 bg-gray-50 rounded-tr-full -z-10" />
+                    </div>
+                )}
+            </div>
         </div>
     );
 }
 
 export default withAuth(ToolMaintenancePage);
+
