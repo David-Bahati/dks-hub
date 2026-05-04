@@ -85,6 +85,15 @@ export type Subscription = {
   updatedAt: any;
 };
 
+export type UsedPart = {
+  id: string;
+  productId: string;
+  name: string;
+  quantity: number;
+  unitPrice: number;
+  createdAt: any;
+};
+
 export type SupportTicket = {
   id: string;
   userId: string;

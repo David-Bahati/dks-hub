@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Navbar } from "@/components/layout/Navbar";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,10 +20,15 @@ import {
     Upload,
     X,
     ShieldAlert,
-    Zap
+    Zap,
+    Cpu,
+    Package,
+    PlusCircle,
+    CheckCircle2,
+    Trash2
 } from "lucide-react";
 import { db } from '@/lib/firebase';
-import { collection, addDoc, serverTimestamp, doc, updateDoc, query, orderBy, onSnapshot } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, updateDoc, query, orderBy, onSnapshot, increment } from 'firebase/firestore';
 import withAuth from '@/components/auth/withAuth';
 import Link from 'next/link';
 import { useCollection, useMemoFirebase } from '@/firebase';
@@ -36,13 +41,14 @@ import {
     SheetContent, 
     SheetHeader, 
     SheetTitle,
+    SheetFooter,
 } from "@/components/ui/sheet";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from '@/lib/utils';
-import { SupportMessage } from '@/lib/types';
+import { SupportMessage, UsedPart, Product } from '@/lib/types';
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
@@ -58,9 +64,12 @@ function SupportPage() {
     const { toast } = useToast();
     const [isSheetOpen, setIsSheetOpen] = useState(false);
     const [isChatOpen, setIsChatOpen] = useState(false);
+    const [isPartsSheetOpen, setIsPartsSheetOpen] = useState(false);
     const [selectedTicket, setSelectedTicket] = useState<any>(null);
     const [search, setSearch] = useState("");
+    const [partSearch, setPartSearch] = useState("");
     const [chatMessages, setChatMessages] = useState<SupportMessage[]>([]);
+    const [usedParts, setUsedParts] = useState<UsedPart[]>([]);
     const [newMessage, setNewMessage] = useState("");
     const [ticketImage, setTicketImage] = useState<string | null>(null);
     const [chatImage, setChatImage] = useState<string | null>(null);
@@ -73,6 +82,11 @@ function SupportPage() {
     }, []);
 
     const { data: tickets, isLoading } = useCollection(ticketsQuery);
+
+    const productsQuery = useMemoFirebase(() => {
+        return query(collection(db, "products"), orderBy("name", "asc"));
+    }, []);
+    const { data: products } = useCollection<Product>(productsQuery);
 
     const isStaff = user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'seller' || user?.role?.toLowerCase() === 'cashier';
 
@@ -89,13 +103,20 @@ function SupportPage() {
         if (isChatOpen && selectedTicket) {
             const messagesRef = collection(db, "supportTickets", selectedTicket.id, "messages");
             const q = query(messagesRef, orderBy("createdAt", "asc"));
-            
-            const unsubscribe = onSnapshot(q, (snapshot) => {
+            const unsubscribeMsg = onSnapshot(q, (snapshot) => {
                 setChatMessages(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as SupportMessage[]);
                 setTimeout(() => { if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight; }, 100);
             });
+
+            const partsRef = collection(db, "supportTickets", selectedTicket.id, "usedParts");
+            const unsubscribeParts = onSnapshot(partsRef, (snapshot) => {
+                setUsedParts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as UsedPart[]);
+            });
             
-            return () => unsubscribe();
+            return () => {
+                unsubscribeMsg();
+                unsubscribeParts();
+            };
         }
     }, [isChatOpen, selectedTicket]);
 
@@ -162,6 +183,36 @@ function SupportPage() {
         } catch (e) { toast({ title: "Erreur", variant: "destructive" }); }
     };
 
+    const handleAddPart = async (product: Product) => {
+        if (!selectedTicket || product.stockQuantity <= 0) return;
+
+        try {
+            await addDoc(collection(db, "supportTickets", selectedTicket.id, "usedParts"), {
+                productId: product.id,
+                name: product.name,
+                quantity: 1,
+                unitPrice: product.sellingPrice,
+                createdAt: serverTimestamp()
+            });
+
+            await updateDoc(doc(db, "products", product.id), {
+                stockQuantity: increment(-1)
+            });
+
+            await addDoc(collection(db, "supportTickets", selectedTicket.id, "messages"), {
+                senderId: user?.uid,
+                senderName: "Système DKS",
+                senderRole: "system",
+                text: `PIÈCE UTILISÉE : ${product.name} (Quantité: 1)`,
+                createdAt: serverTimestamp()
+            });
+
+            toast({ title: "Pièce ajoutée", description: `Le stock de ${product.name} a été mis à jour.` });
+        } catch (error) {
+            toast({ title: "Erreur Stock", variant: "destructive" });
+        }
+    };
+
     const handleSendMessage = async (e: React.FormEvent) => {
         e.preventDefault();
         if ((!newMessage.trim() && !chatImage) || !selectedTicket || !user) return;
@@ -183,6 +234,11 @@ function SupportPage() {
             await updateDoc(doc(db, "supportTickets", selectedTicket.id), { updatedAt: serverTimestamp() });
         } catch (e) { console.error(e); }
     };
+
+    const filteredParts = useMemo(() => {
+        if (!products) return [];
+        return products.filter(p => p.name.toLowerCase().includes(partSearch.toLowerCase()));
+    }, [products, partSearch]);
 
     const getStatusBadge = (status: string) => {
         switch (status) {
@@ -251,7 +307,7 @@ function SupportPage() {
                                 
                                 <CardContent className="p-8 flex flex-col md:flex-row items-center gap-8">
                                     <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center text-accent shrink-0 overflow-hidden relative">
-                                        {ticket.imageUrl ? <img src={ticket.imageUrl} className="w-full h-full object-cover" /> : <Wrench size={28} />}
+                                        {ticket.imageUrl ? <img src={ticket.imageUrl} className="w-full h-full object-cover" alt="Ticket" /> : <Wrench size={28} />}
                                     </div>
                                     
                                     <div className="flex-1 space-y-3 text-center md:text-left">
@@ -264,13 +320,7 @@ function SupportPage() {
                                         <div className="flex items-center justify-center md:justify-start gap-5 text-[9px] font-black uppercase italic text-muted-foreground/40 tracking-widest">
                                             <span className="flex items-center gap-2"><UserIcon size={12} className="text-accent" /> {ticket.customerName}</span>
                                             <span>•</span>
-                                            <span className="flex items-center gap-2"><Clock size={12} /> {ticket.createdAt?.toDate?.().toLocaleDateString() || 'Récemment'}</span>
-                                            {ticket.subscriptionTitle && (
-                                                <>
-                                                    <span>•</span>
-                                                    <span className="flex items-center gap-2 text-red-400"><ShieldAlert size={12} /> {ticket.subscriptionTitle}</span>
-                                                </>
-                                            )}
+                                            <span className="flex items-center gap-2"><Clock size={12} /> {ticket.createdAt?.toDate?.().toLocaleDateString('fr-FR') || 'Récemment'}</span>
                                         </div>
                                     </div>
 
@@ -377,7 +427,7 @@ function SupportPage() {
                                 <div onClick={() => ticketFileInputRef.current?.click()} className="aspect-video rounded-3xl border-2 border-dashed border-white/10 hover:border-accent/50 bg-black/20 flex flex-col items-center justify-center cursor-pointer transition-all overflow-hidden relative group">
                                     {ticketImage ? (
                                         <>
-                                            <img src={ticketImage} className="w-full h-full object-cover" />
+                                            <img src={ticketImage} className="w-full h-full object-cover" alt="Preview" />
                                             <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"><Upload className="text-white" /></div>
                                             <button type="button" className="absolute top-4 right-4 bg-destructive text-white p-2 rounded-full" onClick={(e) => { e.stopPropagation(); setTicketImage(null); }}><X size={14} /></button>
                                         </>
@@ -392,7 +442,7 @@ function SupportPage() {
                             </div>
                         </div>
                         <div className="pt-8">
-                            <Button type="submit" disabled={form.formState.isSubmitting} className="w-full h-16 bg-primary text-white font-black uppercase italic rounded-2xl shadow-xl shadow-primary/20 text-lg">
+                            <Button type="submit" disabled={form.formState.isSubmitting} className="w-full h-16 bg-primary text-white font-black uppercase italic rounded-2xl shadow-xl shadow-primary/10 text-lg">
                                 {form.formState.isSubmitting ? <Loader2 className="animate-spin" /> : "Soumettre aux Experts DKS"}
                             </Button>
                         </div>
@@ -414,12 +464,53 @@ function SupportPage() {
                                 <p className="text-[10px] text-muted-foreground uppercase font-black tracking-widest"># {selectedTicket?.id.substring(0, 8)}</p>
                             </div>
                         </div>
-                        <Button variant="ghost" size="icon" onClick={() => setIsChatOpen(false)} className="rounded-full hover:bg-white/5 text-white/40"><X size={20}/></Button>
+                        <div className="flex gap-2">
+                             {isStaff && (
+                                <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    className="h-10 rounded-xl border-accent/20 text-accent font-black uppercase text-[9px] gap-2 hover:bg-accent hover:text-black"
+                                    onClick={() => setIsPartsSheetOpen(true)}
+                                >
+                                    <Cpu size={14} /> Pièces
+                                </Button>
+                             )}
+                             <Button variant="ghost" size="icon" onClick={() => setIsChatOpen(false)} className="rounded-full hover:bg-white/5 text-white/40"><X size={20}/></Button>
+                        </div>
                     </div>
 
                     <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar bg-black/40" ref={scrollRef}>
+                        {/* Summary of used parts */}
+                        {usedParts.length > 0 && (
+                            <Card className="bg-accent/5 border-accent/10 p-4 rounded-2xl space-y-3 mb-6">
+                                <p className="text-[10px] font-black uppercase text-accent tracking-[0.2em] flex items-center gap-2">
+                                    <Package size={12} /> Liste du Matériel Installé
+                                </p>
+                                <div className="space-y-2">
+                                    {usedParts.map((part) => (
+                                        <div key={part.id} className="flex justify-between items-center bg-black/20 p-2 rounded-xl border border-white/5">
+                                            <span className="text-[11px] font-bold text-white uppercase">{part.name}</span>
+                                            <Badge variant="outline" className="text-[9px] font-black border-accent/20 text-accent">STOCK DÉDUIT</Badge>
+                                        </div>
+                                    ))}
+                                </div>
+                            </Card>
+                        )}
+
                         {chatMessages.map((msg) => {
                             const isMe = msg.senderId === user?.uid;
+                            const isSystem = msg.senderRole === 'system';
+
+                            if (isSystem) {
+                                return (
+                                    <div key={msg.id} className="flex justify-center">
+                                        <Badge className="bg-white/5 text-muted-foreground border-none text-[8px] font-black uppercase tracking-widest px-4 h-6">
+                                            {msg.text}
+                                        </Badge>
+                                    </div>
+                                );
+                            }
+
                             return (
                                 <div key={msg.id} className={cn("flex flex-col", isMe ? "items-end" : "items-start")}>
                                     <div className={cn(
@@ -428,7 +519,7 @@ function SupportPage() {
                                     )}>
                                         {msg.imageUrl && (
                                             <div className="mb-3 relative group">
-                                                <img src={msg.imageUrl} className="rounded-xl max-w-full cursor-pointer hover:brightness-90 transition-all" onClick={() => window.open(msg.imageUrl)} />
+                                                <img src={msg.imageUrl} className="rounded-xl max-w-full cursor-pointer hover:brightness-90 transition-all" alt="Sent" onClick={() => window.open(msg.imageUrl)} />
                                             </div>
                                         )}
                                         {msg.text && <p className="whitespace-pre-wrap">{msg.text}</p>}
@@ -442,7 +533,7 @@ function SupportPage() {
                     <form onSubmit={handleSendMessage} className="p-6 bg-black/60 border-t border-white/5 space-y-4">
                         {chatImage && (
                             <div className="relative w-24 h-24 rounded-2xl overflow-hidden border-2 border-accent shadow-2xl animate-in zoom-in-95">
-                                <img src={chatImage} className="w-full h-full object-cover" />
+                                <img src={chatImage} className="w-full h-full object-cover" alt="Chat preview" />
                                 <button type="button" onClick={() => setChatImage(null)} className="absolute top-1 right-1 bg-black/60 rounded-full p-1 text-white hover:bg-destructive"><X size={12}/></button>
                             </div>
                         )}
@@ -455,6 +546,55 @@ function SupportPage() {
                     </form>
                 </DialogContent>
             </Dialog>
+
+            {/* Spare Parts Selection Sheet */}
+            <Sheet open={isPartsSheetOpen} onOpenChange={setIsPartsSheetOpen}>
+                <SheetContent side="right" className="bg-card/95 backdrop-blur-3xl border-white/10 w-full sm:max-w-md flex flex-col p-0">
+                    <SheetHeader className="p-8 bg-accent/10 border-b border-white/5">
+                        <SheetTitle className="text-2xl font-black uppercase italic tracking-tighter">Stock de Pièces</SheetTitle>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Consommation Matériel SAV</p>
+                    </SheetHeader>
+                    
+                    <div className="p-6 border-b border-white/5">
+                        <div className="relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={14} />
+                            <Input 
+                                placeholder="Chercher une pièce (ex: RAM, Ecran...)" 
+                                className="h-12 pl-10 bg-white/5 border-white/10 rounded-xl text-xs"
+                                value={partSearch}
+                                onChange={(e) => setPartSearch(e.target.value)}
+                            />
+                        </div>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
+                        {filteredParts.length === 0 ? (
+                            <div className="text-center py-20 opacity-20 italic">
+                                <Package size={48} className="mx-auto mb-4" />
+                                <p>Aucun article trouvé</p>
+                            </div>
+                        ) : filteredParts.map(product => (
+                            <div key={product.id} className={cn(
+                                "p-4 rounded-2xl bg-white/5 border border-white/5 flex justify-between items-center transition-all",
+                                product.stockQuantity <= 0 ? "opacity-40 grayscale" : "hover:border-accent/30"
+                            )}>
+                                <div className="space-y-1">
+                                    <p className="font-bold text-sm uppercase">{product.name}</p>
+                                    <p className="text-[10px] text-muted-foreground font-black uppercase">Stock: <span className={cn(product.stockQuantity < 5 ? "text-orange-400" : "text-accent")}>{product.stockQuantity} UNITÉS</span></p>
+                                </div>
+                                <Button 
+                                    size="sm" 
+                                    className="h-10 px-4 bg-accent text-black font-black uppercase italic text-[9px] rounded-xl gap-2 shadow-lg"
+                                    onClick={() => handleAddPart(product)}
+                                    disabled={product.stockQuantity <= 0}
+                                >
+                                    <PlusCircle size={14} /> Déduire
+                                </Button>
+                            </div>
+                        ))}
+                    </div>
+                </SheetContent>
+            </Sheet>
         </div>
     );
 }
