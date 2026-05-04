@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useMemo, useState, useRef } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Navbar } from "@/components/layout/Navbar";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,8 +17,7 @@ import {
     QrCode,
     Zap,
     TrendingUp,
-    Briefcase,
-    Plus,
+    Send,
     Wallet,
     Award,
     Star,
@@ -26,10 +25,13 @@ import {
     Gift,
     Smartphone,
     Info,
-    ExternalLink
+    Search,
+    User as UserIcon,
+    CheckCircle2,
+    X
 } from "lucide-react";
 import { db } from '@/lib/firebase';
-import { collection, query, where, orderBy, updateDoc, doc, addDoc, serverTimestamp, increment, limit } from 'firebase/firestore';
+import { collection, query, where, orderBy, updateDoc, doc, addDoc, serverTimestamp, increment, limit, getDocs } from 'firebase/firestore';
 import withAuth from '@/components/auth/withAuth';
 import Link from 'next/link';
 import { useCollection, useMemoFirebase } from '@/firebase';
@@ -39,7 +41,13 @@ import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { useToast } from '@/hooks/use-toast';
 import { Input } from "@/components/ui/input";
-import { Logo } from '@/components/ui/Logo';
+import { Label } from "@/components/ui/label";
+import { 
+    Sheet, 
+    SheetContent, 
+    SheetHeader, 
+    SheetTitle,
+} from "@/components/ui/sheet";
 
 const POINTS_PER_TOKEN = 100;
 
@@ -48,7 +56,17 @@ function UniversalWalletPage() {
     const { toast } = useToast();
     const [isMinting, setIsMinting] = useState(false);
     const [isSyncing, setIsSyncing] = useState(false);
+    const [isTransferSheetOpen, setIsTransferSheetOpen] = useState(false);
+    const [isProcessingTransfer, setIsProcessingTransfer] = useState(false);
     const [tempPiAddress, setTempPiAddress] = useState("");
+
+    // Transfer States
+    const [searchQuery, setSearchQuery] = useState("");
+    const [searchResults, setSearchResults] = useState<any[]>([]);
+    const [isSearching, setIsSearching] = useState(false);
+    const [selectedRecipient, setSelectedRecipient] = useState<any>(null);
+    const [transferAmount, setTransferAmount] = useState("");
+    const [transferMemo, setTransferMemo] = useState("");
 
     const isStaff = user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'seller' || user?.role?.toLowerCase() === 'cashier';
 
@@ -74,18 +92,18 @@ function UniversalWalletPage() {
     const { data: transactions } = useCollection(txQuery);
 
     const pointsStats = useMemo(() => {
-        if (!user) return { totalPoints: 0, redeemableTokens: 0, progress: 0 };
+        if (!user) return { totalPoints: 0, redeemableTokens: 0, progress: 0, availablePoints: 0 };
 
         let total = 0;
 
         if (isStaff) {
-            // Staff logic (SAV, Academy, Logs - Simplified for wallet view)
             total += (logs?.length || 0) * 10;
-            total += (user.tokenBalance || 0) * 20; // Simulated point history
+            // On ajoute une base de points pour les actions staff (SAV, Academy)
+            // En prod, cela viendrait d'un calcul plus complexe en base
+            total += (user.tokenBalance || 0) * 5; 
         } else {
-            // Customer logic
-            total += (orders?.length || 0) * 100; // 100 pts per completed order
-            total += (user.referralCount || 0) * 500; // 500 pts per referral
+            total += (orders?.length || 0) * 100; 
+            total += (user.referralCount || 0) * 500; 
         }
 
         const availablePoints = total - (user.pointsConverted || 0);
@@ -94,6 +112,35 @@ function UniversalWalletPage() {
 
         return { totalPoints: total, availablePoints, redeemableTokens: redeemable, progress };
     }, [user, logs, orders, isStaff]);
+
+    // Recipient Search Logic
+    useEffect(() => {
+        const delayDebounce = setTimeout(async () => {
+            if (searchQuery.length < 3) {
+                setSearchResults([]);
+                return;
+            }
+            setIsSearching(true);
+            try {
+                const q = query(collection(db, "users"), limit(10));
+                const snap = await getDocs(q);
+                const results = snap.docs
+                    .map(doc => ({ id: doc.id, ...doc.data() }))
+                    .filter((u: any) => 
+                        u.id !== user?.uid && 
+                        (u.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                         u.email?.toLowerCase().includes(searchQuery.toLowerCase()))
+                    );
+                setSearchResults(results);
+            } catch (e) {
+                console.error(e);
+            } finally {
+                setIsSearching(false);
+            }
+        }, 500);
+
+        return () => clearTimeout(delayDebounce);
+    }, [searchQuery, user?.uid]);
 
     const handleSavePiWallet = async () => {
         if (!user || !tempPiAddress) return;
@@ -149,6 +196,88 @@ function UniversalWalletPage() {
         }
     };
 
+    const handleTransfer = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!user || !selectedRecipient || !transferAmount) return;
+        
+        const amount = parseFloat(transferAmount);
+        if (amount > (user.tokenBalance || 0)) {
+            toast({ title: "Solde insuffisant", variant: "destructive" });
+            return;
+        }
+
+        setIsProcessingTransfer(true);
+        try {
+            const piTxId = `PI-P2P-${Math.random().toString(36).substring(2, 12).toUpperCase()}`;
+
+            // 1. Debit sender
+            await updateDoc(doc(db, "users", user.uid), {
+                tokenBalance: increment(-amount),
+                updatedAt: serverTimestamp()
+            });
+
+            // 2. Credit recipient
+            await updateDoc(doc(db, "users", selectedRecipient.id), {
+                tokenBalance: increment(amount),
+                updatedAt: serverTimestamp()
+            });
+
+            // 3. Log transaction for BOTH (sender sees it as transfer, recipient sees it as receiving)
+            // In our system, we log one transaction that can be queried by both if we adjust the query,
+            // but for simplicity in this prototype, we'll log it twice so it appears in both ledgers easily.
+            
+            // Log for Sender
+            await addDoc(collection(db, "tokenTransactions"), {
+                userId: user.uid,
+                userName: user.name,
+                type: 'transfer',
+                tokenAmount: amount,
+                direction: 'sent',
+                recipientId: selectedRecipient.id,
+                recipientName: selectedRecipient.name || selectedRecipient.displayName,
+                memo: transferMemo,
+                piTxId: piTxId,
+                createdAt: serverTimestamp()
+            });
+
+            // Log for Recipient
+            await addDoc(collection(db, "tokenTransactions"), {
+                userId: selectedRecipient.id,
+                userName: selectedRecipient.name || selectedRecipient.displayName,
+                type: 'transfer',
+                tokenAmount: amount,
+                direction: 'received',
+                senderId: user.uid,
+                senderName: user.name,
+                memo: transferMemo,
+                piTxId: piTxId,
+                createdAt: serverTimestamp()
+            });
+
+            // 4. Notify recipient
+            await addDoc(collection(db, "notifications"), {
+                userId: selectedRecipient.id,
+                title: "DKST Reçu !",
+                message: `${user.name} vous a envoyé ${amount} DKST.`,
+                type: 'success',
+                isRead: false,
+                createdAt: serverTimestamp(),
+                link: '/dashboard/wallet'
+            });
+
+            toast({ title: "Transfert réussi", description: `${amount} DKST envoyés à ${selectedRecipient.name || selectedRecipient.displayName}` });
+            setIsTransferSheetOpen(false);
+            setTransferAmount("");
+            setTransferMemo("");
+            setSelectedRecipient(null);
+            setSearchQuery("");
+        } catch (error) {
+            toast({ title: "Erreur transfert", variant: "destructive" });
+        } finally {
+            setIsProcessingTransfer(false);
+        }
+    };
+
     return (
         <div className="min-h-screen bg-background text-foreground pb-20">
             <Navbar />
@@ -164,6 +293,14 @@ function UniversalWalletPage() {
                             <h1 className="text-4xl font-black uppercase italic tracking-tighter">Mon Wallet <span className="text-accent">DKST</span></h1>
                             <p className="text-muted-foreground text-xs uppercase font-black opacity-40 mt-1">Gérez vos actifs numériques & conversion de récompenses</p>
                         </div>
+                    </div>
+                    <div className="flex gap-3">
+                        <Button 
+                            onClick={() => setIsTransferSheetOpen(true)}
+                            className="bg-accent text-black hover:bg-accent/90 h-14 px-8 rounded-2xl font-black uppercase italic gap-3 shadow-xl shadow-accent/20"
+                        >
+                            <Send size={20} /> Envoyer des DKST
+                        </Button>
                     </div>
                 </div>
 
@@ -187,7 +324,7 @@ function UniversalWalletPage() {
 
                                 <div className="p-8 bg-black/40 backdrop-blur-3xl rounded-[2.5rem] border border-white/5 space-y-6">
                                     <div className="flex justify-between items-end">
-                                        <p className="text-[10px] font-black uppercase opacity-40">Points convertibles</p>
+                                        <p className="text-[8px] font-black uppercase opacity-40">Points convertibles</p>
                                         <span className="text-xs font-bold text-accent">{pointsStats.availablePoints} / {POINTS_PER_TOKEN}</span>
                                     </div>
                                     <Progress value={pointsStats.progress} className="h-2 bg-white/5" indicatorClassName="bg-accent shadow-[0_0_15px_rgba(56,189,248,0.5)]" />
@@ -271,14 +408,27 @@ function UniversalWalletPage() {
                                 {transactions && transactions.length > 0 ? transactions.map((tx) => (
                                     <div key={tx.id} className="p-6 flex items-center justify-between hover:bg-white/[0.02] transition-colors">
                                         <div className="flex items-center gap-5">
-                                            <div className="w-12 h-12 rounded-2xl bg-accent/10 flex items-center justify-center text-accent shadow-lg">
-                                                <RefreshCw size={20} className="animate-spin-slow" />
+                                            <div className={cn(
+                                                "w-12 h-12 rounded-2xl flex items-center justify-center text-accent shadow-lg",
+                                                tx.type === 'mint' ? "bg-accent/10" : "bg-primary/10"
+                                            )}>
+                                                {tx.type === 'mint' ? <RefreshCw size={20} className="animate-spin-slow" /> : <Send size={20} />}
                                             </div>
                                             <div>
-                                                <p className="text-sm font-black uppercase italic tracking-tight">Minting {tx.tokenAmount} DKST</p>
-                                                <div className="flex items-center gap-2 mt-1">
-                                                    <Lock size={10} className="text-green-500" />
-                                                    <p className="text-[9px] font-mono text-muted-foreground truncate max-w-[250px]">{tx.piTxId || "Hachage en attente..."}</p>
+                                                <p className="text-sm font-black uppercase italic tracking-tight">
+                                                    {tx.type === 'mint' ? `Minting ${tx.tokenAmount} DKST` : `${tx.direction === 'sent' ? 'Envoi' : 'Réception'} ${tx.tokenAmount} DKST`}
+                                                </p>
+                                                <div className="flex flex-col gap-1 mt-1">
+                                                    <div className="flex items-center gap-2">
+                                                        <Lock size={10} className="text-green-500" />
+                                                        <p className="text-[9px] font-mono text-muted-foreground truncate max-w-[200px]">{tx.piTxId || "Hachage en attente..."}</p>
+                                                    </div>
+                                                    {tx.memo && <p className="text-[9px] italic text-white/40">"{tx.memo}"</p>}
+                                                    {tx.type === 'transfer' && (
+                                                        <p className="text-[8px] font-bold uppercase text-accent/60">
+                                                            {tx.direction === 'sent' ? `Vers: ${tx.recipientName}` : `De: ${tx.senderName}`}
+                                                        </p>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>
@@ -305,6 +455,118 @@ function UniversalWalletPage() {
                     </div>
                 </div>
             </main>
+
+            {/* TRANSFER SHEET */}
+            <Sheet open={isTransferSheetOpen} onOpenChange={setIsTransferSheetOpen}>
+                <SheetContent side="right" className="bg-card/95 backdrop-blur-3xl border-white/10 w-full sm:max-w-md flex flex-col p-0">
+                    <SheetHeader className="p-8 bg-accent/10 border-b border-white/5">
+                        <SheetTitle className="text-2xl font-black uppercase italic tracking-tighter">Transférer des DKST</SheetTitle>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Échange Universel Elite</p>
+                    </SheetHeader>
+                    
+                    <div className="flex-1 p-8 space-y-8 overflow-y-auto custom-scrollbar">
+                        <div className="space-y-6">
+                            <div className="space-y-3">
+                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Chercher un membre (Nom ou Email)</Label>
+                                <div className="relative">
+                                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
+                                    <Input 
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        placeholder="Min. 3 caractères..." 
+                                        className="h-14 pl-12 bg-background/50 border-white/5 rounded-2xl focus:border-accent"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Search Results */}
+                            {searchQuery.length >= 3 && (
+                                <div className="space-y-2">
+                                    {isSearching ? (
+                                        <div className="py-4 text-center"><Loader2 className="animate-spin text-accent h-5 w-5 mx-auto" /></div>
+                                    ) : searchResults.length > 0 ? (
+                                        <div className="grid grid-cols-1 gap-2 max-h-[200px] overflow-y-auto pr-2 custom-scrollbar">
+                                            {searchResults.map((u) => (
+                                                <button
+                                                    key={u.id}
+                                                    onClick={() => { setSelectedRecipient(u); setSearchQuery(""); setSearchResults([]); }}
+                                                    className={cn(
+                                                        "flex items-center gap-4 p-4 rounded-xl border transition-all text-left",
+                                                        selectedRecipient?.id === u.id ? "bg-accent border-accent text-black" : "bg-white/5 border-white/5 text-white hover:bg-white/10"
+                                                    )}
+                                                >
+                                                    <div className={cn("w-10 h-10 rounded-lg flex items-center justify-center font-black", selectedRecipient?.id === u.id ? "bg-black text-accent" : "bg-accent/10 text-accent")}>
+                                                        {u.name?.substring(0, 1) || u.displayName?.substring(0, 1)}
+                                                    </div>
+                                                    <div className="flex-1 overflow-hidden">
+                                                        <p className="text-xs font-bold uppercase truncate">{u.name || u.displayName}</p>
+                                                        <p className="text-[9px] opacity-40 truncate">{u.email}</p>
+                                                    </div>
+                                                    {selectedRecipient?.id === u.id && <CheckCircle2 size={18} />}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <p className="text-[10px] text-center italic opacity-30 py-4 uppercase">Aucun membre trouvé</p>
+                                    )}
+                                </div>
+                            )}
+
+                            {selectedRecipient && (
+                                <div className="p-5 bg-accent/5 border border-accent/20 rounded-2xl flex items-center justify-between animate-in zoom-in-95">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-12 h-12 rounded-xl bg-accent text-black flex items-center justify-center font-black italic shadow-lg">
+                                            {selectedRecipient.name?.substring(0, 1)}
+                                        </div>
+                                        <div>
+                                            <p className="text-[8px] font-black uppercase text-accent">Destinataire Sélectionné</p>
+                                            <p className="text-sm font-black uppercase italic">{selectedRecipient.name}</p>
+                                        </div>
+                                    </div>
+                                    <Button variant="ghost" size="icon" onClick={() => setSelectedRecipient(null)} className="h-8 w-8 text-white/20 hover:text-red-500">
+                                        <X size={16} />
+                                    </Button>
+                                </div>
+                            )}
+
+                            {selectedRecipient && (
+                                <form onSubmit={handleTransfer} className="space-y-6 animate-in slide-in-from-bottom-4">
+                                    <div className="space-y-3">
+                                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Montant (Max: {user?.tokenBalance})</Label>
+                                        <div className="relative">
+                                            <Coins className="absolute left-4 top-1/2 -translate-y-1/2 text-accent" size={20} />
+                                            <Input 
+                                                type="number"
+                                                step="0.01"
+                                                value={transferAmount}
+                                                onChange={(e) => setTransferAmount(e.target.value)}
+                                                className="h-16 pl-14 bg-background/50 border-white/5 rounded-2xl text-2xl font-black text-accent"
+                                                required
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="space-y-3">
+                                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Message d'accompagnement (Optionnel)</Label>
+                                        <Input 
+                                            value={transferMemo}
+                                            onChange={(e) => setTransferMemo(e.target.value)}
+                                            placeholder="Ex: Merci pour ton aide !" 
+                                            className="h-14 bg-background/50 border-white/5 rounded-2xl italic text-sm"
+                                        />
+                                    </div>
+                                    <Button 
+                                        type="submit" 
+                                        disabled={isProcessingTransfer || !transferAmount || parseFloat(transferAmount) <= 0}
+                                        className="w-full h-16 bg-accent text-black font-black uppercase italic rounded-2xl shadow-xl shadow-accent/20 text-lg gap-3"
+                                    >
+                                        {isProcessingTransfer ? <Loader2 className="animate-spin h-6 w-6" /> : <><Send size={22} /> Confirmer l'envoi</>}
+                                    </Button>
+                                </form>
+                            )}
+                        </div>
+                    </div>
+                </SheetContent>
+            </Sheet>
         </div>
     );
 }
