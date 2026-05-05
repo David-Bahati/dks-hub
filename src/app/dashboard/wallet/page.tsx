@@ -88,9 +88,10 @@ import {
     DialogContent, 
     DialogHeader, 
     DialogTitle,
-    DialogFooter 
+    DialogFooter,
+    DialogDescription 
 } from "@/components/ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/tabs";
 import { authenticateWithPi } from '@/lib/pi-payment';
 import { 
     AreaChart, 
@@ -104,6 +105,9 @@ import {
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import { Logo } from '@/components/ui/Logo';
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { format } from "date-fns";
+import { fr } from "date-fns/locale";
 
 const POINTS_PER_TOKEN = 100;
 const GCV_VALUE = 314159; // Global Consensus Value in USD
@@ -285,18 +289,15 @@ function UniversalWalletPage() {
         } catch (error) { toast({ title: "Erreur Mint", variant: "destructive" }); } finally { setIsMinting(false); }
     };
 
-    // --- SECURITY WRAPPER ---
     const secureAction = (action: () => void) => {
         if (user?.isWalletLocked) {
             toast({ title: "Wallet Verrouillé", description: "Déverrouillez votre wallet dans le centre de sécurité.", variant: "destructive" });
             return;
         }
-        
         if (!user?.walletPin) {
             toast({ title: "PIN non configuré", description: "Veuillez configurer un code PIN dans les réglages.", variant: "destructive" });
             return;
         }
-
         setPendingAction(() => action);
         setIsPinVerificationOpen(true);
     };
@@ -319,11 +320,7 @@ function UniversalWalletPage() {
         setIsEmergencyLockProcessing(true);
         try {
             const newLockState = !user.isWalletLocked;
-            await updateDoc(doc(db, "users", user.uid), {
-                isWalletLocked: newLockState,
-                updatedAt: serverTimestamp()
-            });
-            
+            await updateDoc(doc(db, "users", user.uid), { isWalletLocked: newLockState, updatedAt: serverTimestamp() });
             await addDoc(collection(db, "notifications"), {
                 userId: user.uid,
                 title: newLockState ? "WALLET VERROUILLÉ" : "WALLET DÉVERROUILLÉ",
@@ -332,13 +329,8 @@ function UniversalWalletPage() {
                 isRead: false,
                 createdAt: serverTimestamp()
             });
-
             toast({ title: newLockState ? "Wallet Verrouillé" : "Wallet Déverrouillé", variant: newLockState ? "destructive" : "default" });
-        } catch (e) {
-            toast({ title: "Erreur Sécurité", variant: "destructive" });
-        } finally {
-            setIsEmergencyLockProcessing(false);
-        }
+        } catch (e) { toast({ title: "Erreur Sécurité", variant: "destructive" }); } finally { setIsEmergencyLockProcessing(false); }
     };
 
     const handleSaveHeritage = async () => {
@@ -353,18 +345,13 @@ function UniversalWalletPage() {
             });
             toast({ title: "Héritage Configuré", description: `En cas d'inactivité, vos actifs seront transmis à ${heritageRecipient.name}.` });
             setHeritageRecipient(null);
-        } catch (e) {
-            toast({ title: "Erreur Héritage", variant: "destructive" });
-        } finally {
-            setIsProcessingAction(false);
-        }
+        } catch (e) { toast({ title: "Erreur Héritage", variant: "destructive" }); } finally { setIsProcessingAction(false); }
     };
 
     const handleStake = async () => {
         if (!user || !stakeAmount || isProcessingAction) return;
         const amount = parseFloat(stakeAmount);
         if (amount > (user.tokenBalance || 0)) { toast({ title: "Solde insuffisant" }); return; }
-
         setIsProcessingAction(true);
         try {
             const txId = `DKST-STAKE-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
@@ -390,7 +377,6 @@ function UniversalWalletPage() {
             const amount = user.stakedBalance;
             const rewards = stats.stakingRewards;
             const total = amount + rewards;
-            
             const txId = `DKST-UNSTAKE-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
             await updateDoc(doc(db, "users", user.uid), {
                 tokenBalance: increment(total),
@@ -411,23 +397,12 @@ function UniversalWalletPage() {
             toast({ title: "Solde insuffisant", description: "Miner plus pour débloquer cet avantage !", variant: "destructive" });
             return;
         }
-
         setIsProcessingAction(true);
         try {
             const promoCode = `DKS-${perk.id.toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
-            await updateDoc(doc(db, "users", user.uid), {
-                tokenBalance: increment(-perk.cost),
-                lastActivityAt: serverTimestamp(),
-                updatedAt: serverTimestamp()
-            });
-            await addDoc(collection(db, "tokenTransactions"), {
-                userId: user.uid, type: 'exchange', tokenAmount: perk.cost, memo: `Burn/Exchange: ${perk.title} (Code: ${promoCode})`, createdAt: serverTimestamp()
-            });
-            await addDoc(collection(db, "notifications"), {
-                userId: user.uid, title: "Privilège Débloqué !",
-                message: `Voici votre code : ${promoCode}. Présentez-le en boutique pour en profiter.`,
-                type: 'success', isRead: false, createdAt: serverTimestamp(), link: '/dashboard/wallet'
-            });
+            await updateDoc(doc(db, "users", user.uid), { tokenBalance: increment(-perk.cost), lastActivityAt: serverTimestamp(), updatedAt: serverTimestamp() });
+            await addDoc(collection(db, "tokenTransactions"), { userId: user.uid, type: 'exchange', tokenAmount: perk.cost, memo: `Burn/Exchange: ${perk.title} (Code: ${promoCode})`, createdAt: serverTimestamp() });
+            await addDoc(collection(db, "notifications"), { userId: user.uid, title: "Privilège Débloqué !", message: `Voici votre code : ${promoCode}. Présentez-le en boutique pour en profiter.`, type: 'success', isRead: false, createdAt: serverTimestamp(), link: '/dashboard/wallet' });
             toast({ title: "Privilège Débloqué", description: "Votre code est disponible dans vos notifications." });
         } catch (e) { toast({ title: "Erreur Achat", variant: "destructive" }); } finally { setIsProcessingAction(false); }
     };
@@ -435,25 +410,13 @@ function UniversalWalletPage() {
     const handleTransferProcess = async () => {
         if (!user || !selectedRecipient || !transferAmount) return;
         const amount = parseFloat(transferAmount);
-        
         setIsProcessingAction(true);
         try {
             const piTxId = `PI-P2P-${Math.random().toString(36).substring(2, 12).toUpperCase()}`;
             await updateDoc(doc(db, "users", user.uid), { tokenBalance: increment(-amount), lastActivityAt: serverTimestamp(), updatedAt: serverTimestamp() });
             await updateDoc(doc(db, "users", selectedRecipient.id), { tokenBalance: increment(amount), updatedAt: serverTimestamp() });
-            
-            await addDoc(collection(db, "tokenTransactions"), {
-                userId: user.uid, userName: user.name, type: 'transfer', tokenAmount: amount, direction: 'sent',
-                recipientId: selectedRecipient.id, recipientName: selectedRecipient.name || selectedRecipient.displayName,
-                memo: transferMemo, piTxId, createdAt: serverTimestamp()
-            });
-
-            await addDoc(collection(db, "tokenTransactions"), {
-                userId: selectedRecipient.id, userName: selectedRecipient.name || selectedRecipient.displayName,
-                type: 'transfer', tokenAmount: amount, direction: 'received',
-                senderId: user.uid, senderName: user.name, memo: transferMemo, piTxId, createdAt: serverTimestamp()
-            });
-
+            await addDoc(collection(db, "tokenTransactions"), { userId: user.uid, userName: user.name, type: 'transfer', tokenAmount: amount, direction: 'sent', recipientId: selectedRecipient.id, recipientName: selectedRecipient.name || selectedRecipient.displayName, memo: transferMemo, piTxId, createdAt: serverTimestamp() });
+            await addDoc(collection(db, "tokenTransactions"), { userId: selectedRecipient.id, userName: selectedRecipient.name || selectedRecipient.displayName, type: 'transfer', tokenAmount: amount, direction: 'received', senderId: user.uid, senderName: user.name, memo: transferMemo, piTxId, createdAt: serverTimestamp() });
             toast({ title: "Transfert réussi", description: `${amount} DKST envoyés.` });
             setIsTransferSheetOpen(false);
             setTransferAmount("");
@@ -483,34 +446,23 @@ function UniversalWalletPage() {
                 const snap = await getDocs(q);
                 const results = snap.docs
                     .map(doc => ({ id: doc.id, ...doc.data() }))
-                    .filter((u: any) => 
-                        u.id !== user?.uid && 
-                        (u.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                         u.email?.toLowerCase().includes(searchQuery.toLowerCase()))
-                    );
+                    .filter((u: any) => u.id !== user?.uid && (u.name?.toLowerCase().includes(searchQuery.toLowerCase()) || u.email?.toLowerCase().includes(searchQuery.toLowerCase())));
                 setSearchResults(results);
             } catch (e) { console.error(e); } finally { setIsSearching(false); }
         }, 500);
         return () => clearTimeout(delayDebounce);
     }, [searchQuery, user?.uid]);
 
-    const filteredTransactions = transactions?.filter(tx => {
-        const matchesFilter = ledgerFilter === "all" || tx.type === ledgerFilter;
-        const matchesSearch = !ledgerSearch || 
-            tx.piTxId?.toLowerCase().includes(ledgerSearch.toLowerCase()) ||
-            tx.memo?.toLowerCase().includes(ledgerSearch.toLowerCase()) ||
-            tx.recipientName?.toLowerCase().includes(ledgerSearch.toLowerCase()) ||
-            tx.senderName?.toLowerCase().includes(ledgerSearch.toLowerCase());
-        return matchesFilter && matchesSearch;
-    }).sort((a,b) => {
-        const da = a.createdAt?.toDate?.() || new Date(0);
-        const db = b.createdAt?.toDate?.() || new Date(0);
-        return db - da;
-    });
+    const getWealthTitle = (wealth: number) => {
+        if (wealth >= 1000000000) return { label: "Billionnaire Élite", icon: <Gem size={10} />, color: "text-yellow-400" };
+        if (wealth >= 10000000) return { label: "Multi-Millionnaire", icon: <Crown size={10} />, color: "text-slate-300" };
+        if (wealth >= 1000000) return { label: "Millionnaire GCV", icon: <Star size={10} />, color: "text-orange-400" };
+        return { label: "Investisseur Émergeant", icon: <Activity size={10} />, color: "text-blue-400" };
+    };
 
     const isMillionaire = stats.gcvUSD >= 1000000;
     const securityScore = useMemo(() => {
-        let score = 30; // Base email auth
+        let score = 30;
         if (user?.walletPin) score += 30;
         if (user?.isWalletLocked) score += 10;
         if (user?.piWalletAddress) score += 15;
@@ -555,9 +507,20 @@ function UniversalWalletPage() {
                         <div className="relative z-10 space-y-10">
                             <div className="flex flex-wrap items-center gap-4">
                                 <Badge className="bg-yellow-500 text-black font-black uppercase italic tracking-widest px-5 py-2">Consensus GCV Activé</Badge>
-                                <Badge variant="outline" className="border-white/10 text-white/40 uppercase font-black text-[9px] tracking-widest flex items-center gap-2">
-                                    <Sparkles size={10} className="text-yellow-500" /> 1 π = $314,159.00
-                                </Badge>
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Badge variant="outline" className="border-white/10 text-white/40 uppercase font-black text-[9px] tracking-widest flex items-center gap-2 cursor-help">
+                                            <Sparkles size={10} className="text-yellow-500" /> 1 π = $314,159.00 <Info size={10} />
+                                        </Badge>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="bg-card border-white/10 text-xs text-muted-foreground p-4 max-w-xs rounded-2xl shadow-2xl">
+                                        <p className="font-bold text-accent uppercase mb-2">Technologie DKST Hybrid</p>
+                                        <p className="leading-relaxed">
+                                            Le jeton <strong>DKST</strong> est un actif utilitaire interne (Off-Chain) vivant sur l'infrastructure du Hub DKS pour garantir rapidité et zéro frais à Bunia. 
+                                            Sa valeur est indexée sur le consensus <strong>Pi GCV</strong>. À terme, un bridge permettra la conversion vers le Mainnet Pi Network.
+                                        </p>
+                                    </PopoverContent>
+                                </Popover>
                                 {user?.isWalletLocked && <Badge className="bg-red-500 text-white border-none uppercase font-black text-[9px] px-3 h-8 flex items-center gap-2 animate-pulse"><Lock size={12}/> Wallet Verrouillé</Badge>}
                             </div>
 
@@ -801,12 +764,7 @@ function UniversalWalletPage() {
                                             <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Chercher un Héritier (Membre DKS)</Label>
                                             <div className="relative">
                                                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
-                                                <Input 
-                                                    value={searchQuery} 
-                                                    onChange={(e) => setSearchQuery(e.target.value)} 
-                                                    placeholder="Nom ou Email..." 
-                                                    className="h-14 pl-12 bg-background/50 border-white/5 rounded-2xl" 
-                                                />
+                                                <Input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Nom ou Email..." className="h-14 pl-12 bg-background/50 border-white/5 rounded-2xl" />
                                             </div>
                                             {searchQuery.length >= 3 && (
                                                 <div className="space-y-2 mt-2 max-h-[150px] overflow-y-auto custom-scrollbar">
@@ -819,7 +777,6 @@ function UniversalWalletPage() {
                                                 </div>
                                             )}
                                         </div>
-
                                         {heritageRecipient && (
                                             <div className="p-4 bg-accent/10 border border-accent/20 rounded-2xl flex justify-between items-center animate-in zoom-in-95">
                                                 <div className="flex items-center gap-3">
@@ -829,28 +786,15 @@ function UniversalWalletPage() {
                                                 <Button variant="ghost" size="icon" onClick={() => setHeritageRecipient(null)} className="h-6 w-6"><X size={14}/></Button>
                                             </div>
                                         )}
-
                                         <div className="space-y-3">
                                             <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Seuil d'Inactivité (Dead Man's Switch)</Label>
                                             <div className="grid grid-cols-3 gap-2">
                                                 {["30", "90", "180"].map(d => (
-                                                    <button 
-                                                        key={d}
-                                                        onClick={() => setHeritageThreshold(d)}
-                                                        className={cn(
-                                                            "h-12 rounded-xl font-black uppercase text-[10px] border transition-all",
-                                                            heritageThreshold === d ? "bg-accent border-accent text-black" : "bg-white/5 border-white/5 text-white/40"
-                                                        )}
-                                                    >
-                                                        {d} Jours
-                                                    </button>
+                                                    <button key={d} onClick={() => setHeritageThreshold(d)} className={cn("h-12 rounded-xl font-black uppercase text-[10px] border transition-all", heritageThreshold === d ? "bg-accent border-accent text-black" : "bg-white/5 border-white/5 text-white/40")}>{d} Jours</button>
                                                 ))}
                                             </div>
                                         </div>
-
-                                        <Button onClick={() => secureAction(handleSaveHeritage)} disabled={isProcessingAction || !heritageRecipient} className="w-full h-16 bg-white text-black font-black uppercase italic rounded-2xl shadow-xl gap-2">
-                                            {isProcessingAction ? <Loader2 className="animate-spin" /> : <><Scale size={18} /> Sceller le Testament Numérique</>}
-                                        </Button>
+                                        <Button onClick={() => secureAction(handleSaveHeritage)} disabled={isProcessingAction || !heritageRecipient} className="w-full h-16 bg-white text-black font-black uppercase italic rounded-2xl shadow-xl gap-2">{isProcessingAction ? <Loader2 className="animate-spin" /> : <><Scale size={18} /> Sceller le Testament Numérique</>}</Button>
                                     </div>
                                 </div>
                             </Card>
@@ -862,7 +806,6 @@ function UniversalWalletPage() {
                                         <h3 className="text-xl font-black uppercase italic tracking-tight">Status de <span className="text-accent">Dernière Pulsation</span></h3>
                                         <Badge className="bg-green-500/10 text-green-400 border-none uppercase text-[8px] font-black tracking-widest px-3">Live Monitor</Badge>
                                     </div>
-
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                         <div className="p-8 bg-white/5 rounded-[2.5rem] border border-white/5 space-y-4">
                                             <p className="text-[10px] font-black uppercase text-white/40 tracking-widest">Dernière Activité</p>
@@ -876,7 +819,6 @@ function UniversalWalletPage() {
                                             <p className="text-3xl font-black text-accent italic truncate">{user?.beneficiaryName || "NON DÉFINI"}</p>
                                         </div>
                                     </div>
-
                                     <div className="p-8 bg-accent/5 rounded-[2.5rem] border border-accent/10 space-y-6">
                                         <div className="flex justify-between items-end">
                                             <p className="text-[10px] font-black uppercase text-accent tracking-widest">Décompte de Transmission</p>
@@ -906,7 +848,6 @@ function UniversalWalletPage() {
                                     <p className="text-[8px] font-bold uppercase mt-4 text-white/20">Calculé sur {topWealthyUsers?.length || 0} leaders de l'élite</p>
                                 </div>
                             </Card>
-
                             <Card className="lg:col-span-8 glossy-card border-none rounded-[3rem] overflow-hidden">
                                 <CardHeader className="p-10 border-b border-white/5 bg-accent/5">
                                     <CardTitle className="text-xl font-black uppercase italic flex items-center gap-4"><Crown className="text-yellow-500" /> Top 10 Wealthy Elite (GCV Rankings)</CardTitle>
@@ -919,22 +860,13 @@ function UniversalWalletPage() {
                                         const wealth = totalTokens * GCV_VALUE;
                                         const rank = getWealthTitle(wealth);
                                         const isMe = u.id === user?.uid;
-
                                         return (
                                             <div key={u.id} className={cn("p-6 flex items-center justify-between hover:bg-white/[0.02] transition-colors", isMe && "bg-accent/5 border-l-4 border-l-accent")}>
                                                 <div className="flex items-center gap-6">
-                                                    <div className={cn(
-                                                        "w-12 h-12 rounded-2xl flex items-center justify-center font-black text-xl italic",
-                                                        i === 0 ? "bg-yellow-500 text-black shadow-lg" : i === 1 ? "bg-slate-300 text-black" : i === 2 ? "bg-orange-400 text-black" : "bg-white/5 text-white/20"
-                                                    )}>
-                                                        {i + 1}
-                                                    </div>
+                                                    <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center font-black text-xl italic", i === 0 ? "bg-yellow-500 text-black shadow-lg" : i === 1 ? "bg-slate-300 text-black" : i === 2 ? "bg-orange-400 text-black" : "bg-white/5 text-white/20")}>{i + 1}</div>
                                                     <div>
                                                         <p className="font-black text-lg uppercase italic tracking-tight">{u.name} {isMe && <span className="text-[10px] text-accent font-black not-italic ml-2">(MOI)</span>}</p>
-                                                        <div className="flex items-center gap-2 mt-1">
-                                                            {rank.icon}
-                                                            <span className={cn("text-[9px] font-black uppercase tracking-widest", rank.color)}>{rank.label}</span>
-                                                        </div>
+                                                        <div className="flex items-center gap-2 mt-1">{rank.icon}<span className={cn("text-[9px] font-black uppercase tracking-widest", rank.color)}>{rank.label}</span></div>
                                                     </div>
                                                 </div>
                                                 <div className="text-right">
@@ -963,39 +895,19 @@ function UniversalWalletPage() {
                             </div>
                         </div>
                     </DialogHeader>
-                    
                     <div className="p-10 space-y-8">
                         <div className="space-y-4">
                             <Label className="text-[10px] font-black uppercase tracking-widest text-center block opacity-40">Entrez votre code secret à 4 chiffres</Label>
                             <div className="flex justify-center gap-4">
                                 <div className="relative w-full max-w-[200px]">
-                                    <Input 
-                                        type={showPin ? "text" : "password"}
-                                        maxLength={4}
-                                        value={enteredPin}
-                                        onChange={(e) => setEnteredPin(e.target.value)}
-                                        className="h-20 bg-background/50 border-white/10 rounded-2xl text-center text-5xl font-black tracking-[0.5em] focus:border-accent"
-                                        autoFocus
-                                    />
-                                    <button 
-                                        onClick={() => setShowPin(!showPin)}
-                                        className="absolute right-4 top-1/2 -translate-y-1/2 text-white/20 hover:text-accent transition-colors"
-                                    >
-                                        {showPin ? <EyeOff size={20}/> : <Eye size={20}/>}
-                                    </button>
+                                    <Input type={showPin ? "text" : "password"} maxLength={4} value={enteredPin} onChange={(e) => setEnteredPin(e.target.value)} className="h-20 bg-background/50 border-white/10 rounded-2xl text-center text-5xl font-black tracking-[0.5em] focus:border-accent" autoFocus />
+                                    <button onClick={() => setShowPin(!showPin)} className="absolute right-4 top-1/2 -translate-y-1/2 text-white/20 hover:text-accent transition-colors">{showPin ? <EyeOff size={20}/> : <Eye size={20}/>}</button>
                                 </div>
                             </div>
                         </div>
-
                         <div className="grid grid-cols-2 gap-4">
                             <Button variant="ghost" onClick={() => setIsPinVerificationOpen(false)} className="h-14 rounded-2xl font-black uppercase italic text-xs">Annuler</Button>
-                            <Button 
-                                onClick={handleVerifyPin} 
-                                disabled={enteredPin.length < 4}
-                                className="h-14 bg-accent text-black font-black uppercase italic text-xs rounded-2xl shadow-xl shadow-accent/20"
-                            >
-                                Signer & Valider
-                            </Button>
+                            <Button onClick={handleVerifyPin} disabled={enteredPin.length < 4} className="h-14 bg-accent text-black font-black uppercase italic text-xs rounded-2xl shadow-xl shadow-accent/20">Signer & Valider</Button>
                         </div>
                     </div>
                 </DialogContent>
@@ -1059,57 +971,12 @@ function UniversalWalletPage() {
                         <div className="absolute inset-0 border-[40px] border-double border-[#1e293b]" />
                         <div className="absolute inset-10 border-4 border-yellow-500/20" />
                         <div className="absolute inset-0 flex items-center justify-center opacity-[0.02] pointer-events-none"><Logo size="xl" /></div>
-
                         <div className="relative z-10 text-center w-full px-40 space-y-12">
-                            <div className="flex flex-col items-center gap-6">
-                                <Logo size="lg" />
-                                <div className="space-y-1">
-                                    <h2 className="text-sm font-bold tracking-[0.4em] uppercase text-yellow-600">Double King Foundation</h2>
-                                    <p className="text-[10px] font-medium uppercase tracking-[0.2em] opacity-40">Département de la Prospérité Digitale • Bunia, RDC</p>
-                                </div>
-                            </div>
-
-                            <div className="space-y-4">
-                                <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200 font-black uppercase italic tracking-[0.3em] px-6 py-2 mb-4">Millionnaire GCV Consensus</Badge>
-                                <h1 className="text-6xl font-black uppercase italic tracking-tighter text-[#1e293b]">CERTIFICAT DE FORTUNE</h1>
-                                <p className="text-xl font-light italic text-gray-500">RECONNAISSANCE DE RÉUSSITE FINANCIÈRE WEB3</p>
-                            </div>
-
-                            <div className="space-y-8 py-10 bg-yellow-50/30 rounded-[3rem] border border-yellow-100">
-                                <p className="text-lg font-medium text-gray-400 uppercase tracking-widest">Le présent titre est décerné à</p>
-                                <h3 className="text-5xl font-black uppercase tracking-tight border-b-2 border-yellow-200 inline-block pb-2 px-14 italic">
-                                    {user?.name}
-                                </h3>
-                                <p className="text-lg font-medium text-gray-600 max-w-2xl mx-auto leading-relaxed italic px-10">
-                                    Pour avoir atteint le seuil d'exception de <strong>{stats.totalTokens.toFixed(2)} DKST</strong>, 
-                                    représentant une valorisation théorique de :
-                                </p>
-                                <h4 className="text-4xl font-black text-yellow-600 tracking-tighter">
-                                    $ {stats.gcvUSD.toLocaleString('fr-FR', { maximumFractionDigits: 0 })} USD
-                                </h4>
-                            </div>
-
-                            <div className="grid grid-cols-3 items-end pt-12">
-                                <div className="text-center space-y-2">
-                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Date de distinction</p>
-                                    <p className="text-sm font-bold">{new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
-                                </div>
-                                <div className="flex flex-col items-center gap-4">
-                                    <div className="p-3 border-2 border-yellow-100 rounded-2xl bg-white shadow-xl"><QrCode size={60} className="opacity-20" /></div>
-                                    <p className="text-[8px] font-bold text-gray-300 uppercase tracking-tighter">ID: DKS-WEALTH-{user?.uid.substring(0, 8).toUpperCase()}</p>
-                                </div>
-                                <div className="text-center space-y-4">
-                                    <div className="w-40 h-px bg-gray-200 mx-auto" />
-                                    <div className="flex flex-col items-center">
-                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Directeur du Hub</p>
-                                        <p className="text-sm font-black italic">Expert Bahati Nyeke</p>
-                                        <ShieldCheck size={24} className="text-yellow-600 mt-2 opacity-30" />
-                                    </div>
-                                </div>
-                            </div>
+                            <div className="flex flex-col items-center gap-6"><Logo size="lg" /><div className="space-y-1"><h2 className="text-sm font-bold tracking-[0.4em] uppercase text-yellow-600">Double King Foundation</h2><p className="text-[10px] font-medium uppercase tracking-[0.2em] opacity-40">Département de la Prospérité Digitale • Bunia, RDC</p></div></div>
+                            <div className="space-y-4"><Badge className="bg-yellow-100 text-yellow-800 border-yellow-200 font-black uppercase italic tracking-[0.3em] px-6 py-2 mb-4">Millionnaire GCV Consensus</Badge><h1 className="text-6xl font-black uppercase italic tracking-tighter text-[#1e293b]">CERTIFICAT DE FORTUNE</h1><p className="text-xl font-light italic text-gray-500">RECONNAISSANCE DE RÉUSSITE FINANCIÈRE WEB3</p></div>
+                            <div className="space-y-8 py-10 bg-yellow-50/30 rounded-[3rem] border border-yellow-100"><p className="text-lg font-medium text-gray-400 uppercase tracking-widest">Le présent titre est décerné à</p><h3 className="text-5xl font-black uppercase tracking-tight border-b-2 border-yellow-200 inline-block pb-2 px-14 italic">{user?.name}</h3><p className="text-lg font-medium text-gray-600 max-w-2xl mx-auto leading-relaxed italic px-10">Pour avoir atteint le seuil d'exception de <strong>{stats.totalTokens.toFixed(2)} DKST</strong>, représentant une valorisation théorique de :</p><h4 className="text-4xl font-black text-yellow-600 tracking-tighter">$ {stats.gcvUSD.toLocaleString('fr-FR', { maximumFractionDigits: 0 })} USD</h4></div>
+                            <div className="grid grid-cols-3 items-end pt-12"><div className="text-center space-y-2"><p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Date de distinction</p><p className="text-sm font-bold">{new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}</p></div><div className="flex flex-col items-center gap-4"><div className="p-3 border-2 border-yellow-100 rounded-2xl bg-white shadow-xl"><QrCode size={60} className="opacity-20" /></div><p className="text-[8px] font-bold text-gray-300 uppercase tracking-tighter">ID: DKS-WEALTH-{user?.uid.substring(0, 8).toUpperCase()}</p></div><div className="text-center space-y-4"><div className="w-40 h-px bg-gray-200 mx-auto" /><div className="flex flex-col items-center"><p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Directeur du Hub</p><p className="text-sm font-black italic">Expert Bahati Nyeke</p><ShieldCheck size={24} className="text-yellow-600 mt-2 opacity-30" /></div></div></div>
                         </div>
-                        <div className="absolute top-0 right-0 w-64 h-64 bg-yellow-500/5 rounded-bl-full -z-10" />
-                        <div className="absolute bottom-0 left-0 w-64 h-64 bg-yellow-500/5 rounded-tr-full -z-10" />
                     </div>
                 )}
             </div>
@@ -1118,3 +985,4 @@ function UniversalWalletPage() {
 }
 
 export default withAuth(UniversalWalletPage);
+
