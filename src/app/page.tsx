@@ -107,16 +107,16 @@ export default function LandingPage() {
     <div className="min-h-screen bg-background text-foreground">
       <Navbar />
 
-      {/* HERO SECTION */}
+      {/* HERO SECTION SUPREME */}
       <section className="relative min-h-[95vh] flex items-center justify-center pt-20 overflow-hidden px-4">
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-accent/10 via-transparent to-transparent opacity-50" />
         <div className="container max-w-6xl mx-auto text-center relative z-10">
-          <Badge className="mb-10 bg-white/5 text-accent border-white/10 px-6 py-2 text-[10px] font-black uppercase tracking-[0.4em] backdrop-blur-md">
+          <Badge className="mb-10 bg-white/5 text-accent border-white/10 px-6 py-2 text-[10px] font-black uppercase tracking-[0.4em] backdrop-blur-md animate-in slide-in-from-top-4 duration-700">
             L'Épicentre de l'Excellence Technologique • Bunia
           </Badge>
-          <h1 className="text-6xl md:text-9xl font-black uppercase italic tracking-tighter leading-[0.8] mb-10">DOMINEZ <br /><span className="premium-gradient-text">LE FUTUR</span></h1>
-          <p className="text-lg md:text-2xl text-white/60 font-medium uppercase max-w-3xl mx-auto mb-16 leading-relaxed italic">Hardware de luxe, Académie de nouvelle génération et infrastructures certifiées.</p>
-          <div className="flex flex-wrap justify-center gap-6">
+          <h1 className="text-6xl md:text-9xl font-black uppercase italic tracking-tighter leading-[0.8] mb-10 animate-in fade-in zoom-in-95 duration-1000">DOMINEZ <br /><span className="premium-gradient-text">LE FUTUR</span></h1>
+          <p className="text-lg md:text-2xl text-white/60 font-medium uppercase max-w-3xl mx-auto mb-16 leading-relaxed italic animate-in slide-in-from-bottom-4 duration-1000">Hardware de luxe, Académie de nouvelle génération et infrastructures certifiées.</p>
+          <div className="flex flex-wrap justify-center gap-6 animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-300">
               <Button size="lg" className="h-20 px-12 rounded-[2rem] bg-accent text-black font-black uppercase italic text-lg shadow-[0_0_50px_rgba(56,189,248,0.3)] hover:scale-105 transition-all group" asChild><Link href="#shop">Explorer le Stock <ArrowUpRight className="ml-2" /></Link></Button>
               <Button size="lg" variant="outline" className="h-20 px-12 rounded-[2rem] border-white/10 hover:bg-white/5 font-black uppercase italic text-lg backdrop-blur-xl" asChild><Link href="/services">Nos Solutions Business</Link></Button>
           </div>
@@ -142,9 +142,9 @@ export default function LandingPage() {
       {/* KEY INDICATORS */}
       <section className="bg-white/[0.02] border-b border-white/5 py-8">
         <div className="container max-w-7xl mx-auto px-6 flex flex-wrap justify-center md:justify-between items-center gap-10">
-            <div className="flex items-center gap-4 group"><div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-accent"><Coins size={20} /></div><div><p className="text-[10px] font-black uppercase text-accent tracking-widest">Consensus GCV Pi</p><p className="text-lg font-black text-white italic">1 π = $314,159.00</p></div></div>
-            <div className="flex items-center gap-4 group"><div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary"><Gem size={20} /></div><div><p className="text-[10px] font-black uppercase text-primary tracking-widest">Économie DKS</p><p className="text-lg font-black text-white italic">50.0M DKST Cap</p></div></div>
-            <div className="flex items-center gap-4 group"><div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center text-green-400"><ShieldCheck size={20} /></div><div><p className="text-[10px] font-black uppercase text-green-400 tracking-widest">Expertise Labo</p><p className="text-lg font-black text-white italic">100% Certifié Bunia</p></div></div>
+            <div className="flex items-center gap-4 group cursor-default"><div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-accent group-hover:scale-110 transition-transform"><Coins size={20} /></div><div><p className="text-[10px] font-black uppercase text-accent tracking-widest">Consensus GCV Pi</p><p className="text-lg font-black text-white italic">1 π = $314,159.00</p></div></div>
+            <div className="flex items-center gap-4 group cursor-default"><div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform"><Gem size={20} /></div><div><p className="text-[10px] font-black uppercase text-primary tracking-widest">Économie DKS</p><p className="text-lg font-black text-white italic">50.0M DKST Cap</p></div></div>
+            <div className="flex items-center gap-4 group cursor-default"><div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center text-green-400 group-hover:scale-110 transition-transform"><ShieldCheck size={20} /></div><div><p className="text-[10px] font-black uppercase text-green-400 tracking-widest">Expertise Labo</p><p className="text-lg font-black text-white italic">100% Certifié Bunia</p></div></div>
         </div>
       </section>
 
@@ -259,7 +259,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ACADEMY CTA */}
+      {/* ACADEMY CTA SUPREME */}
       <section className="container max-w-7xl mx-auto px-6 py-32">
         <Card className="bg-primary/10 border-primary/20 rounded-[3rem] p-8 md:p-20 relative overflow-hidden group">
             <div className="absolute top-0 right-0 p-12 opacity-5 scale-150 rotate-12 group-hover:rotate-0 transition-transform duration-1000"><GraduationCap size={240} /></div>

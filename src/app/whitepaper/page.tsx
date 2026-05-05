@@ -23,7 +23,11 @@ import {
     Lock,
     Users,
     Gem,
-    QrCode
+    QrCode,
+    Timer,
+    MapPin,
+    Flame,
+    Rocket
 } from "lucide-react";
 import Link from 'next/link';
 import { Badge } from "@/components/ui/badge";
@@ -150,30 +154,31 @@ export default function WhitePaperPage() {
                     </div>
                 </section>
 
-                {/* SECTION 3: ACADEMY */}
+                {/* SECTION 3: ROADMAP (NOUVEAU) */}
                 <section className="grid grid-cols-1 md:grid-cols-12 gap-16 items-start">
                     <div className="md:col-span-4 space-y-6">
-                        <div className="w-16 h-16 rounded-2xl bg-purple-500/20 flex items-center justify-center text-purple-400 shadow-xl shadow-purple-500/10">
-                            <GraduationCap size={32} />
+                        <div className="w-16 h-16 rounded-2xl bg-orange-500/20 flex items-center justify-center text-orange-500 shadow-xl shadow-orange-500/10">
+                            <Rocket size={32} />
                         </div>
-                        <h2 className="text-3xl font-black uppercase italic tracking-tight leading-none">03. DKS <br /><span className="text-purple-400">ACADEMY</span></h2>
+                        <h2 className="text-3xl font-black uppercase italic tracking-tight leading-none">03. FEUILLE <br /><span className="text-orange-500">DE ROUTE</span></h2>
                     </div>
-                    <div className="md:col-span-8 space-y-8">
-                        <p className="text-lg text-white/70 italic">
-                            L'intelligence artificielle et la blockchain sont les leviers de l'indépendance économique de l'Afrique Centrale.
-                        </p>
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                            {[
-                                { t: "IA Expert", d: "Prompt Engineering & Automatisation" },
-                                { t: "Blockchain", d: "Web3, Wallets & Smart Contracts" },
-                                { t: "Hardware", d: "Micro-soudage & Maintenance Pro" }
-                            ].map((c, i) => (
-                                <div key={i} className="p-6 bg-white/[0.03] rounded-3xl border border-white/5 text-center">
-                                    <p className="font-black uppercase italic text-xs mb-2">{c.t}</p>
-                                    <p className="text-[9px] text-muted-foreground uppercase font-bold">{c.d}</p>
+                    <div className="md:col-span-8 space-y-12">
+                        {[
+                            { year: "2024", title: "Consolidation Hub", desc: "Lancement du Mainnet DKST, certification Starlink Business et automatisation de l'Academy par l'IA.", icon: <ShieldCheck size={20} className="text-accent" /> },
+                            { year: "2025", title: "Expansion Régionale", desc: "Ouverture du DKS Hub Kisangani, déploiement des terminaux de paiement NFC et tokenisation du stock physique.", icon: <Globe size={20} className="text-primary" /> },
+                            { year: "2026", title: "Écosystème Global", desc: "Lancement de DKS Venture pour financer les startups tech locales et intégration du Hub dans le commerce transfrontalier via Pi.", icon: <Gem size={20} className="text-yellow-500" /> }
+                        ].map((step, idx) => (
+                            <div key={idx} className="relative pl-12 before:absolute before:left-0 before:top-0 before:bottom-0 before:w-px before:bg-white/10 group">
+                                <div className="absolute left-[-10px] top-0 w-5 h-5 rounded-full bg-background border-2 border-white/10 flex items-center justify-center group-hover:border-accent transition-colors">
+                                    <div className="w-2 h-2 rounded-full bg-white/20 group-hover:bg-accent animate-pulse" />
                                 </div>
-                            ))}
-                        </div>
+                                <div className="space-y-2">
+                                    <Badge className="bg-white/5 text-white/40 border-none font-black text-[10px] px-3">{step.year}</Badge>
+                                    <h4 className="text-xl font-black uppercase italic flex items-center gap-3">{step.icon} {step.title}</h4>
+                                    <p className="text-sm text-muted-foreground leading-relaxed italic">"{step.desc}"</p>
+                                </div>
+                            </div>
+                        ))}
                     </div>
                 </section>
 
