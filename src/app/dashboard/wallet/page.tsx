@@ -69,7 +69,7 @@ import { db } from '@/lib/firebase';
 import { collection, query, where, orderBy, updateDoc, doc, addDoc, serverTimestamp, increment, limit, getDocs, Timestamp } from 'firebase/firestore';
 import withAuth from '@/components/auth/withAuth';
 import Link from 'next/link';
-import { useCollection, useMemoFirebase } from '@/firebase';
+import { useCollection, useDoc, useMemoFirebase } from '@/firebase';
 import { useAuth } from "@/context/AuthContext";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -91,7 +91,7 @@ import {
     DialogFooter,
     DialogDescription 
 } from "@/components/ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { authenticateWithPi } from '@/lib/pi-payment';
 import { 
     AreaChart, 
@@ -510,7 +510,7 @@ function UniversalWalletPage() {
                         <div className="absolute top-0 right-0 p-12 opacity-10 scale-150 rotate-12 group-hover:rotate-0 transition-transform duration-[3s]"><Gem size={300} className="text-yellow-500" /></div>
                         <div className="relative z-10 space-y-10">
                             <div className="flex flex-wrap items-center gap-4">
-                                <Badge className="bg-yellow-500 text-black font-black uppercase italic tracking-widest px-5 py-2">Consensus GCV Activé</Badge>
+                                <Badge className="bg-yellow-500 text-black font-black uppercase italic text-[9px] px-4 py-1 mb-4">Consensus GCV Activé</Badge>
                                 <Popover>
                                     <PopoverTrigger asChild>
                                         <Badge variant="outline" className="border-white/10 text-white/40 uppercase font-black text-[9px] tracking-widest flex items-center gap-2 cursor-help">
@@ -844,9 +844,9 @@ function UniversalWalletPage() {
                         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                             <Card className="lg:col-span-4 bg-gradient-to-br from-yellow-500/10 to-background border-yellow-500/20 rounded-[3rem] p-10 space-y-8">
                                 <div className="space-y-4">
-                                    <Badge className="bg-yellow-500 text-black font-black uppercase italic text-[8px] tracking-[0.3em] px-4 py-1">Global Wealth Index</Badge>
+                                    <Badge className="bg-yellow-500 text-black font-black uppercase italic text-[9px] tracking-[0.3em] px-4 py-1">Global Wealth Index</Badge>
                                     <h3 className="text-3xl font-black uppercase italic tracking-tighter leading-none text-white">PIB THÉORIQUE <br /><span className="text-yellow-500">DU HUB DKS</span></h3>
-                                    <p className="text-sm text-muted-foreground leading-relaxed italic">Somme de toutes les fortunes de la communauté de Bunia valorisée au consensus GCV.</p>
+                                    <p className="text-sm text-muted-foreground leading-relaxed italic">Somme de toutes les fortunes de la communauté de Bunia paradoxalement valorisée au consensus GCV.</p>
                                 </div>
                                 <div className="p-8 bg-black/60 rounded-[2.5rem] border border-yellow-500/30 shadow-inner">
                                     <p className="text-[10px] font-black uppercase text-yellow-500 mb-2 tracking-[0.4em]">Community Net Worth</p>
