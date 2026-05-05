@@ -27,6 +27,7 @@ import { useAuth } from '@/context/AuthContext';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { useToast } from '@/hooks/use-toast';
+import { cn } from "@/lib/utils";
 
 const getRoleBadge = (role: string) => {
   const r = role?.toLowerCase();
