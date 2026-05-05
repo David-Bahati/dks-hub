@@ -35,7 +35,13 @@ import {
     Ticket,
     Vault,
     Timer,
-    CircleDollarSign
+    CircleDollarSign,
+    Filter,
+    ArrowDownLeft,
+    ArrowUpRight,
+    GraduationCap,
+    Wrench,
+    Flame
 } from "lucide-react";
 import { db } from '@/lib/firebase';
 import { collection, query, where, orderBy, updateDoc, doc, addDoc, serverTimestamp, increment, limit, getDocs, Timestamp } from 'firebase/firestore';
@@ -56,9 +62,9 @@ import {
     SheetTitle,
 } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { authenticateWithPi } from '@/lib/pi-payment';
 
 const POINTS_PER_TOKEN = 100;
-const STAKING_APR = 0.05; // 5% APR
 
 const SHOP_PERKS = [
     { id: 'discount_10', title: 'Coupon -10% Hardware', cost: 50, description: 'Réduction immédiate sur tout article en stock.', icon: <ShoppingBag className="text-accent" /> },
@@ -74,6 +80,10 @@ function UniversalWalletPage() {
     const [isTransferSheetOpen, setIsTransferSheetOpen] = useState(false);
     const [isProcessingAction, setIsProcessingAction] = useState(false);
     const [tempPiAddress, setTempPiAddress] = useState("");
+    
+    // UI States
+    const [ledgerFilter, setLedgerFilter] = useState("all");
+    const [ledgerSearch, setLedgerSearch] = useState("");
 
     // Staking States
     const [stakeAmount, setStakeAmount] = useState("");
@@ -105,17 +115,17 @@ function UniversalWalletPage() {
     // Fetch Token Transactions for Ledger
     const txQuery = useMemoFirebase(() => {
         if (!user?.uid) return null;
-        return query(collection(db, "tokenTransactions"), where("userId", "==", user.uid), orderBy("createdAt", "desc"), limit(15));
+        return query(collection(db, "tokenTransactions"), where("userId", "==", user.uid), orderBy("createdAt", "desc"), limit(30));
     }, [user?.uid]);
-    const { data: transactions } = useCollection(txQuery);
+    const { data: transactions, isLoading: loadingTx } = useCollection(txQuery);
 
     const stats = useMemo(() => {
-        if (!user) return { totalPoints: 0, redeemableTokens: 0, progress: 0, availablePoints: 0, stakingRewards: 0 };
+        if (!user) return { totalPoints: 0, redeemableTokens: 0, progress: 0, availablePoints: 0, stakingRewards: 0, income: 0, expense: 0, apr: 5 };
 
+        // 1. Points Calculation
         let total = 0;
         if (isStaff) {
             total += (logs?.length || 0) * 10;
-            total += (user.tokenBalance || 0) * 5; 
         } else {
             total += (orders?.length || 0) * 100; 
             total += (user.referralCount || 0) * 500; 
@@ -125,16 +135,33 @@ function UniversalWalletPage() {
         const redeemable = Math.floor(availablePoints / POINTS_PER_TOKEN);
         const progress = (availablePoints % POINTS_PER_TOKEN);
 
-        // Simulated Staking Rewards
+        // 2. APR based on level
+        let apr = 5;
+        if (user.loyaltyLevel === 'Gold') apr = 12;
+        else if (user.loyaltyLevel === 'Silver') apr = 8;
+
+        // 3. Staking Rewards
         let rewards = 0;
         if (user.stakedBalance && user.stakingStartedAt) {
             const start = user.stakingStartedAt?.toDate ? user.stakingStartedAt.toDate() : new Date(user.stakingStartedAt);
-            const daysStaked = Math.max(0, (Date.now() - start.getTime()) / (1000 * 60 * 60 * 24));
-            rewards = (user.stakedBalance * STAKING_APR * (daysStaked / 365));
+            const hoursStaked = Math.max(0, (Date.now() - start.getTime()) / (1000 * 60 * 60));
+            // Reward = Balance * (APR/100) * (Hours / HoursPerYear)
+            rewards = (user.stakedBalance * (apr / 100) * (hoursStaked / 8760));
         }
 
-        return { totalPoints: total, availablePoints, redeemableTokens: redeemable, progress, stakingRewards: rewards };
-    }, [user, logs, orders, isStaff]);
+        // 4. Ledger Summary (Income vs Expense)
+        let income = 0;
+        let expense = 0;
+        transactions?.forEach(tx => {
+            if (tx.type === 'mint' || tx.type === 'mining' || tx.type === 'unstaking' || (tx.type === 'transfer' && tx.direction === 'received')) {
+                income += tx.tokenAmount;
+            } else if (tx.type === 'staking' || tx.type === 'exchange' || (tx.type === 'transfer' && tx.direction === 'sent')) {
+                expense += tx.tokenAmount;
+            }
+        });
+
+        return { totalPoints: total, availablePoints, redeemableTokens: redeemable, progress, stakingRewards: rewards, income, expense, apr };
+    }, [user, logs, orders, isStaff, transactions]);
 
     // Recipient Search Logic
     useEffect(() => {
@@ -157,14 +184,23 @@ function UniversalWalletPage() {
         return () => clearTimeout(delayDebounce);
     }, [searchQuery, user?.uid]);
 
-    const handleSavePiWallet = async () => {
-        if (!user || !tempPiAddress) return;
+    const handleSyncPi = async () => {
         setIsSyncing(true);
         try {
-            await updateDoc(doc(db, "users", user.uid), { piWalletAddress: tempPiAddress, updatedAt: serverTimestamp() });
-            toast({ title: "Wallet Pi Associé", description: "Votre identité blockchain est liée à votre compte DKS." });
-            setTempPiAddress("");
-        } catch (error) { toast({ title: "Erreur", variant: "destructive" }); } finally { setIsSyncing(false); }
+            const piUser = await authenticateWithPi();
+            if (piUser) {
+                await updateDoc(doc(db, "users", user!.uid), { 
+                    piUsername: piUser.username,
+                    piWalletAddress: piUser.uid, // Simplifié pour le prototype
+                    updatedAt: serverTimestamp() 
+                });
+                toast({ title: "Pi Network Synchronisé", description: `Bienvenue ${piUser.username} !` });
+            }
+        } catch (error: any) {
+            toast({ title: "Erreur Pi", description: error.message, variant: "destructive" });
+        } finally {
+            setIsSyncing(false);
+        }
     };
 
     const mintTokens = async () => {
@@ -208,7 +244,7 @@ function UniversalWalletPage() {
             await addDoc(collection(db, "tokenTransactions"), {
                 userId: user.uid, type: 'staking', tokenAmount: amount, piTxId: txId, createdAt: serverTimestamp()
             });
-            toast({ title: "Contrat de Staking Actif", description: `Vos ${amount} DKST génèrent maintenant 5% APR.` });
+            toast({ title: "Contrat de Staking Actif", description: `Vos ${amount} DKST génèrent maintenant ${stats.apr}% APR.` });
             setStakeAmount("");
         } catch (e) { toast({ title: "Erreur Staking", variant: "destructive" }); } finally { setIsProcessingAction(false); }
     };
@@ -241,8 +277,6 @@ function UniversalWalletPage() {
             return;
         }
 
-        if (!window.confirm(`Confirmer l'échange de ${perk.cost} DKST contre : ${perk.title} ?`)) return;
-
         setIsProcessingAction(true);
         try {
             const promoCode = `DKS-${perk.id.toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
@@ -251,14 +285,14 @@ function UniversalWalletPage() {
                 updatedAt: serverTimestamp()
             });
             await addDoc(collection(db, "tokenTransactions"), {
-                userId: user.uid, type: 'exchange', tokenAmount: perk.cost, memo: `Code: ${promoCode}`, createdAt: serverTimestamp()
+                userId: user.uid, type: 'exchange', tokenAmount: perk.cost, memo: `Burn/Exchange: ${perk.title} (Code: ${promoCode})`, createdAt: serverTimestamp()
             });
             await addDoc(collection(db, "notifications"), {
                 userId: user.uid, title: "Privilège Débloqué !",
                 message: `Voici votre code : ${promoCode}. Présentez-le en boutique pour en profiter.`,
                 type: 'success', isRead: false, createdAt: serverTimestamp(), link: '/dashboard/wallet'
             });
-            toast({ title: "Achat Réussi", description: "Votre code est disponible dans vos notifications." });
+            toast({ title: "Privilège Débloqué", description: "Votre code est disponible dans vos notifications." });
         } catch (e) { toast({ title: "Erreur Achat", variant: "destructive" }); } finally { setIsProcessingAction(false); }
     };
 
@@ -299,6 +333,16 @@ function UniversalWalletPage() {
         } catch (error) { toast({ title: "Erreur transfert", variant: "destructive" }); } finally { setIsProcessingAction(false); }
     };
 
+    const filteredTransactions = transactions?.filter(tx => {
+        const matchesFilter = ledgerFilter === "all" || tx.type === ledgerFilter;
+        const matchesSearch = !ledgerSearch || 
+            tx.piTxId?.toLowerCase().includes(ledgerSearch.toLowerCase()) ||
+            tx.memo?.toLowerCase().includes(ledgerSearch.toLowerCase()) ||
+            tx.recipientName?.toLowerCase().includes(ledgerSearch.toLowerCase()) ||
+            tx.senderName?.toLowerCase().includes(ledgerSearch.toLowerCase());
+        return matchesFilter && matchesSearch;
+    });
+
     return (
         <div className="min-h-screen bg-background text-foreground pb-20">
             <Navbar />
@@ -309,177 +353,329 @@ function UniversalWalletPage() {
                             <Button variant="outline" className="h-14 w-14 rounded-2xl border-white/10 hover:bg-accent/10 hover:text-accent p-0 transition-all"><ArrowLeft size={24} /></Button>
                         </Link>
                         <div>
-                            <h1 className="text-4xl font-black uppercase italic tracking-tighter">Banque Centrale <span className="text-accent">DKST</span></h1>
-                            <p className="text-muted-foreground text-xs uppercase font-black opacity-40 mt-1">Gérez vos actifs numériques & privilèges d'élite</p>
+                            <h1 className="text-4xl font-black uppercase italic tracking-tighter">Mon Wallet <span className="text-accent">Élite</span></h1>
+                            <p className="text-muted-foreground text-xs uppercase font-black opacity-40 mt-1">Gestionnaire d'actifs numériques Double King Shop</p>
                         </div>
                     </div>
                     <div className="flex gap-3">
-                        <Link href="/dashboard/hall-of-fame">
-                             <Button variant="outline" className="border-accent/20 text-accent h-14 px-8 rounded-2xl font-black uppercase italic gap-3">
-                                <Award size={20} /> Hall of Fame
-                            </Button>
-                        </Link>
+                        <Button 
+                            onClick={handleSyncPi}
+                            disabled={isSyncing}
+                            variant="outline"
+                            className="border-orange-500/20 text-orange-500 h-14 px-6 rounded-2xl font-black uppercase italic gap-3 hover:bg-orange-500/10 transition-all"
+                        >
+                            {isSyncing ? <Loader2 className="animate-spin" /> : <Globe size={20} />}
+                            {user?.piWalletAddress ? "Synchronisé Pi" : "Connecter Pi SDK"}
+                        </Button>
                         <Button onClick={() => setIsTransferSheetOpen(true)} className="bg-accent text-black hover:bg-accent/90 h-14 px-8 rounded-2xl font-black uppercase italic gap-3 shadow-xl shadow-accent/20">
                             <Send size={20} /> Transférer
                         </Button>
                     </div>
                 </div>
 
-                <Tabs defaultValue="assets" className="space-y-10">
+                {/* DASHBOARD ANALYTICS */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+                    <Card className="bg-accent/10 border-accent/20 rounded-[2.5rem] p-8 space-y-4 relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:rotate-12 transition-transform"><Coins size={80} /></div>
+                        <p className="text-[9px] font-black uppercase text-accent/60 tracking-widest">Solde DKST</p>
+                        <p className="text-4xl font-black text-white italic">{user?.tokenBalance?.toFixed(2) || "0.00"}</p>
+                        <div className="flex items-center gap-2 text-[10px] font-bold text-white/40">
+                             <TrendingUp size={12} className="text-accent" /> ≈ {((user?.tokenBalance || 0) / 314159).toFixed(6)} π (GCV)
+                        </div>
+                    </Card>
+                    <Card className="bg-primary/10 border-primary/20 rounded-[2.5rem] p-8 space-y-4">
+                        <p className="text-[9px] font-black uppercase text-primary/60 tracking-widest">Staking Actif</p>
+                        <p className="text-4xl font-black text-white italic">{user?.stakedBalance?.toFixed(2) || "0.00"}</p>
+                        <div className="flex items-center gap-2 text-[10px] font-bold text-primary">
+                             <Zap size={12} /> Taux APR: {stats.apr}%
+                        </div>
+                    </Card>
+                    <Card className="bg-green-500/10 border-green-500/20 rounded-[2.5rem] p-8 space-y-4">
+                        <p className="text-[9px] font-black uppercase text-green-500/60 tracking-widest">Revenus Totaux</p>
+                        <p className="text-4xl font-black text-white italic">+{stats.income.toFixed(2)}</p>
+                        <div className="flex items-center gap-2 text-[10px] font-bold text-green-500">
+                             <ArrowDownLeft size={12} /> Minting & Transferts
+                        </div>
+                    </Card>
+                    <Card className="bg-red-500/10 border-red-500/20 rounded-[2.5rem] p-8 space-y-4">
+                        <p className="text-[9px] font-black uppercase text-red-500/60 tracking-widest">Dépenses / Invest.</p>
+                        <p className="text-4xl font-black text-white italic">-{stats.expense.toFixed(2)}</p>
+                        <div className="flex items-center gap-2 text-[10px] font-bold text-red-500">
+                             <ArrowUpRight size={12} /> Staking & Privilèges
+                        </div>
+                    </Card>
+                </div>
+
+                <Tabs defaultValue="overview" className="space-y-10">
                     <TabsList className="bg-white/5 border border-white/5 p-1.5 rounded-[1.5rem] h-16 w-full max-w-xl mx-auto flex">
-                        <TabsTrigger value="assets" className="flex-1 rounded-xl font-black uppercase italic text-[10px] data-[state=active]:bg-accent data-[state=active]:text-black"><Wallet size={14} className="mr-2" /> Actifs</TabsTrigger>
-                        <TabsTrigger value="staking" className="flex-1 rounded-xl font-black uppercase italic text-[10px] data-[state=active]:bg-accent data-[state=active]:text-black"><Vault size={14} className="mr-2" /> Vault (Staking)</TabsTrigger>
-                        <TabsTrigger value="exchange" className="flex-1 rounded-xl font-black uppercase italic text-[10px] data-[state=active]:bg-accent data-[state=active]:text-black"><ShoppingBag size={14} className="mr-2" /> Échanger</TabsTrigger>
+                        <TabsTrigger value="overview" className="flex-1 rounded-xl font-black uppercase italic text-[10px] data-[state=active]:bg-accent data-[state=active]:text-black"><Wallet size={14} className="mr-2" /> Vue d'ensemble</TabsTrigger>
+                        <TabsTrigger value="vault" className="flex-1 rounded-xl font-black uppercase italic text-[10px] data-[state=active]:bg-accent data-[state=active]:text-black"><Lock size={14} className="mr-2" /> DKS Vault</TabsTrigger>
+                        <TabsTrigger value="history" className="flex-1 rounded-xl font-black uppercase italic text-[10px] data-[state=active]:bg-accent data-[state=active]:text-black"><History size={14} className="mr-2" /> Registre</TabsTrigger>
                     </TabsList>
 
-                    {/* ONGLET ACTIFS */}
-                    <TabsContent value="assets" className="space-y-10 animate-in fade-in slide-in-from-bottom-4">
-                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                            <div className="lg:col-span-5 space-y-8">
-                                <Card className="bg-accent/10 border-accent/20 rounded-[3rem] p-10 space-y-8 relative overflow-hidden group">
-                                    <div className="absolute top-0 right-0 p-8 opacity-5 scale-150 rotate-12 transition-transform duration-1000"><Coins size={200} /></div>
-                                    <div className="relative z-10 space-y-8">
-                                        <div className="flex justify-between items-start">
-                                            <div className="space-y-1">
-                                                <Badge className="bg-accent text-black font-black uppercase italic text-[8px] tracking-widest px-3 mb-2">Portfolio Universel</Badge>
-                                                <p className="text-[10px] font-black uppercase text-accent/60 tracking-widest">Solde Libre</p>
-                                                <p className="text-6xl font-black text-white italic">{user?.tokenBalance || 0} <span className="text-xl font-light opacity-40 not-italic">DKST</span></p>
-                                                <p className="text-sm font-bold text-white/40 mt-2">≈ {(user?.tokenBalance || 0) / 314159} π (GCV)</p>
-                                            </div>
-                                            <div className="w-16 h-16 rounded-2xl bg-accent text-black flex items-center justify-center shadow-lg"><Wallet size={32} /></div>
-                                        </div>
-
-                                        <div className="p-8 bg-black/40 backdrop-blur-3xl rounded-[2.5rem] border border-white/5 space-y-6">
+                    {/* ONGLET VUE D'ENSEMBLE */}
+                    <TabsContent value="overview" className="space-y-10 animate-in fade-in slide-in-from-bottom-4">
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+                             <div className="lg:col-span-5 space-y-8">
+                                <Card className="glossy-card border-none rounded-[3rem] p-10 space-y-8">
+                                    <div className="flex items-center gap-4"><Flame className="text-orange-500" size={24} /><h3 className="text-xl font-black uppercase italic tracking-tight">Convertir mes Points</h3></div>
+                                    <div className="space-y-6">
+                                        <div className="p-8 bg-black/40 rounded-[2.5rem] border border-white/5 space-y-6">
                                             <div className="flex justify-between items-end">
-                                                <p className="text-[8px] font-black uppercase opacity-40">Points convertibles</p>
-                                                <span className="text-xs font-bold text-accent">{stats.availablePoints} / {POINTS_PER_TOKEN}</span>
+                                                <p className="text-[10px] font-black uppercase opacity-40">Points Accumulés</p>
+                                                <span className="text-xl font-black text-accent">{stats.availablePoints} <span className="text-[10px] opacity-40 not-italic">PTS</span></span>
                                             </div>
-                                            <Progress value={stats.progress} className="h-2 bg-white/5" indicatorClassName="bg-accent" />
+                                            <div className="relative pt-2">
+                                                 <Progress value={stats.progress} className="h-3 bg-white/5" indicatorClassName="bg-accent shadow-[0_0_15px_rgba(56,189,248,0.5)]" />
+                                                 <div className="absolute top-0 left-0 w-full flex justify-between px-1 -mt-2">
+                                                    {[...Array(5)].map((_, i) => <div key={i} className="w-0.5 h-1.5 bg-white/10 rounded-full" />)}
+                                                 </div>
+                                            </div>
+                                            <div className="text-center space-y-1">
+                                                <p className="text-[9px] font-bold text-muted-foreground uppercase">Taux de frappe: 100 PTS = 1 DKST</p>
+                                                {stats.redeemableTokens >= 1 ? (
+                                                    <p className="text-[10px] font-black text-green-400 uppercase">Prêt à mint: {stats.redeemableTokens} DKST</p>
+                                                ) : (
+                                                    <p className="text-[10px] font-black text-white/20 uppercase">Besoin de {100 - stats.progress} pts de plus</p>
+                                                )}
+                                            </div>
                                             <Button onClick={mintTokens} disabled={isMinting || stats.redeemableTokens < 1} className="w-full h-14 bg-accent text-black font-black uppercase italic rounded-xl gap-2 shadow-xl shadow-accent/10">
-                                                {isMinting ? <Loader2 className="animate-spin" /> : <><RefreshCw size={18} /> Convertir les Points (Mint)</>}
+                                                {isMinting ? <Loader2 className="animate-spin" /> : <><RefreshCw size={18} /> Lancer le Minting</>}
                                             </Button>
                                         </div>
                                     </div>
                                 </Card>
 
-                                <Card className="glossy-card border-none rounded-[3rem] p-10 space-y-8">
-                                    <div className="flex items-center gap-4"><Globe className="text-orange-500" size={24} /><h3 className="text-xl font-black uppercase italic tracking-tight">Sync Blockchain Pi</h3></div>
-                                    {!user?.piWalletAddress ? (
-                                        <div className="space-y-6">
-                                            <p className="text-xs text-muted-foreground leading-relaxed italic">Associez votre adresse Pi pour synchroniser vos jetons sur le registre décentralisé.</p>
-                                            <div className="flex gap-3">
-                                                <Input value={tempPiAddress} onChange={(e) => setTempPiAddress(e.target.value)} placeholder="Adresse G..." className="h-14 bg-white/5 border-white/5 rounded-2xl text-xs font-mono" />
-                                                <Button onClick={handleSavePiWallet} disabled={isSyncing} className="h-14 bg-white text-black px-6 rounded-2xl">{isSyncing ? <Loader2 className="animate-spin" /> : <CheckCircle2 />}</Button>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div className="p-6 bg-green-500/5 rounded-[2rem] border border-green-500/20 flex flex-col items-center gap-4 text-center">
-                                            <QrCode size={100} className="text-green-500 opacity-60" />
-                                            <div className="space-y-1"><p className="text-[9px] font-black uppercase text-green-500">Mainnet Pi Connecté</p><p className="text-[10px] font-mono text-white/40 truncate w-48">{user.piWalletAddress}</p></div>
-                                        </div>
-                                    )}
-                                </Card>
-                            </div>
-
-                            <div className="lg:col-span-7 space-y-8">
-                                <Card className="glossy-card border-none rounded-[3rem] overflow-hidden flex-1">
-                                    <CardHeader className="p-10 border-b border-white/5 bg-white/[0.02] flex flex-row justify-between items-center">
-                                        <CardTitle className="text-xl font-black uppercase italic flex items-center gap-4"><History className="text-accent" /> Registre Ledger</CardTitle>
-                                        <Badge variant="outline" className="border-accent/20 text-accent text-[8px] font-black uppercase">Simulated Hub-Net</Badge>
-                                    </CardHeader>
-                                    <div className="divide-y divide-white/5">
-                                        {transactions && transactions.length > 0 ? transactions.map((tx) => (
-                                            <div key={tx.id} className="p-6 flex items-center justify-between hover:bg-white/[0.02] transition-colors">
-                                                <div className="flex items-center gap-5">
-                                                    <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center text-accent shadow-lg", tx.type === 'mint' || tx.type === 'unstaking' ? "bg-accent/10" : tx.type === 'staking' || tx.type === 'exchange' ? "bg-red-500/10 text-red-500" : "bg-primary/10")}>
-                                                        {tx.type === 'mint' ? <RefreshCw size={20} /> : tx.type === 'staking' ? <Vault size={20} /> : tx.type === 'exchange' ? <Ticket size={20} /> : <Send size={20} />}
-                                                    </div>
-                                                    <div>
-                                                        <p className="text-sm font-black uppercase italic tracking-tight">{tx.type.toUpperCase()} {tx.tokenAmount} DKST</p>
-                                                        <div className="flex items-center gap-2 mt-1"><Lock size={10} className="text-green-500" /><p className="text-[9px] font-mono text-muted-foreground truncate max-w-[150px]">{tx.piTxId || "Hachage..."}</p></div>
-                                                        {tx.memo && <p className="text-[9px] italic text-white/40 mt-1">"{tx.memo}"</p>}
-                                                    </div>
+                                <Card className="bg-gradient-to-br from-primary/10 to-background border-primary/20 rounded-[3rem] p-10 space-y-6">
+                                    <div className="flex items-center gap-4"><Award className="text-primary" size={24} /><h3 className="text-xl font-black uppercase italic tracking-tight">Privilèges Elite</h3></div>
+                                    <div className="grid grid-cols-1 gap-4">
+                                        {SHOP_PERKS.map(perk => (
+                                            <button 
+                                                key={perk.id}
+                                                onClick={() => handleBuyPerk(perk)}
+                                                disabled={isProcessingAction}
+                                                className="flex items-center gap-5 p-5 bg-black/40 rounded-2xl border border-white/5 hover:border-primary/50 transition-all text-left group"
+                                            >
+                                                <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                                    {perk.icon}
                                                 </div>
-                                                <div className="text-right">
-                                                    <Badge className="bg-green-500/10 text-green-400 border-none uppercase text-[8px] font-black px-2 mb-1">Confirmed</Badge>
-                                                    <p className="text-[9px] font-bold opacity-30 uppercase">{tx.createdAt?.toDate?.().toLocaleString()}</p>
+                                                <div className="flex-1">
+                                                    <p className="font-bold text-xs uppercase italic">{perk.title}</p>
+                                                    <p className="text-[10px] text-white/40">{perk.description}</p>
                                                 </div>
-                                            </div>
-                                        )) : <div className="p-20 text-center opacity-20 italic text-sm">Aucun historique blockchain.</div>}
+                                                <Badge className="bg-primary/20 text-primary border-none font-black text-[10px]">{perk.cost} DKST</Badge>
+                                            </button>
+                                        ))}
                                     </div>
                                 </Card>
-                            </div>
+                             </div>
+
+                             <div className="lg:col-span-7 space-y-8">
+                                <Card className="glossy-card border-none rounded-[3rem] p-10 h-full relative overflow-hidden">
+                                    <div className="absolute top-0 right-0 p-8 opacity-5"><ShieldCheck size={120} /></div>
+                                    <div className="relative z-10 space-y-10">
+                                        <div className="flex justify-between items-center">
+                                            <h3 className="text-2xl font-black uppercase italic tracking-tight">Sécurité & <span className="text-accent">Garantie</span></h3>
+                                            <Badge variant="outline" className="border-accent/20 text-accent uppercase font-black text-[8px] tracking-widest">Audit v2.0</Badge>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                            <div className="p-6 bg-white/5 rounded-3xl border border-white/5 space-y-4">
+                                                <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-accent"><Smartphone size={20} /></div>
+                                                <h4 className="font-black uppercase italic text-xs">Authentification</h4>
+                                                <p className="text-xs text-muted-foreground leading-relaxed">Votre wallet est protégé par le cryptage DKS. Seules les transactions signées par votre compte sont validées sur le registre.</p>
+                                            </div>
+                                            <div className="p-6 bg-white/5 rounded-3xl border border-white/5 space-y-4">
+                                                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary"><QrCode size={20} /></div>
+                                                <h4 className="font-black uppercase italic text-xs">Identité Digitale</h4>
+                                                <p className="text-xs text-muted-foreground leading-relaxed">Chaque transfert P2P génère un reçu numérique avec hachage blockchain, vérifiable à tout moment en boutique.</p>
+                                            </div>
+                                        </div>
+
+                                        <div className="p-8 rounded-[2.5rem] bg-accent/5 border border-dashed border-accent/20 flex flex-col items-center text-center gap-6">
+                                            <div className="w-24 h-24 bg-white p-3 rounded-3xl shadow-2xl"><QrCode size="full" className="text-black" /></div>
+                                            <div className="space-y-2">
+                                                <p className="text-xs font-black uppercase italic">VOTRE QR CODE HUB</p>
+                                                <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-widest">Scannez pour recevoir des DKST instantanément</p>
+                                            </div>
+                                            <Button variant="outline" className="h-10 border-white/10 rounded-xl text-[9px] font-black uppercase italic">Télécharger le QR d'expert</Button>
+                                        </div>
+                                    </div>
+                                </Card>
+                             </div>
                         </div>
                     </TabsContent>
 
-                    {/* ONGLET STAKING */}
-                    <TabsContent value="staking" className="animate-in fade-in slide-in-from-bottom-4">
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                            <Card className="bg-primary/10 border-primary/20 rounded-[3rem] p-10 flex flex-col justify-between h-[550px] relative overflow-hidden">
-                                <div className="absolute top-0 right-0 p-12 opacity-5 scale-150"><Vault size={240} /></div>
+                    {/* ONGLET VAULT (STAKING) */}
+                    <TabsContent value="vault" className="animate-in fade-in slide-in-from-bottom-4">
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+                            <Card className="bg-primary/10 border-primary/20 rounded-[3.5rem] p-12 flex flex-col justify-between h-[600px] relative overflow-hidden group">
+                                <div className="absolute top-0 right-0 p-12 opacity-5 scale-150 group-hover:scale-125 transition-transform duration-[2s]"><Vault size={300} /></div>
                                 <div className="space-y-8 relative z-10">
-                                    <Badge className="bg-primary text-white border-none px-4 py-1.5 font-black uppercase italic">DKS VAULT CONTRACT</Badge>
+                                    <Badge className="bg-primary text-white border-none px-5 py-2 font-black uppercase italic tracking-widest">DKS VAULT V2 • PROFIT MAX</Badge>
                                     <div className="space-y-2">
-                                        <h2 className="text-5xl font-black uppercase italic tracking-tighter leading-tight text-white">GÉNÉREZ DU <br /><span className="text-primary">RENDEMENT</span></h2>
-                                        <p className="text-sm text-white/60 font-bold uppercase">Taux d'intérêt annuel : 5% (APR)</p>
+                                        <h2 className="text-5xl md:text-7xl font-black uppercase italic tracking-tighter leading-tight text-white">ÉPARGNEZ <br /><span className="text-primary">GAGNEZ</span></h2>
+                                        <p className="text-lg text-white/60 font-bold uppercase italic">Rendement Annuel Garanti : {stats.apr}% (APR)</p>
                                     </div>
-                                    <div className="p-8 bg-black/40 backdrop-blur-3xl rounded-[2.5rem] border border-white/5 space-y-6">
-                                        <div className="flex justify-between items-end"><p className="text-[10px] font-black uppercase opacity-40">Votre dépôt actuel</p><span className="text-3xl font-black text-primary">{user?.stakedBalance || 0} DKST</span></div>
-                                        <div className="flex justify-between items-end"><p className="text-[10px] font-black uppercase opacity-40">Intérêts cumulés</p><span className="text-xl font-black text-green-400">+{stats.stakingRewards.toFixed(4)} DKST</span></div>
+                                    
+                                    <div className="p-8 bg-black/60 backdrop-blur-3xl rounded-[3rem] border border-white/10 space-y-8 shadow-2xl">
+                                        <div className="grid grid-cols-2 gap-8">
+                                            <div className="space-y-1">
+                                                <p className="text-[10px] font-black uppercase opacity-40 tracking-widest">Dépôt Actuel</p>
+                                                <p className="text-4xl font-black text-primary italic">{user?.stakedBalance || "0.00"} <span className="text-xs opacity-40 not-italic">DKST</span></p>
+                                            </div>
+                                            <div className="space-y-1 text-right">
+                                                <p className="text-[10px] font-black uppercase opacity-40 tracking-widest">Intérêts (Real-time)</p>
+                                                <p className="text-2xl font-black text-green-400 italic">+{stats.stakingRewards.toFixed(4)}</p>
+                                            </div>
+                                        </div>
+
                                         <Progress value={user?.stakedBalance ? 100 : 0} className="h-1.5 bg-white/5" indicatorClassName="bg-primary" />
+                                        
                                         {user?.stakedBalance ? (
-                                            <Button onClick={handleUnstake} disabled={isProcessingAction} className="w-full h-16 bg-white text-primary font-black uppercase italic rounded-2xl shadow-xl">Libérer le Vault (Unstake)</Button>
+                                            <div className="space-y-4">
+                                                <div className="flex items-center gap-3 p-4 bg-primary/5 border border-primary/20 rounded-2xl">
+                                                    <Timer size={16} className="text-primary animate-pulse" />
+                                                    <p className="text-[10px] font-bold text-white/70 italic">Contrat actif depuis le {user.stakingStartedAt?.toDate ? user.stakingStartedAt.toDate().toLocaleDateString() : '?'}</p>
+                                                </div>
+                                                <Button onClick={handleUnstake} disabled={isProcessingAction} className="w-full h-20 bg-white text-primary font-black uppercase italic rounded-[2rem] shadow-xl text-lg">Libérer les jetons (Unstake)</Button>
+                                            </div>
                                         ) : (
                                             <div className="space-y-4">
-                                                <Input type="number" value={stakeAmount} onChange={(e) => setStakeAmount(e.target.value)} placeholder="Montant à bloquer..." className="h-14 bg-background/50 border-white/10 rounded-xl text-center font-black" />
-                                                <Button onClick={handleStake} disabled={!stakeAmount || isProcessingAction} className="w-full h-16 bg-primary text-white font-black uppercase italic rounded-2xl shadow-xl">Activer le Contrat</Button>
+                                                <div className="relative">
+                                                    <CircleDollarSign className="absolute left-6 top-1/2 -translate-y-1/2 text-primary" />
+                                                    <Input type="number" value={stakeAmount} onChange={(e) => setStakeAmount(e.target.value)} placeholder="Montant à bloquer..." className="h-16 pl-14 bg-background/50 border-white/10 rounded-2xl text-center text-xl font-black" />
+                                                </div>
+                                                <Button onClick={handleStake} disabled={!stakeAmount || isProcessingAction} className="w-full h-20 bg-primary text-white font-black uppercase italic rounded-[2rem] shadow-2xl text-lg">Activer le Contrat</Button>
                                             </div>
                                         )}
                                     </div>
                                 </div>
-                                <p className="text-[9px] font-bold text-center uppercase opacity-30 italic mt-6">Les jetons stakés sont bloqués mais génèrent de la valeur passivement.</p>
                             </Card>
 
-                            <Card className="glossy-card border-none rounded-[3rem] p-10 space-y-8">
-                                <div className="flex items-center gap-4"><TrendingUp size={24} className="text-primary" /><h2 className="text-xl font-black uppercase italic tracking-tight">Performances du Vault</h2></div>
-                                <div className="space-y-6">
-                                    {[
-                                        { label: "Sécurisé par le Hub", desc: "Vos actifs sont protégés par la blockchain interne du Hub.", icon: <ShieldCheck /> },
-                                        { label: "Rendement Quotidien", desc: "Les intérêts sont calculés et affichés en temps réel sur votre tableau de bord.", icon: <Timer /> },
-                                        { label: "Boost de Mineur", desc: "Le staking pourrait bientôt augmenter votre puissance de minage nuagique.", icon: <Zap /> },
-                                    ].map((item, i) => (
-                                        <div key={i} className="flex gap-5 p-6 bg-white/5 rounded-2xl border border-white/5">
-                                            <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">{item.icon}</div>
-                                            <div className="space-y-1"><p className="font-bold text-sm uppercase italic">{item.label}</p><p className="text-xs text-muted-foreground leading-relaxed">{item.desc}</p></div>
+                            <div className="space-y-8">
+                                <Card className="glossy-card border-none rounded-[3rem] p-10 space-y-8">
+                                    <div className="flex items-center gap-4"><TrendingUp size={24} className="text-primary" /><h2 className="text-xl font-black uppercase italic tracking-tight">Pourquoi Staker vos DKST ?</h2></div>
+                                    <div className="space-y-6">
+                                        {[
+                                            { label: "Rendement Évolutif", desc: "Plus votre grade Elite est haut, plus votre taux APR augmente (jusqu'à 12% pour le grade Gold).", icon: <TrendingUp className="text-accent" /> },
+                                            { label: "Sécurité Maximale", desc: "Vos actifs sont gelés dans un coffre-fort numérique protégé par le Hub, à l'abri des fluctuations.", icon: <ShieldCheck className="text-green-400" /> },
+                                            { label: "Gouvernance Premium", desc: "Les jetons stakés comptent double lors des votes de gouvernance DAO.", icon: <Star className="text-yellow-400" /> },
+                                        ].map((item, i) => (
+                                            <div key={i} className="flex gap-6 p-6 bg-white/5 rounded-3xl border border-white/5 group hover:bg-white/[0.08] transition-all">
+                                                <div className="w-14 h-14 rounded-2xl bg-white/5 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">{item.icon}</div>
+                                                <div className="space-y-1"><p className="font-bold text-sm uppercase italic tracking-tight">{item.label}</p><p className="text-xs text-muted-foreground leading-relaxed">{item.desc}</p></div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </Card>
+
+                                <Card className="bg-accent/5 border border-accent/20 rounded-[3rem] p-10">
+                                    <div className="flex items-center gap-4 mb-8">
+                                        <Info size={20} className="text-accent" />
+                                        <h4 className="text-sm font-black uppercase italic">Staking Calculator</h4>
+                                    </div>
+                                    <div className="space-y-6">
+                                        <div className="flex justify-between items-center p-4 bg-black/20 rounded-2xl">
+                                            <span className="text-[10px] font-bold text-white/40 uppercase">Montant simulé</span>
+                                            <span className="text-lg font-black italic">100 DKST</span>
                                         </div>
-                                    ))}
-                                </div>
-                            </Card>
+                                        <div className="flex justify-between items-center p-4 bg-black/20 rounded-2xl">
+                                            <span className="text-[10px] font-bold text-white/40 uppercase">Rendement estimé (1 an)</span>
+                                            <span className="text-lg font-black text-green-400 italic">+{stats.apr} DKST</span>
+                                        </div>
+                                        <p className="text-[9px] text-center text-muted-foreground uppercase font-bold italic opacity-40">Basé sur votre taux APR de {stats.apr}% lié à votre grade {user?.loyaltyLevel}.</p>
+                                    </div>
+                                </Card>
+                            </div>
                         </div>
                     </TabsContent>
 
-                    {/* ONGLET ÉCHANGE (PRIVILÈGES) */}
-                    <TabsContent value="exchange" className="animate-in fade-in slide-in-from-bottom-4">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                            {SHOP_PERKS.map((perk) => (
-                                <Card key={perk.id} className="glossy-card border-none rounded-[3rem] overflow-hidden group relative">
-                                    <div className="p-8 space-y-6 text-center">
-                                        <div className="w-20 h-20 rounded-[2rem] bg-white/5 flex items-center justify-center mx-auto shadow-2xl group-hover:scale-110 transition-transform">{perk.icon}</div>
-                                        <div className="space-y-2">
-                                            <h3 className="text-xl font-black uppercase italic leading-tight">{perk.title}</h3>
-                                            <p className="text-xs text-muted-foreground leading-relaxed">{perk.description}</p>
-                                        </div>
-                                        <div className="pt-6 border-t border-white/5">
-                                            <div className="flex items-center justify-center gap-2 mb-6">
-                                                <Coins size={16} className="text-accent" />
-                                                <span className="text-2xl font-black text-accent">{perk.cost} DKST</span>
-                                            </div>
-                                            <Button onClick={() => handleBuyPerk(perk)} disabled={isProcessingAction} className="w-full h-14 rounded-2xl bg-accent text-black font-black uppercase italic shadow-lg shadow-accent/10">Échanger mes Jetons</Button>
-                                        </div>
+                    {/* ONGLET REGISTRE (HISTORY) */}
+                    <TabsContent value="history" className="animate-in fade-in slide-in-from-bottom-4">
+                        <Card className="glossy-card border-none rounded-[3rem] overflow-hidden flex flex-col">
+                            <CardHeader className="p-10 border-b border-white/5 bg-white/[0.02] space-y-8">
+                                <div className="flex flex-col md:flex-row justify-between items-center gap-6">
+                                    <CardTitle className="text-2xl font-black uppercase italic flex items-center gap-4"><History className="text-accent" /> Registre Ledger v2.0</CardTitle>
+                                    <div className="flex bg-white/5 p-1 rounded-2xl border border-white/5">
+                                        {['all', 'mint', 'transfer', 'staking', 'exchange'].map(f => (
+                                            <button 
+                                                key={f} 
+                                                onClick={() => setLedgerFilter(f)}
+                                                className={cn(
+                                                    "px-6 h-10 rounded-xl font-black uppercase italic text-[9px] transition-all",
+                                                    ledgerFilter === f ? "bg-accent text-black shadow-lg" : "text-white/40 hover:text-white"
+                                                )}
+                                            >
+                                                {f === 'all' ? 'Tous' : f === 'exchange' ? 'Burn' : f}
+                                            </button>
+                                        ))}
                                     </div>
-                                </Card>
-                            ))}
-                        </div>
+                                </div>
+                                <div className="relative">
+                                    <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
+                                    <Input 
+                                        placeholder="Chercher une transaction, un mémo ou un identifiant..." 
+                                        className="h-14 pl-14 bg-background/40 border-white/5 rounded-2xl focus:border-accent"
+                                        value={ledgerSearch}
+                                        onChange={(e) => setLedgerSearch(e.target.value)}
+                                    />
+                                </div>
+                            </CardHeader>
+
+                            <div className="divide-y divide-white/5 max-h-[600px] overflow-y-auto custom-scrollbar">
+                                {loadingTx ? (
+                                    <div className="p-20 text-center"><Loader2 className="animate-spin text-accent mx-auto" /></div>
+                                ) : filteredTransactions && filteredTransactions.length > 0 ? (
+                                    filteredTransactions.map((tx) => {
+                                        const isIncoming = tx.type === 'mint' || tx.type === 'mining' || tx.type === 'unstaking' || (tx.type === 'transfer' && tx.direction === 'received');
+                                        return (
+                                            <div key={tx.id} className="p-8 flex flex-col md:flex-row items-center justify-between hover:bg-white/[0.02] transition-colors group gap-6">
+                                                <div className="flex items-center gap-6 flex-1 w-full">
+                                                    <div className={cn(
+                                                        "w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg transition-transform group-hover:scale-110",
+                                                        isIncoming ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-500"
+                                                    )}>
+                                                        {tx.type === 'mint' ? <RefreshCw size={24} /> : 
+                                                         tx.type === 'staking' ? <Vault size={24} /> : 
+                                                         tx.type === 'exchange' ? <Flame size={24} /> : 
+                                                         isIncoming ? <ArrowDownLeft size={24} /> : <ArrowUpRight size={24} />}
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <div className="flex items-center gap-3">
+                                                            <p className="text-sm font-black uppercase italic tracking-tight">{tx.type.toUpperCase()}</p>
+                                                            <Badge variant="outline" className="text-[7px] font-black uppercase border-white/10 opacity-40">Confirmed</Badge>
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            <Lock size={10} className="text-green-500 opacity-60" />
+                                                            <p className="text-[10px] font-mono text-muted-foreground truncate max-w-[200px]">{tx.piTxId || tx.id}</p>
+                                                        </div>
+                                                        {tx.memo && <p className="text-[10px] italic text-white/40 bg-white/5 px-2 py-0.5 rounded-md inline-block">"{tx.memo}"</p>}
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex flex-col items-center md:items-end gap-1 shrink-0">
+                                                    <p className={cn(
+                                                        "text-2xl font-black italic",
+                                                        isIncoming ? "text-green-400" : "text-red-400"
+                                                    )}>
+                                                        {isIncoming ? '+' : '-'}{tx.tokenAmount.toFixed(2)} <span className="text-xs not-italic opacity-40">DKST</span>
+                                                    </p>
+                                                    <p className="text-[10px] font-bold opacity-30 uppercase tracking-widest">
+                                                        {tx.createdAt?.toDate ? tx.createdAt.toDate().toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'Récemment'}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        );
+                                    })
+                                ) : (
+                                    <div className="p-32 text-center flex flex-col items-center gap-6 opacity-20 italic">
+                                        <History size={64} strokeWidth={1} />
+                                        <p className="text-xs uppercase font-black tracking-widest">Aucun mouvement détecté sur ce compte</p>
+                                    </div>
+                                )}
+                            </div>
+                        </Card>
                     </TabsContent>
                 </Tabs>
             </main>
@@ -487,39 +683,87 @@ function UniversalWalletPage() {
             {/* TRANSFER SHEET */}
             <Sheet open={isTransferSheetOpen} onOpenChange={setIsTransferSheetOpen}>
                 <SheetContent side="right" className="bg-card/95 backdrop-blur-3xl border-white/10 w-full sm:max-w-md flex flex-col p-0">
-                    <SheetHeader className="p-8 bg-accent/10 border-b border-white/5">
-                        <SheetTitle className="text-2xl font-black uppercase italic tracking-tighter">Envoyer des Jetons</SheetTitle>
-                        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Échange Universel Elite</p>
-                    </SheetHeader>
-                    <div className="flex-1 p-8 space-y-8 overflow-y-auto">
-                        <div className="space-y-6">
-                            <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Chercher un membre</Label>
-                            <div className="relative">
-                                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
-                                <Input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Nom ou Email..." className="h-14 pl-12 bg-background/50 border-white/5 rounded-2xl" />
+                    <SheetHeader className="p-10 bg-accent/10 border-b border-white/5">
+                        <div className="flex items-center gap-5">
+                            <div className="w-16 h-16 rounded-2xl bg-accent/20 flex items-center justify-center text-accent shadow-xl shadow-accent/10"><Send size={32} /></div>
+                            <div>
+                                <SheetTitle className="text-3xl font-black uppercase italic tracking-tighter">Envoyer des Jetons</SheetTitle>
+                                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Échange Universel DKS</p>
                             </div>
-                            {searchQuery.length >= 3 && (
-                                <div className="space-y-2">
-                                    {isSearching ? <div className="py-4 text-center"><Loader2 className="animate-spin text-accent mx-auto" /></div> : searchResults.map((u) => (
-                                        <button key={u.id} onClick={() => { setSelectedRecipient(u); setSearchQuery(""); }} className={cn("flex items-center gap-4 p-4 w-full rounded-xl border transition-all text-left", selectedRecipient?.id === u.id ? "bg-accent text-black" : "bg-white/5 border-white/5 hover:bg-white/10")}>
-                                            <div className="w-10 h-10 rounded-lg flex items-center justify-center font-black bg-accent/10 text-accent">{u.name?.substring(0, 1)}</div>
-                                            <div className="flex-1 overflow-hidden"><p className="text-xs font-bold uppercase truncate">{u.name}</p><p className="text-[9px] opacity-40 truncate">{u.email}</p></div>
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
-                            {selectedRecipient && (
-                                <form onSubmit={handleTransfer} className="space-y-6 animate-in slide-in-from-bottom-4">
-                                    <div className="p-4 bg-accent/5 border border-accent/20 rounded-2xl flex items-center justify-between">
-                                        <div className="flex items-center gap-3"><div className="w-10 h-10 rounded-xl bg-accent text-black flex items-center justify-center font-black italic">{selectedRecipient.name?.substring(0, 1)}</div><div><p className="text-[8px] font-black text-accent uppercase">Destinataire</p><p className="text-sm font-black uppercase italic">{selectedRecipient.name}</p></div></div>
-                                        <Button variant="ghost" size="icon" onClick={() => setSelectedRecipient(null)}><X size={16}/></Button>
-                                    </div>
-                                    <div className="space-y-2"><Label className="text-[10px] font-black uppercase opacity-60">Montant (Max: {user?.tokenBalance})</Label><Input type="number" step="0.01" value={transferAmount} onChange={(e) => setTransferAmount(e.target.value)} className="h-14 bg-background/50 border-white/5 rounded-2xl text-2xl font-black text-accent" required /></div>
-                                    <div className="space-y-2"><Label className="text-[10px] font-black uppercase opacity-60">Mémo</Label><Input value={transferMemo} onChange={(e) => setTransferMemo(e.target.value)} placeholder="Optionnel..." className="h-14 bg-background/50 border-white/5 rounded-2xl italic text-sm" /></div>
-                                    <Button type="submit" disabled={isProcessingAction || !transferAmount} className="w-full h-16 bg-accent text-black font-black uppercase italic rounded-2xl shadow-xl shadow-accent/20 text-lg gap-3">{isProcessingAction ? <Loader2 className="animate-spin" /> : <><Send size={22} /> Valider l'envoi</>}</Button>
-                                </form>
-                            )}
                         </div>
+                    </SheetHeader>
+                    
+                    <div className="flex-1 p-10 space-y-10 overflow-y-auto custom-scrollbar">
+                        {!selectedRecipient ? (
+                            <div className="space-y-6">
+                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Chercher un membre</Label>
+                                <div className="relative">
+                                    <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
+                                    <Input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Nom ou Email du bénéficiaire..." className="h-16 pl-14 bg-background/50 border-white/10 rounded-2xl focus:border-accent font-bold" />
+                                </div>
+                                {searchQuery.length >= 3 && (
+                                    <div className="space-y-2 max-h-[350px] overflow-y-auto pr-2 custom-scrollbar">
+                                        {isSearching ? <div className="py-10 text-center"><Loader2 className="animate-spin text-accent mx-auto h-8 w-8" /></div> : searchResults.length > 0 ? searchResults.map((u) => (
+                                            <button key={u.id} onClick={() => { setSelectedRecipient(u); setSearchQuery(""); }} className="flex items-center gap-4 p-5 w-full rounded-2xl bg-white/5 border border-white/5 hover:bg-accent/5 hover:border-accent/20 transition-all text-left">
+                                                <div className="w-12 h-12 rounded-xl bg-accent/10 flex items-center justify-center font-black text-accent text-lg italic">{u.name?.substring(0, 1)}</div>
+                                                <div className="flex-1 overflow-hidden"><p className="font-black text-sm uppercase italic truncate">{u.name}</p><p className="text-[10px] opacity-40 truncate">{u.email}</p></div>
+                                            </button>
+                                        )) : <p className="text-center py-10 text-[10px] font-black uppercase opacity-30 italic">Aucun résultat trouvé</p>}
+                                    </div>
+                                )}
+                                
+                                {/* Contacts Récents (Simulé) */}
+                                <div className="pt-6 border-t border-white/5 space-y-4">
+                                    <p className="text-[9px] font-black uppercase tracking-[0.2em] opacity-30">Récemment sollicités</p>
+                                    <div className="flex gap-4">
+                                        {[...Array(3)].map((_, i) => (
+                                            <div key={i} className="flex flex-col items-center gap-2 opacity-30">
+                                                <div className="w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center"><UserIcon size={18}/></div>
+                                                <div className="w-10 h-2 bg-white/5 rounded-full" />
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            <form onSubmit={handleTransfer} className="space-y-10 animate-in slide-in-from-right-4 duration-300">
+                                <div className="p-6 bg-accent/5 border border-accent/20 rounded-[2.5rem] flex items-center justify-between">
+                                    <div className="flex items-center gap-5">
+                                        <div className="w-14 h-14 rounded-2xl bg-accent text-black flex items-center justify-center font-black text-xl italic shadow-lg shadow-accent/20">{selectedRecipient.name?.substring(0, 1)}</div>
+                                        <div>
+                                            <p className="text-[9px] font-black text-accent uppercase tracking-widest">Envoi vers</p>
+                                            <p className="text-lg font-black uppercase italic text-white leading-none mt-1">{selectedRecipient.name}</p>
+                                        </div>
+                                    </div>
+                                    <Button variant="ghost" size="icon" onClick={() => setSelectedRecipient(null)} className="h-10 w-10 rounded-full hover:bg-white/5 text-white/40"><X size={20}/></Button>
+                                </div>
+
+                                <div className="space-y-8">
+                                    <div className="space-y-3">
+                                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Montant à transférer</Label>
+                                        <div className="relative">
+                                            <Coins className="absolute left-6 top-1/2 -translate-y-1/2 text-accent" size={24} />
+                                            <Input type="number" step="0.01" value={transferAmount} onChange={(e) => setTransferAmount(e.target.value)} className="h-20 pl-16 bg-background/50 border-white/10 rounded-[2rem] text-4xl font-black text-accent" required />
+                                            <div className="absolute right-6 top-1/2 -translate-y-1/2 flex flex-col items-end">
+                                                <p className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">DISPO</p>
+                                                <p className="text-xs font-bold text-white/40">{user?.tokenBalance?.toFixed(2)}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-3">
+                                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Mémo de transaction</Label>
+                                        <Input value={transferMemo} onChange={(e) => setTransferMemo(e.target.value)} placeholder="Ex: Remboursement diagnostic..." className="h-14 bg-background/50 border-white/10 rounded-2xl italic text-sm font-medium" />
+                                    </div>
+                                </div>
+
+                                <div className="pt-6">
+                                    <Button type="submit" disabled={isProcessingAction || !transferAmount} className="w-full h-20 bg-accent text-black font-black uppercase italic rounded-[2rem] shadow-2xl shadow-accent/20 text-xl gap-4">
+                                        {isProcessingAction ? <Loader2 className="animate-spin" /> : <><Send size={24} /> Valider le Transfert</>}
+                                    </Button>
+                                </div>
+                            </form>
+                        )}
                     </div>
                 </SheetContent>
             </Sheet>
