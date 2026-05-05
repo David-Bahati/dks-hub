@@ -41,7 +41,10 @@ import {
     ArrowUpRight,
     GraduationCap,
     Wrench,
-    Flame
+    Flame,
+    Calculator,
+    Gem,
+    Sparkles
 } from "lucide-react";
 import { db } from '@/lib/firebase';
 import { collection, query, where, orderBy, updateDoc, doc, addDoc, serverTimestamp, increment, limit, getDocs, Timestamp } from 'firebase/firestore';
@@ -65,6 +68,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { authenticateWithPi } from '@/lib/pi-payment';
 
 const POINTS_PER_TOKEN = 100;
+const GCV_VALUE = 314159; // Global Consensus Value in USD
 
 const SHOP_PERKS = [
     { id: 'discount_10', title: 'Coupon -10% Hardware', cost: 50, description: 'Réduction immédiate sur tout article en stock.', icon: <ShoppingBag className="text-accent" /> },
@@ -84,6 +88,7 @@ function UniversalWalletPage() {
     // UI States
     const [ledgerFilter, setLedgerFilter] = useState("all");
     const [ledgerSearch, setLedgerSearch] = useState("");
+    const [isGcvExpanded, setIsGcvExpanded] = useState(false);
 
     // Staking States
     const [stakeAmount, setStakeAmount] = useState("");
@@ -120,7 +125,7 @@ function UniversalWalletPage() {
     const { data: transactions, isLoading: loadingTx } = useCollection(txQuery);
 
     const stats = useMemo(() => {
-        if (!user) return { totalPoints: 0, redeemableTokens: 0, progress: 0, availablePoints: 0, stakingRewards: 0, income: 0, expense: 0, apr: 5 };
+        if (!user) return { totalPoints: 0, redeemableTokens: 0, progress: 0, availablePoints: 0, stakingRewards: 0, income: 0, expense: 0, apr: 5, gcvUSD: 0, gcvPi: 0 };
 
         // 1. Points Calculation
         let total = 0;
@@ -145,11 +150,10 @@ function UniversalWalletPage() {
         if (user.stakedBalance && user.stakingStartedAt) {
             const start = user.stakingStartedAt?.toDate ? user.stakingStartedAt.toDate() : new Date(user.stakingStartedAt);
             const hoursStaked = Math.max(0, (Date.now() - start.getTime()) / (1000 * 60 * 60));
-            // Reward = Balance * (APR/100) * (Hours / HoursPerYear)
             rewards = (user.stakedBalance * (apr / 100) * (hoursStaked / 8760));
         }
 
-        // 4. Ledger Summary (Income vs Expense)
+        // 4. Ledger Summary
         let income = 0;
         let expense = 0;
         transactions?.forEach(tx => {
@@ -160,7 +164,22 @@ function UniversalWalletPage() {
             }
         });
 
-        return { totalPoints: total, availablePoints, redeemableTokens: redeemable, progress, stakingRewards: rewards, income, expense, apr };
+        // 5. GCV Conversion (Assuming 1 DKST = 1 Pi in internal consensus context for calculation)
+        const totalTokens = (user.tokenBalance || 0) + (user.stakedBalance || 0) + rewards;
+        const gcvUSD = totalTokens * GCV_VALUE;
+
+        return { 
+            totalPoints: total, 
+            availablePoints, 
+            redeemableTokens: redeemable, 
+            progress, 
+            stakingRewards: rewards, 
+            income, 
+            expense, 
+            apr,
+            gcvUSD,
+            totalTokens
+        };
     }, [user, logs, orders, isStaff, transactions]);
 
     // Recipient Search Logic
@@ -191,7 +210,7 @@ function UniversalWalletPage() {
             if (piUser) {
                 await updateDoc(doc(db, "users", user!.uid), { 
                     piUsername: piUser.username,
-                    piWalletAddress: piUser.uid, // Simplifié pour le prototype
+                    piWalletAddress: piUser.uid,
                     updatedAt: serverTimestamp() 
                 });
                 toast({ title: "Pi Network Synchronisé", description: `Bienvenue ${piUser.username} !` });
@@ -354,7 +373,7 @@ function UniversalWalletPage() {
                         </Link>
                         <div>
                             <h1 className="text-4xl font-black uppercase italic tracking-tighter">Mon Wallet <span className="text-accent">Élite</span></h1>
-                            <p className="text-muted-foreground text-xs uppercase font-black opacity-40 mt-1">Gestionnaire d'actifs numériques Double King Shop</p>
+                            <p className="text-muted-foreground text-xs uppercase font-black opacity-40 mt-1">Gestionnaire d'actifs numériques & GCV Pi Terminal</p>
                         </div>
                     </div>
                     <div className="flex gap-3">
@@ -365,7 +384,7 @@ function UniversalWalletPage() {
                             className="border-orange-500/20 text-orange-500 h-14 px-6 rounded-2xl font-black uppercase italic gap-3 hover:bg-orange-500/10 transition-all"
                         >
                             {isSyncing ? <Loader2 className="animate-spin" /> : <Globe size={20} />}
-                            {user?.piWalletAddress ? "Synchronisé Pi" : "Connecter Pi SDK"}
+                            {user?.piWalletAddress ? "Pi Mainnet Synced" : "Connecter Pi SDK"}
                         </Button>
                         <Button onClick={() => setIsTransferSheetOpen(true)} className="bg-accent text-black hover:bg-accent/90 h-14 px-8 rounded-2xl font-black uppercase italic gap-3 shadow-xl shadow-accent/20">
                             <Send size={20} /> Transférer
@@ -373,16 +392,87 @@ function UniversalWalletPage() {
                     </div>
                 </div>
 
-                {/* DASHBOARD ANALYTICS */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-                    <Card className="bg-accent/10 border-accent/20 rounded-[2.5rem] p-8 space-y-4 relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:rotate-12 transition-transform"><Coins size={80} /></div>
-                        <p className="text-[9px] font-black uppercase text-accent/60 tracking-widest">Solde DKST</p>
-                        <p className="text-4xl font-black text-white italic">{user?.tokenBalance?.toFixed(2) || "0.00"}</p>
-                        <div className="flex items-center gap-2 text-[10px] font-bold text-white/40">
-                             <TrendingUp size={12} className="text-accent" /> ≈ {((user?.tokenBalance || 0) / 314159).toFixed(6)} π (GCV)
+                {/* GCV INTERACTIVE HERO SECTION */}
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-12">
+                    <Card className="lg:col-span-8 bg-gradient-to-br from-yellow-500/20 via-background to-black border-yellow-500/20 rounded-[3.5rem] p-12 relative overflow-hidden group shadow-2xl">
+                        <div className="absolute top-0 right-0 p-12 opacity-10 scale-150 rotate-12 group-hover:rotate-0 transition-transform duration-[3s]"><Gem size={300} className="text-yellow-500" /></div>
+                        <div className="relative z-10 space-y-10">
+                            <div className="flex flex-wrap items-center gap-4">
+                                <Badge className="bg-yellow-500 text-black font-black uppercase italic tracking-widest px-5 py-2">Consensus GCV Activé</Badge>
+                                <Badge variant="outline" className="border-white/10 text-white/40 uppercase font-black text-[9px] tracking-widest flex items-center gap-2">
+                                    <Sparkles size={10} className="text-yellow-500" /> 1 π = $314,159.00
+                                </Badge>
+                            </div>
+
+                            <div className="flex flex-col md:flex-row justify-between items-end gap-10">
+                                <div className="space-y-2">
+                                    <h2 className="text-6xl md:text-8xl font-black text-white italic tracking-tighter leading-none">
+                                        {stats.totalTokens.toFixed(2)} <span className="text-2xl md:text-3xl text-yellow-500 not-italic uppercase ml-2">DKST</span>
+                                    </h2>
+                                    <p className="text-lg md:text-xl font-bold text-white/40 uppercase tracking-widest">Actifs de l'Élite • Fortune Numérique</p>
+                                </div>
+                                <div className="bg-black/60 backdrop-blur-3xl p-8 rounded-[2.5rem] border border-yellow-500/30 text-right min-w-[280px] shadow-inner">
+                                    <p className="text-[10px] font-black uppercase text-yellow-500 mb-2 tracking-[0.4em]">Valeur Estimée (USD)</p>
+                                    <p className="text-4xl font-black text-white italic tracking-tighter">
+                                        ${stats.gcvUSD.toLocaleString('fr-FR', { maximumFractionDigits: 0 })}
+                                    </p>
+                                    <p className="text-[9px] font-bold uppercase mt-4 text-white/20">Basé sur le consensus global Pi Network</p>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-6">
+                                <div className="p-5 bg-white/5 rounded-2xl border border-white/5 flex flex-col justify-center">
+                                    <p className="text-[9px] font-black uppercase text-white/40 mb-1">Liquidité</p>
+                                    <p className="text-xl font-black text-white">{user?.tokenBalance?.toFixed(2)} DKST</p>
+                                </div>
+                                <div className="p-5 bg-white/5 rounded-2xl border border-white/5 flex flex-col justify-center">
+                                    <p className="text-[9px] font-black uppercase text-white/40 mb-1">Épargne Vault</p>
+                                    <p className="text-xl font-black text-primary">{user?.stakedBalance?.toFixed(2)} DKST</p>
+                                </div>
+                                <div className="p-5 bg-white/5 rounded-2xl border border-white/5 flex flex-col justify-center">
+                                    <p className="text-[9px] font-black uppercase text-white/40 mb-1">Récompenses</p>
+                                    <p className="text-xl font-black text-green-400">+{stats.stakingRewards.toFixed(4)}</p>
+                                </div>
+                            </div>
                         </div>
                     </Card>
+
+                    <Card className="lg:col-span-4 glossy-card border-none rounded-[3.5rem] p-10 flex flex-col justify-between overflow-hidden relative">
+                         <div className="absolute bottom-0 right-0 p-8 opacity-5"><Calculator size={100} /></div>
+                         <div className="space-y-6">
+                            <div className="flex items-center gap-3">
+                                <div className="w-12 h-12 rounded-2xl bg-accent text-black flex items-center justify-center shadow-lg"><Calculator size={24} /></div>
+                                <h4 className="text-xl font-black uppercase italic tracking-tight">Calculateur <span className="text-accent">Wealth</span></h4>
+                            </div>
+                            <p className="text-xs text-muted-foreground leading-relaxed italic">"Simulez l'impact de vos gains sur votre fortune future au taux GCV."</p>
+                            
+                            <div className="space-y-4 pt-4">
+                                <div className="space-y-2">
+                                    <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Gain Cible (DKST)</Label>
+                                    <Input 
+                                        type="number" 
+                                        placeholder="Ex: 10" 
+                                        className="h-14 bg-background/50 border-white/10 rounded-2xl text-xl font-black text-center" 
+                                        onChange={(e) => {
+                                            const val = parseFloat(e.target.value) || 0;
+                                            const res = val * GCV_VALUE;
+                                            (document.getElementById('calc-res') as HTMLElement).innerText = `$${res.toLocaleString('fr-FR')}`;
+                                        }}
+                                    />
+                                </div>
+                                <div className="p-6 bg-black/40 rounded-3xl border border-dashed border-accent/30 text-center">
+                                    <p className="text-[8px] font-black uppercase text-accent mb-2">Valeur GCV Potentielle</p>
+                                    <p id="calc-res" className="text-3xl font-black text-white italic">$0</p>
+                                </div>
+                            </div>
+                         </div>
+                         <Button variant="ghost" className="h-10 text-[9px] font-black uppercase tracking-widest text-white/20 mt-6 group">
+                            Comprendre le GCV <ArrowRight size={12} className="ml-2 group-hover:translate-x-2 transition-transform" />
+                         </Button>
+                    </Card>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
                     <Card className="bg-primary/10 border-primary/20 rounded-[2.5rem] p-8 space-y-4">
                         <p className="text-[9px] font-black uppercase text-primary/60 tracking-widest">Staking Actif</p>
                         <p className="text-4xl font-black text-white italic">{user?.stakedBalance?.toFixed(2) || "0.00"}</p>
@@ -404,13 +494,20 @@ function UniversalWalletPage() {
                              <ArrowUpRight size={12} /> Staking & Privilèges
                         </div>
                     </Card>
+                    <Card className="bg-accent/10 border-accent/20 rounded-[2.5rem] p-8 space-y-4">
+                        <p className="text-[9px] font-black uppercase text-accent/60 tracking-widest">Valeur Pi (GCV)</p>
+                        <p className="text-4xl font-black text-white italic">{(stats.totalTokens).toFixed(4)} <span className="text-sm not-italic">π</span></p>
+                        <div className="flex items-center gap-2 text-[10px] font-bold text-accent">
+                             <Coins size={12} /> 1 DKST = 1 Pi Consensus
+                        </div>
+                    </Card>
                 </div>
 
                 <Tabs defaultValue="overview" className="space-y-10">
                     <TabsList className="bg-white/5 border border-white/5 p-1.5 rounded-[1.5rem] h-16 w-full max-w-xl mx-auto flex">
-                        <TabsTrigger value="overview" className="flex-1 rounded-xl font-black uppercase italic text-[10px] data-[state=active]:bg-accent data-[state=active]:text-black"><Wallet size={14} className="mr-2" /> Vue d'ensemble</TabsTrigger>
-                        <TabsTrigger value="vault" className="flex-1 rounded-xl font-black uppercase italic text-[10px] data-[state=active]:bg-accent data-[state=active]:text-black"><Lock size={14} className="mr-2" /> DKS Vault</TabsTrigger>
-                        <TabsTrigger value="history" className="flex-1 rounded-xl font-black uppercase italic text-[10px] data-[state=active]:bg-accent data-[state=active]:text-black"><History size={14} className="mr-2" /> Registre</TabsTrigger>
+                        <TabsTrigger value="overview" className="flex-1 rounded-xl font-black uppercase italic text-[10px] data-[state=active]:bg-accent data-[state=active]:text-black transition-all"><Wallet size={14} className="mr-2" /> Vue d'ensemble</TabsTrigger>
+                        <TabsTrigger value="vault" className="flex-1 rounded-xl font-black uppercase italic text-[10px] data-[state=active]:bg-accent data-[state=active]:text-black transition-all"><Lock size={14} className="mr-2" /> DKS Vault</TabsTrigger>
+                        <TabsTrigger value="history" className="flex-1 rounded-xl font-black uppercase italic text-[10px] data-[state=active]:bg-accent data-[state=active]:text-black transition-all"><History size={14} className="mr-2" /> Registre</TabsTrigger>
                     </TabsList>
 
                     {/* ONGLET VUE D'ENSEMBLE */}
@@ -538,7 +635,7 @@ function UniversalWalletPage() {
                                                     <Timer size={16} className="text-primary animate-pulse" />
                                                     <p className="text-[10px] font-bold text-white/70 italic">Contrat actif depuis le {user.stakingStartedAt?.toDate ? user.stakingStartedAt.toDate().toLocaleDateString() : '?'}</p>
                                                 </div>
-                                                <Button onClick={handleUnstake} disabled={isProcessingAction} className="w-full h-20 bg-white text-primary font-black uppercase italic rounded-[2rem] shadow-xl text-lg">Libérer les jetons (Unstake)</Button>
+                                                <Button onClick={handleUnstake} disabled={isProcessingAction} className="w-full h-20 bg-white text-primary font-black uppercase italic rounded-[2rem] shadow-xl text-lg transition-all active:scale-95">Libérer les jetons (Unstake)</Button>
                                             </div>
                                         ) : (
                                             <div className="space-y-4">
@@ -546,7 +643,7 @@ function UniversalWalletPage() {
                                                     <CircleDollarSign className="absolute left-6 top-1/2 -translate-y-1/2 text-primary" />
                                                     <Input type="number" value={stakeAmount} onChange={(e) => setStakeAmount(e.target.value)} placeholder="Montant à bloquer..." className="h-16 pl-14 bg-background/50 border-white/10 rounded-2xl text-center text-xl font-black" />
                                                 </div>
-                                                <Button onClick={handleStake} disabled={!stakeAmount || isProcessingAction} className="w-full h-20 bg-primary text-white font-black uppercase italic rounded-[2rem] shadow-2xl text-lg">Activer le Contrat</Button>
+                                                <Button onClick={handleStake} disabled={!stakeAmount || isProcessingAction} className="w-full h-20 bg-primary text-white font-black uppercase italic rounded-[2rem] shadow-2xl text-lg transition-all active:scale-95">Activer le Contrat</Button>
                                             </div>
                                         )}
                                     </div>
@@ -712,7 +809,6 @@ function UniversalWalletPage() {
                                     </div>
                                 )}
                                 
-                                {/* Contacts Récents (Simulé) */}
                                 <div className="pt-6 border-t border-white/5 space-y-4">
                                     <p className="text-[9px] font-black uppercase tracking-[0.2em] opacity-30">Récemment sollicités</p>
                                     <div className="flex gap-4">
