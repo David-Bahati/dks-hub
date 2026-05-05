@@ -1,6 +1,6 @@
 'use server';
 /**
- * @fileOverview Flow Genkit pour l'Assistant Client de Double King Shop.
+ * @fileOverview Flow Genkit pour l'Assistant Client de Double King Shop avec support multilingue expert.
  * 
  * Cet agent guide les clients, répond aux questions sur l'entreprise et les produits.
  */
@@ -12,6 +12,7 @@ import { collection, getDocs, query, where, limit } from 'firebase/firestore';
 
 const AssistantInputSchema = z.object({
   message: z.string(),
+  language: z.string().optional().default('fr'),
   history: z.array(z.object({
     role: z.enum(['user', 'model']),
     content: z.array(z.object({ text: z.string() }))
@@ -65,17 +66,32 @@ const customerAssistantFlow = ai.defineFlow(
   },
   async (input) => {
     try {
+      const langNames: Record<string, string> = {
+        'fr': 'Français',
+        'en': 'Anglais',
+        'sw': 'Swahili',
+        'ln': 'Lingala'
+      };
+      
       const response = await ai.generate({
         model: 'googleai/gemini-1.5-flash',
-        system: `Tu es l'Expert Double King (DKS), l'assistant IA de la boutique de luxe Double King Shop à Bunia, RDC.
-        Ton but est de guider les clients, de les conseiller sur le matériel informatique et de répondre à leurs questions.
+        system: `Tu es l'Expert Double King (DKS), l'assistant IA de l'écosystème technologique Double King Shop à Bunia, RDC.
+        Ton rôle est d'être un expert conseil en hardware, éducation numérique (Academy) et infrastructures.
 
-        INFOS CLÉS :
+        IMPORTANT : Tu dois répondre EXCLUSIVEMENT en ${langNames[input.language] || 'Français'}.
+        Garde un ton professionnel, technologique mais chaleureux, typique de l'élite de Bunia.
+
+        CONTEXTE ET VALEURS :
         - Localisation : Immeuble Bahati, Boulevard de la Libération, Bunia, Ituri, RDC.
-        - Spécialité : Hardware informatique haut de gamme (RTX, Processeurs, Laptops Pro).
-        - Paiements : Pi Network (1 Pi = $314,159), Mobile Money (M-Pesa, Airtel, Orange), et Cash.
-        - Style : Professionnel, chaleureux et expert.
-        - IMPORTANT : Si on te demande un produit, utilise toujours l'outil searchProducts.`,
+        - Spécialité : Hardware premium (RTX, Laptops ROG), Starlink, Vidéosurveillance.
+        - DKS Academy : Formations certifiantes en IA et Blockchain.
+        - Économie : Paiement en Pi Network (1 Pi = $314,159 GCV) et jetons DKST.
+        - Le jeton DKST : Actif interne du Hub pour des transactions sans frais.
+        
+        INSTRUCTIONS DE REPONSE :
+        - Pour les produits, utilise l'outil searchProducts.
+        - Explique toujours les bénéfices des paiements en Crypto (Pi/DKST).
+        - Si on te parle en Lingala ou Swahili, montre que tu es un expert local qui comprend les réalités de l'Ituri.`,
         tools: [searchProducts],
         prompt: input.message,
         history: input.history,
@@ -84,7 +100,7 @@ const customerAssistantFlow = ai.defineFlow(
       return response.text;
     } catch (error: any) {
       console.error("Genkit Flow Error:", error);
-      return "Désolé, je rencontre une difficulté technique pour accéder à mes services. Veuillez réessayer dans quelques instants.";
+      return "Désolé, je rencontre une difficulté technique pour accéder à mes services linguistiques. Veuillez réessayer.";
     }
   }
 );

@@ -7,18 +7,15 @@ import {
     Send, 
     Sparkles, 
     Loader2, 
-    User, 
-    Bot, 
-    ArrowRight,
-    Cpu,
-    Smartphone,
-    MapPin,
-    RotateCcw,
-    ChevronDown,
-    Mic,
-    MicOff,
-    Volume2,
-    VolumeX
+    RotateCcw, 
+    ChevronDown, 
+    Mic, 
+    MicOff, 
+    Volume2, 
+    VolumeX, 
+    Languages,
+    Globe,
+    Check
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -27,19 +24,61 @@ import { Badge } from '@/components/ui/badge';
 import { askAssistant } from '@/ai/flows/customer-assistant';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 type Message = {
     role: 'user' | 'model';
     text: string;
 };
 
-const INITIAL_MESSAGE = "Bonjour ! Je suis l'Expert Double King. Comment puis-je vous aider dans votre setup aujourd'hui ? Je connais tout sur notre stock à Bunia et nos options de paiement Crypto (Pi, DKST).";
+const LANGUAGES = [
+    { code: 'fr', label: 'Français', flag: '🇫🇷', voiceCode: 'fr-FR' },
+    { code: 'en', label: 'English', flag: '🇺🇸', voiceCode: 'en-US' },
+    { code: 'sw', label: 'Swahili', flag: '🇹🇿', voiceCode: 'sw-TZ' },
+    { code: 'ln', label: 'Lingala', flag: '🇨🇩', voiceCode: 'ln-CD' },
+];
+
+const INITIAL_MESSAGES: Record<string, string> = {
+    'fr': "Bonjour ! Je suis l'Expert Double King. Comment puis-je vous aider aujourd'hui ? Je connais tout sur notre stock à Bunia et nos options de paiement Crypto.",
+    'en': "Hello! I am the Double King Expert. How can I help you today? I know everything about our stock in Bunia and our Crypto payment options.",
+    'sw': "Habari! Mimi ni Mtaalamu wa Double King. Nawezaje kukusaidia leo? Ninajua kila kitu kuhusu bidhaa zetu huko Bunia na chaguzi zetu za malipo ya Crypto.",
+    'ln': "Mbote! Nazali Expert ya Double King. Ndenge nini nakoki kosalisa yo lelo? Nayebi makambo nionso ya stock na biso na Bunia mpe ndenge ya kofuta na Crypto."
+};
+
+const PROTOCOLS: Record<string, {t: string, i: any}[]> = {
+    'fr': [
+        { t: "Modes de paiement ?", i: <Globe size={12}/> },
+        { t: "Où est le Hub ?", i: <MapPin size={12}/> },
+        { t: "Arrivages RTX ?", i: <Cpu size={12}/> }
+    ],
+    'en': [
+        { t: "Payment methods?", i: <Globe size={12}/> },
+        { t: "Where is the Hub?", i: <MapPin size={12}/> },
+        { t: "RTX arrivals?", i: <Cpu size={12}/> }
+    ],
+    'sw': [
+        { t: "Njia za malipo?", i: <Globe size={12}/> },
+        { t: "Hub iko wapi?", i: <MapPin size={12}/> },
+        { t: "Bidhaa za RTX?", i: <Cpu size={12}/> }
+    ],
+    'ln': [
+        { t: "Ndenge ya kofuta?", i: <Globe size={12}/> },
+        { t: "Hub ezali wapi?", i: <MapPin size={12}/> },
+        { t: "RTX ya sika?", i: <Cpu size={12}/> }
+    ]
+};
 
 export function AiAssistant() {
     const [isOpen, setIsOpen] = useState(false);
     const [showTeaser, setShowTeaser] = useState(false);
+    const [currentLanguage, setCurrentLanguage] = useState(LANGUAGES[0]);
     const [messages, setMessages] = useState<Message[]>([
-        { role: 'model', text: INITIAL_MESSAGE }
+        { role: 'model', text: INITIAL_MESSAGES['fr'] }
     ]);
     const [input, setInput] = useState("");
     const [isLoading, setIsLoading] = useState(false);
@@ -58,20 +97,17 @@ export function AiAssistant() {
                 recognitionRef.current = new SpeechRecognition();
                 recognitionRef.current.continuous = false;
                 recognitionRef.current.interimResults = false;
-                recognitionRef.current.lang = 'fr-FR';
+                recognitionRef.current.lang = currentLanguage.voiceCode;
 
                 recognitionRef.current.onresult = (event: any) => {
                     const transcript = event.results[0][0].transcript;
                     setInput(transcript);
                     setIsListening(false);
-                    // Optionnel: envoyer directement
-                    // handleSend(transcript);
                 };
 
                 recognitionRef.current.onerror = (event: any) => {
                     console.error("Speech Recognition Error:", event.error);
                     setIsListening(false);
-                    toast({ title: "Erreur Vocale", description: "Impossible de capter votre voix.", variant: "destructive" });
                 };
 
                 recognitionRef.current.onend = () => {
@@ -79,26 +115,22 @@ export function AiAssistant() {
                 };
             }
         }
-    }, [toast]);
+    }, [currentLanguage]);
 
-    // Text-to-Speech function
     const speak = (text: string) => {
         if (!isSpeechEnabled || typeof window === 'undefined') return;
-        
-        window.speechSynthesis.cancel(); // Arrêter toute lecture en cours
+        window.speechSynthesis.cancel();
         const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = 'fr-FR';
-        utterance.rate = 1.1;
-        utterance.pitch = 1;
+        utterance.lang = currentLanguage.voiceCode;
+        utterance.rate = 1;
         window.speechSynthesis.speak(utterance);
     };
 
     const toggleListening = () => {
         if (!recognitionRef.current) {
-            toast({ title: "Non supporté", description: "Votre navigateur ne supporte pas la reconnaissance vocale.", variant: "destructive" });
+            toast({ title: "Non supporté", description: "Navigateur incompatible avec la voix.", variant: "destructive" });
             return;
         }
-
         if (isListening) {
             recognitionRef.current.stop();
         } else {
@@ -107,11 +139,10 @@ export function AiAssistant() {
         }
     };
 
-    // Effet pour afficher un petit teaser après 3 secondes au premier chargement
     useEffect(() => {
         const timer = setTimeout(() => {
             if (!isOpen) setShowTeaser(true);
-        }, 3000);
+        }, 5000);
         return () => clearTimeout(timer);
     }, [isOpen]);
 
@@ -134,7 +165,6 @@ export function AiAssistant() {
         setIsLoading(true);
 
         try {
-            // Filtrer l'historique pour Gemini (doit commencer par user)
             const historyForAi = newMessages
                 .filter((_, index) => index > 0 || newMessages[0].role === 'user')
                 .slice(0, -1)
@@ -145,18 +175,15 @@ export function AiAssistant() {
 
             const response = await askAssistant({ 
                 message: userMsg,
+                language: currentLanguage.code,
                 history: historyForAi 
             });
 
             setMessages(prev => [...prev, { role: 'model', text: response }]);
-            
-            // Lire la réponse si activé
-            if (isSpeechEnabled) {
-                speak(response);
-            }
+            if (isSpeechEnabled) speak(response);
         } catch (error) {
             console.error("Chat Error:", error);
-            const errMsg = "Désolé, je rencontre une difficulté technique. Pouvez-vous reformuler votre question ?";
+            const errMsg = "Désolé, je rencontre une difficulté technique. Pouvez-vous reformuler ?";
             setMessages(prev => [...prev, { role: 'model', text: errMsg }]);
             if (isSpeechEnabled) speak(errMsg);
         } finally {
@@ -164,21 +191,30 @@ export function AiAssistant() {
         }
     };
 
+    const handleLanguageChange = (lang: typeof LANGUAGES[0]) => {
+        setCurrentLanguage(lang);
+        setMessages([{ role: 'model', text: INITIAL_MESSAGES[lang.code] }]);
+        window.speechSynthesis.cancel();
+        toast({ 
+            title: `Langue : ${lang.label}`, 
+            description: "L'Expert DKS s'est adapté à votre canal linguistique." 
+        });
+    };
+
     const clearChat = () => {
-        setMessages([{ role: 'model', text: INITIAL_MESSAGE }]);
+        setMessages([{ role: 'model', text: INITIAL_MESSAGES[currentLanguage.code] }]);
         window.speechSynthesis.cancel();
     };
 
     return (
         <div className="fixed bottom-6 right-6 z-[100] flex flex-col items-end gap-4">
             
-            {/* Bulles de Teaser */}
             {showTeaser && !isOpen && (
                 <div 
                     onClick={() => { setIsOpen(true); setShowTeaser(false); }}
-                    className="bg-accent text-black p-4 rounded-2xl rounded-br-none shadow-2xl cursor-pointer animate-in slide-in-from-right-4 fade-in duration-500 max-w-[200px] relative group"
+                    className="bg-accent text-black p-4 rounded-2xl rounded-br-none shadow-2xl cursor-pointer animate-in slide-in-from-right-4 fade-in duration-500 max-w-[220px] relative group"
                 >
-                    <p className="text-[10px] font-black uppercase italic leading-tight">Besoin d'un conseil hardware ?</p>
+                    <p className="text-[10px] font-black uppercase italic leading-tight">Besoin d'un conseil d'expert ?</p>
                     <button className="absolute -top-2 -left-2 bg-white rounded-full p-1 shadow-md opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => { e.stopPropagation(); setShowTeaser(false); }}>
                         <X size={10} />
                     </button>
@@ -186,7 +222,6 @@ export function AiAssistant() {
                 </div>
             )}
 
-            {/* Fenêtre de Chat */}
             {isOpen && (
                 <Card className="w-[380px] h-[600px] glossy-card border-white/10 rounded-[2.5rem] flex flex-col overflow-hidden shadow-[0_30px_60px_rgba(0,0,0,0.6)] animate-in slide-in-from-bottom-8 zoom-in-95 duration-500">
                     <CardHeader className="bg-primary/20 backdrop-blur-3xl p-6 border-b border-white/5 shrink-0">
@@ -199,21 +234,44 @@ export function AiAssistant() {
                                     <CardTitle className="text-sm font-black uppercase italic tracking-tighter">EXPERT DKS</CardTitle>
                                     <div className="flex items-center gap-1.5 mt-0.5">
                                         <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                                        <span className="text-[8px] font-black uppercase text-accent tracking-widest">IA Active • Bunia Hub</span>
+                                        <span className="text-[8px] font-black uppercase text-accent tracking-widest">Live • {currentLanguage.label}</span>
                                     </div>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1">
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl text-white/40 hover:text-accent">
+                                            <Languages size={14} />
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent className="bg-card border-white/10 min-w-[140px] rounded-xl p-2" align="end">
+                                        {LANGUAGES.map((lang) => (
+                                            <DropdownMenuItem 
+                                                key={lang.code} 
+                                                onClick={() => handleLanguageChange(lang)}
+                                                className={cn(
+                                                    "text-[10px] font-black uppercase italic gap-3 rounded-lg mb-1 cursor-pointer",
+                                                    currentLanguage.code === lang.code ? "bg-accent/10 text-accent" : "text-white/60 hover:bg-white/5"
+                                                )}
+                                            >
+                                                <span className="text-base">{lang.flag}</span>
+                                                <span className="flex-1">{lang.label}</span>
+                                                {currentLanguage.code === lang.code && <Check size={12} />}
+                                            </DropdownMenuItem>
+                                        ))}
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+
                                 <Button 
                                     variant="ghost" 
                                     size="icon" 
                                     onClick={() => setIsSpeechEnabled(!isSpeechEnabled)} 
-                                    title={isSpeechEnabled ? "Désactiver la voix" : "Activer la voix"} 
                                     className={cn("h-8 w-8 rounded-xl transition-all", isSpeechEnabled ? "text-accent bg-accent/10" : "text-white/20")}
                                 >
                                     {isSpeechEnabled ? <Volume2 size={14} /> : <VolumeX size={14} />}
                                 </Button>
-                                <Button variant="ghost" size="icon" onClick={clearChat} title="Réinitialiser" className="h-8 w-8 rounded-xl hover:bg-white/5 text-white/20 hover:text-white">
+                                <Button variant="ghost" size="icon" onClick={clearChat} className="h-8 w-8 rounded-xl hover:bg-white/5 text-white/20 hover:text-white">
                                     <RotateCcw size={14} />
                                 </Button>
                                 <Button variant="ghost" size="icon" onClick={() => setIsOpen(false)} className="h-8 w-8 rounded-xl hover:bg-white/5">
@@ -235,7 +293,7 @@ export function AiAssistant() {
                                     {m.text}
                                 </div>
                                 <span className="text-[7px] font-black uppercase opacity-20 mt-1.5 px-1 tracking-[0.2em]">
-                                    {m.role === 'user' ? 'Transmission Membre' : 'Réponse Expert DKS'}
+                                    {m.role === 'user' ? 'Transmission' : 'Expert DKS'}
                                 </span>
                             </div>
                         ))}
@@ -251,16 +309,11 @@ export function AiAssistant() {
                             </div>
                         )}
                         
-                        {/* Suggestions rapides stylisées */}
                         {messages.length === 1 && !isLoading && (
                             <div className="pt-4 space-y-3">
                                 <p className="text-[8px] font-black uppercase text-muted-foreground/30 ml-1 tracking-[0.3em]">Protocoles suggérés :</p>
                                 <div className="flex flex-col gap-2">
-                                    {[
-                                        { t: "Quels sont les modes de paiement ?", i: <Coins size={12}/> },
-                                        { t: "Où se trouve le Hub à Bunia ?", i: <MapPin size={12}/> },
-                                        { t: "Quels sont les arrivages RTX ?", i: <Cpu size={12}/> }
-                                    ].map(s => (
+                                    {PROTOCOLS[currentLanguage.code]?.map(s => (
                                         <button 
                                             key={s.t} 
                                             onClick={() => { handleSend(s.t); }}
@@ -290,7 +343,7 @@ export function AiAssistant() {
                                 {isListening ? <MicOff size={20} /> : <Mic size={20} />}
                             </Button>
                             <Input 
-                                placeholder={isListening ? "Écoute en cours..." : "Interroger l'Expert..."} 
+                                placeholder={isListening ? "Écoute..." : "Poser une question..."} 
                                 value={input}
                                 onChange={(e) => setInput(e.target.value)}
                                 className="h-14 bg-background/50 border-white/10 rounded-2xl focus:border-accent text-xs font-medium"
@@ -309,11 +362,10 @@ export function AiAssistant() {
                 </Card>
             )}
 
-            {/* Bouton Principal */}
             <Button 
                 onClick={() => { setIsOpen(!isOpen); setShowTeaser(false); }}
                 className={cn(
-                    "h-16 w-16 rounded-[2rem] shadow-2xl transition-all duration-500 relative group",
+                    "h-16 w-16 rounded-[2.2rem] shadow-2xl transition-all duration-500 relative group",
                     isOpen 
                         ? "bg-background border border-white/10 text-white rotate-90" 
                         : "bg-accent text-black hover:scale-110 active:scale-95 shadow-[0_0_30px_rgba(56,189,248,0.4)]"
@@ -321,11 +373,11 @@ export function AiAssistant() {
             >
                 {isOpen ? <X size={28} /> : <Sparkles size={28} className="animate-pulse" />}
                 {!isOpen && (
-                    <div className="absolute -inset-1 bg-accent/20 rounded-[2.2rem] blur-xl opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <div className="absolute -inset-1 bg-accent/20 rounded-[2.5rem] blur-xl opacity-0 group-hover:opacity-100 transition-opacity" />
                 )}
             </Button>
         </div>
     );
 }
 
-import { Coins } from 'lucide-react';
+import { MapPin, Cpu } from 'lucide-react';
