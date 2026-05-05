@@ -33,10 +33,13 @@ import {
     Wallet,
     Globe,
     ExternalLink,
-    Lock
+    Lock,
+    Medal,
+    Sparkles,
+    Flame
 } from "lucide-react";
 import { db } from '@/lib/firebase';
-import { collection, query, where, orderBy, updateDoc, doc, addDoc, serverTimestamp, increment } from 'firebase/firestore';
+import { collection, query, where, orderBy, updateDoc, doc, addDoc, serverTimestamp, increment, limit } from 'firebase/firestore';
 import withAuth from '@/components/auth/withAuth';
 import Link from 'next/link';
 import { useCollection, useMemoFirebase } from '@/firebase';
@@ -79,7 +82,7 @@ function ExpertProfilePage() {
     // Fetch User Academy sessions
     const academyQuery = useMemoFirebase(() => {
         if (!user?.uid) return null;
-        return query(collection(db, "serviceBookings"), where("technicianId", "==", user.uid), where("status", "==", "completed"));
+        return query(collection(db, "serviceBookings"), where("userId", "==", user.uid), where("status", "==", "completed"));
     }, [user?.uid]);
     const { data: academySessions, isLoading: loadingAcademy } = useCollection(academyQuery);
 
@@ -112,7 +115,6 @@ function ExpertProfilePage() {
         const mySales = sales || [];
         const myTotalSalesAmount = mySales.reduce((acc, s) => acc + (s.totalAmount || 0), 0);
 
-        // Point calculation matches leaderboard logic in Dashboard
         let totalPoints = myLogs.length * 10;
         totalPoints += myAcademy.length * 50;
         totalPoints += mySAVCount * 30;
@@ -133,12 +135,24 @@ function ExpertProfilePage() {
         };
 
         const badges = [];
-        if (stats.totalActions >= 100) badges.push({ id: 'legend', label: 'Légende DKS', icon: <Crown size={14} />, color: 'bg-yellow-500/20 text-yellow-500' });
-        else if (stats.totalActions >= 50) badges.push({ id: 'expert', label: 'Expert Senior', icon: <ShieldCheck size={14} />, color: 'bg-accent/20 text-accent' });
         
-        if (stats.sales >= 20) badges.push({ id: 'closer', label: 'Top Closer', icon: <TrendingUp size={14} />, color: 'bg-green-500/20 text-green-400' });
-        if (stats.academy >= 5) badges.push({ id: 'mentor', label: 'Mentor Academy', icon: <GraduationCap size={14} />, color: 'bg-primary/20 text-primary' });
-        if (stats.logs >= 30) badges.push({ id: 'keeper', label: 'Gardien du Savoir', icon: <BookText size={14} />, color: 'bg-orange-500/20 text-orange-500' });
+        // 1. Career Badges
+        if (stats.totalActions >= 100) badges.push({ id: 'legend', label: 'Légende DKS', icon: <Crown size={14} />, color: 'bg-yellow-500/20 text-yellow-500', desc: "Pilier historique de l'écosystème." });
+        else if (stats.totalActions >= 50) badges.push({ id: 'expert', label: 'Expert Senior', icon: <ShieldCheck size={14} />, color: 'bg-accent/20 text-accent', desc: "Compétences techniques validées." });
+        
+        // 2. Achievements (Gamified)
+        if (myAcademy.some(s => s.serviceId === 'ia-mastery')) {
+            badges.push({ id: 'ai_architect', label: 'AI Architect', icon: <Sparkles size={14} />, color: 'bg-purple-500/20 text-purple-400', desc: "Maîtrise de l'IA générative." });
+        }
+        if (myAcademy.some(s => s.serviceId === 'network-pro')) {
+            badges.push({ id: 'starlink_pioneer', label: 'Starlink Pioneer', icon: <Globe size={14} />, color: 'bg-blue-500/20 text-blue-400', desc: "Expert en connectivité spatiale." });
+        }
+        if (user.tokenBalance && user.tokenBalance > 100) {
+            badges.push({ id: 'whale', label: 'Whale Investor', icon: <Coins size={14} />, color: 'bg-yellow-400/20 text-yellow-400', desc: "Détenteur majeur de DKST." });
+        }
+        if (user.miningPower && user.miningPower > 5) {
+            badges.push({ id: 'master_miner', label: 'Master Miner', icon: <Flame size={14} />, color: 'bg-orange-500/20 text-orange-400', desc: "Puissance d'extraction élevée." });
+        }
 
         const radarData = [
             { subject: 'SAV', A: Math.min(100, stats.sav * 10), fullMark: 100 },
@@ -186,7 +200,6 @@ function ExpertProfilePage() {
 
         setIsMinting(true);
         try {
-            // Simulated Pi Blockchain Interaction
             const simulatedPiTxId = `PI-TX-${Math.random().toString(36).substring(2, 15).toUpperCase()}`;
 
             const userRef = doc(db, "users", user.uid);
@@ -237,7 +250,7 @@ function ExpertProfilePage() {
         return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin text-accent" /></div>;
     }
 
-    const redeemableTokens = Math.floor((careerStats?.stats.totalPoints || 0) - (user?.pointsConverted || 0)) / POINTS_PER_TOKEN;
+    const redeemableTokens = Math.floor(((careerStats?.stats.totalPoints || 0) - (user?.pointsConverted || 0)) / POINTS_PER_TOKEN);
 
     return (
         <div className="min-h-screen bg-background text-foreground pb-20">
@@ -310,7 +323,7 @@ function ExpertProfilePage() {
 
                                 <div className="space-y-1">
                                     <p className="text-[10px] font-black uppercase text-accent/60 tracking-widest">Solde Actuel</p>
-                                    <p className="text-5xl font-black text-white italic">{user?.tokenBalance || 0} <span className="text-sm font-light opacity-40 not-italic">DKST</span></p>
+                                    <p className="text-5xl font-black text-white italic">{user?.tokenBalance?.toFixed(2) || 0} <span className="text-sm font-light opacity-40 not-italic">DKST</span></p>
                                 </div>
 
                                 {!user?.piWalletAddress ? (
@@ -358,14 +371,23 @@ function ExpertProfilePage() {
 
                         <Card className="glossy-card border-none rounded-[2.5rem] p-10 space-y-6">
                             <h4 className="text-[10px] font-black uppercase tracking-widest opacity-40 italic flex items-center gap-2">
-                                <Award size={14} className="text-accent" /> Mur de Prestige
+                                <Medal size={14} className="text-accent" /> Mur des Distinctions
                             </h4>
-                            <div className="flex flex-wrap gap-3">
+                            <div className="grid grid-cols-1 gap-3">
                                 {careerStats?.badges.map((b, i) => (
-                                    <div key={i} className={cn("px-4 py-2 rounded-xl flex items-center gap-2 font-black uppercase italic text-[9px] shadow-lg", b.color)}>
-                                        {b.icon} {b.label}
+                                    <div key={i} className={cn("p-4 rounded-2xl flex items-center gap-4 border transition-all hover:scale-[1.02] shadow-lg", b.color, "border-white/5")}>
+                                        <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center shrink-0">
+                                            {b.icon}
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] font-black uppercase italic leading-none">{b.label}</p>
+                                            <p className="text-[8px] font-bold uppercase opacity-60 mt-1 tracking-widest">{b.desc}</p>
+                                        </div>
                                     </div>
                                 ))}
+                                {careerStats?.badges.length === 0 && (
+                                    <p className="text-[9px] text-center opacity-30 italic py-4">Relevez des défis pour débloquer vos badges.</p>
+                                )}
                             </div>
                         </Card>
                     </div>
@@ -453,7 +475,7 @@ function ExpertProfilePage() {
                                         </div>
                                         <div className="text-right">
                                             <p className="text-[10px] font-black text-accent uppercase">Confirmed</p>
-                                            <p className="text-[8px] font-bold opacity-30 uppercase">{tx.createdAt?.toDate?.().toLocaleString()}</p>
+                                            <p className="text-[8px] font-bold opacity-30 uppercase">{tx.createdAt?.toDate ? tx.createdAt.toDate().toLocaleString() : 'Récemment'}</p>
                                         </div>
                                     </div>
                                 )) : (
