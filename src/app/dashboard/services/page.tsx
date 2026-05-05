@@ -54,6 +54,8 @@ import { Label } from "@/components/ui/label";
 const SERVICE_PRICES: Record<string, number> = {
     "ia-mastery": 75,
     "crypto-trading": 50,
+    "pc-building": 35,
+    "cyber-audit": 250,
     "network-pro": 150,
     "hardware-extreme": 45,
     "ia-workshop": 50,

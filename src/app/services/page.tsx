@@ -22,7 +22,10 @@ import {
     Users,
     ShieldCheck,
     Building2,
-    Clock
+    Clock,
+    Hammer,
+    ShieldAlert,
+    Shield
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -63,6 +66,19 @@ const ACADEMY_COURSES = [
         includes: ["Accès API GPT-4", "Support de cours digital", "Networking Privé"]
     },
     {
+        id: "pc-building",
+        category: "formation",
+        title: "Workshop Montage PC Gaming",
+        subtitle: "L'art d'assembler sa propre machine de guerre.",
+        description: "Apprenez à choisir vos composants et à monter votre setup de A à Z avec nos experts.",
+        price: 35,
+        duration: "4 Heures",
+        certification: "DKS Hardware Builder",
+        icon: <Hammer className="text-orange-400" size={40} />,
+        curriculum: ["Compatibilité & Architecture", "Optimisation BIOS", "Cable Management Pro"],
+        includes: ["Outillage fourni", "Pâte thermique premium", "Guide d'entretien"]
+    },
+    {
         id: "crypto-trading",
         category: "formation",
         title: "Économie Digitale & Crypto",
@@ -78,6 +94,14 @@ const ACADEMY_COURSES = [
 ];
 
 const TECHNICAL_SERVICES = [
+    {
+        id: "cyber-audit",
+        category: "infrastructure",
+        title: "Audit Cybersécurité Pro",
+        description: "Pentest et sécurisation de vos serveurs d'entreprise à Bunia.",
+        price: 250,
+        icon: <ShieldAlert className="text-red-500" size={32} />,
+    },
     {
         id: "network-pro",
         category: "infrastructure",
@@ -172,30 +196,34 @@ export default function ServicesCataloguePage() {
                 </div>
             </section>
 
+            {/* SECTION SOLUTIONS BUSINESS */}
             <section className="container max-w-7xl mx-auto px-6 mb-32">
-                <Card className="bg-accent/10 border-accent/20 rounded-[4rem] p-12 relative overflow-hidden group">
-                    <div className="absolute top-0 right-0 p-12 opacity-5 scale-150 rotate-12 group-hover:rotate-0 transition-transform duration-1000"><Building2 size={240} /></div>
-                    <div className="relative z-10 flex flex-col lg:flex-row items-center gap-12">
-                        <div className="flex-1 space-y-8">
-                            <Badge className="bg-accent text-black font-black uppercase tracking-[0.3em] px-4 py-1.5 italic">OFFRE CORPORATE</Badge>
-                            <h2 className="text-5xl md:text-7xl font-black uppercase italic tracking-tighter leading-[0.9] text-white">
-                                AUDIT TECHNIQUE <br /><span className="text-accent">INFRASTRUCTURE</span>
-                            </h2>
-                            <p className="text-lg text-muted-foreground max-w-2xl leading-relaxed font-medium">
-                                Votre entreprise fait face à des lenteurs réseaux ou des failles de sécurité ? Nos experts certifiés interviennent pour un audit complet de vos systèmes à Bunia.
-                            </p>
-                        </div>
-                        <div className="shrink-0">
-                            <Link href="/services/audit">
-                                <Button className="h-24 px-12 rounded-[2rem] bg-accent text-black font-black uppercase italic text-xl shadow-[0_0_50px_rgba(56,189,248,0.3)] hover:scale-105 active:scale-95 transition-all">
-                                    Demander un Audit <ArrowRight size={28} className="ml-3" />
-                                </Button>
-                            </Link>
-                        </div>
-                    </div>
-                </Card>
+                <div className="flex items-center gap-6 mb-16">
+                    <h2 className="text-2xl font-black uppercase italic tracking-tighter flex items-center gap-4">
+                        <Building2 className="text-accent" /> Solutions Business
+                    </h2>
+                    <div className="h-px flex-1 bg-white/5" />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                    {TECHNICAL_SERVICES.map((s) => (
+                        <Card key={s.id} className="glossy-card border-none rounded-[2.5rem] p-8 group hover:scale-[1.02] transition-all">
+                            <div className="flex justify-between items-start mb-8">
+                                <div className="w-14 h-14 rounded-2xl bg-white/5 flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                                    {s.icon}
+                                </div>
+                                <p className="text-2xl font-black text-white italic">${s.price}</p>
+                            </div>
+                            <h3 className="text-xl font-black uppercase italic tracking-tight mb-4">{s.title}</h3>
+                            <p className="text-xs text-muted-foreground italic mb-8">"{s.description}"</p>
+                            <Button onClick={() => handleOpenBooking(s)} variant="outline" className="w-full border-white/10 rounded-xl font-black uppercase italic text-[10px] hover:bg-accent hover:text-black">
+                                Demander un Devis <ArrowRight size={14} className="ml-2" />
+                            </Button>
+                        </Card>
+                    ))}
+                </div>
             </section>
 
+            {/* SECTION ACADEMY */}
             <section className="container max-w-7xl mx-auto px-6 mb-32">
                 <div className="flex items-center gap-6 mb-16">
                     <div className="h-px flex-1 bg-white/5" />
