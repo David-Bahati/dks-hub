@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -7,10 +6,10 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { User, Mail, Lock, ArrowRight, Home, Loader2, Sparkles } from 'lucide-react';
+import { User, Mail, Lock, ArrowRight, Home, Loader2, Sparkles, Gift } from 'lucide-react';
 import { initializeFirebase } from '@/firebase';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, query, collection, where, getDocs, updateDoc, increment, addDoc } from 'firebase/firestore';
 import { Badge } from '@/components/ui/badge';
 import { Logo } from '@/components/ui/Logo';
 
@@ -18,6 +17,7 @@ export default function RegisterPage() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [referralCode, setReferralCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
@@ -47,10 +47,47 @@ export default function RegisterPage() {
     setIsLoading(true);
 
     try {
+      // 1. Création du compte Auth
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const firebaseUser = userCredential.user;
 
       await updateProfile(firebaseUser, { displayName: name });
+
+      // 2. Logique de Parrainage
+      let referrerId = null;
+      let referrerName = null;
+
+      if (referralCode.trim()) {
+        const q = query(collection(firestore, 'users'), where('referralCode', '==', referralCode.trim().toUpperCase()));
+        const querySnapshot = await getDocs(q);
+        
+        if (!querySnapshot.empty) {
+          const referrerDoc = querySnapshot.docs[0];
+          referrerId = referrerDoc.id;
+          referrerName = referrerDoc.data().name || referrerDoc.data().displayName;
+
+          // Créditer le parrain
+          await updateDoc(doc(firestore, 'users', referrerId), {
+            referralCount: increment(1),
+            points: increment(100), // Bonus de bienvenue pour le parrain
+            updatedAt: serverTimestamp()
+          });
+
+          // Notifier le parrain
+          await addDoc(collection(firestore, 'notifications'), {
+            userId: referrerId,
+            title: "Nouveau Parrainage !",
+            message: `${name} a rejoint le Hub grâce à vous. Votre bonus est actif.`,
+            type: 'success',
+            isRead: false,
+            createdAt: serverTimestamp(),
+            link: '/dashboard/referrals'
+          });
+        }
+      }
+
+      // 3. Création du document utilisateur avec son propre code de parrainage
+      const myReferralCode = `DKS-${name.substring(0, 3).toUpperCase()}-${firebaseUser.uid.substring(0, 4).toUpperCase()}`;
 
       await setDoc(doc(firestore, 'users', firebaseUser.uid), {
         id: firebaseUser.uid,
@@ -58,14 +95,24 @@ export default function RegisterPage() {
         firstName: name.split(' ')[0],
         lastName: name.split(' ').slice(1).join(' ') || 'Client',
         displayName: name,
+        name: name,
         role: 'customer',
+        referralCode: myReferralCode,
+        referredBy: referrerId,
+        referralCount: 0,
+        tokenBalance: 0,
+        points: 0,
+        pointsConverted: 0,
+        loyaltyLevel: 'Bronze',
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
 
       toast({
         title: 'Bienvenue chez DKS !',
-        description: 'Votre compte a été créé avec succès. Bon shopping !',
+        description: referrerName 
+          ? `Compte créé. Merci à ${referrerName} de vous avoir parrainé !` 
+          : 'Votre compte a été créé avec succès. Bon shopping !',
       });
 
       router.push('/dashboard');
@@ -146,6 +193,21 @@ export default function RegisterPage() {
                   disabled={isLoading}
                 />
               </div>
+
+              <div className="pt-2">
+                <div className="relative group/input">
+                  <Gift className="absolute left-5 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within/input:text-accent transition-colors" size={18} />
+                  <Input
+                    type="text"
+                    placeholder="Code de parrainage (Optionnel)"
+                    className="h-14 pl-14 rounded-2xl bg-white/5 border-white/10 border-dashed focus:border-accent text-xs font-black uppercase tracking-widest transition-all"
+                    value={referralCode}
+                    onChange={(e) => setReferralCode(e.target.value)}
+                    disabled={isLoading}
+                  />
+                </div>
+                <p className="text-[9px] text-muted-foreground mt-2 ml-2 uppercase font-bold opacity-40">Obtenez des remises immédiates avec un code.</p>
+              </div>
             </div>
             
             <Button 
@@ -157,7 +219,7 @@ export default function RegisterPage() {
                 <Loader2 className="animate-spin" />
               ) : (
                 <>
-                  S'inscrire
+                  Créer mon Profil Élite
                   <ArrowRight size={20}/>
                 </>
               )}
