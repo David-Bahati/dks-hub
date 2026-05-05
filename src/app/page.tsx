@@ -24,10 +24,11 @@ import {
   Award,
   Star,
   ShoppingCart,
-  ZapOff,
   Server,
-  Monitor,
-  Network
+  Network,
+  Newspaper,
+  Calendar,
+  MessageSquare
 } from 'lucide-react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
@@ -76,13 +77,36 @@ export default function LandingPage() {
     { name: "Intel", icon: <Server size={20} /> }
   ];
 
+  const news = [
+    {
+      date: "12 Mai 2024",
+      category: "Communiqué",
+      title: "DKS Solutions devient Installateur Certifié Starlink en Ituri",
+      excerpt: "Une nouvelle ère de connectivité s'ouvre pour les entreprises de Bunia avec notre certification officielle.",
+      icon: <Globe className="text-accent" />
+    },
+    {
+      date: "08 Mai 2024",
+      category: "Arrivage",
+      title: "Stock RTX 4090 Founders Edition disponible au Hub",
+      excerpt: "Le fleuron de NVIDIA arrive enfin dans notre boutique pour les setups les plus extrêmes.",
+      icon: <Cpu className="text-primary" />
+    },
+    {
+      date: "01 Mai 2024",
+      category: "Événement",
+      title: "Succès du premier Atelier IA 'Prompt Engineering'",
+      excerpt: "Plus de 50 participants formés à la maîtrise des outils génératifs au sein de la DKS Academy.",
+      icon: <Sparkles className="text-yellow-500" />
+    }
+  ];
+
   return (
     <div className="min-h-screen bg-background text-foreground selection:bg-accent/30 selection:text-accent">
       <Navbar />
 
       {/* HERO SECTION INSTITUTIONNELLE */}
       <section className="relative min-h-[95vh] flex items-center justify-center pt-20 overflow-hidden px-4">
-        {/* Background Effects */}
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-accent/10 via-transparent to-transparent opacity-50" />
         <div className="absolute -top-24 -right-24 w-96 h-96 bg-primary/10 rounded-full blur-[120px] animate-pulse" />
         <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-accent/10 rounded-full blur-[120px] animate-pulse delay-1000" />
@@ -114,14 +138,13 @@ export default function LandingPage() {
           </div>
         </div>
 
-        {/* Scroll Indicator */}
         <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-4 opacity-20">
             <div className="w-px h-12 bg-gradient-to-b from-white to-transparent" />
             <span className="text-[8px] font-black uppercase tracking-[0.5em] rotate-90 origin-left ml-2">Scroll</span>
         </div>
       </section>
 
-      {/* BANDEAU D'INDICATEURS ÉCONOMIQUES (TRUST BAR) */}
+      {/* BANDEAU D'INDICATEURS ÉCONOMIQUES */}
       <section className="bg-white/[0.02] border-y border-white/5 py-8 backdrop-blur-3xl relative z-20">
         <div className="container max-w-7xl mx-auto px-6">
             <div className="flex flex-wrap justify-center md:justify-between items-center gap-10">
@@ -152,7 +175,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* SECTION PARTENAIRES */}
+      {/* SECTION PARTENAIRES STRATÉGIQUES */}
       <section className="py-12 bg-black/20 border-b border-white/5">
         <div className="container max-w-7xl mx-auto px-6">
           <div className="flex flex-col items-center gap-8">
@@ -169,8 +192,46 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* SECTION DES 3 PILIERS (LES SERVICES) */}
-      <section className="container max-w-7xl mx-auto px-6 py-32">
+      {/* SECTION DKS PRESS & ACTUALITÉS */}
+      <section className="py-32 bg-background relative overflow-hidden">
+        <div className="container max-w-7xl mx-auto px-6">
+            <div className="flex items-center gap-6 mb-16">
+                <h2 className="text-2xl font-black uppercase italic tracking-tighter flex items-center gap-4">
+                    <Newspaper className="text-accent" /> DKS <span className="text-accent">PRESS</span>
+                </h2>
+                <div className="h-px flex-1 bg-white/5" />
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                {news.map((item, idx) => (
+                    <Card key={idx} className="bg-white/[0.02] border-white/5 rounded-[2.5rem] overflow-hidden hover:bg-white/[0.05] transition-all group">
+                        <CardContent className="p-8 space-y-6">
+                            <div className="flex justify-between items-start">
+                                <div className="w-14 h-14 rounded-2xl bg-white/5 flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                                    {item.icon}
+                                </div>
+                                <Badge variant="outline" className="border-accent/20 text-accent text-[8px] font-black uppercase px-2">{item.category}</Badge>
+                            </div>
+                            <div className="space-y-3">
+                                <div className="flex items-center gap-2 text-[9px] font-bold text-muted-foreground uppercase tracking-widest">
+                                    <Calendar size={10} /> {item.date}
+                                </div>
+                                <h3 className="text-xl font-black uppercase italic leading-tight group-hover:text-white transition-colors">{item.title}</h3>
+                                <p className="text-xs text-muted-foreground leading-relaxed italic line-clamp-3">"{item.excerpt}"</p>
+                            </div>
+                            <div className="pt-4 flex items-center gap-3 text-[10px] font-black uppercase italic text-white/20 group-hover:text-accent transition-colors">
+                                <span>Lire le communiqué</span>
+                                <ArrowRight size={14} />
+                            </div>
+                        </CardContent>
+                    </Card>
+                ))}
+            </div>
+        </div>
+      </section>
+
+      {/* LES 3 PILIERS DU HUB */}
+      <section className="container max-w-7xl mx-auto px-6 py-32 border-t border-white/5">
         <div className="text-center mb-24 space-y-4">
             <h2 className="text-4xl md:text-6xl font-black uppercase italic tracking-tighter">NOS <span className="text-accent">PÔLES D'EXCELLENCE</span></h2>
             <p className="text-muted-foreground text-sm uppercase font-bold tracking-[0.3em]">L'écosystème technologique le plus avancé de l'Ituri</p>
@@ -206,7 +267,7 @@ export default function LandingPage() {
                 <Link key={i} href={s.link}>
                     <Card className="glossy-card border-none rounded-[3.5rem] p-12 group cursor-pointer h-full flex flex-col justify-between hover:scale-[1.02] transition-all">
                         <div>
-                            <div className={cn("w-20 h-20 rounded-[2rem] bg-white/5 flex items-center justify-center mb-10 group-hover:scale-110 transition-transform shadow-2xl", s.color)}>
+                            <div className="w-20 h-20 rounded-[2rem] bg-white/5 flex items-center justify-center mb-10 group-hover:scale-110 transition-transform shadow-2xl" style={{color: s.color.replace('text-', '')}}>
                                 {s.icon}
                             </div>
                             <Badge variant="outline" className="mb-4 border-white/10 text-white/40 text-[8px] font-black uppercase tracking-widest">{s.badge}</Badge>
@@ -223,7 +284,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* CATALOGUE HARDWARE (LE SHOP) */}
+      {/* CATALOGUE HARDWARE */}
       <section id="shop" className="bg-white/[0.01] py-32 border-y border-white/5">
         <div className="container max-w-7xl mx-auto px-6">
             <div className="flex flex-col lg:flex-row justify-between items-start gap-12 mb-20">
@@ -296,12 +357,6 @@ export default function LandingPage() {
                     </Card>
                 ))}
             </div>
-
-            {filteredProducts.length === 0 && !loading && (
-                <div className="py-32 text-center bg-white/5 rounded-[4rem] border border-dashed border-white/10 opacity-30">
-                    <p className="text-xl font-black uppercase italic tracking-widest italic">Aucun article ne correspond à votre élite...</p>
-                </div>
-            )}
             
             <div className="mt-20 text-center">
                 <Link href="/shop">
@@ -313,49 +368,8 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* PORTFOLIO & SAVOIR-FAIRE (REALISATIONS) */}
-      <section className="py-32 container max-w-7xl mx-auto px-6">
-        <div className="flex flex-col md:flex-row justify-between items-end mb-20 gap-8">
-            <div className="space-y-4">
-                <Badge className="bg-primary/20 text-primary border-none font-black uppercase tracking-[0.4em] px-5 py-1.5 rounded-full">Projets d'Exception</Badge>
-                <h2 className="text-5xl md:text-7xl font-black uppercase italic tracking-tighter leading-none">NOTRE <span className="text-primary">HÉRITAGE</span></h2>
-                <p className="text-muted-foreground text-sm font-bold uppercase tracking-widest italic">Transformer Bunia par la haute technologie.</p>
-            </div>
-            <Link href="/portfolio">
-                <Button variant="outline" className="h-14 px-8 rounded-2xl border-white/10 font-black uppercase italic text-xs gap-3">
-                    Voir toutes les réalisations <Layout size={18} />
-                </Button>
-            </Link>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-            <Card className="overflow-hidden rounded-[4rem] border-none aspect-video relative group cursor-pointer">
-                <img src="https://picsum.photos/seed/build1/1200/800" className="object-cover w-full h-full group-hover:scale-105 transition-all duration-1000" />
-                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent p-12 flex flex-col justify-end">
-                    <div className="flex items-center gap-4 mb-6">
-                        <Badge className="bg-accent text-black font-black uppercase text-[10px] tracking-widest px-4 py-1">Infrastructure</Badge>
-                        <span className="text-[10px] font-bold uppercase text-white/60">Bunia, Immeuble Bahati</span>
-                    </div>
-                    <h3 className="text-4xl font-black uppercase italic text-white tracking-tight leading-none group-hover:text-accent transition-colors">Déploiement Wi-Fi Business <br /> Maillé Haute Densité</h3>
-                    <p className="text-white/40 text-sm mt-4 max-w-lg italic opacity-0 group-hover:opacity-100 transition-opacity">Expertise UniFi & Starlink pour une connectivité sans faille.</p>
-                </div>
-            </Card>
-            <Card className="overflow-hidden rounded-[4rem] border-none aspect-video relative group cursor-pointer">
-                <img src="https://picsum.photos/seed/build2/1200/800" className="object-cover w-full h-full group-hover:scale-105 transition-all duration-1000" />
-                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent p-12 flex flex-col justify-end">
-                    <div className="flex items-center gap-4 mb-6">
-                        <Badge className="bg-primary text-white font-black uppercase text-[10px] tracking-widest px-4 py-1">Custom PC</Badge>
-                        <span className="text-[10px] font-bold uppercase text-white/60">Client VIP Élite</span>
-                    </div>
-                    <h3 className="text-4xl font-black uppercase italic text-white tracking-tight leading-none group-hover:text-primary transition-colors">Station de Travail 8K <br /> Optimisation IA GCV</h3>
-                    <p className="text-white/40 text-sm mt-4 max-w-lg italic opacity-0 group-hover:opacity-100 transition-opacity">Refroidissement liquide sur mesure et performances brutes.</p>
-                </div>
-            </Card>
-        </div>
-      </section>
-
-      {/* SECTION CTA ACADEMY "ELITE FUTURE" */}
-      <section className="container max-w-6xl mx-auto px-6 mb-32">
+      {/* SECTION CTA ACADEMY */}
+      <section className="container max-w-6xl mx-auto px-6 py-32">
           <Card className="bg-gradient-to-br from-primary/20 via-background to-black border-primary/20 rounded-[5rem] p-20 text-center relative overflow-hidden group shadow-2xl">
               <div className="absolute top-0 right-0 p-12 opacity-5 scale-150 rotate-45 group-hover:rotate-0 transition-transform duration-[3s]"><GraduationCap size={400} className="text-primary" /></div>
               <div className="relative z-10 space-y-10">
@@ -443,4 +457,3 @@ export default function LandingPage() {
     </div>
   );
 }
-
