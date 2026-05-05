@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { Navbar } from "@/components/layout/Navbar";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,12 @@ import {
     MessageCircle,
     ArrowRight,
     Coins,
-    Percent
+    Percent,
+    FileBadge,
+    Download,
+    Loader2,
+    ShieldCheck,
+    QrCode
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import withAuth from "@/components/auth/withAuth";
@@ -27,11 +32,16 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { Logo } from "@/components/ui/Logo";
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
+import { cn } from "@/lib/utils";
 
 function AmbassadorProgramPage() {
     const { user } = useAuth();
     const { toast } = useToast();
     const [hasCopied, setHasCopied] = useState(false);
+    const [isGenerating, setIsGenerating] = useState(false);
+    const certRef = useRef<HTMLDivElement>(null);
 
     const referralCode = useMemo(() => {
         return user?.referralCode || `DKS-${user?.name?.substring(0, 3).toUpperCase()}-${user?.uid?.substring(0, 4).toUpperCase()}`;
@@ -44,11 +54,30 @@ function AmbassadorProgramPage() {
         discount: Math.min(25, (user?.referralCount || 0) * 5)
     };
 
+    const isGold = stats.level === 'Gold';
+
     const copyToClipboard = () => {
         navigator.clipboard.writeText(`Rejoignez le Hub Double King Shop avec mon code expert pour obtenir une remise : ${referralCode}`);
         setHasCopied(true);
         toast({ title: "Code Copié", description: "Partagez l'excellence technologique avec votre réseau." });
         setTimeout(() => setHasCopied(false), 2000);
+    };
+
+    const handleDownloadPartnerCert = async () => {
+        if (!certRef.current) return;
+        setIsGenerating(true);
+        try {
+            const canvas = await html2canvas(certRef.current, { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
+            const imgData = canvas.toDataURL('image/png');
+            const pdf = new jsPDF({ orientation: 'landscape', unit: 'px', format: [canvas.width / 2, canvas.height / 2] });
+            pdf.addImage(imgData, 'PNG', 0, 0, canvas.width / 2, canvas.height / 2);
+            pdf.save(`CERTIF_PARTENAIRE_DKS_${user?.name?.replace(/\s+/g, '_')}.pdf`);
+            toast({ title: "Certificat généré", description: "Votre titre de Partenaire Officiel est prêt pour l'impression." });
+        } catch (error) {
+            toast({ title: "Erreur génération", variant: "destructive" });
+        } finally {
+            setIsGenerating(false);
+        }
     };
 
     return (
@@ -65,6 +94,16 @@ function AmbassadorProgramPage() {
                             <p className="text-muted-foreground text-xs uppercase font-bold tracking-widest opacity-40 mt-1">Développez l'écosystème technologique de l'Ituri</p>
                         </div>
                     </div>
+
+                    {isGold && (
+                        <Button 
+                            onClick={handleDownloadPartnerCert}
+                            disabled={isGenerating}
+                            className="h-14 px-8 rounded-2xl bg-yellow-500 text-black font-black uppercase italic gap-3 shadow-xl shadow-yellow-500/20 hover:scale-105 transition-all"
+                        >
+                            {isGenerating ? <Loader2 className="animate-spin" /> : <><FileBadge size={20} /> Certificat Partenaire</>}
+                        </Button>
+                    )}
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -184,6 +223,62 @@ function AmbassadorProgramPage() {
                     </div>
                 </div>
             </main>
+
+            {/* MODÈLE DE CERTIFICAT DE PARTENAIRE CACHÉ */}
+            <div style={{ position: 'absolute', left: '-9999px', top: 0 }}>
+                <div ref={certRef} className="bg-white text-black p-0 w-[1123px] h-[794px] font-serif relative overflow-hidden flex items-center justify-center">
+                    <div className="absolute inset-0 border-[40px] border-double border-[#1e293b]" />
+                    <div className="absolute inset-10 border-4 border-yellow-600/20" />
+                    <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none"><Logo size="xl" /></div>
+                    
+                    <div className="relative z-10 text-center w-full px-40 space-y-12">
+                        <div className="flex flex-col items-center gap-6">
+                            <Logo size="lg" />
+                            <div className="space-y-1">
+                                <h2 className="text-sm font-bold tracking-[0.4em] uppercase text-yellow-600">Double King Foundation</h2>
+                                <p className="text-[10px] font-medium uppercase tracking-[0.2em] opacity-40">Bunia Hub • RDC</p>
+                            </div>
+                        </div>
+
+                        <div className="space-y-4">
+                            <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200 font-black uppercase italic tracking-[0.3em] px-6 py-2">Membre Élite Ambassadeur Gold</Badge>
+                            <h1 className="text-6xl font-black uppercase italic tracking-tighter text-[#1e293b]">TITRE DE PARTENAIRE</h1>
+                            <p className="text-xl font-light italic text-gray-500 uppercase tracking-widest">Écosystème Technologique Hybride</p>
+                        </div>
+
+                        <div className="space-y-8 py-10 bg-yellow-50/30 rounded-[3rem] border border-yellow-100">
+                            <p className="text-lg font-medium text-gray-500">Nous certifions officiellement que</p>
+                            <h3 className="text-5xl font-black uppercase tracking-tight border-b-2 border-yellow-200 inline-block pb-2 px-14 italic">
+                                {user?.name}
+                            </h3>
+                            <p className="text-lg font-medium text-gray-600 max-w-2xl mx-auto leading-relaxed italic px-10">
+                                Est reconnu comme **Partenaire Stratégique du Hub DKS** pour son implication exceptionnelle dans le rayonnement technologique de la province de l'Ituri.
+                            </p>
+                        </div>
+
+                        <div className="grid grid-cols-3 items-end pt-12">
+                            <div className="text-center space-y-2">
+                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Délivré le</p>
+                                <p className="text-sm font-bold">{new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+                            </div>
+                            <div className="flex flex-col items-center gap-4">
+                                <div className="p-3 border-2 border-gray-100 rounded-2xl bg-white shadow-xl"><QrCode size={60} className="opacity-20" /></div>
+                                <p className="text-[8px] font-bold text-gray-300 uppercase tracking-tighter">ID-PARTNER: {user?.uid.substring(0, 10).toUpperCase()}</p>
+                            </div>
+                            <div className="text-center space-y-4">
+                                <div className="w-40 h-px bg-gray-200 mx-auto" />
+                                <div className="flex flex-col items-center">
+                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Direction Générale</p>
+                                    <p className="text-sm font-black italic">Expert Bahati Nyeke</p>
+                                    <ShieldCheck size={24} className="text-yellow-600 mt-2 opacity-30" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="absolute top-0 right-0 w-64 h-64 bg-yellow-500/5 rounded-bl-full -z-10" />
+                    <div className="absolute bottom-0 left-0 w-64 h-64 bg-yellow-500/5 rounded-tr-full -z-10" />
+                </div>
+            </div>
         </div>
     );
 }
