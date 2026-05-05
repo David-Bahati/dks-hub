@@ -22,12 +22,14 @@ import {
   ArrowUpRight,
   Gem,
   Award,
-  Star
+  Star,
+  ShoppingCart
 } from 'lucide-react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Logo } from '@/components/ui/Logo';
+import { cn } from "@/lib/utils";
 
 export default function LandingPage() {
   const [products, setProducts] = useState<Product[]>([]);
