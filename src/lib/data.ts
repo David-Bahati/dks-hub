@@ -19,6 +19,36 @@ export async function getExchangeRate() {
 }
 
 /**
+ * Récupère les données d'impact du pool (redistributions légendaires)
+ */
+export async function getPoolImpactData() {
+  try {
+    const txCol = collection(db, "tokenTransactions");
+    const q = query(txCol, where("type", "==", "mining"), where("rarity", "==", "legendary"), orderBy("createdAt", "desc"), limit(50));
+    const snapshot = await getDocs(q);
+    
+    const impactByDay: Record<string, number> = {};
+    let totalDistributed = 0;
+
+    snapshot.docs.forEach(doc => {
+      const data = doc.data();
+      const date = data.createdAt?.toDate ? format(data.createdAt.toDate(), 'dd/MM') : '??';
+      // On simule l'impact : chaque bloc légendaire a distribué environ 0.5 DKST au total au pool
+      const distributionEstimate = 0.5; 
+      impactByDay[date] = (impactByDay[date] || 0) + distributionEstimate;
+      totalDistributed += distributionEstimate;
+    });
+
+    const chartData = Object.entries(impactByDay).map(([name, total]) => ({ name, total })).reverse();
+
+    return { chartData, totalDistributed };
+  } catch (error) {
+    console.error("Error fetching pool impact:", error);
+    return { chartData: [], totalDistributed: 0 };
+  }
+}
+
+/**
  * Calcule les statistiques globales pour le dashboard avec répartition par pôle
  */
 export async function getDashboardStats() {
@@ -52,10 +82,6 @@ export async function getDashboardStats() {
     }
   });
 
-  // Si on utilise aussi la collection 'sales' pour le POS physique (souvent hardware)
-  // On ajuste pour éviter les doublons si les orders sont migrés vers sales
-  // Pour cet exemple, on considère que 'sales' contient le total réel
-  // Et on utilise les orders sources pour définir le ratio.
   const serviceRatio = totalRevenueUSD > 0 ? servicesRevenue / (servicesRevenue + hardwareRevenue || 1) : 0;
   const finalServicesRevenue = totalRevenueUSD * serviceRatio;
   const finalHardwareRevenue = totalRevenueUSD - finalServicesRevenue;

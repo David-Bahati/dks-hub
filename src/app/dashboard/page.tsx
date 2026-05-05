@@ -64,7 +64,8 @@ import {
   Layout,
   Gem,
   ArrowUpCircle,
-  Heart
+  Heart,
+  Activity
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -84,7 +85,8 @@ import {
     getExchangeRate,
     getDashboardStats,
     getLowStockItems,
-    getRevenueChartData
+    getRevenueChartData,
+    getPoolImpactData
 } from '@/lib/data';
 import { Product, DailyMission } from '@/lib/types';
 import withAuth from '@/components/auth/withAuth';
@@ -103,7 +105,9 @@ import {
   YAxis, 
   CartesianGrid, 
   Tooltip, 
-  ResponsiveContainer
+  ResponsiveContainer,
+  BarChart,
+  Bar
 } from 'recharts';
 import { Progress } from "@/components/ui/progress";
 import html2canvas from 'html2canvas';
@@ -152,6 +156,8 @@ function DashboardPage() {
   const [stats, setStats] = useState<any>(null);
   const [lowStock, setLowStock] = useState<Product[]>([]);
   const [chartData, setChartData] = useState<any[]>([]);
+  const [poolImpactChart, setPoolImpactChart] = useState<any[]>([]);
+  const [totalPoolGifted, setTotalPoolGifted] = useState(0);
   const [rate, setRate] = useState(2500);
   const [isSendingDigest, setIsSendingDigest] = useState(false);
   const [isGeneratingCert, setIsGeneratingCert] = useState(false);
@@ -308,9 +314,8 @@ function DashboardPage() {
             createdAt: serverTimestamp()
         });
 
-        // LEGENDARY REDISTRIBUTION LOGIC
         if (rarity === 'legendary' && activeMiners && activeMiners.length > 1) {
-            const shareAmount = 0.05; // Fixed small system bonus for others
+            const shareAmount = 0.05;
             const others = activeMiners.filter(u => u.id !== user.uid);
             
             others.forEach(async (other) => {
@@ -343,17 +348,9 @@ function DashboardPage() {
         }
 
         if (rarity === 'legendary') {
-            toast({ 
-                title: "JACKPOT LÉGENDAIRE !", 
-                description: `Récompense partagée avec le pool : Vous avez extrait ${reward} DKST !`,
-                className: "bg-yellow-500 text-black font-black"
-            });
+            toast({ title: "JACKPOT LÉGENDAIRE !", description: `Récompense partagée avec le pool : Vous avez extrait ${reward} DKST !`, className: "bg-yellow-500 text-black font-black" });
         } else if (rarity === 'rare') {
-            toast({ 
-                title: "Bloc Rare Découvert !", 
-                description: `Récompense x2 : ${reward} DKST ajoutés à votre wallet.`,
-                className: "bg-purple-500 text-white font-black"
-            });
+            toast({ title: "Bloc Rare Découvert !", description: `Récompense x2 : ${reward} DKST ajoutés à votre wallet.`, className: "bg-purple-500 text-white font-black" });
         } else {
             toast({ title: "Minage Réussi", description: `Vous avez extrait ${reward} DKST du bloc standard.` });
         }
@@ -362,6 +359,7 @@ function DashboardPage() {
         toast({ title: "Erreur Minage", variant: "destructive" });
     } finally {
         setIsMining(false);
+        fetchGlobalData();
     }
   };
 
@@ -462,16 +460,19 @@ function DashboardPage() {
   const fetchGlobalData = async () => {
     setLoading(true);
     try {
-      const [dashboardStats, lowStockItems, exchangeRate, revenueData] = await Promise.all([
+      const [dashboardStats, lowStockItems, exchangeRate, revenueData, poolImpact] = await Promise.all([
         getDashboardStats(),
         getLowStockItems(),
         getExchangeRate(),
-        getRevenueChartData()
+        getRevenueChartData(),
+        getPoolImpactData()
       ]);
       setStats(dashboardStats);
       setLowStock(lowStockItems);
       setRate(exchangeRate);
       setChartData(revenueData);
+      setPoolImpactChart(poolImpact.chartData);
+      setTotalPoolGifted(poolImpact.totalDistributed);
     } catch (error) {
       console.error("Dashboard Data Fetch Error:", error);
     } finally {
@@ -692,48 +693,51 @@ function DashboardPage() {
                       </div>
                   </Card>
 
-                  <div className="flex items-center justify-between px-4 mt-6">
-                      <div className="flex items-center gap-4">
-                          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary"><Target size={20} /></div>
-                          <h2 className="text-xl font-black uppercase italic tracking-tight">Objectifs <span className="text-primary">du Jour</span></h2>
-                      </div>
-                      <Badge variant="outline" className="border-primary/20 text-primary uppercase font-black text-[9px] tracking-widest">Reset en 12h</Badge>
-                  </div>
-
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {DAILY_MISSIONS.filter(m => !m.targetRole || m.targetRole === 'all' || (m.targetRole === 'staff' && isStaff) || (m.targetRole === 'customer' && !isStaff)).map((mission) => {
-                          const isDone = user?.completedMissionsToday?.includes(mission.id);
-                          return (
-                              <Card key={mission.id} className={cn(
-                                  "bg-white/5 border border-white/5 rounded-[2.2rem] p-6 transition-all group relative overflow-hidden",
-                                  isDone ? "opacity-60 border-green-500/20" : "hover:bg-white/[0.08] hover:border-primary/30"
-                              )}>
-                                  {isDone && <div className="absolute top-4 right-6 text-green-400 animate-in zoom-in-50"><CheckCircle2 size={24} /></div>}
-                                  <div className="flex items-start gap-5">
-                                      <div className="w-14 h-14 rounded-2xl bg-white/5 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">
-                                          {mission.icon}
-                                      </div>
-                                      <div className="flex-1 space-y-2">
-                                          <div>
-                                              <h4 className="font-black uppercase italic text-sm tracking-tight text-white">{mission.title}</h4>
-                                              <p className="text-[10px] text-muted-foreground leading-snug">{mission.description}</p>
-                                          </div>
-                                          <div className="flex items-center gap-3">
-                                              <Badge className="bg-primary/20 text-primary border-none uppercase text-[8px] font-black">+{mission.rewardPoints} PTS</Badge>
-                                              {!isDone && (
-                                                  <button 
-                                                      onClick={() => handleCompleteMission(mission)}
-                                                      className="text-[9px] font-black uppercase italic text-accent hover:underline flex items-center gap-1"
-                                                  >
-                                                      Valider <ArrowRight size={10} />
-                                                  </button>
-                                              )}
-                                          </div>
-                                      </div>
-                                  </div>
-                              </Card>
-                          );
-                      })}
+                        <Card className="bg-white/5 border-white/5 rounded-[2.2rem] p-8 flex flex-col justify-between overflow-hidden relative">
+                             <div className="absolute top-0 right-0 p-6 opacity-5"><Activity size={80} /></div>
+                             <div className="space-y-4 relative z-10">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-accent"><Heart size={20} /></div>
+                                    <h4 className="text-sm font-black uppercase italic">Impact Collectif</h4>
+                                </div>
+                                <div className="space-y-1">
+                                    <p className="text-4xl font-black text-white italic">{totalPoolGifted.toFixed(2)} <span className="text-xs opacity-40 not-italic">DKST</span></p>
+                                    <p className="text-[8px] font-black uppercase text-muted-foreground tracking-widest">Fortune distribuée par les bienfaiteurs</p>
+                                </div>
+                             </div>
+                             <div className="h-24 w-full mt-6">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <AreaChart data={poolImpactChart}>
+                                        <defs><linearGradient id="poolGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="hsl(var(--accent))" stopOpacity={0.3}/><stop offset="95%" stopColor="hsl(var(--accent))" stopOpacity={0}/></linearGradient></defs>
+                                        <Area type="monotone" dataKey="total" stroke="hsl(var(--accent))" strokeWidth={2} fill="url(#poolGrad)" />
+                                    </AreaChart>
+                                </ResponsiveContainer>
+                             </div>
+                        </Card>
+
+                        <div className="space-y-4">
+                            {DAILY_MISSIONS.slice(0, 2).map((mission) => {
+                                const isDone = user?.completedMissionsToday?.includes(mission.id);
+                                return (
+                                    <Card key={mission.id} className={cn(
+                                        "bg-white/5 border border-white/5 rounded-[2.2rem] p-6 transition-all group relative overflow-hidden h-[calc(50%-8px)]",
+                                        isDone ? "opacity-60" : "hover:bg-white/[0.08]"
+                                    )}>
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center text-xl">{mission.icon}</div>
+                                            <div className="flex-1">
+                                                <h4 className="font-black uppercase italic text-xs tracking-tight text-white">{mission.title}</h4>
+                                                <div className="flex items-center gap-2 mt-1">
+                                                    <Badge className="bg-primary/20 text-primary border-none uppercase text-[7px] font-black">+{mission.rewardPoints} PTS</Badge>
+                                                    {isDone ? <CheckCircle2 size={12} className="text-green-400" /> : <button onClick={() => handleCompleteMission(mission)} className="text-[8px] font-black uppercase italic text-accent hover:underline">Valider</button>}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </Card>
+                                );
+                            })}
+                        </div>
                   </div>
               </div>
           </div>
