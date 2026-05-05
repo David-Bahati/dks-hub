@@ -30,7 +30,8 @@ import {
     QrCode,
     ShieldCheck,
     MessageSquareText,
-    Send
+    Send,
+    UsersRound
 } from "lucide-react";
 import { db } from '@/lib/firebase';
 import { collection, query, orderBy, updateDoc, doc, addDoc, serverTimestamp, onSnapshot, where } from 'firebase/firestore';
@@ -107,17 +108,17 @@ function ServiceManagementPage() {
             });
 
             if (newStatus === 'completed') {
-                const price = SERVICE_PRICES[booking.serviceId] || SERVICE_PRICES[booking.category] || 30;
+                const finalPrice = booking.totalAmount || SERVICE_PRICES[booking.serviceId] || 30;
                 
                 await addDoc(collection(db, "orders"), {
                     userId: booking.userId,
                     customerName: booking.customerName,
                     items: [{ 
-                        name: `Academy/Solution: ${booking.serviceTitle}`, 
+                        name: `Academy/Solution: ${booking.serviceTitle} ${booking.groupSize > 1 ? `(Groupe x${booking.groupSize})` : ''}`, 
                         quantity: 1, 
-                        price: price 
+                        price: finalPrice 
                     }],
-                    total: price,
+                    total: finalPrice,
                     status: "pending_payment",
                     paymentMethod: "CASH",
                     createdAt: serverTimestamp(),
@@ -126,7 +127,7 @@ function ServiceManagementPage() {
                     sourceId: booking.id
                 });
 
-                toast({ title: "Prestation terminée", description: `Facture de ${price}$ générée.` });
+                toast({ title: "Prestation terminée", description: `Facture de ${finalPrice}$ générée.` });
             }
 
             await addDoc(collection(db, "notifications"), {
@@ -284,12 +285,16 @@ function ServiceManagementPage() {
                                         <div className="flex flex-wrap justify-center md:justify-start items-center gap-3">
                                             <h3 className="text-xl font-black uppercase italic tracking-tight">{booking.serviceTitle}</h3>
                                             {getStatusBadge(booking.status)}
-                                            {booking.level && <Badge variant="outline" className="border-primary/20 text-primary text-[8px] font-black uppercase px-2">{booking.level}</Badge>}
+                                            {booking.groupSize > 1 && (
+                                                <Badge className="bg-accent/10 text-accent border-accent/20 text-[9px] font-black uppercase px-2 flex items-center gap-1">
+                                                    <UsersRound size={10} /> Effectif: {booking.groupSize}
+                                                </Badge>
+                                            )}
                                         </div>
                                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-y-2 gap-x-6 text-[10px] font-black uppercase italic text-muted-foreground/60">
                                             <div className="flex items-center gap-2"><User size={12} className="text-primary"/> {booking.customerName}</div>
                                             <div className="flex items-center gap-2"><Calendar size={12} className="text-accent"/> {booking.scheduledDate || 'Date à fixer'}</div>
-                                            <div className="flex items-center gap-2"><Award size={12} className="text-accent"/> Certif: {booking.category === 'formation' ? 'Oui' : 'Non'}</div>
+                                            <div className="flex items-center gap-2"><Receipt size={12} className="text-accent"/> Total: ${booking.totalAmount || 'Calcul...'}</div>
                                             <div className="flex items-center gap-2"><UserCheck size={12} className="text-primary"/> Expert: {booking.technicianName || 'Non assigné'}</div>
                                         </div>
                                         {booking.notes && <p className="text-xs italic text-muted-foreground line-clamp-1 border-t border-white/5 pt-2">Objectif: "{booking.notes}"</p>}
@@ -459,7 +464,7 @@ function ServiceManagementPage() {
                     <div className="flex-1 p-10 space-y-10 overflow-y-auto custom-scrollbar">
                         <div className="space-y-6">
                             <div className="space-y-4 text-center">
-                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Votre Note Élite</Label>
+                                <Label className="text-[10px] font-black uppercase tracking-widest text-center block opacity-40">Votre Note Élite</Label>
                                 <div className="flex justify-center gap-3">
                                     {[1, 2, 3, 4, 5].map((s) => (
                                         <button 

@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Navbar } from "@/components/layout/Navbar";
 import { Button } from "@/components/ui/button";
 import { 
@@ -25,7 +25,9 @@ import {
     Clock,
     Hammer,
     ShieldAlert,
-    Shield
+    Shield,
+    UsersRound,
+    Percent
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -129,6 +131,23 @@ export default function ServicesCataloguePage() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [date, setDate] = useState<Date>();
     const [timeSlot, setTimeSlot] = useState<string>("morning");
+    const [groupSize, setGroupSize] = useState(1);
+
+    const pricing = useMemo(() => {
+        if (!selectedService) return { original: 0, discount: 0, total: 0 };
+        const base = selectedService.price;
+        const subtotal = base * groupSize;
+        let discount = 0;
+        if (groupSize >= 5) discount = 0.25;
+        else if (groupSize >= 3) discount = 0.15;
+        
+        const discountAmount = subtotal * discount;
+        return {
+            original: subtotal,
+            discount: discount * 100,
+            total: subtotal - discountAmount
+        };
+    }, [selectedService, groupSize]);
 
     const handleOpenBooking = (service: any) => {
         if (!user) { 
@@ -137,6 +156,7 @@ export default function ServicesCataloguePage() {
             return; 
         }
         setSelectedService(service);
+        setGroupSize(1);
         setIsSheetOpen(true);
     };
 
@@ -159,6 +179,8 @@ export default function ServicesCataloguePage() {
                 serviceTitle: selectedService.title,
                 category: selectedService.category,
                 level: formData.get('level'),
+                groupSize: groupSize,
+                totalAmount: pricing.total,
                 status: 'pending',
                 scheduledDate: date.toISOString(),
                 timeSlot: timeSlot,
@@ -167,7 +189,7 @@ export default function ServicesCataloguePage() {
                 createdAt: serverTimestamp()
             });
 
-            toast({ title: "Dossier Transmis", description: "Un conseiller DKS Academy va analyser votre profil." });
+            toast({ title: "Dossier Transmis", description: `Inscription groupe (${groupSize} pers.) envoyée.` });
             setIsSheetOpen(false);
             router.push('/dashboard/services');
         } catch (error) {
@@ -298,6 +320,36 @@ export default function ServicesCataloguePage() {
 
                     <form onSubmit={handleBooking} className="flex-1 p-10 space-y-8 overflow-y-auto custom-scrollbar">
                         <div className="space-y-6">
+                            {selectedService?.category === 'formation' && (
+                                <div className="p-6 bg-accent/5 border border-accent/20 rounded-3xl space-y-4">
+                                    <div className="flex justify-between items-center">
+                                        <Label className="text-[10px] font-black uppercase tracking-widest text-accent flex items-center gap-2">
+                                            <UsersRound size={14} /> Nombre de participants
+                                        </Label>
+                                        <div className="flex items-center gap-4 bg-black/40 px-3 py-1 rounded-xl">
+                                            <button type="button" onClick={() => setGroupSize(Math.max(1, groupSize - 1))} className="text-accent hover:scale-125 transition-transform">-</button>
+                                            <span className="font-black text-white w-4 text-center">{groupSize}</span>
+                                            <button type="button" onClick={() => setGroupSize(groupSize + 1)} className="text-accent hover:scale-125 transition-transform">+</button>
+                                        </div>
+                                    </div>
+                                    
+                                    {groupSize >= 3 && (
+                                        <div className="flex items-center gap-2 text-green-400 animate-in zoom-in">
+                                            <Percent size={14} />
+                                            <p className="text-[9px] font-black uppercase tracking-widest">Remise de groupe {pricing.discount}% activée</p>
+                                        </div>
+                                    )}
+
+                                    <div className="pt-4 border-t border-white/5 flex justify-between items-end">
+                                        <p className="text-[9px] font-black uppercase text-muted-foreground">Total Inscription</p>
+                                        <div className="text-right">
+                                            {groupSize >= 3 && <p className="text-xs line-through text-white/20 font-black">${pricing.original}</p>}
+                                            <p className="text-2xl font-black text-accent">${pricing.total}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
                             <div className="space-y-2">
                                 <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Numéro WhatsApp Privilège</Label>
                                 <div className="relative">
@@ -365,3 +417,4 @@ export default function ServicesCataloguePage() {
         </div>
     );
 }
+
