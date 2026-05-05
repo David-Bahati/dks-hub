@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Navbar } from '@/components/layout/Navbar';
 import { Button } from '@/components/ui/button';
 import { Product } from '@/lib/types';
-import { collection, query, where, getDocs, limit as firestoreLimit } from 'firebase/firestore';
+import { collection, query, where, getDocs, limit as firestoreLimit, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useCart } from '@/context/CartContext';
 import { 
@@ -28,19 +28,29 @@ import {
   Network,
   Newspaper,
   Calendar,
-  MessageSquare
+  MessageSquare,
+  Send,
+  MailCheck,
+  CheckCircle
 } from 'lucide-react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Logo } from '@/components/ui/Logo';
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
+import { Input } from "@/components/ui/input";
 
 export default function LandingPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
+  const [email, setEmail] = useState('');
+  const [subscribed, setSubscribed] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  
   const { addToCart } = useCart();
+  const { toast } = useToast();
 
   useEffect(() => {
     async function fetchData() {
@@ -67,6 +77,30 @@ export default function LandingPage() {
       p.category?.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [products, searchTerm]);
+
+  const handleSubscribe = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email || !email.includes('@')) {
+        toast({ title: "Email invalide", description: "Veuillez entrer une adresse correcte.", variant: "destructive" });
+        return;
+    }
+    
+    setSubmitting(true);
+    try {
+        await addDoc(collection(db, "newsletter"), {
+            email,
+            createdAt: serverTimestamp(),
+            source: 'landing_page_footer'
+        });
+        setSubscribed(true);
+        setEmail("");
+        toast({ title: "Bienvenue dans l'Élite", description: "Votre inscription à la newsletter DKS est validée." });
+    } catch (error) {
+        toast({ title: "Erreur", description: "Impossible de valider l'inscription.", variant: "destructive" });
+    } finally {
+        setSubmitting(false);
+    }
+  };
 
   const partners = [
     { name: "NVIDIA", icon: <Zap size={20} /> },
@@ -267,7 +301,7 @@ export default function LandingPage() {
                 <Link key={i} href={s.link}>
                     <Card className="glossy-card border-none rounded-[3.5rem] p-12 group cursor-pointer h-full flex flex-col justify-between hover:scale-[1.02] transition-all">
                         <div>
-                            <div className="w-20 h-20 rounded-[2rem] bg-white/5 flex items-center justify-center mb-10 group-hover:scale-110 transition-transform shadow-2xl" style={{color: s.color.replace('text-', '')}}>
+                            <div className={cn("w-20 h-20 rounded-[2rem] bg-white/5 flex items-center justify-center mb-10 group-hover:scale-110 transition-transform shadow-2xl", s.color)}>
                                 {s.icon}
                             </div>
                             <Badge variant="outline" className="mb-4 border-white/10 text-white/40 text-[8px] font-black uppercase tracking-widest">{s.badge}</Badge>
@@ -396,6 +430,48 @@ export default function LandingPage() {
         <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_bottom,_var(--tw-gradient-stops))] from-accent/5 via-transparent to-transparent pointer-events-none" />
         
         <div className="container max-w-7xl mx-auto px-6 relative z-10">
+          
+          {/* NEWSLETTER MODULE */}
+          <div className="mb-32 p-12 rounded-[3.5rem] bg-white/[0.02] border border-white/5 backdrop-blur-3xl relative overflow-hidden group">
+            <div className="absolute top-0 right-0 p-8 opacity-5"><MailCheck size={120} className="text-accent group-hover:scale-110 transition-transform duration-1000" /></div>
+            <div className="relative z-10 flex flex-col lg:flex-row items-center justify-between gap-12">
+                <div className="max-w-xl space-y-4 text-center lg:text-left">
+                    <Badge className="bg-accent/10 text-accent border-none font-black uppercase italic tracking-widest px-3 py-1">Newsletter Exclusive</Badge>
+                    <h2 className="text-4xl font-black uppercase italic tracking-tighter leading-none">RESTEZ <span className="text-accent">SYNCHRONISÉ</span></h2>
+                    <p className="text-muted-foreground text-sm font-medium leading-relaxed italic">
+                        Soyez le premier informé des nouveaux arrivages RTX, des opportunités de minage DKST et des masterclass IA à Bunia.
+                    </p>
+                </div>
+                
+                <div className="w-full max-w-md">
+                    {subscribed ? (
+                        <div className="flex items-center gap-4 p-6 bg-accent/10 border border-accent/20 rounded-3xl animate-in zoom-in-95 duration-500">
+                            <div className="w-12 h-12 rounded-2xl bg-accent text-black flex items-center justify-center shadow-lg shadow-accent/20"><CheckCircle size={24} /></div>
+                            <div>
+                                <p className="font-black uppercase italic text-sm">Inscription validée !</p>
+                                <p className="text-[10px] text-accent font-bold uppercase tracking-widest">Bienvenue dans le cercle d'élite.</p>
+                            </div>
+                        </div>
+                    ) : (
+                        <form onSubmit={handleSubscribe} className="flex flex-col sm:flex-row gap-3">
+                            <Input 
+                                type="email" 
+                                placeholder="Votre email officiel..." 
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                                className="h-16 px-6 bg-black/40 border-white/10 rounded-2xl focus:border-accent font-bold italic"
+                                required
+                                disabled={submitting}
+                            />
+                            <Button type="submit" disabled={submitting} className="h-16 px-8 rounded-2xl bg-accent text-black font-black uppercase italic gap-3 shadow-xl shadow-accent/20 hover:scale-105 transition-all">
+                                {submitting ? <Loader2 className="animate-spin" /> : <><Send size={20} /> Rejoindre</>}
+                            </Button>
+                        </form>
+                    )}
+                </div>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-20 mb-32">
             <div className="space-y-10">
               <Logo showText={true} size="lg" className="transition-transform hover:scale-105" />
