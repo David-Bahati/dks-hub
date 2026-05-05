@@ -35,7 +35,9 @@ import {
   Activity,
   Flame,
   UserCheck,
-  Info
+  Info,
+  Plus,
+  Loader2
 } from 'lucide-react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
