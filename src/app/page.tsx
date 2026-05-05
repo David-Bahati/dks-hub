@@ -34,7 +34,8 @@ import {
   CheckCircle,
   Activity,
   Flame,
-  UserCheck
+  UserCheck,
+  Info
 } from 'lucide-react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
@@ -70,6 +71,19 @@ export default function LandingPage() {
   const filteredProducts = useMemo(() => {
     return products.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
   }, [products, searchTerm]);
+
+  const handleNewsletter = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email) return;
+    setSubmitting(true);
+    try {
+        await addDoc(collection(db, "newsletter"), { email, createdAt: serverTimestamp() });
+        setSubscribed(true);
+        toast({ title: "Inscription réussie", description: "Vous faites désormais partie de l'élite informée." });
+    } catch (e) {
+        toast({ title: "Erreur", variant: "destructive" });
+    } finally { setSubmitting(false); }
+  };
 
   const partners = [
     { name: "NVIDIA", icon: <Zap size={20} /> },
@@ -122,6 +136,7 @@ export default function LandingPage() {
           </div>
       </section>
 
+      {/* KEY INDICATORS */}
       <section className="bg-white/[0.02] border-b border-white/5 py-8">
         <div className="container max-w-7xl mx-auto px-6 flex flex-wrap justify-center md:justify-between items-center gap-10">
             <div className="flex items-center gap-4 group"><div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-accent"><Coins size={20} /></div><div><p className="text-[10px] font-black uppercase text-accent tracking-widest">Consensus GCV Pi</p><p className="text-lg font-black text-white italic">1 π = $314,159.00</p></div></div>
@@ -135,12 +150,96 @@ export default function LandingPage() {
         <div className="container max-w-7xl mx-auto px-6 flex flex-col items-center gap-8">
           <p className="text-[9px] font-black uppercase tracking-[0.4em] text-white/20">Nos Partenaires Stratégiques</p>
           <div className="flex flex-wrap justify-center items-center gap-x-16 gap-y-8 opacity-40 hover:opacity-100 transition-opacity">
-            {partners.map((p, i) => <div key={i} className="flex items-center gap-3 text-white group cursor-default"><div className="group-hover:text-accent transition-colors">{p.icon}</div><span className="font-black uppercase italic text-sm tracking-tighter group-hover:text-white transition-colors">{p.name}</span></div>)}
+            {partners.map((p, i) => (
+                <div key={i} className="flex items-center gap-3 text-white group cursor-default">
+                    <div className="group-hover:text-accent transition-colors">{p.icon}</div>
+                    <span className="font-black uppercase italic text-sm tracking-tighter group-hover:text-white transition-colors">{p.name}</span>
+                </div>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* NEWS */}
+      {/* POLES OF EXCELLENCE */}
+      <section className="container max-w-7xl mx-auto px-6 py-32">
+        <div className="text-center mb-24 space-y-4">
+            <h2 className="text-4xl md:text-6xl font-black uppercase italic tracking-tighter">NOS <span className="text-accent">PÔLES D'EXCELLENCE</span></h2>
+            <p className="text-muted-foreground text-sm uppercase font-bold tracking-[0.3em]">L'écosystème technologique le plus avancé de l'Ituri</p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
+            {[
+                { icon: <Cpu size={32} />, title: "Hardware Élite", desc: "Composants haut de gamme, RTX Serie 40 et configurations sur mesure.", link: "#shop", color: "text-accent", badge: "Elite Stock" },
+                { icon: <GraduationCap size={32} />, title: "DKS Academy", desc: "Formations certifiantes en Intelligence Artificielle et Blockchain.", link: "/services", color: "text-primary", badge: "Education 2.0" },
+                { icon: <Globe size={32} />, title: "Solutions Business", desc: "Déploiement Starlink, CCTV 8K et Infrastructures réseaux.", link: "/services/audit", color: "text-purple-400", badge: "Infrastructure" }
+            ].map((s, i) => (
+                <Link key={i} href={s.link}>
+                    <Card className="glossy-card border-none rounded-[3rem] p-12 group cursor-pointer h-full flex flex-col justify-between hover:scale-[1.02] transition-all">
+                        <div>
+                            <div className={cn("w-20 h-20 rounded-[2rem] bg-white/5 flex items-center justify-center mb-10 group-hover:scale-110 transition-transform shadow-2xl", s.color)}>
+                                {s.icon}
+                            </div>
+                            <Badge variant="outline" className="mb-4 border-white/10 text-white/40 text-[8px] font-black uppercase tracking-widest">{s.badge}</Badge>
+                            <h3 className="text-3xl font-black uppercase italic tracking-tight mb-6">{s.title}</h3>
+                            <p className="text-muted-foreground leading-relaxed italic text-sm">"{s.desc}"</p>
+                        </div>
+                    </Card>
+                </Link>
+            ))}
+        </div>
+      </section>
+
+      {/* ELITE STOCK SHOWCASE */}
+      <section id="shop" className="py-32 bg-black/20">
+        <div className="container max-w-7xl mx-auto px-6">
+            <div className="flex flex-col md:flex-row justify-between items-end gap-10 mb-20">
+                <div className="space-y-4">
+                    <h2 className="text-4xl md:text-6xl font-black uppercase italic tracking-tighter">ELITE <span className="text-accent">STOCK</span></h2>
+                    <p className="text-muted-foreground text-sm uppercase font-bold tracking-[0.3em]">Arrivages Hardware certifiés DKS</p>
+                </div>
+                <div className="relative w-full max-w-md">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
+                    <Input 
+                        placeholder="Chercher un composant..." 
+                        className="h-14 pl-12 bg-white/5 border-white/10 rounded-2xl focus:border-accent"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                </div>
+            </div>
+
+            {loading ? (
+                <div className="flex justify-center py-20"><Loader2 className="animate-spin text-accent h-10 w-10" /></div>
+            ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+                    {filteredProducts.map(product => (
+                        <Card key={product.id} className="glossy-card border-none rounded-[2.5rem] overflow-hidden group">
+                            <div className="aspect-square relative overflow-hidden">
+                                <img src={product.imageUrl} alt={product.name} className="object-cover w-full h-full group-hover:scale-110 transition-transform duration-500" />
+                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
+                                    <Button variant="secondary" size="icon" className="rounded-xl"><Info size={18}/></Button>
+                                    <Button className="rounded-xl bg-accent text-black" onClick={() => addToCart(product)}><ShoppingCart size={18}/></Button>
+                                </div>
+                                {product.stockQuantity < 5 && <Badge className="absolute top-4 right-4 bg-red-500 text-white border-none text-[8px] font-black uppercase px-2">Stock Limité</Badge>}
+                            </div>
+                            <CardContent className="p-8">
+                                <Badge variant="outline" className="border-accent/20 text-accent text-[8px] font-black uppercase px-2 mb-3">{product.category}</Badge>
+                                <h3 className="text-lg font-black uppercase italic truncate mb-4">{product.name}</h3>
+                                <div className="flex justify-between items-end">
+                                    <div>
+                                        <p className="text-[10px] font-black uppercase text-white/40 tracking-widest mb-1">Prix Elite</p>
+                                        <p className="text-2xl font-black text-white italic">${product.sellingPrice.toFixed(2)}</p>
+                                    </div>
+                                    <Button variant="ghost" size="icon" onClick={() => addToCart(product)} className="text-accent hover:bg-accent/10 h-10 w-10"><Plus size={20}/></Button>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    ))}
+                </div>
+            )}
+        </div>
+      </section>
+
+      {/* DKS PRESS */}
       <section className="py-32 bg-background">
         <div className="container max-w-7xl mx-auto px-6">
             <div className="flex items-center gap-6 mb-16"><h2 className="text-2xl font-black uppercase italic tracking-tighter flex items-center gap-4"><Newspaper className="text-accent" /> DKS <span className="text-accent">PRESS</span></h2><div className="h-px flex-1 bg-white/5" /></div>
@@ -157,29 +256,96 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section className="container max-w-7xl mx-auto px-6 py-32 border-t border-white/5">
-        <div className="text-center mb-24 space-y-4"><h2 className="text-4xl md:text-6xl font-black uppercase italic tracking-tighter">NOS <span className="text-accent">PÔLES D'EXCELLENCE</span></h2><p className="text-muted-foreground text-sm uppercase font-bold tracking-[0.3em]">L'écosystème technologique le plus avancé de l'Ituri</p></div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
-            {[
-                { icon: <Cpu size={32} />, title: "Hardware Élite", desc: "Composants haut de gamme, RTX Serie 40 et configurations sur mesure.", link: "#shop", color: "text-accent", badge: "Elite Stock" },
-                { icon: <GraduationCap size={32} />, title: "DKS Academy", desc: "Formations certifiantes en Intelligence Artificielle et Blockchain.", link: "/services", color: "text-primary", badge: "Education 2.0" },
-                { icon: <Globe size={32} />, title: "Solutions Business", desc: "Déploiement Starlink, CCTV 8K et Infrastructures réseaux.", link: "/services/audit", color: "text-purple-400", badge: "Infrastructure" }
-            ].map((s, i) => (
-                <Link key={i} href={s.link}>
-                    <Card className="glossy-card border-none rounded-[3rem] p-12 group cursor-pointer h-full flex flex-col justify-between hover:scale-[1.02] transition-all">
-                        <div><div className={cn("w-20 h-20 rounded-[2rem] bg-white/5 flex items-center justify-center mb-10 group-hover:scale-110 transition-transform shadow-2xl", s.color)}>{s.icon}</div><Badge variant="outline" className="mb-4 border-white/10 text-white/40 text-[8px] font-black uppercase tracking-widest">{s.badge}</Badge><h3 className="text-3xl font-black uppercase italic tracking-tight mb-6">{s.title}</h3><p className="text-muted-foreground leading-relaxed italic text-sm">"{s.desc}"</p></div>
-                    </Card>
-                </Link>
-            ))}
-        </div>
+      {/* ACADEMY CTA */}
+      <section className="container max-w-7xl mx-auto px-6 py-32">
+        <Card className="bg-primary/10 border-primary/20 rounded-[3rem] p-8 md:p-20 relative overflow-hidden group">
+            <div className="absolute top-0 right-0 p-12 opacity-5 scale-150 rotate-12 group-hover:rotate-0 transition-transform duration-1000"><GraduationCap size={240} /></div>
+            <div className="relative z-10 flex flex-col lg:flex-row items-center gap-12 text-center lg:text-left">
+                <div className="flex-1 space-y-8">
+                    <Badge className="bg-primary text-white font-black uppercase tracking-[0.3em] px-4 py-1.5 italic">ACADEMY 2.0</Badge>
+                    <h2 className="text-5xl md:text-7xl font-black uppercase italic tracking-tighter leading-[0.9] text-white">
+                        REJOIGNEZ L'ÉLITE <br /><span className="text-primary">DU SAVOIR</span>
+                    </h2>
+                    <p className="text-lg text-muted-foreground max-w-2xl leading-relaxed font-medium">
+                        Ne soyez plus spectateur de la révolution IA et Blockchain. Devenez un acteur certifié par Double King Academy à Bunia.
+                    </p>
+                </div>
+                <div className="shrink-0 w-full sm:w-auto">
+                    <Link href="/services">
+                        <Button className="h-24 w-full sm:w-auto px-12 rounded-[2rem] bg-primary text-white font-black uppercase italic text-xl shadow-[0_0_50px_rgba(59,130,246,0.3)] hover:scale-105 active:scale-95 transition-all">
+                            Voir les Cursus <ArrowRight size={28} className="ml-3" />
+                        </Button>
+                    </Link>
+                </div>
+            </div>
+        </Card>
       </section>
 
-      {/* FOOTER */}
+      {/* INSTITUTIONAL FOOTER */}
       <footer className="bg-card/40 border-t border-white/5 pt-32 pb-16 relative overflow-hidden">
-        <div className="container max-w-7xl mx-auto px-6 relative z-10 text-center">
-            <Logo showText={true} size="lg" className="justify-center mb-10" />
-            <p className="text-muted-foreground text-sm max-w-xl mx-auto italic mb-12">Double King Shop est le premier Hub Technologique Hybride de l'Ituri, alliant commerce de luxe et formation d'élite.</p>
-            <p className="text-[10px] font-black uppercase tracking-[0.4em] text-white/20">© 2024 DOUBLE KING SHOP MANAGER • TOUS DROITS RÉSERVÉS</p>
+        <div className="container max-w-7xl mx-auto px-6 relative z-10">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-20 mb-24">
+                <div className="lg:col-span-4 space-y-10">
+                    <Logo showText={true} size="lg" />
+                    <p className="text-muted-foreground text-sm leading-relaxed italic">"Le premier Hub Technologique Hybride de l'Ituri, alliant commerce de luxe, formation d'élite et déploiements d'infrastructures certifiées."</p>
+                    <div className="flex gap-4">
+                        {[1, 2, 3].map(i => <div key={i} className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 hover:border-accent transition-all cursor-pointer" />)}
+                    </div>
+                </div>
+
+                <div className="lg:col-span-4 grid grid-cols-2 gap-10">
+                    <div className="space-y-6">
+                        <h4 className="text-[10px] font-black uppercase tracking-widest text-white/40">Hub</h4>
+                        <ul className="space-y-4 text-xs font-bold uppercase italic text-muted-foreground">
+                            <li><Link href="/" className="hover:text-accent">Stock Hardware</Link></li>
+                            <li><Link href="/services" className="hover:text-accent">DKS Academy</Link></li>
+                            <li><Link href="/portfolio" className="hover:text-accent">Portfolio</Link></li>
+                        </ul>
+                    </div>
+                    <div className="space-y-6">
+                        <h4 className="text-[10px] font-black uppercase tracking-widest text-white/40">Support</h4>
+                        <ul className="space-y-4 text-xs font-bold uppercase italic text-muted-foreground">
+                            <li><Link href="/dashboard/support" className="hover:text-accent">SAV Live</Link></li>
+                            <li><Link href="/dashboard/wallet" className="hover:text-accent">Pi GCV Wallet</Link></li>
+                            <li><Link href="/login" className="hover:text-accent">Connexion</Link></li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div className="lg:col-span-4 space-y-8">
+                    <h4 className="text-[10px] font-black uppercase tracking-widest text-accent">REJOINDRE L'ALERTE ÉLITE</h4>
+                    {subscribed ? (
+                        <div className="p-8 bg-accent/10 border border-accent/20 rounded-3xl animate-in zoom-in duration-500">
+                            <div className="flex items-center gap-4 text-accent">
+                                <MailCheck size={32} />
+                                <div><p className="font-black uppercase italic text-sm">Abonnement Actif</p><p className="text-[10px] font-bold opacity-60">Vous recevrez les arrivages RTX en priorité.</p></div>
+                            </div>
+                        </div>
+                    ) : (
+                        <form onSubmit={handleNewsletter} className="relative group">
+                            <Input 
+                                type="email" 
+                                placeholder="Votre email officiel..." 
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                                className="h-16 pl-6 pr-16 bg-white/5 border-white/10 rounded-2xl focus:border-accent transition-all"
+                            />
+                            <Button type="submit" disabled={submitting} className="absolute right-2 top-1/2 -translate-y-1/2 h-12 w-12 rounded-xl bg-accent text-black p-0 shadow-lg shadow-accent/20">
+                                {submitting ? <Loader2 className="animate-spin h-5 w-5" /> : <Send size={20} />}
+                            </Button>
+                        </form>
+                    )}
+                    <p className="text-[9px] text-white/20 uppercase font-black tracking-widest">Informez-vous sur les stocks, sessions Academy et opportunités Mining.</p>
+                </div>
+            </div>
+
+            <div className="pt-16 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-8">
+                <p className="text-[10px] font-black uppercase tracking-[0.4em] text-white/20">© 2024 DOUBLE KING SHOP HUB • EST. BUNIA, RDC</p>
+                <div className="flex items-center gap-6">
+                    <Badge variant="outline" className="border-white/5 text-white/20 text-[8px] font-black uppercase">Infrastructure Certifiée</Badge>
+                    <Badge variant="outline" className="border-white/5 text-white/20 text-[8px] font-black uppercase">Pi GCV compliant</Badge>
+                </div>
+            </div>
         </div>
       </footer>
     </div>
