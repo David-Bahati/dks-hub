@@ -114,6 +114,7 @@ import {
   Bar
 } from 'recharts';
 import { Progress } from "@/components/ui/progress";
+import { UserGuide } from "@/components/dashboard/UserGuide";
 
 const TOTAL_COMMUNITY_SUPPLY = 32500000;
 
@@ -306,7 +307,7 @@ function DashboardPage() {
         </div>
       </header>
 
-      <main className="flex-1 p-4 md:p-8 space-y-8 pb-24 max-w-[1600px] mx-auto w-full">
+      <main className="flex-1 p-4 md:p-8 space-y-12 pb-24 max-w-[1600px] mx-auto w-full">
           <div className="grid gap-6 grid-cols-1 lg:grid-cols-12">
               <Card className="lg:col-span-5 bg-gradient-to-br from-accent/10 via-background to-black border-accent/20 rounded-[3rem] p-10 relative overflow-hidden group shadow-2xl">
                   <div className="absolute top-0 right-0 p-8 opacity-5 scale-150 rotate-45 group-hover:rotate-0 transition-transform duration-1000"><Pickaxe size={200} className="text-accent" /></div>
@@ -410,6 +411,8 @@ function DashboardPage() {
                   </div>
               </div>
           </div>
+
+          <UserGuide role={user?.role || "customer"} />
 
           {isStaff && stats && (
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
