@@ -37,7 +37,8 @@ import {
   UserCheck,
   Info,
   Plus,
-  Loader2
+  Loader2,
+  FileText
 } from 'lucide-react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
@@ -302,6 +303,7 @@ export default function LandingPage() {
                             <li><Link href="/" className="hover:text-accent">Stock Hardware</Link></li>
                             <li><Link href="/services" className="hover:text-accent">DKS Academy</Link></li>
                             <li><Link href="/portfolio" className="hover:text-accent">Portfolio</Link></li>
+                            <li><Link href="/whitepaper" className="hover:text-accent flex items-center gap-2"><FileText size={12}/> Livre Blanc</Link></li>
                         </ul>
                     </div>
                     <div className="space-y-6">
