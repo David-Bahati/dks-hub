@@ -27,7 +27,9 @@ import {
     ShieldAlert,
     Shield,
     UsersRound,
-    Percent
+    Percent,
+    Video,
+    Play
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -66,6 +68,19 @@ const ACADEMY_COURSES = [
         icon: <Sparkles className="text-accent" size={40} />,
         curriculum: ["Prompt Engineering Avancé", "Automatisation No-Code", "Générations Médias HD"],
         includes: ["Accès API GPT-4", "Support de cours digital", "Networking Privé"]
+    },
+    {
+        id: "ia-workshop",
+        category: "formation",
+        title: "Atelier IA Créative & Vidéo",
+        subtitle: "Générez du contenu visuel de classe mondiale.",
+        description: "Maîtrisez la création d'images et de vidéos par IA pour booster votre marketing.",
+        price: 50,
+        duration: "6 Heures",
+        certification: "DKS Creative IA Designer",
+        icon: <Play className="text-pink-500" size={40} />,
+        curriculum: ["Design Midjourney/Flux", "Vidéos Runway/Sora", "Identité Visuelle IA"],
+        includes: ["Banque de prompts", "Outils de montage", "Portfolio assisté"]
     },
     {
         id: "pc-building",
@@ -111,6 +126,14 @@ const TECHNICAL_SERVICES = [
         description: "Installation haute performance pour entreprises et résidences de luxe.",
         price: 150,
         icon: <Globe className="text-accent" size={32} />,
+    },
+    {
+        id: "cctv-install",
+        category: "infrastructure",
+        title: "Vidéosurveillance IP & Domotique",
+        description: "Sécurisez votre espace avec des caméras 4K intelligentes et contrôle mobile.",
+        price: 150,
+        icon: <Video className="text-green-500" size={32} />,
     },
     {
         id: "hardware-extreme",
@@ -226,7 +249,7 @@ export default function ServicesCataloguePage() {
                     </h2>
                     <div className="h-px flex-1 bg-white/5" />
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
                     {TECHNICAL_SERVICES.map((s) => (
                         <Card key={s.id} className="glossy-card border-none rounded-[2.5rem] p-8 group hover:scale-[1.02] transition-all">
                             <div className="flex justify-between items-start mb-8">
@@ -417,4 +440,3 @@ export default function ServicesCataloguePage() {
         </div>
     );
 }
-

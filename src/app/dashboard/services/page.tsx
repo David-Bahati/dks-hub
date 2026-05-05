@@ -55,12 +55,13 @@ import { Label } from "@/components/ui/label";
 // Mapping des prix pour la facturation automatique
 const SERVICE_PRICES: Record<string, number> = {
     "ia-mastery": 75,
+    "ia-workshop": 50,
     "crypto-trading": 50,
     "pc-building": 35,
     "cyber-audit": 250,
     "network-pro": 150,
+    "cctv-install": 150,
     "hardware-extreme": 45,
-    "ia-workshop": 50,
     "network-install": 150,
     "hardware-upgrade": 25,
     "support": 15
