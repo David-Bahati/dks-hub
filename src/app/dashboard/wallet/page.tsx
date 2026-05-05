@@ -44,7 +44,10 @@ import {
     Flame,
     Calculator,
     Gem,
-    Sparkles
+    Sparkles,
+    ArrowRight,
+    LineChart as ChartIcon,
+    Activity
 } from "lucide-react";
 import { db } from '@/lib/firebase';
 import { collection, query, where, orderBy, updateDoc, doc, addDoc, serverTimestamp, increment, limit, getDocs, Timestamp } from 'firebase/firestore';
@@ -66,6 +69,15 @@ import {
 } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { authenticateWithPi } from '@/lib/pi-payment';
+import { 
+    AreaChart, 
+    Area, 
+    XAxis, 
+    YAxis, 
+    CartesianGrid, 
+    Tooltip, 
+    ResponsiveContainer 
+} from 'recharts';
 
 const POINTS_PER_TOKEN = 100;
 const GCV_VALUE = 314159; // Global Consensus Value in USD
@@ -88,7 +100,6 @@ function UniversalWalletPage() {
     // UI States
     const [ledgerFilter, setLedgerFilter] = useState("all");
     const [ledgerSearch, setLedgerSearch] = useState("");
-    const [isGcvExpanded, setIsGcvExpanded] = useState(false);
 
     // Staking States
     const [stakeAmount, setStakeAmount] = useState("");
@@ -120,12 +131,12 @@ function UniversalWalletPage() {
     // Fetch Token Transactions for Ledger
     const txQuery = useMemoFirebase(() => {
         if (!user?.uid) return null;
-        return query(collection(db, "tokenTransactions"), where("userId", "==", user.uid), orderBy("createdAt", "desc"), limit(30));
+        return query(collection(db, "tokenTransactions"), where("userId", "==", user.uid), orderBy("createdAt", "asc"));
     }, [user?.uid]);
     const { data: transactions, isLoading: loadingTx } = useCollection(txQuery);
 
     const stats = useMemo(() => {
-        if (!user) return { totalPoints: 0, redeemableTokens: 0, progress: 0, availablePoints: 0, stakingRewards: 0, income: 0, expense: 0, apr: 5, gcvUSD: 0, gcvPi: 0 };
+        if (!user) return { totalPoints: 0, redeemableTokens: 0, progress: 0, availablePoints: 0, stakingRewards: 0, income: 0, expense: 0, apr: 5, gcvUSD: 0, totalTokens: 0, wealthHistory: [] };
 
         // 1. Points Calculation
         let total = 0;
@@ -153,18 +164,33 @@ function UniversalWalletPage() {
             rewards = (user.stakedBalance * (apr / 100) * (hoursStaked / 8760));
         }
 
-        // 4. Ledger Summary
+        // 4. Ledger & Wealth History Simulation
         let income = 0;
         let expense = 0;
-        transactions?.forEach(tx => {
-            if (tx.type === 'mint' || tx.type === 'mining' || tx.type === 'unstaking' || (tx.type === 'transfer' && tx.direction === 'received')) {
+        let runningTotal = 0;
+        const wealthHistory: any[] = [];
+
+        transactions?.forEach((tx, idx) => {
+            const isIncoming = tx.type === 'mint' || tx.type === 'mining' || tx.type === 'unstaking' || (tx.type === 'transfer' && tx.direction === 'received');
+            
+            if (isIncoming) {
                 income += tx.tokenAmount;
-            } else if (tx.type === 'staking' || tx.type === 'exchange' || (tx.type === 'transfer' && tx.direction === 'sent')) {
+                runningTotal += tx.tokenAmount;
+            } else {
                 expense += tx.tokenAmount;
+                runningTotal -= tx.tokenAmount;
             }
+
+            // Pour le graphique, on prend un échantillon ou on formate par date
+            const date = tx.createdAt?.toDate ? tx.createdAt.toDate().toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }) : `T${idx}`;
+            wealthHistory.push({
+                name: date,
+                balance: runningTotal,
+                wealth: runningTotal * GCV_VALUE
+            });
         });
 
-        // 5. GCV Conversion (Assuming 1 DKST = 1 Pi in internal consensus context for calculation)
+        // 5. GCV Conversion
         const totalTokens = (user.tokenBalance || 0) + (user.stakedBalance || 0) + rewards;
         const gcvUSD = totalTokens * GCV_VALUE;
 
@@ -178,30 +204,10 @@ function UniversalWalletPage() {
             expense, 
             apr,
             gcvUSD,
-            totalTokens
+            totalTokens,
+            wealthHistory: wealthHistory.slice(-15) // On garde les 15 derniers points
         };
     }, [user, logs, orders, isStaff, transactions]);
-
-    // Recipient Search Logic
-    useEffect(() => {
-        const delayDebounce = setTimeout(async () => {
-            if (searchQuery.length < 3) { setSearchResults([]); return; }
-            setIsSearching(true);
-            try {
-                const q = query(collection(db, "users"), limit(10));
-                const snap = await getDocs(q);
-                const results = snap.docs
-                    .map(doc => ({ id: doc.id, ...doc.data() }))
-                    .filter((u: any) => 
-                        u.id !== user?.uid && 
-                        (u.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                         u.email?.toLowerCase().includes(searchQuery.toLowerCase()))
-                    );
-                setSearchResults(results);
-            } catch (e) { console.error(e); } finally { setIsSearching(false); }
-        }, 500);
-        return () => clearTimeout(delayDebounce);
-    }, [searchQuery, user?.uid]);
 
     const handleSyncPi = async () => {
         setIsSyncing(true);
@@ -352,6 +358,27 @@ function UniversalWalletPage() {
         } catch (error) { toast({ title: "Erreur transfert", variant: "destructive" }); } finally { setIsProcessingAction(false); }
     };
 
+    // Recipient Search Logic
+    useEffect(() => {
+        const delayDebounce = setTimeout(async () => {
+            if (searchQuery.length < 3) { setSearchResults([]); return; }
+            setIsSearching(true);
+            try {
+                const q = query(collection(db, "users"), limit(10));
+                const snap = await getDocs(q);
+                const results = snap.docs
+                    .map(doc => ({ id: doc.id, ...doc.data() }))
+                    .filter((u: any) => 
+                        u.id !== user?.uid && 
+                        (u.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                         u.email?.toLowerCase().includes(searchQuery.toLowerCase()))
+                    );
+                setSearchResults(results);
+            } catch (e) { console.error(e); } finally { setIsSearching(false); }
+        }, 500);
+        return () => clearTimeout(delayDebounce);
+    }, [searchQuery, user?.uid]);
+
     const filteredTransactions = transactions?.filter(tx => {
         const matchesFilter = ledgerFilter === "all" || tx.type === ledgerFilter;
         const matchesSearch = !ledgerSearch || 
@@ -360,6 +387,10 @@ function UniversalWalletPage() {
             tx.recipientName?.toLowerCase().includes(ledgerSearch.toLowerCase()) ||
             tx.senderName?.toLowerCase().includes(ledgerSearch.toLowerCase());
         return matchesFilter && matchesSearch;
+    }).sort((a,b) => {
+        const da = a.createdAt?.toDate?.() || new Date(0);
+        const db = b.createdAt?.toDate?.() || new Date(0);
+        return db - da; // Décroissant pour l'historique
     });
 
     return (
@@ -568,7 +599,49 @@ function UniversalWalletPage() {
                              </div>
 
                              <div className="lg:col-span-7 space-y-8">
-                                <Card className="glossy-card border-none rounded-[3rem] p-10 h-full relative overflow-hidden">
+                                {/* NOVEAU GRAPHIQUE D'ÉVOLUTION DE FORTUNE */}
+                                <Card className="glossy-card border-none rounded-[3rem] p-10 relative overflow-hidden group">
+                                    <div className="absolute top-0 right-0 p-8 opacity-5"><ChartIcon size={120} /></div>
+                                    <div className="relative z-10 space-y-8">
+                                        <div className="flex justify-between items-center">
+                                            <div>
+                                                <h3 className="text-2xl font-black uppercase italic tracking-tight">Trajectoire de <span className="text-accent">Richesse</span></h3>
+                                                <p className="text-[10px] text-muted-foreground uppercase font-black tracking-widest mt-1">Valorisation GCV ($314,159/π)</p>
+                                            </div>
+                                            <div className="w-12 h-12 rounded-2xl bg-accent/10 flex items-center justify-center text-accent"><Activity className="animate-pulse" size={24}/></div>
+                                        </div>
+
+                                        <div className="h-[300px] w-full">
+                                            {stats.wealthHistory.length > 0 ? (
+                                                <ResponsiveContainer width="100%" height="100%">
+                                                    <AreaChart data={stats.wealthHistory}>
+                                                        <defs>
+                                                            <linearGradient id="colorWealth" x1="0" y1="0" x2="0" y2="1">
+                                                                <stop offset="5%" stopColor="hsl(var(--accent))" stopOpacity={0.3}/>
+                                                                <stop offset="95%" stopColor="hsl(var(--accent))" stopOpacity={0}/>
+                                                            </linearGradient>
+                                                        </defs>
+                                                        <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" vertical={false} />
+                                                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 10}} dy={10} />
+                                                        <Tooltip 
+                                                            contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', borderRadius: '12px', fontSize: '12px' }} 
+                                                            itemStyle={{ color: 'hsl(var(--accent))' }}
+                                                            formatter={(value: any) => [`$${value.toLocaleString()}`, "Valeur GCV"]}
+                                                        />
+                                                        <Area type="monotone" dataKey="wealth" stroke="hsl(var(--accent))" strokeWidth={3} fillOpacity={1} fill="url(#colorWealth)" />
+                                                    </AreaChart>
+                                                </ResponsiveContainer>
+                                            ) : (
+                                                <div className="h-full flex flex-col items-center justify-center opacity-20 text-center gap-4">
+                                                    <ChartIcon size={48} />
+                                                    <p className="text-xs uppercase font-black tracking-widest">Registre insuffisant pour l'analyse</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </Card>
+
+                                <Card className="glossy-card border-none rounded-[3rem] p-10 h-auto relative overflow-hidden">
                                     <div className="absolute top-0 right-0 p-8 opacity-5"><ShieldCheck size={120} /></div>
                                     <div className="relative z-10 space-y-10">
                                         <div className="flex justify-between items-center">
@@ -587,15 +660,6 @@ function UniversalWalletPage() {
                                                 <h4 className="font-black uppercase italic text-xs">Identité Digitale</h4>
                                                 <p className="text-xs text-muted-foreground leading-relaxed">Chaque transfert P2P génère un reçu numérique avec hachage blockchain, vérifiable à tout moment en boutique.</p>
                                             </div>
-                                        </div>
-
-                                        <div className="p-8 rounded-[2.5rem] bg-accent/5 border border-dashed border-accent/20 flex flex-col items-center text-center gap-6">
-                                            <div className="w-24 h-24 bg-white p-3 rounded-3xl shadow-2xl"><QrCode size="full" className="text-black" /></div>
-                                            <div className="space-y-2">
-                                                <p className="text-xs font-black uppercase italic">VOTRE QR CODE HUB</p>
-                                                <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-widest">Scannez pour recevoir des DKST instantanément</p>
-                                            </div>
-                                            <Button variant="outline" className="h-10 border-white/10 rounded-xl text-[9px] font-black uppercase italic">Télécharger le QR d'expert</Button>
                                         </div>
                                     </div>
                                 </Card>
@@ -664,24 +728,6 @@ function UniversalWalletPage() {
                                                 <div className="space-y-1"><p className="font-bold text-sm uppercase italic tracking-tight">{item.label}</p><p className="text-xs text-muted-foreground leading-relaxed">{item.desc}</p></div>
                                             </div>
                                         ))}
-                                    </div>
-                                </Card>
-
-                                <Card className="bg-accent/5 border border-accent/20 rounded-[3rem] p-10">
-                                    <div className="flex items-center gap-4 mb-8">
-                                        <Info size={20} className="text-accent" />
-                                        <h4 className="text-sm font-black uppercase italic">Staking Calculator</h4>
-                                    </div>
-                                    <div className="space-y-6">
-                                        <div className="flex justify-between items-center p-4 bg-black/20 rounded-2xl">
-                                            <span className="text-[10px] font-bold text-white/40 uppercase">Montant simulé</span>
-                                            <span className="text-lg font-black italic">100 DKST</span>
-                                        </div>
-                                        <div className="flex justify-between items-center p-4 bg-black/20 rounded-2xl">
-                                            <span className="text-[10px] font-bold text-white/40 uppercase">Rendement estimé (1 an)</span>
-                                            <span className="text-lg font-black text-green-400 italic">+{stats.apr} DKST</span>
-                                        </div>
-                                        <p className="text-[9px] text-center text-muted-foreground uppercase font-bold italic opacity-40">Basé sur votre taux APR de {stats.apr}% lié à votre grade {user?.loyaltyLevel}.</p>
                                     </div>
                                 </Card>
                             </div>
@@ -808,18 +854,6 @@ function UniversalWalletPage() {
                                         )) : <p className="text-center py-10 text-[10px] font-black uppercase opacity-30 italic">Aucun résultat trouvé</p>}
                                     </div>
                                 )}
-                                
-                                <div className="pt-6 border-t border-white/5 space-y-4">
-                                    <p className="text-[9px] font-black uppercase tracking-[0.2em] opacity-30">Récemment sollicités</p>
-                                    <div className="flex gap-4">
-                                        {[...Array(3)].map((_, i) => (
-                                            <div key={i} className="flex flex-col items-center gap-2 opacity-30">
-                                                <div className="w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center"><UserIcon size={18}/></div>
-                                                <div className="w-10 h-2 bg-white/5 rounded-full" />
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
                             </div>
                         ) : (
                             <form onSubmit={handleTransfer} className="space-y-10 animate-in slide-in-from-right-4 duration-300">
