@@ -33,6 +33,15 @@ export type AppUser = {
   heritageThresholdDays?: number;
 };
 
+export type Treasury = {
+  dkstBalance: number;
+  piBalance: number;
+  usdBalance: number;
+  cdfBalance: number;
+  totalMinted: number;
+  lastReconciliationAt: any;
+};
+
 export type TokenTransaction = {
   id: string;
   userId: string;
@@ -49,6 +58,7 @@ export type TokenTransaction = {
   createdAt: any;
   direction?: 'sent' | 'received';
   rarity?: 'common' | 'rare' | 'legendary';
+  source?: string;
 };
 
 export type GovernanceProposal = {
@@ -60,15 +70,6 @@ export type GovernanceProposal = {
   status: 'active' | 'closed' | 'executed';
   createdBy: string;
   endsAt: any;
-  createdAt: any;
-};
-
-export type Vote = {
-  id: string;
-  proposalId: string;
-  userId: string;
-  optionIndex: number;
-  weight: number;
   createdAt: any;
 };
 

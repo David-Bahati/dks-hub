@@ -34,6 +34,19 @@
       },
       "required": ["id", "email", "role", "updatedAt"]
     },
+    "Treasury": {
+      "title": "Treasury",
+      "description": "Global company wallet storing all currencies and tracking revenue sources.",
+      "type": "object",
+      "properties": {
+        "dkstBalance": { "type": "number" },
+        "piBalance": { "type": "number" },
+        "usdBalance": { "type": "number" },
+        "cdfBalance": { "type": "number" },
+        "totalMinted": { "type": "number" },
+        "lastReconciliationAt": { "type": "string", "format": "date-time" }
+      }
+    },
     "TokenTransaction": {
       "title": "TokenTransaction",
       "description": "Represents a point-to-token conversion, token usage on the Pi blockchain, or mining reward.",
@@ -41,7 +54,7 @@
       "properties": {
         "id": { "type": "string" },
         "userId": { "type": "string" },
-        "type": { "type": "string", "enum": ["mint", "burn", "transfer", "mining", "staking", "unstaking", "exchange", "heritage"] },
+        "type": { "type": "string", "enum": ["mint", "burn", "transfer", "mining", "staking", "unstaking", "exchange", "heritage", "dividend"] },
         "pointsAmount": { "type": "number" },
         "tokenAmount": { "type": "number" },
         "piTxId": { "type": "string", "description": "Pi Blockchain transaction hash" },
@@ -66,18 +79,6 @@
         "endsAt": { "type": "string", "format": "date-time" },
         "createdAt": { "type": "string", "format": "date-time" }
       }
-    },
-    "Vote": {
-      "title": "Vote",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "proposalId": { "type": "string" },
-        "userId": { "type": "string" },
-        "optionIndex": { "type": "number" },
-        "weight": { "type": "number" },
-        "createdAt": { "type": "string", "format": "date-time" }
-      }
     }
   },
   "auth": {
@@ -87,14 +88,15 @@
     "/users/{userId}": {
       "schema": "User"
     },
+    "/system/treasury": {
+      "schema": "Treasury",
+      "description": "Corporate wallet state"
+    },
     "/tokenTransactions/{txId}": {
       "schema": "TokenTransaction"
     },
     "/proposals/{proposalId}": {
       "schema": "GovernanceProposal"
-    },
-    "/proposals/{proposalId}/votes/{voteId}": {
-      "schema": "Vote"
     }
   }
 }
