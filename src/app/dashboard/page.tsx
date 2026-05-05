@@ -65,7 +65,8 @@ import {
   Gem,
   ArrowUpCircle,
   Heart,
-  Activity
+  Activity,
+  Vote
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -123,6 +124,7 @@ const DAILY_MISSIONS: DailyMission[] = [
 const navConfig = [
   { href: "/dashboard", icon: LineChart, label: "Aperçu", roles: ["Admin", "Seller", "Cashier", "customer"] },
   { href: "/dashboard/wallet", icon: Wallet, label: "Mon Wallet DKST", roles: ["Admin", "Seller", "Cashier", "customer"] },
+  { href: "/dashboard/governance", icon: Vote, label: "Gouvernance DAO", roles: ["Admin", "Seller", "Cashier", "customer"] },
   { href: "/dashboard/profile/expert", icon: UserIcon, label: "Mon Profil Expert", roles: ["Admin", "Seller", "Cashier"] },
   { href: "/dashboard/tokens", icon: Coins, label: "Économie Hub", roles: ["Admin", "Seller", "Cashier"] },
   { href: "/dashboard/calendar", icon: CalendarIcon, label: "Agenda Hub", roles: ["Admin", "Seller", "Cashier"] },

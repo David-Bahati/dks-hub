@@ -46,18 +46,32 @@
       },
       "required": ["userId", "type", "tokenAmount", "createdAt"]
     },
-    "HallOfFameEntry": {
-        "title": "HallOfFameEntry",
-        "type": "object",
-        "properties": {
-            "id": { "type": "string" },
-            "userId": { "type": "string" },
-            "userName": { "type": "string" },
-            "title": { "type": "string" },
-            "period": { "type": "string" },
-            "achievement": { "type": "string" },
-            "createdAt": { "type": "string", "format": "date-time" }
-        }
+    "GovernanceProposal": {
+      "title": "GovernanceProposal",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "category": { "type": "string", "enum": ["hardware", "academy", "hub", "other"] },
+        "options": { "type": "array", "items": { "type": "string" } },
+        "status": { "type": "string", "enum": ["active", "closed", "executed"] },
+        "createdBy": { "type": "string" },
+        "endsAt": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Vote": {
+      "title": "Vote",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "proposalId": { "type": "string" },
+        "userId": { "type": "string" },
+        "optionIndex": { "type": "number" },
+        "weight": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
     }
   },
   "auth": {
@@ -65,16 +79,16 @@
   },
   "firestore": {
     "/users/{userId}": {
-      "schema": "User",
-      "description": "User profiles."
+      "schema": "User"
     },
     "/tokenTransactions/{txId}": {
-      "schema": "TokenTransaction",
-      "description": "Prestige point conversions and mining events."
+      "schema": "TokenTransaction"
     },
-    "/hallOfFame/{id}": {
-        "schema": "HallOfFameEntry",
-        "description": "Historical records of DKS champions."
+    "/proposals/{proposalId}": {
+      "schema": "GovernanceProposal"
+    },
+    "/proposals/{proposalId}/votes/{voteId}": {
+      "schema": "Vote"
     }
   }
 }

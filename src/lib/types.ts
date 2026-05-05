@@ -17,6 +17,8 @@ export type AppUser = {
   tokenBalance?: number;
   pointsConverted?: number;
   piWalletAddress?: string;
+  stakedBalance?: number;
+  stakingStartedAt?: any;
   lastMiningAt?: any;
   miningPower?: number;
   completedMissionsToday?: string[];
@@ -27,7 +29,7 @@ export type TokenTransaction = {
   id: string;
   userId: string;
   userName?: string;
-  type: 'mint' | 'burn' | 'transfer' | 'mining';
+  type: 'mint' | 'burn' | 'transfer' | 'mining' | 'staking' | 'unstaking' | 'exchange';
   pointsAmount?: number;
   tokenAmount: number;
   piTxId?: string;
@@ -39,6 +41,27 @@ export type TokenTransaction = {
   createdAt: any;
   direction?: 'sent' | 'received';
   rarity?: 'common' | 'rare' | 'legendary';
+};
+
+export type GovernanceProposal = {
+  id: string;
+  title: string;
+  description: string;
+  category: 'hardware' | 'academy' | 'hub' | 'other';
+  options: string[];
+  status: 'active' | 'closed' | 'executed';
+  createdBy: string;
+  endsAt: any;
+  createdAt: any;
+};
+
+export type Vote = {
+  id: string;
+  proposalId: string;
+  userId: string;
+  optionIndex: number;
+  weight: number;
+  createdAt: any;
 };
 
 export type Product = {
