@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
 import { Navbar } from "@/components/layout/Navbar";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -47,7 +47,10 @@ import {
     Sparkles,
     ArrowRight,
     LineChart as ChartIcon,
-    Activity
+    Activity,
+    Download,
+    FileBadge,
+    Medal
 } from "lucide-react";
 import { db } from '@/lib/firebase';
 import { collection, query, where, orderBy, updateDoc, doc, addDoc, serverTimestamp, increment, limit, getDocs, Timestamp } from 'firebase/firestore';
@@ -78,6 +81,9 @@ import {
     Tooltip, 
     ResponsiveContainer 
 } from 'recharts';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
+import { Logo } from '@/components/ui/Logo';
 
 const POINTS_PER_TOKEN = 100;
 const GCV_VALUE = 314159; // Global Consensus Value in USD
@@ -111,6 +117,10 @@ function UniversalWalletPage() {
     const [selectedRecipient, setSelectedRecipient] = useState<any>(null);
     const [transferAmount, setTransferAmount] = useState("");
     const [transferMemo, setTransferMemo] = useState("");
+
+    // Certificate States
+    const [isGeneratingCert, setIsGeneratingCert] = useState(false);
+    const certRef = useRef<HTMLDivElement>(null);
 
     const isStaff = user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'seller' || user?.role?.toLowerCase() === 'cashier';
 
@@ -181,7 +191,6 @@ function UniversalWalletPage() {
                 runningTotal -= tx.tokenAmount;
             }
 
-            // Pour le graphique, on prend un échantillon ou on formate par date
             const date = tx.createdAt?.toDate ? tx.createdAt.toDate().toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }) : `T${idx}`;
             wealthHistory.push({
                 name: date,
@@ -190,7 +199,6 @@ function UniversalWalletPage() {
             });
         });
 
-        // 5. GCV Conversion
         const totalTokens = (user.tokenBalance || 0) + (user.stakedBalance || 0) + rewards;
         const gcvUSD = totalTokens * GCV_VALUE;
 
@@ -205,7 +213,7 @@ function UniversalWalletPage() {
             apr,
             gcvUSD,
             totalTokens,
-            wealthHistory: wealthHistory.slice(-15) // On garde les 15 derniers points
+            wealthHistory: wealthHistory.slice(-15) 
         };
     }, [user, logs, orders, isStaff, transactions]);
 
@@ -358,7 +366,23 @@ function UniversalWalletPage() {
         } catch (error) { toast({ title: "Erreur transfert", variant: "destructive" }); } finally { setIsProcessingAction(false); }
     };
 
-    // Recipient Search Logic
+    const handleDownloadFortuneCert = async () => {
+        if (!certRef.current) return;
+        setIsGeneratingCert(true);
+        try {
+            const canvas = await html2canvas(certRef.current, { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
+            const imgData = canvas.toDataURL('image/png');
+            const pdf = new jsPDF({ orientation: 'landscape', unit: 'px', format: [canvas.width / 2, canvas.height / 2] });
+            pdf.addImage(imgData, 'PNG', 0, 0, canvas.width / 2, canvas.height / 2);
+            pdf.save(`CERTIFICAT_FORTUNE_DKS_${user?.name?.replace(/\s+/g, '_')}.pdf`);
+            toast({ title: "Certificat de Fortune généré", description: "Félicitations pour votre réussite financière !" });
+        } catch (error) {
+            toast({ title: "Erreur PDF", variant: "destructive" });
+        } finally {
+            setIsGeneratingCert(false);
+        }
+    };
+
     useEffect(() => {
         const delayDebounce = setTimeout(async () => {
             if (searchQuery.length < 3) { setSearchResults([]); return; }
@@ -390,8 +414,10 @@ function UniversalWalletPage() {
     }).sort((a,b) => {
         const da = a.createdAt?.toDate?.() || new Date(0);
         const db = b.createdAt?.toDate?.() || new Date(0);
-        return db - da; // Décroissant pour l'historique
+        return db - da;
     });
+
+    const isMillionaire = stats.gcvUSD >= 1000000;
 
     return (
         <div className="min-h-screen bg-background text-foreground pb-20">
@@ -408,6 +434,16 @@ function UniversalWalletPage() {
                         </div>
                     </div>
                     <div className="flex gap-3">
+                        {isMillionaire && (
+                            <Button 
+                                onClick={handleDownloadFortuneCert}
+                                disabled={isGeneratingCert}
+                                className="bg-yellow-500 text-black hover:bg-yellow-400 h-14 px-6 rounded-2xl font-black uppercase italic gap-3 shadow-xl shadow-yellow-500/20 animate-in zoom-in duration-500"
+                            >
+                                {isGeneratingCert ? <Loader2 className="animate-spin" /> : <Medal size={20} />}
+                                Certificat Millionnaire
+                            </Button>
+                        )}
                         <Button 
                             onClick={handleSyncPi}
                             disabled={isSyncing}
@@ -423,7 +459,6 @@ function UniversalWalletPage() {
                     </div>
                 </div>
 
-                {/* GCV INTERACTIVE HERO SECTION */}
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-12">
                     <Card className="lg:col-span-8 bg-gradient-to-br from-yellow-500/20 via-background to-black border-yellow-500/20 rounded-[3.5rem] p-12 relative overflow-hidden group shadow-2xl">
                         <div className="absolute top-0 right-0 p-12 opacity-10 scale-150 rotate-12 group-hover:rotate-0 transition-transform duration-[3s]"><Gem size={300} className="text-yellow-500" /></div>
@@ -433,6 +468,7 @@ function UniversalWalletPage() {
                                 <Badge variant="outline" className="border-white/10 text-white/40 uppercase font-black text-[9px] tracking-widest flex items-center gap-2">
                                     <Sparkles size={10} className="text-yellow-500" /> 1 π = $314,159.00
                                 </Badge>
+                                {isMillionaire && <Badge className="bg-white/10 text-yellow-500 border-yellow-500/50 uppercase font-black text-[9px] tracking-widest px-3 h-8 flex items-center gap-2"><Crown size={12}/> Millionnaire Club</Badge>}
                             </div>
 
                             <div className="flex flex-col md:flex-row justify-between items-end gap-10">
@@ -503,37 +539,6 @@ function UniversalWalletPage() {
                     </Card>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-                    <Card className="bg-primary/10 border-primary/20 rounded-[2.5rem] p-8 space-y-4">
-                        <p className="text-[9px] font-black uppercase text-primary/60 tracking-widest">Staking Actif</p>
-                        <p className="text-4xl font-black text-white italic">{user?.stakedBalance?.toFixed(2) || "0.00"}</p>
-                        <div className="flex items-center gap-2 text-[10px] font-bold text-primary">
-                             <Zap size={12} /> Taux APR: {stats.apr}%
-                        </div>
-                    </Card>
-                    <Card className="bg-green-500/10 border-green-500/20 rounded-[2.5rem] p-8 space-y-4">
-                        <p className="text-[9px] font-black uppercase text-green-500/60 tracking-widest">Revenus Totaux</p>
-                        <p className="text-4xl font-black text-white italic">+{stats.income.toFixed(2)}</p>
-                        <div className="flex items-center gap-2 text-[10px] font-bold text-green-500">
-                             <ArrowDownLeft size={12} /> Minting & Transferts
-                        </div>
-                    </Card>
-                    <Card className="bg-red-500/10 border-red-500/20 rounded-[2.5rem] p-8 space-y-4">
-                        <p className="text-[9px] font-black uppercase text-red-500/60 tracking-widest">Dépenses / Invest.</p>
-                        <p className="text-4xl font-black text-white italic">-{stats.expense.toFixed(2)}</p>
-                        <div className="flex items-center gap-2 text-[10px] font-bold text-red-500">
-                             <ArrowUpRight size={12} /> Staking & Privilèges
-                        </div>
-                    </Card>
-                    <Card className="bg-accent/10 border-accent/20 rounded-[2.5rem] p-8 space-y-4">
-                        <p className="text-[9px] font-black uppercase text-accent/60 tracking-widest">Valeur Pi (GCV)</p>
-                        <p className="text-4xl font-black text-white italic">{(stats.totalTokens).toFixed(4)} <span className="text-sm not-italic">π</span></p>
-                        <div className="flex items-center gap-2 text-[10px] font-bold text-accent">
-                             <Coins size={12} /> 1 DKST = 1 Pi Consensus
-                        </div>
-                    </Card>
-                </div>
-
                 <Tabs defaultValue="overview" className="space-y-10">
                     <TabsList className="bg-white/5 border border-white/5 p-1.5 rounded-[1.5rem] h-16 w-full max-w-xl mx-auto flex">
                         <TabsTrigger value="overview" className="flex-1 rounded-xl font-black uppercase italic text-[10px] data-[state=active]:bg-accent data-[state=active]:text-black transition-all"><Wallet size={14} className="mr-2" /> Vue d'ensemble</TabsTrigger>
@@ -541,7 +546,6 @@ function UniversalWalletPage() {
                         <TabsTrigger value="history" className="flex-1 rounded-xl font-black uppercase italic text-[10px] data-[state=active]:bg-accent data-[state=active]:text-black transition-all"><History size={14} className="mr-2" /> Registre</TabsTrigger>
                     </TabsList>
 
-                    {/* ONGLET VUE D'ENSEMBLE */}
                     <TabsContent value="overview" className="space-y-10 animate-in fade-in slide-in-from-bottom-4">
                         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
                              <div className="lg:col-span-5 space-y-8">
@@ -555,9 +559,6 @@ function UniversalWalletPage() {
                                             </div>
                                             <div className="relative pt-2">
                                                  <Progress value={stats.progress} className="h-3 bg-white/5" indicatorClassName="bg-accent shadow-[0_0_15px_rgba(56,189,248,0.5)]" />
-                                                 <div className="absolute top-0 left-0 w-full flex justify-between px-1 -mt-2">
-                                                    {[...Array(5)].map((_, i) => <div key={i} className="w-0.5 h-1.5 bg-white/10 rounded-full" />)}
-                                                 </div>
                                             </div>
                                             <div className="text-center space-y-1">
                                                 <p className="text-[9px] font-bold text-muted-foreground uppercase">Taux de frappe: 100 PTS = 1 DKST</p>
@@ -584,9 +585,7 @@ function UniversalWalletPage() {
                                                 disabled={isProcessingAction}
                                                 className="flex items-center gap-5 p-5 bg-black/40 rounded-2xl border border-white/5 hover:border-primary/50 transition-all text-left group"
                                             >
-                                                <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center group-hover:scale-110 transition-transform">
-                                                    {perk.icon}
-                                                </div>
+                                                <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center group-hover:scale-110 transition-transform">{perk.icon}</div>
                                                 <div className="flex-1">
                                                     <p className="font-bold text-xs uppercase italic">{perk.title}</p>
                                                     <p className="text-[10px] text-white/40">{perk.description}</p>
@@ -599,7 +598,6 @@ function UniversalWalletPage() {
                              </div>
 
                              <div className="lg:col-span-7 space-y-8">
-                                {/* NOVEAU GRAPHIQUE D'ÉVOLUTION DE FORTUNE */}
                                 <Card className="glossy-card border-none rounded-[3rem] p-10 relative overflow-hidden group">
                                     <div className="absolute top-0 right-0 p-8 opacity-5"><ChartIcon size={120} /></div>
                                     <div className="relative z-10 space-y-8">
@@ -617,8 +615,7 @@ function UniversalWalletPage() {
                                                     <AreaChart data={stats.wealthHistory}>
                                                         <defs>
                                                             <linearGradient id="colorWealth" x1="0" y1="0" x2="0" y2="1">
-                                                                <stop offset="5%" stopColor="hsl(var(--accent))" stopOpacity={0.3}/>
-                                                                <stop offset="95%" stopColor="hsl(var(--accent))" stopOpacity={0}/>
+                                                                <stop offset="5%" stopColor="hsl(var(--accent))" stopOpacity={0.3}/><stop offset="95%" stopColor="hsl(var(--accent))" stopOpacity={0}/>
                                                             </linearGradient>
                                                         </defs>
                                                         <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" vertical={false} />
@@ -648,7 +645,6 @@ function UniversalWalletPage() {
                                             <h3 className="text-2xl font-black uppercase italic tracking-tight">Sécurité & <span className="text-accent">Garantie</span></h3>
                                             <Badge variant="outline" className="border-accent/20 text-accent uppercase font-black text-[8px] tracking-widest">Audit v2.0</Badge>
                                         </div>
-
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                             <div className="p-6 bg-white/5 rounded-3xl border border-white/5 space-y-4">
                                                 <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-accent"><Smartphone size={20} /></div>
@@ -667,7 +663,6 @@ function UniversalWalletPage() {
                         </div>
                     </TabsContent>
 
-                    {/* ONGLET VAULT (STAKING) */}
                     <TabsContent value="vault" className="animate-in fade-in slide-in-from-bottom-4">
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
                             <Card className="bg-primary/10 border-primary/20 rounded-[3.5rem] p-12 flex flex-col justify-between h-[600px] relative overflow-hidden group">
@@ -678,7 +673,6 @@ function UniversalWalletPage() {
                                         <h2 className="text-5xl md:text-7xl font-black uppercase italic tracking-tighter leading-tight text-white">ÉPARGNEZ <br /><span className="text-primary">GAGNEZ</span></h2>
                                         <p className="text-lg text-white/60 font-bold uppercase italic">Rendement Annuel Garanti : {stats.apr}% (APR)</p>
                                     </div>
-                                    
                                     <div className="p-8 bg-black/60 backdrop-blur-3xl rounded-[3rem] border border-white/10 space-y-8 shadow-2xl">
                                         <div className="grid grid-cols-2 gap-8">
                                             <div className="space-y-1">
@@ -690,9 +684,7 @@ function UniversalWalletPage() {
                                                 <p className="text-2xl font-black text-green-400 italic">+{stats.stakingRewards.toFixed(4)}</p>
                                             </div>
                                         </div>
-
                                         <Progress value={user?.stakedBalance ? 100 : 0} className="h-1.5 bg-white/5" indicatorClassName="bg-primary" />
-                                        
                                         {user?.stakedBalance ? (
                                             <div className="space-y-4">
                                                 <div className="flex items-center gap-3 p-4 bg-primary/5 border border-primary/20 rounded-2xl">
@@ -713,7 +705,6 @@ function UniversalWalletPage() {
                                     </div>
                                 </div>
                             </Card>
-
                             <div className="space-y-8">
                                 <Card className="glossy-card border-none rounded-[3rem] p-10 space-y-8">
                                     <div className="flex items-center gap-4"><TrendingUp size={24} className="text-primary" /><h2 className="text-xl font-black uppercase italic tracking-tight">Pourquoi Staker vos DKST ?</h2></div>
@@ -734,7 +725,6 @@ function UniversalWalletPage() {
                         </div>
                     </TabsContent>
 
-                    {/* ONGLET REGISTRE (HISTORY) */}
                     <TabsContent value="history" className="animate-in fade-in slide-in-from-bottom-4">
                         <Card className="glossy-card border-none rounded-[3rem] overflow-hidden flex flex-col">
                             <CardHeader className="p-10 border-b border-white/5 bg-white/[0.02] space-y-8">
@@ -742,47 +732,23 @@ function UniversalWalletPage() {
                                     <CardTitle className="text-2xl font-black uppercase italic flex items-center gap-4"><History className="text-accent" /> Registre Ledger v2.0</CardTitle>
                                     <div className="flex bg-white/5 p-1 rounded-2xl border border-white/5">
                                         {['all', 'mint', 'transfer', 'staking', 'exchange'].map(f => (
-                                            <button 
-                                                key={f} 
-                                                onClick={() => setLedgerFilter(f)}
-                                                className={cn(
-                                                    "px-6 h-10 rounded-xl font-black uppercase italic text-[9px] transition-all",
-                                                    ledgerFilter === f ? "bg-accent text-black shadow-lg" : "text-white/40 hover:text-white"
-                                                )}
-                                            >
-                                                {f === 'all' ? 'Tous' : f === 'exchange' ? 'Burn' : f}
-                                            </button>
+                                            <button key={f} onClick={() => setLedgerFilter(f)} className={cn("px-6 h-10 rounded-xl font-black uppercase italic text-[9px] transition-all", ledgerFilter === f ? "bg-accent text-black shadow-lg" : "text-white/40 hover:text-white")}>{f === 'all' ? 'Tous' : f === 'exchange' ? 'Burn' : f}</button>
                                         ))}
                                     </div>
                                 </div>
                                 <div className="relative">
                                     <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
-                                    <Input 
-                                        placeholder="Chercher une transaction, un mémo ou un identifiant..." 
-                                        className="h-14 pl-14 bg-background/40 border-white/5 rounded-2xl focus:border-accent"
-                                        value={ledgerSearch}
-                                        onChange={(e) => setLedgerSearch(e.target.value)}
-                                    />
+                                    <Input placeholder="Chercher une transaction, un mémo ou un identifiant..." className="h-14 pl-14 bg-background/40 border-white/5 rounded-2xl focus:border-accent" value={ledgerSearch} onChange={(e) => setLedgerSearch(e.target.value)} />
                                 </div>
                             </CardHeader>
-
                             <div className="divide-y divide-white/5 max-h-[600px] overflow-y-auto custom-scrollbar">
-                                {loadingTx ? (
-                                    <div className="p-20 text-center"><Loader2 className="animate-spin text-accent mx-auto" /></div>
-                                ) : filteredTransactions && filteredTransactions.length > 0 ? (
-                                    filteredTransactions.map((tx) => {
+                                {loadingTx ? <div className="p-20 text-center"><Loader2 className="animate-spin text-accent mx-auto" /></div> : filteredTransactions && filteredTransactions.length > 0 ? filteredTransactions.map((tx) => {
                                         const isIncoming = tx.type === 'mint' || tx.type === 'mining' || tx.type === 'unstaking' || (tx.type === 'transfer' && tx.direction === 'received');
                                         return (
                                             <div key={tx.id} className="p-8 flex flex-col md:flex-row items-center justify-between hover:bg-white/[0.02] transition-colors group gap-6">
                                                 <div className="flex items-center gap-6 flex-1 w-full">
-                                                    <div className={cn(
-                                                        "w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg transition-transform group-hover:scale-110",
-                                                        isIncoming ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-500"
-                                                    )}>
-                                                        {tx.type === 'mint' ? <RefreshCw size={24} /> : 
-                                                         tx.type === 'staking' ? <Vault size={24} /> : 
-                                                         tx.type === 'exchange' ? <Flame size={24} /> : 
-                                                         isIncoming ? <ArrowDownLeft size={24} /> : <ArrowUpRight size={24} />}
+                                                    <div className={cn("w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg transition-transform group-hover:scale-110", isIncoming ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-500")}>
+                                                        {tx.type === 'mint' ? <RefreshCw size={24} /> : tx.type === 'staking' ? <Vault size={24} /> : tx.type === 'exchange' ? <Flame size={24} /> : isIncoming ? <ArrowDownLeft size={24} /> : <ArrowUpRight size={24} />}
                                                     </div>
                                                     <div className="space-y-1">
                                                         <div className="flex items-center gap-3">
@@ -796,27 +762,13 @@ function UniversalWalletPage() {
                                                         {tx.memo && <p className="text-[10px] italic text-white/40 bg-white/5 px-2 py-0.5 rounded-md inline-block">"{tx.memo}"</p>}
                                                     </div>
                                                 </div>
-
                                                 <div className="flex flex-col items-center md:items-end gap-1 shrink-0">
-                                                    <p className={cn(
-                                                        "text-2xl font-black italic",
-                                                        isIncoming ? "text-green-400" : "text-red-400"
-                                                    )}>
-                                                        {isIncoming ? '+' : '-'}{tx.tokenAmount.toFixed(2)} <span className="text-xs not-italic opacity-40">DKST</span>
-                                                    </p>
-                                                    <p className="text-[10px] font-bold opacity-30 uppercase tracking-widest">
-                                                        {tx.createdAt?.toDate ? tx.createdAt.toDate().toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'Récemment'}
-                                                    </p>
+                                                    <p className={cn("text-2xl font-black italic", isIncoming ? "text-green-400" : "text-red-400")}>{isIncoming ? '+' : '-'}{tx.tokenAmount.toFixed(2)} <span className="text-xs not-italic opacity-40">DKST</span></p>
+                                                    <p className="text-[10px] font-bold opacity-30 uppercase tracking-widest">{tx.createdAt?.toDate ? tx.createdAt.toDate().toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'Récemment'}</p>
                                                 </div>
                                             </div>
                                         );
-                                    })
-                                ) : (
-                                    <div className="p-32 text-center flex flex-col items-center gap-6 opacity-20 italic">
-                                        <History size={64} strokeWidth={1} />
-                                        <p className="text-xs uppercase font-black tracking-widest">Aucun mouvement détecté sur ce compte</p>
-                                    </div>
-                                )}
+                                    }) : <div className="p-32 text-center flex flex-col items-center gap-6 opacity-20 italic"><History size={64} strokeWidth={1} /><p className="text-xs uppercase font-black tracking-widest">Aucun mouvement détecté sur ce compte</p></div>}
                             </div>
                         </Card>
                     </TabsContent>
@@ -829,21 +781,14 @@ function UniversalWalletPage() {
                     <SheetHeader className="p-10 bg-accent/10 border-b border-white/5">
                         <div className="flex items-center gap-5">
                             <div className="w-16 h-16 rounded-2xl bg-accent/20 flex items-center justify-center text-accent shadow-xl shadow-accent/10"><Send size={32} /></div>
-                            <div>
-                                <SheetTitle className="text-3xl font-black uppercase italic tracking-tighter">Envoyer des Jetons</SheetTitle>
-                                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Échange Universel DKS</p>
-                            </div>
+                            <div><SheetTitle className="text-3xl font-black uppercase italic tracking-tighter">Envoyer des Jetons</SheetTitle><p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Échange Universel DKS</p></div>
                         </div>
                     </SheetHeader>
-                    
                     <div className="flex-1 p-10 space-y-10 overflow-y-auto custom-scrollbar">
                         {!selectedRecipient ? (
                             <div className="space-y-6">
                                 <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Chercher un membre</Label>
-                                <div className="relative">
-                                    <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
-                                    <Input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Nom ou Email du bénéficiaire..." className="h-16 pl-14 bg-background/50 border-white/10 rounded-2xl focus:border-accent font-bold" />
-                                </div>
+                                <div className="relative"><Search className="absolute left-5 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} /><Input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Nom ou Email du bénéficiaire..." className="h-16 pl-14 bg-background/50 border-white/10 rounded-2xl focus:border-accent font-bold" /></div>
                                 {searchQuery.length >= 3 && (
                                     <div className="space-y-2 max-h-[350px] overflow-y-auto pr-2 custom-scrollbar">
                                         {isSearching ? <div className="py-10 text-center"><Loader2 className="animate-spin text-accent mx-auto h-8 w-8" /></div> : searchResults.length > 0 ? searchResults.map((u) => (
@@ -860,43 +805,88 @@ function UniversalWalletPage() {
                                 <div className="p-6 bg-accent/5 border border-accent/20 rounded-[2.5rem] flex items-center justify-between">
                                     <div className="flex items-center gap-5">
                                         <div className="w-14 h-14 rounded-2xl bg-accent text-black flex items-center justify-center font-black text-xl italic shadow-lg shadow-accent/20">{selectedRecipient.name?.substring(0, 1)}</div>
-                                        <div>
-                                            <p className="text-[9px] font-black text-accent uppercase tracking-widest">Envoi vers</p>
-                                            <p className="text-lg font-black uppercase italic text-white leading-none mt-1">{selectedRecipient.name}</p>
-                                        </div>
+                                        <div><p className="text-[9px] font-black text-accent uppercase tracking-widest">Envoi vers</p><p className="text-lg font-black uppercase italic text-white leading-none mt-1">{selectedRecipient.name}</p></div>
                                     </div>
                                     <Button variant="ghost" size="icon" onClick={() => setSelectedRecipient(null)} className="h-10 w-10 rounded-full hover:bg-white/5 text-white/40"><X size={20}/></Button>
                                 </div>
-
                                 <div className="space-y-8">
                                     <div className="space-y-3">
                                         <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Montant à transférer</Label>
-                                        <div className="relative">
-                                            <Coins className="absolute left-6 top-1/2 -translate-y-1/2 text-accent" size={24} />
-                                            <Input type="number" step="0.01" value={transferAmount} onChange={(e) => setTransferAmount(e.target.value)} className="h-20 pl-16 bg-background/50 border-white/10 rounded-[2rem] text-4xl font-black text-accent" required />
-                                            <div className="absolute right-6 top-1/2 -translate-y-1/2 flex flex-col items-end">
-                                                <p className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">DISPO</p>
-                                                <p className="text-xs font-bold text-white/40">{user?.tokenBalance?.toFixed(2)}</p>
-                                            </div>
-                                        </div>
+                                        <div className="relative"><Coins className="absolute left-6 top-1/2 -translate-y-1/2 text-accent" size={24} /><Input type="number" step="0.01" value={transferAmount} onChange={(e) => setTransferAmount(e.target.value)} className="h-20 pl-16 bg-background/50 border-white/10 rounded-[2rem] text-4xl font-black text-accent" required /><div className="absolute right-6 top-1/2 -translate-y-1/2 flex flex-col items-end"><p className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">DISPO</p><p className="text-xs font-bold text-white/40">{user?.tokenBalance?.toFixed(2)}</p></div></div>
                                     </div>
-
                                     <div className="space-y-3">
                                         <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Mémo de transaction</Label>
                                         <Input value={transferMemo} onChange={(e) => setTransferMemo(e.target.value)} placeholder="Ex: Remboursement diagnostic..." className="h-14 bg-background/50 border-white/10 rounded-2xl italic text-sm font-medium" />
                                     </div>
                                 </div>
-
-                                <div className="pt-6">
-                                    <Button type="submit" disabled={isProcessingAction || !transferAmount} className="w-full h-20 bg-accent text-black font-black uppercase italic rounded-[2rem] shadow-2xl shadow-accent/20 text-xl gap-4">
-                                        {isProcessingAction ? <Loader2 className="animate-spin" /> : <><Send size={24} /> Valider le Transfert</>}
-                                    </Button>
-                                </div>
+                                <div className="pt-6"><Button type="submit" disabled={isProcessingAction || !transferAmount} className="w-full h-20 bg-accent text-black font-black uppercase italic rounded-[2rem] shadow-2xl shadow-accent/20 text-xl gap-4">{isProcessingAction ? <Loader2 className="animate-spin" /> : <><Send size={24} /> Valider le Transfert</>}</Button></div>
                             </form>
                         )}
                     </div>
                 </SheetContent>
             </Sheet>
+
+            {/* MODÈLE DE CERTIFICAT DE FORTUNE CACHÉ */}
+            <div style={{ position: 'absolute', left: '-9999px', top: 0 }}>
+                {isMillionaire && (
+                    <div ref={certRef} className="bg-white text-black p-0 w-[1123px] h-[794px] font-serif relative overflow-hidden flex items-center justify-center">
+                        <div className="absolute inset-0 border-[40px] border-double border-[#1e293b]" />
+                        <div className="absolute inset-10 border-4 border-yellow-500/20" />
+                        <div className="absolute inset-0 flex items-center justify-center opacity-[0.02] pointer-events-none"><Logo size="xl" /></div>
+
+                        <div className="relative z-10 text-center w-full px-40 space-y-12">
+                            <div className="flex flex-col items-center gap-6">
+                                <Logo size="lg" />
+                                <div className="space-y-1">
+                                    <h2 className="text-sm font-bold tracking-[0.4em] uppercase text-yellow-600">Double King Foundation</h2>
+                                    <p className="text-[10px] font-medium uppercase tracking-[0.2em] opacity-40">Département de la Prospérité Digitale • Bunia, RDC</p>
+                                </div>
+                            </div>
+
+                            <div className="space-y-4">
+                                <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200 font-black uppercase italic tracking-[0.3em] px-6 py-2 mb-4">Millionnaire GCV Consensus</Badge>
+                                <h1 className="text-6xl font-black uppercase italic tracking-tighter text-[#1e293b]">CERTIFICAT DE FORTUNE</h1>
+                                <p className="text-xl font-light italic text-gray-500">RECONNAISSANCE DE RÉUSSITE FINANCIÈRE WEB3</p>
+                            </div>
+
+                            <div className="space-y-8 py-10 bg-yellow-50/30 rounded-[3rem] border border-yellow-100">
+                                <p className="text-lg font-medium text-gray-400 uppercase tracking-widest">Le présent titre est décerné à</p>
+                                <h3 className="text-5xl font-black uppercase tracking-tight border-b-2 border-yellow-200 inline-block pb-2 px-14 italic">
+                                    {user?.name}
+                                </h3>
+                                <p className="text-lg font-medium text-gray-600 max-w-2xl mx-auto leading-relaxed italic px-10">
+                                    Pour avoir atteint le seuil d'exception de <strong>{stats.totalTokens.toFixed(2)} DKST</strong>, 
+                                    représentant une valorisation théorique de :
+                                </p>
+                                <h4 className="text-4xl font-black text-yellow-600 tracking-tighter">
+                                    $ {stats.gcvUSD.toLocaleString('fr-FR', { maximumFractionDigits: 0 })} USD
+                                </h4>
+                            </div>
+
+                            <div className="grid grid-cols-3 items-end pt-12">
+                                <div className="text-center space-y-2">
+                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Date de distinction</p>
+                                    <p className="text-sm font-bold">{new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+                                </div>
+                                <div className="flex flex-col items-center gap-4">
+                                    <div className="p-3 border-2 border-yellow-100 rounded-2xl bg-white shadow-xl"><QrCode size={60} className="opacity-20" /></div>
+                                    <p className="text-[8px] font-bold text-gray-300 uppercase tracking-tighter">ID: DKS-WEALTH-{user?.uid.substring(0, 8).toUpperCase()}</p>
+                                </div>
+                                <div className="text-center space-y-4">
+                                    <div className="w-40 h-px bg-gray-200 mx-auto" />
+                                    <div className="flex flex-col items-center">
+                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Directeur du Hub</p>
+                                        <p className="text-sm font-black italic">Expert Bahati Nyeke</p>
+                                        <ShieldCheck size={24} className="text-yellow-600 mt-2 opacity-30" />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="absolute top-0 right-0 w-64 h-64 bg-yellow-500/5 rounded-bl-full -z-10" />
+                        <div className="absolute bottom-0 left-0 w-64 h-64 bg-yellow-500/5 rounded-tr-full -z-10" />
+                    </div>
+                )}
+            </div>
         </div>
     );
 }
