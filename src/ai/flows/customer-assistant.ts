@@ -1,8 +1,8 @@
 'use server';
 /**
- * @fileOverview Flow Genkit pour l'Assistant Client de Double King Shop avec support multilingue expert.
+ * @fileOverview Flow Genkit pour l'Assistant Client de Double King Shop avec support multilingue et vision par ordinateur.
  * 
- * Cet agent guide les clients, répond aux questions sur l'entreprise et les produits.
+ * Cet agent guide les clients, répond aux questions sur l'entreprise et les produits, et identifie le matériel par photo.
  */
 
 import { ai } from '@/ai/genkit';
@@ -13,6 +13,7 @@ import { collection, getDocs, query, where, limit } from 'firebase/firestore';
 const AssistantInputSchema = z.object({
   message: z.string(),
   language: z.string().optional().default('fr'),
+  photoDataUri: z.string().optional().describe("Photo du matériel au format data URI base64"),
   history: z.array(z.object({
     role: z.enum(['user', 'model']),
     content: z.array(z.object({ text: z.string() }))
@@ -73,34 +74,45 @@ const customerAssistantFlow = ai.defineFlow(
         'ln': 'Lingala'
       };
       
-      const response = await ai.generate({
-        model: 'googleai/gemini-1.5-flash',
-        system: `Tu es l'Expert Double King (DKS), l'assistant IA de l'écosystème technologique Double King Shop à Bunia, RDC.
-        Ton rôle est d'être un expert conseil en hardware, éducation numérique (Academy) et infrastructures.
+      const promptParts: any[] = [
+        { text: `Tu es l'Expert Double King (DKS), l'assistant IA de l'écosystème technologique Double King Shop à Bunia, RDC.
+        Ton rôle est d'être un expert conseil en hardware, vision par ordinateur et économie numérique.
 
         IMPORTANT : Tu dois répondre EXCLUSIVEMENT en ${langNames[input.language] || 'Français'}.
-        Garde un ton professionnel, technologique mais chaleureux, typique de l'élite de Bunia.
+        Garde un ton professionnel, technologique mais chaleureux.
+
+        CAPACITÉ VISUELLE :
+        Si une image est fournie, analyse-la pour identifier le composant informatique ou le problème technique.
+        Utilise cette analyse pour conseiller le client sur le stock disponible ou la réparation nécessaire.
 
         CONTEXTE ET VALEURS :
         - Localisation : Immeuble Bahati, Boulevard de la Libération, Bunia, Ituri, RDC.
-        - Spécialité : Hardware premium (RTX, Laptops ROG), Starlink, Vidéosurveillance.
-        - DKS Academy : Formations certifiantes en IA et Blockchain.
+        - Spécialité : Hardware premium, Starlink, Vidéosurveillance.
         - Économie : Paiement en Pi Network (1 Pi = $314,159 GCV) et jetons DKST.
-        - Le jeton DKST : Actif interne du Hub pour des transactions sans frais.
         
         INSTRUCTIONS DE REPONSE :
         - Pour les produits, utilise l'outil searchProducts.
-        - Explique toujours les bénéfices des paiements en Crypto (Pi/DKST).
-        - Si on te parle en Lingala ou Swahili, montre que tu es un expert local qui comprend les réalités de l'Ituri.`,
+        - Si l'image montre un composant cassé, propose d'ouvrir un ticket SAV au Hub.
+        - Explique toujours les bénéfices des paiements en Crypto.` }
+      ];
+
+      if (input.photoDataUri) {
+        promptParts.push({ media: { url: input.photoDataUri, contentType: 'image/jpeg' } });
+      }
+
+      promptParts.push({ text: input.message });
+
+      const response = await ai.generate({
+        model: 'googleai/gemini-1.5-flash',
         tools: [searchProducts],
-        prompt: input.message,
+        prompt: promptParts,
         history: input.history,
       });
 
       return response.text;
     } catch (error: any) {
       console.error("Genkit Flow Error:", error);
-      return "Désolé, je rencontre une difficulté technique pour accéder à mes services linguistiques. Veuillez réessayer.";
+      return "Désolé, je rencontre une difficulté technique pour analyser cette demande. Veuillez réessayer.";
     }
   }
 );
