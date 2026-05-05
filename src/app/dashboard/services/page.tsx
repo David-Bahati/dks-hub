@@ -31,7 +31,8 @@ import {
     ShieldCheck,
     MessageSquareText,
     Send,
-    UsersRound
+    UsersRound,
+    FileText
 } from "lucide-react";
 import { db } from '@/lib/firebase';
 import { collection, query, orderBy, updateDoc, doc, addDoc, serverTimestamp, onSnapshot, where } from 'firebase/firestore';
@@ -190,10 +191,12 @@ function ServiceManagementPage() {
                     backgroundColor: "#ffffff" 
                 });
                 const imgData = canvas.toDataURL('image/png');
-                // Format A4 Paysage
                 const pdf = new jsPDF({ orientation: 'landscape', unit: 'px', format: [canvas.width / 2, canvas.height / 2] });
+                const fileName = booking.groupSize > 1 
+                    ? `CERTIF_GROUPE_DKS_${booking.customerName.replace(/\s+/g, '_')}.pdf`
+                    : `CERTIF_DKS_${booking.customerName.replace(/\s+/g, '_')}.pdf`;
                 pdf.addImage(imgData, 'PNG', 0, 0, canvas.width / 2, canvas.height / 2);
-                pdf.save(`CERTIFICAT_DKS_${booking.customerName.replace(/\s+/g, '_')}.pdf`);
+                pdf.save(fileName);
                 toast({ title: "Certificat généré", description: "Félicitations pour cette réussite !" });
             } catch (error) {
                 toast({ title: "Erreur PDF", variant: "destructive" });
@@ -243,7 +246,7 @@ function ServiceManagementPage() {
     });
 
     return (
-        <div className="min-h-screen bg-background text-foreground">
+        <div className="min-h-screen bg-background text-foreground pb-24">
             <Navbar />
             <main className="max-w-7xl mx-auto px-4 py-12">
                 <div className="flex flex-col md:flex-row justify-between items-start gap-8 mb-12">
@@ -330,11 +333,12 @@ function ServiceManagementPage() {
                                                         <Button 
                                                             size="icon" 
                                                             variant="outline" 
-                                                            className="h-10 w-10 border-accent/20 text-accent"
+                                                            className={cn("h-10 w-10 border-accent/20 text-accent", booking.groupSize > 1 && "bg-accent/10")}
                                                             onClick={() => handleDownloadCertificate(booking)}
                                                             disabled={isGeneratingCert}
+                                                            title={booking.groupSize > 1 ? "Certificat de Groupe" : "Certificat Individuel"}
                                                         >
-                                                            {isGeneratingCert ? <Loader2 className="animate-spin h-4 w-4" /> : <Download size={16} />}
+                                                            {isGeneratingCert ? <Loader2 className="animate-spin h-4 w-4" /> : booking.groupSize > 1 ? <FileText size={16} /> : <Download size={16} />}
                                                         </Button>
                                                     )}
                                                 </div>
@@ -350,7 +354,7 @@ function ServiceManagementPage() {
                                                                 disabled={isGeneratingCert}
                                                             >
                                                                 {isGeneratingCert ? <Loader2 className="animate-spin h-4 w-4" /> : <FileBadge size={16} />}
-                                                                Télécharger mon Diplôme
+                                                                {booking.groupSize > 1 ? "Télécharger Certificat Collectif" : "Télécharger mon Diplôme"}
                                                             </Button>
                                                         )}
                                                         {!booking.hasReview && (
@@ -385,7 +389,7 @@ function ServiceManagementPage() {
                 </div>
             </main>
 
-            {/* MODÈLE DE CERTIFICAT CACHÉ POUR GÉNÉRATION PDF */}
+            {/* MODÈLE DE CERTIFICAT CACHÉ POUR GÉNÉRATION PDF (DYNAMIQUE INDIVIDUEL/GROUPE) */}
             <div style={{ position: 'absolute', left: '-9999px', top: 0 }}>
                 {selectedBookingForCert && (
                     <div ref={certRef} className="bg-white text-black p-0 w-[1123px] h-[794px] font-serif relative overflow-hidden flex items-center justify-center">
@@ -403,17 +407,23 @@ function ServiceManagementPage() {
                             </div>
 
                             <div className="space-y-4">
-                                <h1 className="text-6xl font-black uppercase italic tracking-tighter text-[#0f172a]">CERTIFICAT</h1>
+                                <h1 className="text-6xl font-black uppercase italic tracking-tighter text-[#0f172a]">
+                                    {selectedBookingForCert.groupSize > 1 ? "CERTIFICAT COLLECTIF" : "CERTIFICAT"}
+                                </h1>
                                 <p className="text-xl font-light italic text-gray-500">DE RÉUSSITE ACADÉMIQUE</p>
                             </div>
 
                             <div className="space-y-6 py-8">
                                 <p className="text-lg font-medium text-gray-400">Le présent certificat est fièrement décerné à</p>
                                 <h3 className="text-5xl font-black uppercase tracking-tight border-b-2 border-gray-100 inline-block pb-2 px-10">
-                                    {selectedBookingForCert.customerName}
+                                    {selectedBookingForCert.groupSize > 1 
+                                        ? `${selectedBookingForCert.customerName} & Groupe (x${selectedBookingForCert.groupSize})` 
+                                        : selectedBookingForCert.customerName}
                                 </h3>
                                 <p className="text-lg font-medium text-gray-500 max-w-2xl mx-auto leading-relaxed">
-                                    Pour avoir complété avec succès et démontré une expertise exceptionnelle lors du cursus intensif :
+                                    {selectedBookingForCert.groupSize > 1 
+                                        ? `Pour avoir complété avec brio une session de formation d'élite et démontré une cohésion d'expertise exceptionnelle lors du cursus :`
+                                        : `Pour avoir complété avec succès et démontré une expertise exceptionnelle lors du cursus intensif :`}
                                 </p>
                                 <h4 className="text-3xl font-bold italic text-[#3b82f6] uppercase tracking-wide">
                                     {selectedBookingForCert.serviceTitle}
