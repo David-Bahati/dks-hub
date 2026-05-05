@@ -160,8 +160,12 @@ function DashboardPage() {
   const [totalPoolGifted, setTotalPoolGifted] = useState(0);
   const [rate, setRate] = useState(2500);
   const [isSendingDigest, setIsSendingDigest] = useState(false);
+  
+  // Certificate States
   const [isGeneratingCert, setIsGeneratingCert] = useState(false);
+  const [isGeneratingPhilanthropyCert, setIsGeneratingPhilanthropyCert] = useState(false);
   const certRef = useRef<HTMLDivElement>(null);
+  const certPhilanthropyRef = useRef<HTMLDivElement>(null);
 
   const [uSearch, setUSearch] = useState("");
   const [uResults, setUResults] = useState<{type: string, title: string, id: string, link: string}[]>([]);
@@ -452,6 +456,7 @@ function DashboardPage() {
   }, [allCustomers, allOrders]);
 
   const weeklyWinner = leaderboard[0];
+  const topBenefactor = benefactorsLeaderboard[0];
 
   useEffect(() => {
     fetchGlobalData();
@@ -494,6 +499,23 @@ function DashboardPage() {
         toast({ title: "Erreur PDF", variant: "destructive" });
     } finally {
         setIsGeneratingCert(false);
+    }
+  };
+
+  const handleDownloadBenefactorCertificate = async () => {
+    if (!certPhilanthropyRef.current || !topBenefactor) return;
+    setIsGeneratingPhilanthropyCert(true);
+    try {
+        const canvas = await html2canvas(certPhilanthropyRef.current, { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
+        const imgData = canvas.toDataURL('image/png');
+        const pdf = new jsPDF({ orientation: 'landscape', unit: 'px', format: [canvas.width / 2, canvas.height / 2] });
+        pdf.addImage(imgData, 'PNG', 0, 0, canvas.width / 2, canvas.height / 2);
+        pdf.save(`CERTIFICAT_MECENE_DKS_${topBenefactor.name.replace(/\s+/g, '_')}.pdf`);
+        toast({ title: "Certificat Mécène généré !" });
+    } catch (error) {
+        toast({ title: "Erreur PDF", variant: "destructive" });
+    } finally {
+        setIsGeneratingPhilanthropyCert(false);
     }
   };
 
@@ -709,7 +731,7 @@ function DashboardPage() {
                              <div className="h-24 w-full mt-6">
                                 <ResponsiveContainer width="100%" height="100%">
                                     <AreaChart data={poolImpactChart}>
-                                        <defs><linearGradient id="poolGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="hsl(var(--accent))" stopOpacity={0.3}/><stop offset="95%" stopColor="hsl(var(--accent))" stopOpacity={0}/></linearGradient></defs>
+                                        <defs><linearGradient id="poolGrad" x1="0" x2="0" x2="0" y2="1"><stop offset="5%" stopColor="hsl(var(--accent))" stopOpacity={0.3}/><stop offset="95%" stopColor="hsl(var(--accent))" stopOpacity={0}/></linearGradient></defs>
                                         <Area type="monotone" dataKey="total" stroke="hsl(var(--accent))" strokeWidth={2} fill="url(#poolGrad)" />
                                     </AreaChart>
                                 </ResponsiveContainer>
@@ -897,10 +919,21 @@ function DashboardPage() {
                 </Card>
 
                 <Card className="glossy-card border-none rounded-[2.5rem] overflow-hidden">
-                    <CardHeader className="py-6 px-8 border-b border-white/5 bg-yellow-500/10">
+                    <CardHeader className="py-6 px-8 border-b border-white/5 bg-yellow-500/10 flex flex-row items-center justify-between">
                       <CardTitle className="text-sm font-black uppercase italic flex items-center gap-3">
                         <Heart className="text-yellow-500" size={16} /> Philanthropes du Hub
                       </CardTitle>
+                      {topBenefactor && (isAdmin || user?.uid === topBenefactor.id) && (
+                          <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8 text-yellow-500 hover:bg-yellow-500/10 rounded-lg"
+                              onClick={handleDownloadBenefactorCertificate}
+                              disabled={isGeneratingPhilanthropyCert}
+                          >
+                              {isGeneratingPhilanthropyCert ? <Loader2 className="animate-spin h-3 w-3" /> : <Download size={14} />}
+                          </Button>
+                      )}
                     </CardHeader>
                     <CardContent className="p-0">
                        <div className="divide-y divide-white/5">
@@ -1012,6 +1045,7 @@ function DashboardPage() {
           </div>
       </main>
 
+      {/* MODÈLES DE CERTIFICATS CACHÉS */}
       <div style={{ position: 'absolute', left: '-9999px', top: 0 }}>
           {weeklyWinner && (
               <div ref={certRef} className="bg-white text-black p-0 w-[1123px] h-[794px] font-serif relative overflow-hidden flex items-center justify-center">
@@ -1032,6 +1066,37 @@ function DashboardPage() {
                           </div>
                       </div>
                   </div>
+              </div>
+          )}
+
+          {topBenefactor && (
+              <div ref={certPhilanthropyRef} className="bg-white text-black p-0 w-[1123px] h-[794px] font-serif relative overflow-hidden flex items-center justify-center">
+                  <div className="absolute inset-0 border-[40px] border-double border-yellow-600" />
+                  <div className="absolute inset-10 border-4 border-yellow-100/50" />
+                  <div className="relative z-10 text-center w-full px-40 space-y-12">
+                      <div className="flex flex-col items-center gap-6">
+                        <Logo size="lg" />
+                        <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200 font-black uppercase italic tracking-widest">Sceat de Bienfaisance</Badge>
+                      </div>
+                      <h1 className="text-6xl font-black uppercase italic tracking-tighter text-[#1e293b]">GRAND MÉCÈNE DU HUB</h1>
+                      <h3 className="text-5xl font-black uppercase italic text-yellow-600 tracking-tight">{topBenefactor.name}</h3>
+                      <p className="text-lg font-medium text-gray-500 max-w-2xl mx-auto leading-relaxed italic">
+                          "Pour avoir découvert et partagé la fortune de <strong>{topBenefactor.count} Bloc(s) Légendaire(s)</strong> avec l'ensemble du pool de minage, renforçant la solidarité de l'élite DKS."
+                      </p>
+                      <div className="grid grid-cols-3 items-end pt-12">
+                          <div className="text-center space-y-1">
+                              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Titre Honorifique</p>
+                              <p className="text-xs font-black uppercase text-yellow-700">Bienfaiteur de l'Ituri</p>
+                          </div>
+                          <div className="p-3 border-2 border-yellow-100 rounded-2xl bg-white shadow-xl"><QrCode size={60} className="opacity-20" /></div>
+                          <div className="flex flex-col items-center">
+                              <p className="text-sm font-black italic">Double King Foundation</p>
+                              <Heart size={24} className="text-red-500 mt-2 animate-pulse" />
+                          </div>
+                      </div>
+                  </div>
+                  <div className="absolute top-0 right-0 w-64 h-64 bg-yellow-500/5 rounded-bl-full -z-10" />
+                  <div className="absolute bottom-0 left-0 w-64 h-64 bg-yellow-500/5 rounded-tr-full -z-10" />
               </div>
           )}
       </div>
