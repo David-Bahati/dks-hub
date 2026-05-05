@@ -14,7 +14,11 @@ import {
     Smartphone,
     MapPin,
     RotateCcw,
-    ChevronDown
+    ChevronDown,
+    Mic,
+    MicOff,
+    Volume2,
+    VolumeX
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -22,6 +26,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { askAssistant } from '@/ai/flows/customer-assistant';
 import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
 
 type Message = {
     role: 'user' | 'model';
@@ -38,7 +43,69 @@ export function AiAssistant() {
     ]);
     const [input, setInput] = useState("");
     const [isLoading, setIsLoading] = useState(false);
+    const [isListening, setIsListening] = useState(false);
+    const [isSpeechEnabled, setIsSpeechEnabled] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
+    const { toast } = useToast();
+
+    // Speech Recognition Setup
+    const recognitionRef = useRef<any>(null);
+
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+            if (SpeechRecognition) {
+                recognitionRef.current = new SpeechRecognition();
+                recognitionRef.current.continuous = false;
+                recognitionRef.current.interimResults = false;
+                recognitionRef.current.lang = 'fr-FR';
+
+                recognitionRef.current.onresult = (event: any) => {
+                    const transcript = event.results[0][0].transcript;
+                    setInput(transcript);
+                    setIsListening(false);
+                    // Optionnel: envoyer directement
+                    // handleSend(transcript);
+                };
+
+                recognitionRef.current.onerror = (event: any) => {
+                    console.error("Speech Recognition Error:", event.error);
+                    setIsListening(false);
+                    toast({ title: "Erreur Vocale", description: "Impossible de capter votre voix.", variant: "destructive" });
+                };
+
+                recognitionRef.current.onend = () => {
+                    setIsListening(false);
+                };
+            }
+        }
+    }, [toast]);
+
+    // Text-to-Speech function
+    const speak = (text: string) => {
+        if (!isSpeechEnabled || typeof window === 'undefined') return;
+        
+        window.speechSynthesis.cancel(); // Arrêter toute lecture en cours
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'fr-FR';
+        utterance.rate = 1.1;
+        utterance.pitch = 1;
+        window.speechSynthesis.speak(utterance);
+    };
+
+    const toggleListening = () => {
+        if (!recognitionRef.current) {
+            toast({ title: "Non supporté", description: "Votre navigateur ne supporte pas la reconnaissance vocale.", variant: "destructive" });
+            return;
+        }
+
+        if (isListening) {
+            recognitionRef.current.stop();
+        } else {
+            setIsListening(true);
+            recognitionRef.current.start();
+        }
+    };
 
     // Effet pour afficher un petit teaser après 3 secondes au premier chargement
     useEffect(() => {
@@ -82,9 +149,16 @@ export function AiAssistant() {
             });
 
             setMessages(prev => [...prev, { role: 'model', text: response }]);
+            
+            // Lire la réponse si activé
+            if (isSpeechEnabled) {
+                speak(response);
+            }
         } catch (error) {
             console.error("Chat Error:", error);
-            setMessages(prev => [...prev, { role: 'model', text: "Désolé, je rencontre une difficulté technique. Pouvez-vous reformuler votre question ?" }]);
+            const errMsg = "Désolé, je rencontre une difficulté technique. Pouvez-vous reformuler votre question ?";
+            setMessages(prev => [...prev, { role: 'model', text: errMsg }]);
+            if (isSpeechEnabled) speak(errMsg);
         } finally {
             setIsLoading(false);
         }
@@ -92,6 +166,7 @@ export function AiAssistant() {
 
     const clearChat = () => {
         setMessages([{ role: 'model', text: INITIAL_MESSAGE }]);
+        window.speechSynthesis.cancel();
     };
 
     return (
@@ -129,6 +204,15 @@ export function AiAssistant() {
                                 </div>
                             </div>
                             <div className="flex items-center gap-2">
+                                <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    onClick={() => setIsSpeechEnabled(!isSpeechEnabled)} 
+                                    title={isSpeechEnabled ? "Désactiver la voix" : "Activer la voix"} 
+                                    className={cn("h-8 w-8 rounded-xl transition-all", isSpeechEnabled ? "text-accent bg-accent/10" : "text-white/20")}
+                                >
+                                    {isSpeechEnabled ? <Volume2 size={14} /> : <VolumeX size={14} />}
+                                </Button>
                                 <Button variant="ghost" size="icon" onClick={clearChat} title="Réinitialiser" className="h-8 w-8 rounded-xl hover:bg-white/5 text-white/20 hover:text-white">
                                     <RotateCcw size={14} />
                                 </Button>
@@ -193,8 +277,20 @@ export function AiAssistant() {
 
                     <CardFooter className="p-6 bg-black/40 border-t border-white/5 shrink-0">
                         <form onSubmit={(e) => { e.preventDefault(); handleSend(); }} className="w-full flex gap-3">
+                            <Button 
+                                type="button" 
+                                variant="outline" 
+                                size="icon" 
+                                onClick={toggleListening}
+                                className={cn(
+                                    "h-14 w-14 rounded-2xl border-white/10 transition-all",
+                                    isListening ? "bg-red-500 border-red-500 text-white animate-pulse" : "hover:bg-accent/10 hover:text-accent"
+                                )}
+                            >
+                                {isListening ? <MicOff size={20} /> : <Mic size={20} />}
+                            </Button>
                             <Input 
-                                placeholder="Interroger l'Expert..." 
+                                placeholder={isListening ? "Écoute en cours..." : "Interroger l'Expert..."} 
                                 value={input}
                                 onChange={(e) => setInput(e.target.value)}
                                 className="h-14 bg-background/50 border-white/10 rounded-2xl focus:border-accent text-xs font-medium"
