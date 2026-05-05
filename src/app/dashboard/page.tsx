@@ -69,7 +69,8 @@ import {
   Vote,
   Scale,
   Building2,
-  Timer
+  Timer,
+  CheckCircle
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -90,13 +91,12 @@ import {
     getDashboardStats,
     getLowStockItems,
     getRevenueChartData,
-    getPoolImpactData
 } from '@/lib/data';
 import { Product, DailyMission } from '@/lib/types';
 import withAuth from '@/components/auth/withAuth';
 import { useAuth } from '@/context/AuthContext';
 import { useCollection, useMemoFirebase, useDoc } from '@/firebase';
-import { collection, query, where, orderBy, limit, getDocs, addDoc, serverTimestamp, doc, updateDoc, increment, Timestamp } from 'firebase/firestore';
+import { collection, query, where, orderBy, limit, addDoc, serverTimestamp, doc, updateDoc, increment, Timestamp, arrayUnion } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/ui/Logo";
@@ -110,8 +110,6 @@ import {
   CartesianGrid, 
   Tooltip, 
   ResponsiveContainer,
-  BarChart,
-  Bar
 } from 'recharts';
 import { Progress } from "@/components/ui/progress";
 import { UserGuide } from "@/components/dashboard/UserGuide";
@@ -167,6 +165,9 @@ function DashboardPage() {
   // Mining States
   const [isMining, setIsMining] = useState(false);
   const [miningTimeLeft, setMiningTimeLeft] = useState<string | null>(null);
+
+  // Missions States
+  const [claimingMission, setClaimingId] = useState<string | null>(null);
 
   const isStaff = user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'seller' || user?.role?.toLowerCase() === 'cashier';
 
@@ -280,6 +281,34 @@ function DashboardPage() {
         toast({ title: `Minage réussi !`, description: `+${finalReward.toFixed(4)} DKST extraits. Prochain Halving à 8M.` });
     } catch (e) { toast({ title: "Erreur Minage", variant: "destructive" }); } finally { setIsMining(false); }
   };
+
+  const handleCompleteMission = async (mission: DailyMission) => {
+    if (!user || user.completedMissionsToday?.includes(mission.id)) return;
+    
+    setClaimingId(mission.id);
+    try {
+        await updateDoc(doc(db, "users", user.uid), {
+            points: increment(mission.rewardPoints),
+            completedMissionsToday: arrayUnion(mission.id),
+            lastActivityAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
+        });
+
+        toast({
+            title: "Mission Accomplie !",
+            description: `Vous avez gagné +${mission.rewardPoints} Points Prestige.`,
+        });
+    } catch (error) {
+        toast({ title: "Erreur Mission", variant: "destructive" });
+    } finally {
+        setClaimingId(null);
+    }
+  };
+
+  const myMissions = useMemo(() => {
+    const userRole = user?.role?.toLowerCase() || 'customer';
+    return DAILY_MISSIONS.filter(m => m.targetRole === 'all' || m.targetRole === (isStaff ? 'staff' : 'customer'));
+  }, [user, isStaff]);
 
   const SidebarContent = () => (
     <nav className="grid gap-1 p-6 overflow-y-auto custom-scrollbar h-full">
@@ -395,18 +424,50 @@ function DashboardPage() {
                                 </div>
                              </div>
                         </Card>
-                        <div className="space-y-4">
-                            {DAILY_MISSIONS.slice(0, 2).map((mission) => (
-                                <Card key={mission.id} className="bg-white/5 border border-white/5 rounded-[2.2rem] p-6 h-[calc(50%-8px)]">
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center text-xl">{mission.icon}</div>
-                                        <div className="flex-1">
-                                            <h4 className="font-black uppercase italic text-xs tracking-tight text-white">{mission.title}</h4>
-                                            <Badge className="bg-primary/20 text-primary border-none uppercase text-[7px] font-black">+{mission.rewardPoints} PTS</Badge>
-                                        </div>
+                        <div className="grid grid-cols-1 gap-4">
+                            <Card className="bg-gradient-to-br from-primary/10 to-background border-primary/20 rounded-[2.2rem] p-6 relative overflow-hidden">
+                                <div className="absolute top-0 right-0 p-4 opacity-5"><Target size={40} /></div>
+                                <div className="relative z-10 space-y-4">
+                                    <div className="flex justify-between items-center">
+                                        <h4 className="text-xs font-black uppercase italic tracking-widest text-primary">Missions du Jour</h4>
+                                        <Badge className="bg-primary/20 text-primary border-none text-[8px] font-black uppercase">
+                                            {user?.completedMissionsToday?.length || 0} / {myMissions.length}
+                                        </Badge>
                                     </div>
-                                </Card>
-                            ))}
+                                    <div className="space-y-2">
+                                        {myMissions.map((mission) => {
+                                            const isDone = user?.completedMissionsToday?.includes(mission.id);
+                                            return (
+                                                <div 
+                                                    key={mission.id} 
+                                                    onClick={() => !isDone && handleCompleteMission(mission)}
+                                                    className={cn(
+                                                        "p-3 rounded-xl border flex items-center justify-between gap-3 transition-all cursor-pointer group",
+                                                        isDone ? "bg-green-500/5 border-green-500/20 opacity-60" : "bg-white/5 border-white/5 hover:border-primary/30"
+                                                    )}
+                                                >
+                                                    <div className="flex items-center gap-3 overflow-hidden">
+                                                        <span className="text-lg">{mission.icon}</span>
+                                                        <div className="overflow-hidden">
+                                                            <p className="text-[9px] font-black uppercase text-white truncate">{mission.title}</p>
+                                                            <p className="text-[7px] text-muted-foreground uppercase font-bold truncate">{mission.description}</p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="shrink-0">
+                                                        {isDone ? (
+                                                            <CheckCircle className="text-green-500 h-4 w-4" />
+                                                        ) : claimingMission === mission.id ? (
+                                                            <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                                                        ) : (
+                                                            <Badge className="bg-primary text-white text-[7px] font-black group-hover:scale-110 transition-transform">+{mission.rewardPoints} PTS</Badge>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            </Card>
                         </div>
                   </div>
               </div>
