@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -10,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { Loader2, ShoppingBag, CreditCard, Banknote, ShieldCheck } from "lucide-react";
+import { Loader2, ShoppingBag, CreditCard, Banknote, ShieldCheck, Coins } from "lucide-react";
 
 export default function CheckoutPage() {
     const { cartItems, totalPrice, clearCart } = useCart();
@@ -75,11 +76,15 @@ export default function CheckoutPage() {
                          <div className="space-y-6">
                             <CardTitle className="text-sm font-black uppercase italic tracking-widest">Mode de règlement</CardTitle>
                             <div className="p-6 bg-white/5 rounded-2xl border border-accent/20 flex items-center gap-4 text-accent">
+                                <Coins size={24} />
+                                <span className="font-bold uppercase italic text-xs">Crypto-monnaie (Pi ou DKST)</span>
+                            </div>
+                            <div className="p-6 bg-white/5 rounded-2xl border border-white/10 flex items-center gap-4 opacity-60">
                                 <Banknote size={24} />
                                 <span className="font-bold uppercase italic text-xs">Paiement Cash au Bureau</span>
                             </div>
-                            <p className="text-[10px] text-muted-foreground leading-relaxed">
-                                Les paiements Pi Network et Mobile Money sont gérés manuellement en boutique pour le moment. 
+                            <p className="text-[10px] text-muted-foreground leading-relaxed italic">
+                                Les paiements Crypto-monnaie (Pi Network / DKST), Mobile Money et Cash sont acceptés. 
                                 Validez votre commande pour réserver votre matériel.
                             </p>
                          </div>

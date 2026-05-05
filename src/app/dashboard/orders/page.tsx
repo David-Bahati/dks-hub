@@ -21,7 +21,8 @@ import {
   Printer,
   FileText,
   QrCode,
-  Zap
+  Zap,
+  Coins
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useCollection, useMemoFirebase } from '@/firebase';
@@ -171,7 +172,7 @@ export default function OrdersPage() {
         return <Badge className="bg-green-500/10 text-green-400 border-none uppercase text-[10px] font-black px-3 py-1 flex items-center gap-1"><CheckCircle size={12} /> Confirmé</Badge>;
       case 'pending_payment':
       case 'en attente':
-        return <Badge className="bg-orange-500/10 text-orange-400 border-none uppercase text-[10px] font-black px-3 py-1 flex items-center gap-1"><Clock size={12} /> Attente Cash</Badge>;
+        return <Badge className="bg-orange-500/10 text-orange-400 border-none uppercase text-[10px] font-black px-3 py-1 flex items-center gap-1"><Clock size={12} /> Attente Encaissement</Badge>;
       case 'cancelled':
       case 'annulé':
         return <Badge className="bg-destructive/10 text-destructive border-none uppercase text-[10px] font-black px-3 py-1 flex items-center gap-1"><XCircle size={12} /> Annulé</Badge>;
@@ -266,7 +267,7 @@ export default function OrdersPage() {
 
                                     <div className="flex items-center gap-6">
                                         <div className="text-right">
-                                            <p className="text-[10px] font-black uppercase text-muted-foreground mb-1">Mode: {order.paymentMethod?.replace('_', ' ')}</p>
+                                            <p className="text-[10px] font-black uppercase text-muted-foreground mb-1">Mode: {order.paymentMethod === 'PI_NETWORK' ? 'Crypto-monnaie' : order.paymentMethod?.replace('_', ' ')}</p>
                                             <p className="text-2xl font-black text-accent">${(order.total || 0).toFixed(2)}</p>
                                         </div>
 
@@ -347,10 +348,10 @@ export default function OrdersPage() {
                         <div className="space-y-4">
                             <h3 className="text-[10px] font-black uppercase text-gray-400 border-b pb-2 tracking-widest">Paiement</h3>
                             <div className="space-y-1">
-                                <p className="text-sm font-bold">Mode : <span className="uppercase">{selectedOrderForPDF.paymentMethod?.replace('_', ' ')}</span></p>
+                                <p className="text-sm font-bold">Mode : <span className="uppercase">{selectedOrderForPDF.paymentMethod === 'PI_NETWORK' ? 'Crypto-monnaie' : selectedOrderForPDF.paymentMethod?.replace('_', ' ')}</span></p>
                                 <p className="text-sm font-bold">Statut : <span className="uppercase text-green-600">{selectedOrderForPDF.status}</span></p>
                                 {selectedOrderForPDF.piValue && (
-                                    <p className="text-xs font-medium text-orange-600 mt-2">Transaction Pi validée blockchain</p>
+                                    <p className="text-xs font-medium text-orange-600 mt-2">Transaction Crypto validée blockchain</p>
                                 )}
                             </div>
                         </div>
@@ -403,7 +404,7 @@ export default function OrdersPage() {
                             </div>
                             {selectedOrderForPDF.piValue && (
                                 <div className="bg-orange-50 p-4 rounded-xl flex justify-between items-center border border-orange-100">
-                                    <span className="text-[10px] font-black text-orange-800 uppercase">Valeur Pi (GCV)</span>
+                                    <span className="text-[10px] font-black text-orange-800 uppercase">Valeur Crypto (GCV)</span>
                                     <span className="text-sm font-black text-orange-800">{selectedOrderForPDF.piValue.toFixed(8)} π</span>
                                 </div>
                             )}

@@ -90,7 +90,7 @@ export default function PublicShop() {
           </div>
           <div className="flex items-center gap-4 text-xs text-muted-foreground bg-white/5 px-4 py-2 rounded-full border border-white/10 overflow-x-auto max-w-full">
             <span className="whitespace-nowrap">Modes acceptés :</span>
-            <div className="flex items-center gap-1 whitespace-nowrap"><Coins size={14} className="text-accent"/> Pi Network</div>
+            <div className="flex items-center gap-1 whitespace-nowrap"><Coins size={14} className="text-accent"/> Crypto (Pi, DKST)</div>
             <div className="flex items-center gap-1 whitespace-nowrap"><Smartphone size={14} className="text-accent"/> Mobile Money</div>
             <div className="flex items-center gap-1 whitespace-nowrap"><Banknote size={14} className="text-accent"/> Cash</div>
           </div>
@@ -138,7 +138,7 @@ export default function PublicShop() {
                 <CardFooter className="pt-0 flex items-center justify-between">
                   <div className="flex flex-col">
                     <span className="text-2xl font-black text-white">${product.sellingPrice.toFixed(2)}</span>
-                    <span className="text-[10px] text-accent font-bold uppercase tracking-tighter">Paiement Pi Dispo</span>
+                    <span className="text-[10px] text-accent font-bold uppercase tracking-tighter">Paiement Crypto Dispo</span>
                   </div>
                   <Button 
                     className="bg-primary hover:bg-primary/90 neon-glow"

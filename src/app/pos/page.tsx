@@ -42,6 +42,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
@@ -585,7 +586,7 @@ function POS() {
                   onClick={() => setPaymentMode("PI_NETWORK")}
                 >
                   <Coins size={18} />
-                  <span className="text-[9px] font-black uppercase tracking-tighter">Pi Network</span>
+                  <span className="text-[9px] font-black uppercase tracking-tighter">Crypto-monnaie</span>
                 </Button>
               </div>
 
@@ -630,12 +631,12 @@ function POS() {
             <div className="w-full p-6 rounded-3xl bg-white/5 border border-white/10 flex flex-col gap-6">
               <div className="flex justify-between items-center">
                 <span className="font-bold uppercase text-xs">Mode de paiement sélectionné</span>
-                <Badge className="bg-accent/20 text-accent font-black border-none px-4 py-1">{paymentMode.replace('_', ' ')}</Badge>
+                <Badge className="bg-accent/20 text-accent font-black border-none px-4 py-1">{paymentMode === 'PI_NETWORK' ? 'Crypto-monnaie' : paymentMode.replace('_', ' ')}</Badge>
               </div>
               {paymentMode === "PI_NETWORK" && (
                 <div className="flex flex-col items-center p-6 bg-black/40 rounded-2xl border border-dashed border-white/20">
                   <QrCode size={120} className="text-white" />
-                  <p className="text-[10px] mt-4 font-black uppercase tracking-widest text-muted-foreground">Scanner via Pi Browser</p>
+                  <p className="text-[10px] mt-4 font-black uppercase tracking-widest text-muted-foreground text-center">Payer avec Pi Network ou DKST</p>
                 </div>
               )}
             </div>
@@ -721,7 +722,7 @@ function POS() {
               </div>
               <div className="flex justify-between mt-2 pt-2 border-t border-gray-100 italic font-black">
                 <span>RÈGLEMENT :</span>
-                <span>{lastTransaction?.mode.replace('_', ' ')}</span>
+                <span>{lastTransaction?.mode === 'PI_NETWORK' ? 'Crypto-monnaie (Pi/DKST)' : lastTransaction?.mode.replace('_', ' ')}</span>
               </div>
             </div>
 
