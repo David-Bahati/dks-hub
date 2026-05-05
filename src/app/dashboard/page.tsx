@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useEffect, useState, useMemo, useRef } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import Link from "next/link";
 import { usePathname } from 'next/navigation';
 import {
@@ -68,7 +68,8 @@ import {
   Activity,
   Vote,
   Scale,
-  Building2
+  Building2,
+  Timer
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -113,8 +114,6 @@ import {
   Bar
 } from 'recharts';
 import { Progress } from "@/components/ui/progress";
-import html2canvas from 'html2canvas';
-import { jsPDF } from 'jspdf';
 
 const TOTAL_COMMUNITY_SUPPLY = 32500000;
 
@@ -163,15 +162,12 @@ function DashboardPage() {
   const [stats, setStats] = useState<any>(null);
   const [lowStock, setLowStock] = useState<Product[]>([]);
   const [chartData, setChartData] = useState<any[]>([]);
-  const [poolImpactChart, setPoolImpactChart] = useState<any[]>([]);
-  const [totalPoolGifted, setTotalPoolGifted] = useState(0);
   
   // Mining States
   const [isMining, setIsMining] = useState(false);
   const [miningTimeLeft, setMiningTimeLeft] = useState<string | null>(null);
 
   const isStaff = user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'seller' || user?.role?.toLowerCase() === 'cashier';
-  const isAdmin = user?.role?.toLowerCase() === 'admin';
 
   const filteredNavLinks = navConfig.filter(link => {
       const roles = link.roles.map(r => r.toLowerCase());
@@ -198,7 +194,14 @@ function DashboardPage() {
     const remaining = Math.max(0, TOTAL_COMMUNITY_SUPPLY - minted);
     const depletedPct = (minted / TOTAL_COMMUNITY_SUPPLY) * 100;
     
-    return { count, totalPower, luckMultiplier, remaining, depletedPct };
+    // Halving Logic
+    let halvingFactor = 1;
+    let halvingLevel = 0;
+    if (minted > 24000000) { halvingFactor = 0.125; halvingLevel = 3; }
+    else if (minted > 16000000) { halvingFactor = 0.25; halvingLevel = 2; }
+    else if (minted > 8000000) { halvingFactor = 0.5; halvingLevel = 1; }
+
+    return { count, totalPower, luckMultiplier, remaining, depletedPct, halvingFactor, halvingLevel };
   }, [activeMiners, treasury]);
 
   // General Dashboard Data
@@ -206,17 +209,14 @@ function DashboardPage() {
     const fetchData = async () => {
         setLoading(true);
         try {
-          const [dashboardStats, lowStockItems, revenueData, poolImpact] = await Promise.all([
+          const [dashboardStats, lowStockItems, revenueData] = await Promise.all([
             getDashboardStats(),
             getLowStockItems(),
-            getRevenueChartData(),
-            getPoolImpactData()
+            getRevenueChartData()
           ]);
           setStats(dashboardStats);
           setLowStock(lowStockItems);
           setChartData(revenueData);
-          setPoolImpactChart(poolImpact.chartData);
-          setTotalPoolGifted(poolImpact.totalDistributed);
         } catch (e) { console.error(e); } finally { setLoading(false); }
     };
     fetchData();
@@ -252,29 +252,31 @@ function DashboardPage() {
         else if (random < 0.20 * poolStats.luckMultiplier) { rarity = 'rare'; multiplier = 2; }
 
         const baseReward = user.loyaltyLevel === 'Gold' ? 0.5 : user.loyaltyLevel === 'Silver' ? 0.2 : 0.1;
-        const reward = Math.min(poolStats.remaining, baseReward * multiplier);
+        
+        // Appliquer le facteur de Halving
+        const finalReward = Math.min(poolStats.remaining, baseReward * multiplier * poolStats.halvingFactor);
 
         await updateDoc(doc(db, "users", user.uid), {
             lastMiningAt: serverTimestamp(),
             lastActivityAt: serverTimestamp(),
-            tokenBalance: increment(reward),
+            tokenBalance: increment(finalReward),
             miningPower: increment(0.1),
             lastBlockRarity: rarity,
             updatedAt: serverTimestamp()
         });
 
         await updateDoc(doc(db, "system", "treasury"), {
-            totalMinted: increment(reward),
+            totalMinted: increment(finalReward),
             updatedAt: serverTimestamp()
         });
 
         await addDoc(collection(db, "tokenTransactions"), {
             userId: user.uid, userName: user.name, type: 'mining',
-            tokenAmount: reward, rarity: rarity, createdAt: serverTimestamp(),
-            memo: `Mining Pool DKS - Bloc ${rarity.toUpperCase()}`
+            tokenAmount: finalReward, rarity: rarity, createdAt: serverTimestamp(),
+            memo: `Mining Pool DKS - Bloc ${rarity.toUpperCase()} (Halving: x${poolStats.halvingFactor})`
         });
 
-        toast({ title: `Minage réussi !`, description: `+${reward.toFixed(2)} DKST extraits de la pool communautaire.` });
+        toast({ title: `Minage réussi !`, description: `+${finalReward.toFixed(4)} DKST extraits. Prochain Halving à 8M.` });
     } catch (e) { toast({ title: "Erreur Minage", variant: "destructive" }); } finally { setIsMining(false); }
   };
 
@@ -315,6 +317,10 @@ function DashboardPage() {
                               <h2 className="text-3xl font-black uppercase italic tracking-tighter">MINAGE <span className="text-accent">D'ÉLITE</span></h2>
                               <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Extraire du stock de 32.5M DKST</p>
                           </div>
+                          <div className="bg-white/5 border border-white/10 p-3 rounded-2xl text-center">
+                              <p className="text-[8px] font-black uppercase text-accent mb-1">Rareté Multiplier</p>
+                              <p className="text-xl font-black text-white italic">x{poolStats.halvingFactor}</p>
+                          </div>
                       </div>
 
                       <div className="p-8 bg-black/60 backdrop-blur-3xl rounded-[2.5rem] border border-white/5 flex flex-col items-center gap-8 shadow-inner">
@@ -331,12 +337,15 @@ function DashboardPage() {
                               <div className="text-center space-y-6">
                                   <div className="space-y-2">
                                       <p className="text-4xl font-black text-white uppercase italic tracking-tighter leading-none">PRÊT À <br /><span className="text-accent">EXTRAIRE</span></p>
-                                      <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest italic">Récompense max : {user?.loyaltyLevel === 'Gold' ? '0.50' : '0.10'} DKST</p>
+                                      <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest italic">Base : {(user?.loyaltyLevel === 'Gold' ? 0.5 : 0.1) * poolStats.halvingFactor} DKST</p>
                                   </div>
                                   <Button onClick={handleStartMining} disabled={isMining || poolStats.remaining <= 0} className="h-20 px-12 rounded-[2rem] bg-accent text-black font-black uppercase italic text-xl shadow-[0_0_50px_rgba(56,189,248,0.4)] hover:scale-105 active:scale-95 transition-all gap-4">
                                       {isMining ? <Loader2 className="animate-spin" /> : <><Flame size={28} /> Lancer le Cycle</>}
                                   </Button>
-                                  <p className="text-[8px] font-black uppercase tracking-widest text-white/20">Blocs restants dans la pool : {poolStats.remaining.toFixed(0)} DKST</p>
+                                  <div className="flex items-center gap-3">
+                                      <Timer size={14} className="text-accent/40" />
+                                      <p className="text-[8px] font-black uppercase tracking-widest text-white/20">Prochaine réduction à 8,000,000 extraits</p>
+                                  </div>
                               </div>
                           )}
                       </div>
@@ -350,23 +359,23 @@ function DashboardPage() {
                           <div className="flex items-center gap-6">
                               <div className="w-16 h-16 rounded-3xl bg-primary/20 flex items-center justify-center text-primary shadow-[0_0_20px_rgba(59,130,246,0.3)]"><Users size={32} /></div>
                               <div>
-                                  <h3 className="text-2xl font-black uppercase italic tracking-tight text-white">Hub Global <span className="text-primary">Supply</span></h3>
-                                  <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Indice de Rareté & Distribution</p>
+                                  <h3 className="text-2xl font-black uppercase italic tracking-tight text-white">Halving <span className="text-primary">Progress</span></h3>
+                                  <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Niveau de Difficulté: {poolStats.halvingLevel + 1}</p>
                               </div>
                           </div>
                           <div className="flex items-center gap-10">
                               <div className="text-center">
                                   <p className="text-3xl font-black text-white italic">{poolStats.depletedPct.toFixed(2)}%</p>
-                                  <p className="text-[8px] font-black uppercase text-muted-foreground">Minted Supply</p>
+                                  <p className="text-[8px] font-black uppercase text-muted-foreground">Extraits de la Pool</p>
                               </div>
                               <div className="bg-primary/10 border border-primary/20 px-5 py-3 rounded-2xl text-center">
-                                  <p className="text-[8px] font-black uppercase text-primary mb-1">Cap Total</p>
-                                  <p className="text-xl font-black text-primary italic">50.0M</p>
+                                  <p className="text-[8px] font-black uppercase text-primary mb-1">Cap Phase</p>
+                                  <p className="text-xl font-black text-primary italic">8.0M</p>
                               </div>
                           </div>
                       </div>
                       <div className="mt-8 space-y-2">
-                          <div className="flex justify-between text-[8px] font-black uppercase text-white/40 tracking-widest px-1"><span>Progression Distribution Totale</span><span>{(treasury?.totalMinted || 0).toLocaleString()} / 50,000,000</span></div>
+                          <div className="flex justify-between text-[8px] font-black uppercase text-white/40 tracking-widest px-1"><span>Épuisement Pool Communautaire</span><span>{(treasury?.totalMinted || 0).toLocaleString()} / 32,500,000</span></div>
                           <Progress value={poolStats.depletedPct} className="h-1.5 bg-white/5" indicatorClassName="bg-primary" />
                       </div>
                   </Card>

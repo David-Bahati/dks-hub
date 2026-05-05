@@ -31,7 +31,9 @@ import {
     ArrowUpCircle,
     DollarSign,
     HeartPulse,
-    LayoutDashboard
+    LayoutDashboard,
+    Flame,
+    ArrowDownCircle
 } from "lucide-react";
 import { db } from '@/lib/firebase';
 import { collection, query, orderBy, limit, addDoc, serverTimestamp, doc, updateDoc, increment, getDocs, where, Timestamp } from 'firebase/firestore';
@@ -59,6 +61,13 @@ const DISTRIBUTION = {
     team: 0.15, // 15% - 7.5M
     members: 0.65 // 65% - 32.5M
 };
+
+const HALVING_STEPS = [
+    { label: "Phase 1", limit: 8000000, reward: "100%", multiplier: "x1.0" },
+    { label: "Phase 2", limit: 16000000, reward: "50%", multiplier: "x0.5" },
+    { label: "Phase 3", limit: 24000000, reward: "25%", multiplier: "x0.25" },
+    { label: "Phase 4", limit: 32500000, reward: "12.5%", multiplier: "x0.125" },
+];
 
 function TokenEconomyPage() {
     const { user } = useAuth();
@@ -316,20 +325,36 @@ function TokenEconomyPage() {
                                 </div>
                             </Card>
 
-                            <div className="lg:col-span-7 grid grid-cols-1 md:grid-cols-2 gap-8">
-                                <Card className="glossy-card border-none rounded-[2.5rem] p-10 space-y-6">
-                                    <div className="w-14 h-14 rounded-2xl bg-accent/10 flex items-center justify-center text-accent"><Users size={28}/></div>
-                                    <div>
-                                        <h4 className="text-xl font-black uppercase italic tracking-tight">Community Mining</h4>
-                                        <p className="text-xs text-muted-foreground mt-1 uppercase font-bold tracking-widest">Basé sur le nombre de membres</p>
-                                    </div>
-                                    <div className="pt-6 space-y-4">
-                                        <div className="flex justify-between items-end">
-                                            <p className="text-[9px] font-black uppercase text-white/40">Épuisement de la Pool</p>
-                                            <span className="text-lg font-black text-white">{economyStats.communityPct.toFixed(1)}%</span>
+                            <div className="lg:col-span-7 space-y-8">
+                                <Card className="glossy-card border-none rounded-[2.5rem] p-10 space-y-8 relative overflow-hidden">
+                                    <div className="absolute top-0 right-0 p-6 opacity-5"><Flame size={100} className="text-orange-500" /></div>
+                                    <div className="relative z-10 space-y-6">
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-14 h-14 rounded-2xl bg-orange-500/10 flex items-center justify-center text-orange-500"><ArrowDownCircle size={28}/></div>
+                                            <h4 className="text-xl font-black uppercase italic tracking-tight">Cycle de Halving</h4>
                                         </div>
-                                        <Progress value={economyStats.communityPct} className="h-1.5 bg-white/5" indicatorClassName="bg-accent" />
-                                        <p className="text-[10px] leading-relaxed text-muted-foreground italic">"La difficulté de minage augmente à mesure que les membres extraient les 32.5M de jetons réservés à la communauté."</p>
+                                        <p className="text-xs text-muted-foreground leading-relaxed italic">
+                                            "Pour garantir la rareté, les récompenses de minage diminuent par paliers de 8,000,000 DKST extraits de la pool communautaire."
+                                        </p>
+                                        <div className="grid grid-cols-1 gap-3">
+                                            {HALVING_STEPS.map((step, idx) => (
+                                                <div key={idx} className={cn(
+                                                    "p-5 rounded-2xl border flex items-center justify-between transition-all",
+                                                    (economyStats.totalMinted >= step.limit - 8000000 && economyStats.totalMinted < step.limit) 
+                                                        ? "bg-orange-500/10 border-orange-500/30 text-white" 
+                                                        : economyStats.totalMinted >= step.limit ? "bg-white/5 border-white/5 opacity-40" : "bg-white/5 border-white/5 opacity-80"
+                                                )}>
+                                                    <div className="flex items-center gap-4">
+                                                        <span className="text-[10px] font-black uppercase tracking-widest">{step.label}</span>
+                                                        <span className="text-[8px] font-bold opacity-40">CAP: {(step.limit/1000000).toFixed(1)}M</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-3">
+                                                        <Badge variant="outline" className="border-orange-500/20 text-orange-400 font-black text-[9px] uppercase">{step.reward} REWARD</Badge>
+                                                        <span className="text-xs font-black italic">{step.multiplier}</span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
                                     </div>
                                 </Card>
 
@@ -432,7 +457,7 @@ function TokenEconomyPage() {
                                                     <span className="text-[10px] font-bold uppercase text-white/60">{tx.userName || tx.senderName}</span>
                                                 </td>
                                                 <td className="p-6">
-                                                    <span className="text-lg font-black text-white">{tx.tokenAmount} <span className="text-[10px] opacity-40">DKST</span></span>
+                                                    <span className="text-lg font-black text-white">{tx.tokenAmount.toFixed(4)} <span className="text-[10px] opacity-40">DKST</span></span>
                                                 </td>
                                                 <td className="p-6 text-right text-green-400 text-[10px] font-black uppercase">Confirmed</td>
                                             </tr>
