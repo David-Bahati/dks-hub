@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { Loader2, ShoppingBag, CreditCard, Banknote, ShieldCheck, Coins, Zap, Globe } from "lucide-react";
+import { Loader2, ShoppingBag, CreditCard, Banknote, ShieldCheck, Coins, Zap, Globe, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type CryptoOption = 'pi' | 'dkst';
