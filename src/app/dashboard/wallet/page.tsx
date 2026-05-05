@@ -187,7 +187,7 @@ function UniversalWalletPage() {
     const { data: topWealthyUsers, isLoading: loadingWealth } = useCollection(topWealthQuery);
 
     const stats = useMemo(() => {
-        if (!user) return { totalPoints: 0, redeemableTokens: 0, progress: 0, availablePoints: 0, stakingRewards: 0, income: 0, expense: 0, apr: 5, gcvUSD: 0, totalTokens: 0, wealthHistory: [] };
+        if (!user) return { totalPoints: 0, redeemableTokens: 0, progress: 0, availablePoints: 0, stakingRewards: 0, income: 0, expense: 0, apr: 5, gcvUSD: 0, totalTokens: 0, wealthHistory: [], nextDividend: 0 };
 
         // 1. Points Calculation
         let total = 0;
@@ -222,7 +222,7 @@ function UniversalWalletPage() {
         const wealthHistory: any[] = [];
 
         transactions?.forEach((tx, idx) => {
-            const isIncoming = tx.type === 'mint' || tx.type === 'mining' || tx.type === 'unstaking' || (tx.type === 'transfer' && tx.direction === 'received');
+            const isIncoming = tx.type === 'mint' || tx.type === 'mining' || tx.type === 'unstaking' || tx.type === 'dividend' || (tx.type === 'transfer' && tx.direction === 'received');
             
             if (isIncoming) {
                 income += tx.tokenAmount;
@@ -243,6 +243,9 @@ function UniversalWalletPage() {
         const totalTokens = (user.tokenBalance || 0) + (user.stakedBalance || 0) + rewards;
         const gcvUSD = totalTokens * GCV_VALUE;
 
+        // Estimated Weekly Dividend (0.5% of current balance)
+        const nextDividend = totalTokens * 0.005;
+
         return { 
             totalPoints: total, 
             availablePoints, 
@@ -254,6 +257,7 @@ function UniversalWalletPage() {
             apr,
             gcvUSD,
             totalTokens,
+            nextDividend,
             wealthHistory: wealthHistory.slice(-15) 
         };
     }, [user, logs, orders, isStaff, transactions]);
@@ -540,18 +544,22 @@ function UniversalWalletPage() {
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-6">
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 pt-6">
                                 <div className="p-5 bg-white/5 rounded-2xl border border-white/5 flex flex-col justify-center">
                                     <p className="text-[9px] font-black uppercase text-white/40 mb-1">Liquidité</p>
-                                    <p className="text-xl font-black text-white">{user?.tokenBalance?.toFixed(2)} DKST</p>
+                                    <p className="text-xl font-black text-white">{user?.tokenBalance?.toFixed(2)}</p>
                                 </div>
                                 <div className="p-5 bg-white/5 rounded-2xl border border-white/5 flex flex-col justify-center">
                                     <p className="text-[9px] font-black uppercase text-white/40 mb-1">Épargne Vault</p>
-                                    <p className="text-xl font-black text-primary">{user?.stakedBalance?.toFixed(2)} DKST</p>
+                                    <p className="text-xl font-black text-primary">{user?.stakedBalance?.toFixed(2)}</p>
                                 </div>
                                 <div className="p-5 bg-white/5 rounded-2xl border border-white/5 flex flex-col justify-center">
-                                    <p className="text-[9px] font-black uppercase text-white/40 mb-1">Récompenses</p>
+                                    <p className="text-[9px] font-black uppercase text-white/40 mb-1">Staking Live</p>
                                     <p className="text-xl font-black text-green-400">+{stats.stakingRewards.toFixed(4)}</p>
+                                </div>
+                                <div className="p-5 bg-yellow-500/5 rounded-2xl border border-yellow-500/10 flex flex-col justify-center">
+                                    <p className="text-[9px] font-black uppercase text-yellow-500/60 mb-1">Dividendes (Est.)</p>
+                                    <p className="text-xl font-black text-yellow-500">+{stats.nextDividend.toFixed(4)}</p>
                                 </div>
                             </div>
                         </div>
@@ -770,8 +778,8 @@ function UniversalWalletPage() {
                                                 <div className="space-y-2 mt-2 max-h-[150px] overflow-y-auto custom-scrollbar">
                                                     {isSearching ? <div className="p-4 text-center"><Loader2 className="animate-spin h-5 w-5 mx-auto" /></div> : searchResults.map(u => (
                                                         <button key={u.id} onClick={() => { setHeritageRecipient(u); setSearchQuery(""); }} className="flex items-center gap-4 p-3 w-full rounded-xl bg-white/5 border border-white/5 hover:bg-accent/5">
-                                                            <div className="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center font-black text-accent text-xs">{u.name?.substring(0, 1)}</div>
-                                                            <div className="flex-1 text-left"><p className="font-bold text-[10px] uppercase truncate">{u.name}</p></div>
+                                                            <div className="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center font-black text-accent text-xs">{(u.name || u.displayName)?.substring(0, 1)}</div>
+                                                            <div className="flex-1 text-left"><p className="font-bold text-[10px] uppercase truncate">{u.name || u.displayName}</p></div>
                                                         </button>
                                                     ))}
                                                 </div>
@@ -781,7 +789,7 @@ function UniversalWalletPage() {
                                             <div className="p-4 bg-accent/10 border border-accent/20 rounded-2xl flex justify-between items-center animate-in zoom-in-95">
                                                 <div className="flex items-center gap-3">
                                                     <UserCheck size={16} className="text-accent" />
-                                                    <span className="text-xs font-black uppercase">{heritageRecipient.name}</span>
+                                                    <span className="text-xs font-black uppercase">{heritageRecipient.name || heritageRecipient.displayName}</span>
                                                 </div>
                                                 <Button variant="ghost" size="icon" onClick={() => setHeritageRecipient(null)} className="h-6 w-6"><X size={14}/></Button>
                                             </div>
@@ -931,8 +939,8 @@ function UniversalWalletPage() {
                                     <div className="space-y-2 max-h-[350px] overflow-y-auto pr-2 custom-scrollbar">
                                         {isSearching ? <div className="py-10 text-center"><Loader2 className="animate-spin text-accent mx-auto h-8 w-8" /></div> : searchResults.length > 0 ? searchResults.map((u) => (
                                             <button key={u.id} onClick={() => { setSelectedRecipient(u); setSearchQuery(""); }} className="flex items-center gap-4 p-5 w-full rounded-2xl bg-white/5 border border-white/5 hover:bg-accent/5 hover:border-accent/20 transition-all text-left">
-                                                <div className="w-12 h-12 rounded-xl bg-accent/10 flex items-center justify-center font-black text-accent text-lg italic">{u.name?.substring(0, 1)}</div>
-                                                <div className="flex-1 overflow-hidden"><p className="font-black text-sm uppercase italic truncate">{u.name}</p><p className="text-[10px] opacity-40 truncate">{u.email}</p></div>
+                                                <div className="w-12 h-12 rounded-xl bg-accent/10 flex items-center justify-center font-black text-accent text-lg italic">{(u.name || u.displayName)?.substring(0, 1)}</div>
+                                                <div className="flex-1 overflow-hidden"><p className="font-black text-sm uppercase italic truncate">{u.name || u.displayName}</p><p className="text-[10px] opacity-40 truncate">{u.email}</p></div>
                                             </button>
                                         )) : <p className="text-center py-10 text-[10px] font-black uppercase opacity-30 italic">Aucun résultat trouvé</p>}
                                     </div>
@@ -942,8 +950,8 @@ function UniversalWalletPage() {
                             <form onSubmit={(e) => { e.preventDefault(); secureAction(handleTransferProcess); }} className="space-y-10 animate-in slide-in-from-right-4 duration-300">
                                 <div className="p-6 bg-accent/5 border border-accent/20 rounded-[2.5rem] flex items-center justify-between">
                                     <div className="flex items-center gap-5">
-                                        <div className="w-14 h-14 rounded-2xl bg-accent text-black flex items-center justify-center font-black text-xl italic shadow-lg shadow-accent/20">{selectedRecipient.name?.substring(0, 1)}</div>
-                                        <div><p className="text-[9px] font-black text-accent uppercase tracking-widest">Envoi vers</p><p className="text-lg font-black uppercase italic text-white leading-none mt-1">{selectedRecipient.name}</p></div>
+                                        <div className="w-14 h-14 rounded-2xl bg-accent text-black flex items-center justify-center font-black text-xl italic shadow-lg shadow-accent/20">{(selectedRecipient.name || selectedRecipient.displayName)?.substring(0, 1)}</div>
+                                        <div><p className="text-[9px] font-black text-accent uppercase tracking-widest">Envoi vers</p><p className="text-lg font-black uppercase italic text-white leading-none mt-1">{selectedRecipient.name || selectedRecipient.displayName}</p></div>
                                     </div>
                                     <Button variant="ghost" size="icon" onClick={() => setSelectedRecipient(null)} className="h-10 w-10 rounded-full hover:bg-white/5 text-white/40"><X size={20}/></Button>
                                 </div>
@@ -985,4 +993,3 @@ function UniversalWalletPage() {
 }
 
 export default withAuth(UniversalWalletPage);
-

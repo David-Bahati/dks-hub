@@ -37,7 +37,7 @@ export type TokenTransaction = {
   id: string;
   userId: string;
   userName?: string;
-  type: 'mint' | 'burn' | 'transfer' | 'mining' | 'staking' | 'unstaking' | 'exchange' | 'heritage';
+  type: 'mint' | 'burn' | 'transfer' | 'mining' | 'staking' | 'unstaking' | 'exchange' | 'heritage' | 'dividend';
   pointsAmount?: number;
   tokenAmount: number;
   piTxId?: string;

@@ -22,10 +22,13 @@ import {
     TrendingUp,
     Briefcase,
     Plus,
-    X
+    X,
+    Banknote,
+    BadgeCheck,
+    AlertCircle
 } from "lucide-react";
 import { db } from '@/lib/firebase';
-import { collection, query, orderBy, limit, addDoc, serverTimestamp, doc, updateDoc, increment, onSnapshot, where } from 'firebase/firestore';
+import { collection, query, orderBy, limit, addDoc, serverTimestamp, doc, updateDoc, increment, getDocs, where, Timestamp } from 'firebase/firestore';
 import withAuth from '@/components/auth/withAuth';
 import Link from 'next/link';
 import { useCollection, useMemoFirebase } from '@/firebase';
@@ -47,6 +50,7 @@ function TokenEconomyPage() {
     const { toast } = useToast();
     const [isTransferSheetOpen, setIsTransferSheetOpen] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
+    const [isDistributingDividends, setIsDistributingDividends] = useState(false);
     const [search, setSearch] = useState("");
     const [recipientId, setRecipientId] = useState("");
     const [transferAmount, setTransferAmount] = useState("");
@@ -58,11 +62,9 @@ function TokenEconomyPage() {
     }, []);
     const { data: transactions, isLoading: loadingTx } = useCollection(transactionsQuery);
 
-    // Fetch All Staff for Transfer
-    const staffQuery = useMemoFirebase(() => {
-        return query(collection(db, "users"), where("role", "in", ["Admin", "Seller", "Cashier", "admin", "seller", "cashier"]));
-    }, []);
-    const { data: staff } = useCollection(staffQuery);
+    // Fetch All Users for Transfer and Dividends
+    const allUsersQuery = useMemoFirebase(() => collection(db, "users"), []);
+    const { data: allUsers } = useCollection(allUsersQuery);
 
     const economyStats = useMemo(() => {
         if (!transactions) return { totalMinted: 0, totalTransferred: 0, txCount: 0 };
@@ -71,7 +73,7 @@ function TokenEconomyPage() {
         let transferred = 0;
         
         transactions.forEach(tx => {
-            if (tx.type === 'mint') minted += tx.tokenAmount;
+            if (tx.type === 'mint' || tx.type === 'mining' || tx.type === 'dividend') minted += tx.tokenAmount;
             if (tx.type === 'transfer') transferred += tx.tokenAmount;
         });
 
@@ -92,26 +94,23 @@ function TokenEconomyPage() {
             return;
         }
 
-        const recipient = staff?.find(s => s.id === recipientId);
+        const recipient = allUsers?.find(s => s.id === recipientId);
         if (!recipient) return;
 
         setIsProcessing(true);
         try {
             const piTxId = `PI-P2P-${Math.random().toString(36).substring(2, 12).toUpperCase()}`;
 
-            // 1. Debit sender
             await updateDoc(doc(db, "users", user.uid), {
                 tokenBalance: increment(-amount),
                 updatedAt: serverTimestamp()
             });
 
-            // 2. Credit recipient
             await updateDoc(doc(db, "users", recipient.id), {
                 tokenBalance: increment(amount),
                 updatedAt: serverTimestamp()
             });
 
-            // 3. Log transaction
             await addDoc(collection(db, "tokenTransactions"), {
                 userId: user.uid,
                 userName: user.name,
@@ -119,6 +118,7 @@ function TokenEconomyPage() {
                 tokenAmount: amount,
                 senderId: user.uid,
                 senderName: user.name,
+                direction: 'sent',
                 recipientId: recipient.id,
                 recipientName: recipient.name || recipient.displayName,
                 memo: transferMemo,
@@ -126,7 +126,19 @@ function TokenEconomyPage() {
                 createdAt: serverTimestamp()
             });
 
-            // 4. Notify recipient
+            await addDoc(collection(db, "tokenTransactions"), {
+                userId: recipient.id,
+                userName: recipient.name || recipient.displayName,
+                type: 'transfer',
+                tokenAmount: amount,
+                direction: 'received',
+                senderId: user.uid,
+                senderName: user.name,
+                memo: transferMemo,
+                piTxId: piTxId,
+                createdAt: serverTimestamp()
+            });
+
             await addDoc(collection(db, "notifications"), {
                 userId: recipient.id,
                 title: "DKST Reçu !",
@@ -149,9 +161,71 @@ function TokenEconomyPage() {
         }
     };
 
+    const handleDistributeDividends = async () => {
+        if (!user || user.role?.toLowerCase() !== 'admin') return;
+        if (!window.confirm("Lancer la distribution hebdomadaire des dividendes (0.5% PIB Hub) ?")) return;
+
+        setIsDistributingDividends(true);
+        try {
+            const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+            const activeUsers = allUsers?.filter(u => {
+                const lastActive = u.lastActivityAt?.toDate ? u.lastActivityAt.toDate() : new Date(u.lastActivityAt || u.createdAt);
+                return lastActive >= sevenDaysAgo && ((u.tokenBalance || 0) + (u.stakedBalance || 0) > 0);
+            });
+
+            if (!activeUsers || activeUsers.length === 0) {
+                toast({ title: "Aucun utilisateur actif", description: "Attendez plus d'activité dans le Hub." });
+                return;
+            }
+
+            const dividendRate = 0.005; // 0.5% performance
+            const batchPromises = activeUsers.map(async (u) => {
+                const totalWealth = (u.tokenBalance || 0) + (u.stakedBalance || 0);
+                const dividendAmount = parseFloat((totalWealth * dividendRate).toFixed(6));
+
+                if (dividendAmount <= 0) return;
+
+                const piTxId = `DIVIDEND-${u.id.substring(0, 4)}-${Date.now()}`;
+
+                await updateDoc(doc(db, "users", u.id), {
+                    tokenBalance: increment(dividendAmount),
+                    updatedAt: serverTimestamp()
+                });
+
+                await addDoc(collection(db, "tokenTransactions"), {
+                    userId: u.id,
+                    userName: u.name || u.displayName,
+                    type: 'dividend',
+                    tokenAmount: dividendAmount,
+                    memo: `Dividende Hebdomadaire (0.5% PIB Hub)`,
+                    piTxId: piTxId,
+                    createdAt: serverTimestamp()
+                });
+
+                await addDoc(collection(db, "notifications"), {
+                    userId: u.id,
+                    title: "Dividendes Versés !",
+                    message: `Le Hub a généré de la croissance. Vous recevez ${dividendAmount} DKST.`,
+                    type: 'success',
+                    isRead: false,
+                    createdAt: serverTimestamp(),
+                    link: '/dashboard/wallet'
+                });
+            });
+
+            await Promise.all(batchPromises);
+            toast({ title: "Dividendes distribués !", description: `${activeUsers.length} membres ont été crédités.` });
+        } catch (error) {
+            toast({ title: "Erreur distribution", variant: "destructive" });
+        } finally {
+            setIsDistributingDividends(false);
+        }
+    };
+
     const filteredTransactions = transactions?.filter(tx => 
         tx.senderName?.toLowerCase().includes(search.toLowerCase()) || 
         tx.recipientName?.toLowerCase().includes(search.toLowerCase()) ||
+        tx.userName?.toLowerCase().includes(search.toLowerCase()) ||
         tx.piTxId?.toLowerCase().includes(search.toLowerCase())
     );
 
@@ -162,7 +236,7 @@ function TokenEconomyPage() {
                 <div className="flex flex-col md:flex-row justify-between items-start gap-8 mb-12">
                     <div className="flex items-start gap-5">
                         <Link href="/dashboard">
-                            <Button variant="outline" className="h-14 w-14 rounded-2xl border-white/10 hover:bg-accent/10 hover:text-accent p-0">
+                            <Button variant="outline" className="h-14 w-14 rounded-2xl border-white/10 hover:bg-accent/10 hover:text-accent p-0 transition-all">
                                 <ArrowLeft size={24} />
                             </Button>
                         </Link>
@@ -173,6 +247,15 @@ function TokenEconomyPage() {
                     </div>
 
                     <div className="flex gap-3">
+                        {user?.role?.toLowerCase() === 'admin' && (
+                            <Button 
+                                onClick={handleDistributeDividends} 
+                                disabled={isDistributingDividends}
+                                className="bg-primary text-white hover:bg-primary/90 h-14 px-8 rounded-2xl font-black uppercase italic gap-3 shadow-xl shadow-primary/20"
+                            >
+                                {isDistributingDividends ? <Loader2 className="animate-spin" /> : <><Banknote size={20} /> Verser Dividendes</>}
+                            </Button>
+                        )}
                         <Button 
                             onClick={() => setIsTransferSheetOpen(true)}
                             className="bg-accent text-black hover:bg-accent/90 h-14 px-8 rounded-2xl font-black uppercase italic gap-3 shadow-xl shadow-accent/20"
@@ -182,9 +265,8 @@ function TokenEconomyPage() {
                     </div>
                 </div>
 
-                {/* STATS OVERVIEW */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-                    <Card className="glossy-card border-none rounded-[2.5rem] p-8 space-y-4">
+                    <Card className="glossy-card border-none rounded-[2.5rem] p-8 space-y-4 border-l-4 border-l-accent">
                         <div className="flex justify-between items-start">
                             <div className="w-12 h-12 rounded-2xl bg-accent/10 flex items-center justify-center text-accent"><Coins size={24} /></div>
                             <Badge variant="outline" className="border-accent/20 text-accent font-black text-[8px] uppercase">Market Cap</Badge>
@@ -216,7 +298,6 @@ function TokenEconomyPage() {
                     </Card>
                 </div>
 
-                {/* EXPLORER SEARCH */}
                 <div className="mb-10 relative">
                     <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-muted-foreground" size={20} />
                     <Input 
@@ -227,7 +308,6 @@ function TokenEconomyPage() {
                     />
                 </div>
 
-                {/* LEDGER TABLE */}
                 <Card className="glossy-card border-none rounded-[3rem] overflow-hidden">
                     <CardHeader className="p-10 border-b border-white/5 bg-accent/5">
                         <CardTitle className="text-xl font-black uppercase italic flex items-center gap-4">
@@ -261,17 +341,19 @@ function TokenEconomyPage() {
                                             <td className="p-6">
                                                 <Badge className={cn(
                                                     "border-none uppercase text-[8px] font-black",
-                                                    tx.type === 'mint' ? 'bg-green-500/10 text-green-400' : 'bg-blue-500/10 text-blue-400'
+                                                    tx.type === 'mint' ? 'bg-green-500/10 text-green-400' : 
+                                                    tx.type === 'dividend' ? 'bg-yellow-500/10 text-yellow-500' :
+                                                    'bg-blue-500/10 text-blue-400'
                                                 )}>
-                                                    {tx.type === 'mint' ? 'Minting (Points)' : 'Transfert P2P'}
+                                                    {tx.type === 'mint' ? 'Minting' : tx.type === 'dividend' ? 'Dividende' : 'Transfert'}
                                                 </Badge>
                                             </td>
                                             <td className="p-6">
-                                                {tx.type === 'mint' ? (
-                                                    <span className="text-[10px] font-bold uppercase text-white/60">Expert: {tx.userName}</span>
+                                                {tx.type === 'mint' || tx.type === 'dividend' || tx.type === 'mining' ? (
+                                                    <span className="text-[10px] font-bold uppercase text-white/60">Bénéficiaire: {tx.userName}</span>
                                                 ) : (
                                                     <div className="flex items-center gap-2 text-[10px] font-bold uppercase">
-                                                        <span className="text-white/60">{tx.senderName}</span>
+                                                        <span className="text-white/60">{tx.senderName || 'Système'}</span>
                                                         <ArrowLeft className="rotate-180 h-3 w-3 text-accent" />
                                                         <span className="text-white/60">{tx.recipientName}</span>
                                                     </div>
@@ -299,20 +381,19 @@ function TokenEconomyPage() {
                 </Card>
             </main>
 
-            {/* TRANSFER SHEET */}
             <Sheet open={isTransferSheetOpen} onOpenChange={setIsTransferSheetOpen}>
                 <SheetContent side="right" className="bg-card/95 backdrop-blur-3xl border-white/10 w-full sm:max-w-md flex flex-col p-0">
                     <SheetHeader className="p-8 bg-accent/10 border-b border-white/5">
                         <SheetTitle className="text-2xl font-black uppercase italic tracking-tighter">Envoyer des Jetons</SheetTitle>
-                        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Reconnaissance P2P Expert</p>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Reconnaissance P2P Hub</p>
                     </SheetHeader>
                     
                     <form onSubmit={handleTransfer} className="flex-1 p-8 space-y-8 overflow-y-auto">
                         <div className="space-y-6">
                             <div className="space-y-2">
-                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Destinataire Expert</Label>
+                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Destinataire</Label>
                                 <div className="grid grid-cols-1 gap-2 max-h-[200px] overflow-y-auto pr-2 custom-scrollbar">
-                                    {staff?.filter(s => s.id !== user?.uid).map(member => (
+                                    {allUsers?.filter(u => u.id !== user?.uid).map(member => (
                                         <button 
                                             key={member.id}
                                             type="button"
@@ -323,10 +404,10 @@ function TokenEconomyPage() {
                                             )}
                                         >
                                             <div className={cn("w-10 h-10 rounded-lg flex items-center justify-center font-black", recipientId === member.id ? "bg-black text-accent" : "bg-accent/10 text-accent")}>
-                                                {member.name?.substring(0, 1)}
+                                                {(member.name || member.displayName)?.substring(0, 1)}
                                             </div>
                                             <div className="flex-1">
-                                                <p className="text-xs font-bold uppercase">{member.name}</p>
+                                                <p className="text-xs font-bold uppercase truncate">{member.name || member.displayName}</p>
                                                 <p className={cn("text-[9px] font-black uppercase opacity-40", recipientId === member.id && "opacity-100")}>{member.role}</p>
                                             </div>
                                             {recipientId === member.id && <CheckCircle2 size={20} />}
