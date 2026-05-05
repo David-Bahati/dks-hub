@@ -66,7 +66,8 @@ import {
   ArrowUpCircle,
   Heart,
   Activity,
-  Vote
+  Vote,
+  Scale
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -127,6 +128,7 @@ const navConfig = [
   { href: "/dashboard/governance", icon: Vote, label: "Gouvernance DAO", roles: ["Admin", "Seller", "Cashier", "customer"] },
   { href: "/dashboard/profile/expert", icon: UserIcon, label: "Mon Profil Expert", roles: ["Admin", "Seller", "Cashier"] },
   { href: "/dashboard/tokens", icon: Coins, label: "Économie Hub", roles: ["Admin", "Seller", "Cashier"] },
+  { href: "/dashboard/notary", icon: Scale, label: "Notaire du Hub", roles: ["Admin"] },
   { href: "/dashboard/calendar", icon: CalendarIcon, label: "Agenda Hub", roles: ["Admin", "Seller", "Cashier"] },
   { href: "/dashboard/products", icon: Package, label: "Produits / Stock", roles: ["Admin", "Seller"] },
   { href: "/dashboard/categories", icon: Tags, label: "Catégories", roles: ["Admin", "Seller"] },
@@ -303,6 +305,7 @@ function DashboardPage() {
 
         await updateDoc(doc(db, "users", user.uid), {
             lastMiningAt: serverTimestamp(),
+            lastActivityAt: serverTimestamp(), // Heartbeat update
             tokenBalance: increment(reward),
             lastBlockRarity: rarity,
             miningPower: increment(0.1),
