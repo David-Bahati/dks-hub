@@ -3,7 +3,7 @@
 
 import { useState, useMemo } from 'react';
 import { Navbar } from "@/components/layout/Navbar";
-import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { 
     Trophy, 
@@ -15,10 +15,10 @@ import {
     ArrowLeft, 
     Star, 
     Crown, 
-    ShieldCheck,
     MessageCircle,
     ArrowRight,
-    Share2
+    Coins,
+    Percent
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import withAuth from "@/components/auth/withAuth";
@@ -26,6 +26,7 @@ import Link from 'next/link';
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
+import { Logo } from "@/components/ui/Logo";
 
 function AmbassadorProgramPage() {
     const { user } = useAuth();
@@ -33,110 +34,122 @@ function AmbassadorProgramPage() {
     const [hasCopied, setHasCopied] = useState(false);
 
     const referralCode = useMemo(() => {
-        // En prod, ceci serait stocké en base. Ici on le génère de façon déterministe pour la démo.
         return user?.referralCode || `DKS-${user?.name?.substring(0, 3).toUpperCase()}-${user?.uid?.substring(0, 4).toUpperCase()}`;
     }, [user]);
 
     const stats = {
         referrals: user?.referralCount || 0,
         points: user?.points || 0,
-        level: user?.loyaltyLevel || 'Bronze'
+        level: user?.loyaltyLevel || 'Bronze',
+        discount: Math.min(25, (user?.referralCount || 0) * 5)
     };
 
     const copyToClipboard = () => {
-        navigator.clipboard.writeText(`Rejoignez Double King Shop avec mon code expert : ${referralCode}`);
+        navigator.clipboard.writeText(`Rejoignez le Hub Double King Shop avec mon code expert pour obtenir une remise : ${referralCode}`);
         setHasCopied(true);
-        toast({ title: "Code Copié", description: "Partagez-le avec votre réseau à Bunia." });
+        toast({ title: "Code Copié", description: "Partagez l'excellence technologique avec votre réseau." });
         setTimeout(() => setHasCopied(false), 2000);
     };
 
     return (
-        <div className="min-h-screen bg-background text-foreground">
+        <div className="min-h-screen bg-background text-foreground pb-20">
             <Navbar />
-            <main className="max-w-6xl mx-auto px-6 py-12">
-                <div className="flex items-center gap-4 mb-10">
-                    <Link href="/dashboard">
-                        <Button variant="outline" className="h-12 w-12 rounded-2xl border-white/10 p-0 transition-all hover:bg-accent/10 hover:text-accent"><ArrowLeft size={20} /></Button>
-                    </Link>
-                    <div>
-                        <h1 className="text-3xl font-black uppercase italic tracking-tighter">Programme <span className="text-accent">Ambassadeur</span></h1>
-                        <p className="text-muted-foreground text-sm uppercase font-bold tracking-widest opacity-40">Développez l'élite technologique de Bunia</p>
+            <main className="max-w-7xl mx-auto px-6 py-12">
+                <div className="flex flex-col md:flex-row justify-between items-start gap-8 mb-12">
+                    <div className="flex items-center gap-4">
+                        <Link href="/dashboard">
+                            <Button variant="outline" className="h-14 w-14 rounded-2xl border-white/10 p-0 transition-all hover:bg-accent/10 hover:text-accent"><ArrowLeft size={24} /></Button>
+                        </Link>
+                        <div>
+                            <h1 className="text-4xl font-black uppercase italic tracking-tighter">Programme <span className="text-accent">Ambassadeur Élite</span></h1>
+                            <p className="text-muted-foreground text-xs uppercase font-bold tracking-widest opacity-40 mt-1">Développez l'écosystème technologique de l'Ituri</p>
+                        </div>
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    {/* Colonne Statut & Carte Virtuelle */}
-                    <div className="lg:col-span-1 space-y-6">
-                        <Card className="bg-gradient-to-br from-card to-background border-none rounded-[3rem] p-8 text-center relative overflow-hidden shadow-2xl">
-                            <div className="absolute top-0 right-0 p-4 opacity-10"><Logo size="xl" /></div>
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                    {/* Carte Statut Ambassadeur */}
+                    <div className="lg:col-span-4 space-y-6">
+                        <Card className="bg-gradient-to-br from-accent/20 via-background to-black border-accent/20 rounded-[3.5rem] p-10 text-center relative overflow-hidden shadow-2xl">
+                            <div className="absolute top-0 right-0 p-6 opacity-10 scale-150 rotate-12"><Logo size="xl" /></div>
                             <div className="relative z-10">
-                                <div className="w-24 h-24 bg-accent/20 rounded-[2.5rem] flex items-center justify-center mx-auto mb-8 text-accent shadow-[0_0_30px_rgba(56,189,248,0.3)] animate-pulse">
-                                    {stats.level === 'Gold' ? <Crown size={48} /> : stats.level === 'Silver' ? <Star size={48} /> : <Trophy size={48} />}
+                                <div className="w-28 h-28 bg-accent/20 rounded-[3rem] flex items-center justify-center mx-auto mb-8 text-accent shadow-[0_0_40px_rgba(56,189,248,0.3)] animate-pulse">
+                                    {stats.level === 'Gold' ? <Crown size={56} /> : stats.level === 'Silver' ? <Star size={56} /> : <Trophy size={56} />}
                                 </div>
-                                <Badge className="bg-accent text-black font-black uppercase italic px-5 py-1.5 mb-4 text-[10px] tracking-widest">
+                                <Badge className="bg-accent text-black font-black uppercase italic px-6 py-2 mb-6 text-[10px] tracking-widest rounded-full">
                                     AMBASSADEUR {stats.level}
                                 </Badge>
-                                <h3 className="text-2xl font-black uppercase italic tracking-tight">{user?.name}</h3>
+                                <h3 className="text-3xl font-black uppercase italic tracking-tighter">{user?.name}</h3>
                                 
-                                <div className="mt-12 space-y-6">
+                                <div className="mt-14 space-y-6">
                                     <div className="flex justify-between items-end">
-                                        <p className="text-[10px] font-black uppercase opacity-40 tracking-widest">Invitations actives</p>
-                                        <span className="text-lg font-black text-accent">{stats.referrals} / 10</span>
+                                        <p className="text-[10px] font-black uppercase opacity-40 tracking-widest">Filleuls Actifs</p>
+                                        <span className="text-xl font-black text-accent italic">{stats.referrals} / 10</span>
                                     </div>
-                                    <Progress value={(stats.referrals / 10) * 100} className="h-3 bg-white/5" indicatorClassName="bg-accent shadow-[0_0_15px_rgba(56,189,248,0.5)]" />
-                                    <p className="text-[8px] font-bold uppercase opacity-30 text-center tracking-tighter">Plus que {10 - stats.referrals} parrainages pour le grade Silver</p>
+                                    <Progress value={(stats.referrals / 10) * 100} className="h-2.5 bg-white/5" indicatorClassName="bg-accent shadow-[0_0_15px_rgba(56,189,248,0.5)]" />
+                                    <div className="flex justify-center gap-4">
+                                        <Badge variant="outline" className="border-white/10 text-white/40 text-[8px] font-black uppercase">Bronze</Badge>
+                                        <Badge variant="outline" className="border-white/10 text-white/40 text-[8px] font-black uppercase">Silver (10)</Badge>
+                                        <Badge variant="outline" className="border-white/10 text-white/40 text-[8px] font-black uppercase">Gold (25)</Badge>
+                                    </div>
                                 </div>
                             </div>
                         </Card>
 
-                        <Card className="glossy-card border-none rounded-[2.5rem] p-8 space-y-6">
+                        {/* Avantages Dynamiques */}
+                        <Card className="glossy-card border-none rounded-[3rem] p-10 space-y-8">
                             <h4 className="text-[10px] font-black uppercase tracking-widest opacity-40 italic flex items-center gap-2">
-                                <Zap size={14} className="text-accent" /> Avantages Actuels
+                                <Zap size={14} className="text-accent" /> Privilèges d'Influenceur
                             </h4>
                             <div className="space-y-4">
-                                {[
-                                    { t: "Priorité SAV 24h", active: true },
-                                    { t: "Diagnostic PC Offert", active: stats.level !== 'Bronze' },
-                                    { t: "Accès VIP Ateliers IA", active: stats.level === 'Gold' },
-                                    { t: "Commision 5% sur Ventes", active: stats.level === 'Gold' }
-                                ].map((p, i) => (
-                                    <div key={i} className={`flex items-center gap-4 p-3 rounded-xl border ${p.active ? 'border-accent/10 bg-accent/5 text-white' : 'border-white/5 opacity-20'}`}>
-                                        <Check size={14} className={p.active ? 'text-accent' : 'text-white/40'} />
-                                        <span className="text-[10px] font-black uppercase tracking-tight">{p.t}</span>
+                                <div className="flex items-center gap-5 p-5 bg-accent/5 rounded-2xl border border-accent/20 transition-all group hover:scale-[1.02]">
+                                    <div className="w-12 h-12 rounded-xl bg-accent text-black flex items-center justify-center shrink-0 shadow-lg shadow-accent/10"><Percent size={24} /></div>
+                                    <div>
+                                        <p className="font-black text-xs uppercase italic text-accent">Remise Services -{stats.discount}%</p>
+                                        <p className="text-[9px] text-white/40 uppercase font-bold mt-1">Valable sur Academy & SAV</p>
                                     </div>
-                                ))}
+                                </div>
+                                <div className="flex items-center gap-5 p-5 bg-white/5 rounded-2xl border border-white/5 transition-all group hover:scale-[1.02]">
+                                    <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center shrink-0"><Coins size={24} className="text-orange-400" /></div>
+                                    <div>
+                                        <p className="font-black text-xs uppercase italic">Bonus Points</p>
+                                        <p className="text-[9px] text-white/40 uppercase font-bold mt-1">+500 PTS par nouveau stagiaire</p>
+                                    </div>
+                                </div>
                             </div>
                         </Card>
                     </div>
 
-                    {/* Colonne Actions & Gains */}
-                    <div className="lg:col-span-2 space-y-8">
-                        <Card className="bg-primary/10 border-primary/20 rounded-[3rem] p-12 relative overflow-hidden group">
-                            <div className="absolute -bottom-10 -right-10 w-64 h-64 bg-primary/20 rounded-full blur-[100px] group-hover:bg-primary/40 transition-all duration-1000" />
-                            <div className="relative z-10 space-y-8">
-                                <div className="space-y-4">
-                                    <Badge className="bg-white/10 text-primary border-none font-black uppercase tracking-widest px-4 py-1">ÉLITE ITURI</Badge>
-                                    <h2 className="text-5xl font-black uppercase italic tracking-tighter leading-[0.9] text-white">
-                                        VOTRE RÉSEAU <br /><span className="text-primary">VOTRE RÉPUTATION</span>
+                    {/* Zone d'action et Partage */}
+                    <div className="lg:col-span-8 space-y-8">
+                        <Card className="bg-primary/10 border-primary/20 rounded-[4rem] p-12 md:p-20 relative overflow-hidden group shadow-2xl">
+                            <div className="absolute -bottom-20 -right-20 w-80 h-80 bg-primary/20 rounded-full blur-[120px] group-hover:bg-primary/40 transition-all duration-1000" />
+                            <div className="relative z-10 space-y-12">
+                                <div className="space-y-6">
+                                    <Badge className="bg-white/10 text-primary border-none font-black uppercase tracking-[0.3em] px-6 py-2 italic text-[10px]">REJOIGNEZ LA FONDATION DKS</Badge>
+                                    <h2 className="text-5xl md:text-7xl font-black uppercase italic tracking-tighter leading-[0.85] text-white">
+                                        PROTÉGEZ <br /><span className="text-primary">VOTRE RÉPUTATION</span>
                                     </h2>
-                                    <p className="text-muted-foreground text-sm max-w-lg leading-relaxed font-medium">
-                                        Recommandez l'excellence technique à vos partenaires, entreprises ou amis. Pour chaque nouveau client "Hub" ou étudiant "Academy", vous débloquez des ressources d'élite pour votre propre matériel.
+                                    <p className="text-muted-foreground text-lg max-w-2xl leading-relaxed font-medium">
+                                        Le Hub appartient à ceux qui le construisent. En parrainant de nouveaux stagiaires à l'Academy ou des entreprises pour nos solutions réseaux, vous réduisez vos propres coûts d'équipement et d'expertise.
                                     </p>
                                 </div>
                                 
-                                <div className="p-8 bg-black/40 backdrop-blur-3xl rounded-[2.5rem] border border-white/5 flex flex-col sm:flex-row items-center gap-10 shadow-2xl">
-                                    <div className="flex-1 space-y-3">
-                                        <p className="text-[10px] font-black uppercase text-primary tracking-[0.3em]">Code Expert Unique</p>
-                                        <code className="text-4xl font-black text-white tracking-[0.2em] font-mono">{referralCode}</code>
+                                <div className="p-10 bg-black/60 backdrop-blur-3xl rounded-[3rem] border border-white/10 flex flex-col sm:flex-row items-center gap-12 shadow-inner">
+                                    <div className="flex-1 space-y-4">
+                                        <p className="text-[10px] font-black uppercase text-primary tracking-[0.4em] ml-2">Code Ambassadeur Unique</p>
+                                        <div className="p-4 bg-white/5 rounded-2xl inline-block">
+                                            <code className="text-4xl md:text-5xl font-black text-white tracking-[0.15em] font-mono">{referralCode}</code>
+                                        </div>
                                     </div>
-                                    <div className="flex flex-col gap-3 w-full sm:w-auto">
-                                        <Button onClick={copyToClipboard} className="h-16 px-10 rounded-2xl bg-primary text-white font-black uppercase italic gap-3 shadow-xl shadow-primary/20 hover:scale-105 active:scale-95 transition-all">
-                                            {hasCopied ? <Check size={20} /> : <Copy size={20} />}
-                                            {hasCopied ? "Code Copié !" : "Copier le code"}
+                                    <div className="flex flex-col gap-4 w-full sm:w-auto min-w-[240px]">
+                                        <Button onClick={copyToClipboard} className="h-16 px-10 rounded-2xl bg-primary text-white font-black uppercase italic gap-3 shadow-xl shadow-primary/30 hover:scale-105 active:scale-95 transition-all text-sm">
+                                            {hasCopied ? <Check size={24} /> : <Copy size={24} />}
+                                            {hasCopied ? "Copié !" : "Copier mon Code"}
                                         </Button>
-                                        <Button variant="outline" className="h-12 border-white/10 rounded-xl gap-2 font-black uppercase italic text-[10px]" asChild>
-                                            <a href={`https://wa.me/?text=Rejoignez%20le%20Hub%20Technologique%20Double%20King%20Shop%20à%20Bunia%20avec%20mon%20code%20expert%20:%20${referralCode}`} target="_blank" rel="noopener noreferrer">
-                                                <MessageCircle size={16} className="text-green-500" /> Partager sur WhatsApp
+                                        <Button variant="outline" className="h-14 border-white/10 rounded-2xl gap-3 font-black uppercase italic text-[10px] tracking-widest hover:bg-green-500/10 hover:text-green-400" asChild>
+                                            <a href={`https://wa.me/?text=Bonjour,%20rejoignez%20le%20Hub%20Technologique%20Double%20King%20Shop%20à%20Bunia%20avec%20mon%20code%20expert%20pour%20obtenir%20une%20remise%20sur%20votre%20formation%20IA%20:%20${referralCode}`} target="_blank" rel="noopener noreferrer">
+                                                <MessageCircle size={18} /> Partager sur WhatsApp
                                             </a>
                                         </Button>
                                     </div>
@@ -145,26 +158,26 @@ function AmbassadorProgramPage() {
                         </Card>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                            <Card className="glossy-card border-none rounded-[3rem] p-10 space-y-6 relative overflow-hidden group">
-                                <div className="w-14 h-14 rounded-2xl bg-orange-500/10 flex items-center justify-center text-orange-400 group-hover:scale-110 transition-transform"><Gift size={32}/></div>
-                                <h4 className="text-xl font-black uppercase italic tracking-tight">Points Élite DKS</h4>
+                            <Card className="glossy-card border-none rounded-[3rem] p-12 space-y-6 relative overflow-hidden group">
+                                <div className="w-16 h-16 rounded-2xl bg-orange-500/10 flex items-center justify-center text-orange-400 group-hover:scale-110 transition-transform shadow-lg"><Gift size={36}/></div>
+                                <h4 className="text-2xl font-black uppercase italic tracking-tight">Récompense Directe</h4>
                                 <p className="text-sm text-muted-foreground leading-relaxed italic">
-                                    Chaque parrainage actif vous crédite **500 Points DKS**. Ces points sont déductibles de vos achats de composants RTX ou de vos frais de formation IA.
+                                    En plus des remises sur les services, recevez **500 Points Prestige** convertibles en DKST pour chaque parrainage validé après le premier cours.
                                 </p>
-                                <div className="pt-4 border-t border-white/5 flex justify-between items-center">
-                                    <span className="text-[10px] font-black uppercase opacity-40 tracking-widest">Solde actuel</span>
-                                    <span className="text-2xl font-black text-orange-400">{stats.points} PTS</span>
+                                <div className="pt-6 border-t border-white/5 flex justify-between items-center">
+                                    <span className="text-[10px] font-black uppercase opacity-40 tracking-widest">Points acquis par parrainage</span>
+                                    <Badge className="bg-orange-500 text-white font-black italic px-3">+500 PTS</Badge>
                                 </div>
                             </Card>
 
-                            <Card className="glossy-card border-none rounded-[3rem] p-10 space-y-6 relative overflow-hidden group">
-                                <div className="w-14 h-14 rounded-2xl bg-green-500/10 flex items-center justify-center text-green-400 group-hover:scale-110 transition-transform"><ShieldCheck size={32}/></div>
-                                <h4 className="text-xl font-black uppercase italic tracking-tight">Statut Partenaire</h4>
+                            <Card className="glossy-card border-none rounded-[3rem] p-12 space-y-6 relative overflow-hidden group">
+                                <div className="w-16 h-16 rounded-2xl bg-green-500/10 flex items-center justify-center text-green-400 group-hover:scale-110 transition-transform shadow-lg"><ArrowRight size={36}/></div>
+                                <h4 className="text-2xl font-black uppercase italic tracking-tight">Échelle de Grade</h4>
                                 <p className="text-sm text-muted-foreground leading-relaxed italic">
-                                    En atteignant le grade **Gold**, vous recevez un certificat officiel de "Partenaire Technologique DKS" et devenez un point de contact privilégié en Ituri.
+                                    Atteignez le grade **Silver** (10 parrainages) ou **Gold** (25 parrainages) pour débloquer les commissions directes sur les ventes hardware du Hub.
                                 </p>
-                                <Button variant="ghost" className="p-0 h-auto font-black uppercase italic text-[10px] text-green-400 hover:text-green-300 gap-2">
-                                    Voir le guide partenaire <ArrowRight size={14} />
+                                <Button variant="ghost" className="p-0 h-auto font-black uppercase italic text-[10px] text-green-400 hover:text-green-300 gap-2 mt-4">
+                                    Voir la grille des commissions <ArrowRight size={14} />
                                 </Button>
                             </Card>
                         </div>

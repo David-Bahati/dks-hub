@@ -12,26 +12,18 @@ import {
     Loader2, 
     Calendar as CalendarIcon,
     Sparkles,
-    MonitorSmartphone,
-    MapPin,
     Smartphone,
-    CheckCircle2,
-    Star,
     Award,
-    BookOpen,
-    Users,
-    ShieldCheck,
-    Building2,
-    Clock,
     Hammer,
-    ShieldAlert,
-    Shield,
     UsersRound,
     Percent,
     Video,
-    Play
+    Play,
+    Gift,
+    ShieldCheck,
+    CheckCircle2
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { 
     Sheet, 
@@ -117,7 +109,7 @@ const TECHNICAL_SERVICES = [
         title: "Audit Cybersécurité Pro",
         description: "Pentest et sécurisation de vos serveurs d'entreprise à Bunia.",
         price: 250,
-        icon: <ShieldAlert className="text-red-500" size={32} />,
+        icon: <ShieldCheck className="text-red-500" size={32} />,
     },
     {
         id: "network-pro",
@@ -157,20 +149,31 @@ export default function ServicesCataloguePage() {
     const [groupSize, setGroupSize] = useState(1);
 
     const pricing = useMemo(() => {
-        if (!selectedService) return { original: 0, discount: 0, total: 0 };
+        if (!selectedService) return { original: 0, groupDiscount: 0, referralDiscount: 0, total: 0, hasReferralBenefit: false };
+        
         const base = selectedService.price;
         const subtotal = base * groupSize;
-        let discount = 0;
-        if (groupSize >= 5) discount = 0.25;
-        else if (groupSize >= 3) discount = 0.15;
         
-        const discountAmount = subtotal * discount;
+        // 1. Remise de groupe
+        let groupDiscountRatio = 0;
+        if (groupSize >= 5) groupDiscountRatio = 0.25;
+        else if (groupSize >= 3) groupDiscountRatio = 0.15;
+        
+        // 2. Remise de parrainage (5% par filleul, max 25%)
+        const referralCount = user?.referralCount || 0;
+        const referralDiscountRatio = Math.min(0.25, referralCount * 0.05);
+
+        const groupDiscountAmount = subtotal * groupDiscountRatio;
+        const referralDiscountAmount = (subtotal - groupDiscountAmount) * referralDiscountRatio;
+
         return {
             original: subtotal,
-            discount: discount * 100,
-            total: subtotal - discountAmount
+            groupDiscount: groupDiscountRatio * 100,
+            referralDiscount: referralDiscountRatio * 100,
+            total: subtotal - groupDiscountAmount - referralDiscountAmount,
+            hasReferralBenefit: referralCount > 0
         };
-    }, [selectedService, groupSize]);
+    }, [selectedService, groupSize, user?.referralCount]);
 
     const handleOpenBooking = (service: any) => {
         if (!user) { 
@@ -209,10 +212,11 @@ export default function ServicesCataloguePage() {
                 timeSlot: timeSlot,
                 location: formData.get('location') || 'shop',
                 notes: formData.get('notes'),
+                referralDiscountApplied: pricing.referralDiscount,
                 createdAt: serverTimestamp()
             });
 
-            toast({ title: "Dossier Transmis", description: `Inscription groupe (${groupSize} pers.) envoyée.` });
+            toast({ title: "Dossier Transmis", description: `Inscription ${groupSize > 1 ? `groupe (x${groupSize})` : 'individuelle'} envoyée.` });
             setIsSheetOpen(false);
             router.push('/dashboard/services');
         } catch (error) {
@@ -245,7 +249,7 @@ export default function ServicesCataloguePage() {
             <section className="container max-w-7xl mx-auto px-6 mb-32">
                 <div className="flex items-center gap-6 mb-16">
                     <h2 className="text-2xl font-black uppercase italic tracking-tighter flex items-center gap-4">
-                        <Building2 className="text-accent" /> Solutions Business
+                        <Globe className="text-accent" /> Solutions Business
                     </h2>
                     <div className="h-px flex-1 bg-white/5" />
                 </div>
@@ -343,35 +347,57 @@ export default function ServicesCataloguePage() {
 
                     <form onSubmit={handleBooking} className="flex-1 p-10 space-y-8 overflow-y-auto custom-scrollbar">
                         <div className="space-y-6">
-                            {selectedService?.category === 'formation' && (
-                                <div className="p-6 bg-accent/5 border border-accent/20 rounded-3xl space-y-4">
+                            <div className="p-6 bg-black/40 rounded-3xl border border-white/5 space-y-6">
+                                <div className="space-y-4">
                                     <div className="flex justify-between items-center">
-                                        <Label className="text-[10px] font-black uppercase tracking-widest text-accent flex items-center gap-2">
-                                            <UsersRound size={14} /> Nombre de participants
+                                        <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                                            <UsersRound size={14} /> Participants
                                         </Label>
-                                        <div className="flex items-center gap-4 bg-black/40 px-3 py-1 rounded-xl">
+                                        <div className="flex items-center gap-4 bg-black/40 px-3 py-1 rounded-xl border border-white/5">
                                             <button type="button" onClick={() => setGroupSize(Math.max(1, groupSize - 1))} className="text-accent hover:scale-125 transition-transform">-</button>
                                             <span className="font-black text-white w-4 text-center">{groupSize}</span>
                                             <button type="button" onClick={() => setGroupSize(groupSize + 1)} className="text-accent hover:scale-125 transition-transform">+</button>
                                         </div>
                                     </div>
                                     
-                                    {groupSize >= 3 && (
-                                        <div className="flex items-center gap-2 text-green-400 animate-in zoom-in">
-                                            <Percent size={14} />
-                                            <p className="text-[9px] font-black uppercase tracking-widest">Remise de groupe {pricing.discount}% activée</p>
+                                    {/* Remise Ambassadeur (Parrainage) */}
+                                    {pricing.hasReferralBenefit && (
+                                        <div className="flex items-center justify-between p-3 bg-accent/10 rounded-xl border border-accent/20 animate-in slide-in-from-top-2">
+                                            <div className="flex items-center gap-2 text-accent">
+                                                <Gift size={14} />
+                                                <p className="text-[9px] font-black uppercase tracking-widest">Remise Ambassadeur</p>
+                                            </div>
+                                            <Badge className="bg-accent text-black text-[9px] font-black">-{pricing.referralDiscount}%</Badge>
                                         </div>
                                     )}
 
-                                    <div className="pt-4 border-t border-white/5 flex justify-between items-end">
-                                        <p className="text-[9px] font-black uppercase text-muted-foreground">Total Inscription</p>
-                                        <div className="text-right">
-                                            {groupSize >= 3 && <p className="text-xs line-through text-white/20 font-black">${pricing.original}</p>}
-                                            <p className="text-2xl font-black text-accent">${pricing.total}</p>
+                                    {/* Remise Groupe */}
+                                    {pricing.groupDiscount > 0 && (
+                                        <div className="flex items-center justify-between p-3 bg-green-500/10 rounded-xl border border-green-500/20 animate-in slide-in-from-top-2">
+                                            <div className="flex items-center gap-2 text-green-400">
+                                                <Percent size={14} />
+                                                <p className="text-[9px] font-black uppercase tracking-widest">Remise de Groupe</p>
+                                            </div>
+                                            <Badge className="bg-green-500 text-white text-[9px] font-black">-{pricing.groupDiscount}%</Badge>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="pt-4 border-t border-white/5 flex justify-between items-end">
+                                    <div>
+                                        <p className="text-[9px] font-black uppercase text-muted-foreground mb-1 tracking-widest">Total Admission</p>
+                                        <div className="flex items-center gap-3">
+                                            {(pricing.groupDiscount > 0 || pricing.referralDiscount > 0) && (
+                                                <span className="text-xs line-through text-white/20 font-black">${pricing.original}</span>
+                                            )}
+                                            <span className="text-3xl font-black text-accent italic">${pricing.total.toFixed(0)}</span>
                                         </div>
                                     </div>
+                                    {pricing.total > 0 && (
+                                        <p className="text-[8px] font-bold text-white/20 uppercase tracking-widest text-right">Taxes incluses</p>
+                                    )}
                                 </div>
-                            )}
+                            </div>
 
                             <div className="space-y-2">
                                 <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Numéro WhatsApp Privilège</Label>
@@ -382,7 +408,7 @@ export default function ServicesCataloguePage() {
                             </div>
 
                             <div className="space-y-2">
-                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Planification Visuelle</Label>
+                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Planification Hub</Label>
                                 <Popover>
                                     <PopoverTrigger asChild>
                                         <Button
@@ -413,7 +439,7 @@ export default function ServicesCataloguePage() {
                                 <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Créneau Souhaité</Label>
                                 <Select value={timeSlot} onValueChange={setTimeSlot}>
                                     <SelectTrigger className="h-14 bg-background/50 border-white/5 rounded-2xl text-[10px] font-black uppercase">
-                                        <Clock className="mr-2 h-4 w-4 text-accent" />
+                                        <CalendarIcon className="mr-2 h-4 w-4 text-accent" />
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent className="bg-card border-white/10">
@@ -424,14 +450,14 @@ export default function ServicesCataloguePage() {
                             </div>
                             
                             <div className="space-y-2">
-                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Objectifs & Niveau</Label>
+                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Objectifs du Stagiaire</Label>
                                 <Textarea name="notes" placeholder="Décrivez vos attentes ou le projet à réaliser..." className="min-h-[120px] bg-background/50 border-white/5 rounded-2xl italic text-sm" />
                             </div>
                         </div>
 
                         <div className="pt-8">
                             <Button type="submit" disabled={isSubmitting} className="w-full h-16 bg-primary text-white font-black uppercase italic rounded-2xl shadow-xl shadow-primary/20 text-lg">
-                                {isSubmitting ? <Loader2 className="animate-spin" /> : "Envoyer ma Candidature Academy"}
+                                {isSubmitting ? <Loader2 className="animate-spin" /> : "Finaliser mon Admission Academy"}
                             </Button>
                         </div>
                     </form>
