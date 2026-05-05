@@ -20,6 +20,7 @@ export type AppUser = {
   stakedBalance?: number;
   stakingStartedAt?: any;
   lastMiningAt?: any;
+  lastActivityAt?: any;
   miningPower?: number;
   completedMissionsToday?: string[];
   lastBlockRarity?: 'common' | 'rare' | 'legendary';
@@ -27,13 +28,16 @@ export type AppUser = {
   isWalletLocked?: boolean;
   dailySpendingLimit?: number;
   todaySpent?: number;
+  beneficiaryId?: string;
+  beneficiaryName?: string;
+  heritageThresholdDays?: number;
 };
 
 export type TokenTransaction = {
   id: string;
   userId: string;
   userName?: string;
-  type: 'mint' | 'burn' | 'transfer' | 'mining' | 'staking' | 'unstaking' | 'exchange';
+  type: 'mint' | 'burn' | 'transfer' | 'mining' | 'staking' | 'unstaking' | 'exchange' | 'heritage';
   pointsAmount?: number;
   tokenAmount: number;
   piTxId?: string;
