@@ -404,19 +404,19 @@ export default function LandingPage() {
 
       {/* SECTION CTA ACADEMY */}
       <section className="container max-w-6xl mx-auto px-6 py-32">
-          <Card className="bg-gradient-to-br from-primary/20 via-background to-black border-primary/20 rounded-[5rem] p-20 text-center relative overflow-hidden group shadow-2xl">
+          <Card className="bg-gradient-to-br from-primary/20 via-background to-black border-primary/20 rounded-[3rem] md:rounded-[5rem] p-8 md:p-20 text-center relative overflow-hidden group shadow-2xl">
               <div className="absolute top-0 right-0 p-12 opacity-5 scale-150 rotate-45 group-hover:rotate-0 transition-transform duration-[3s]"><GraduationCap size={400} className="text-primary" /></div>
               <div className="relative z-10 space-y-10">
                   <Badge className="bg-primary text-white font-black uppercase italic tracking-[0.4em] px-8 py-2 rounded-full">Rejoignez l'élite du savoir</Badge>
-                  <h2 className="text-5xl md:text-8xl font-black uppercase italic tracking-tighter leading-[0.8] text-white">
+                  <h2 className="text-4xl md:text-8xl font-black uppercase italic tracking-tighter leading-[0.8] text-white">
                       NE SOYEZ PAS <br /><span className="text-primary">SPECTATEUR</span>
                   </h2>
-                  <p className="text-xl text-white/40 font-medium max-w-2xl mx-auto leading-relaxed italic">
+                  <p className="text-lg md:text-xl text-white/40 font-medium max-w-2xl mx-auto leading-relaxed italic">
                       Apprenez à maîtriser l'Intelligence Artificielle et la Blockchain avec nos experts. Obtenez une certification reconnue par le Hub DKS.
                   </p>
                   <div className="pt-8">
-                      <Link href="/services">
-                        <Button className="h-24 px-16 rounded-[2.5rem] bg-primary text-white font-black uppercase italic text-2xl shadow-[0_0_60px_rgba(59,130,246,0.3)] hover:scale-105 active:scale-95 transition-all gap-5">
+                      <Link href="/services" className="inline-block w-full sm:w-auto">
+                        <Button className="h-20 md:h-24 w-full sm:w-auto px-10 md:px-16 rounded-[2rem] bg-primary text-white font-black uppercase italic text-xl md:text-2xl shadow-[0_0_60px_rgba(59,130,246,0.3)] hover:scale-105 active:scale-95 transition-all gap-5 whitespace-normal sm:whitespace-nowrap">
                             S'inscrire à l'Academy <Zap size={32} />
                         </Button>
                       </Link>
