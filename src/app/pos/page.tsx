@@ -33,7 +33,9 @@ import {
   History,
   Clock,
   ShoppingBag,
-  ExternalLink
+  ExternalLink,
+  Zap,
+  Globe
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -62,13 +64,16 @@ interface CartItem extends Product {
   quantity: number;
 }
 
+type CryptoSubMode = 'pi' | 'dkst';
+
 function POS() {
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [search, setSearch] = useState("");
-  const [orderSearch, setOrderSearch] = useState(""); // Recherche spécifique pour les commandes web
+  const [orderSearch, setOrderSearch] = useState("");
   const [customerName, setCustomerName] = useState("");
   const [paymentMode, setPaymentMode] = useState<PaymentMode>("CASH");
+  const [cryptoSubMode, setCryptoSubMode] = useState<CryptoSubMode>("pi");
   const [isProcessing, setIsProcessing] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [showReceipt, setShowReceipt] = useState(false);
@@ -82,6 +87,7 @@ function POS() {
     items: any[];
     total: number;
     mode: string;
+    cryptoType?: string;
     date: string;
     customerName: string;
   } | null>(null);
@@ -89,7 +95,6 @@ function POS() {
   const { toast } = useToast();
   const { user } = useAuth();
 
-  // Fetch Products & Config
   useEffect(() => {
     const unsubscribeProds = onSnapshot(collection(db, "products"), (snapshot) => {
       const productsData = snapshot.docs.map(doc => ({
@@ -111,7 +116,6 @@ function POS() {
     return () => unsubscribeProds();
   }, []);
 
-  // Fetch Recent Sales for History
   useEffect(() => {
     const q = query(collection(db, "sales"), orderBy("createdAt", "desc"), limit(10));
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -125,7 +129,6 @@ function POS() {
     return () => unsubscribe();
   }, []);
 
-  // Fetch Pending Web Orders
   useEffect(() => {
     const q = query(
       collection(db, "orders"), 
@@ -257,6 +260,7 @@ function POS() {
             totalAmount: total,
             totalCDF: total * exchangeRate,
             paymentMode: paymentMode,
+            cryptoType: paymentMode === 'PI_NETWORK' ? cryptoSubMode : null,
             createdAt: serverTimestamp(),
             status: 'Payé',
             orderId: activeOrderId || null
@@ -293,6 +297,7 @@ function POS() {
             items: [...cart],
             total: total,
             mode: paymentMode,
+            cryptoType: paymentMode === 'PI_NETWORK' ? cryptoSubMode : undefined,
             date: now,
             customerName: finalCustomerName
         });
@@ -321,6 +326,7 @@ function POS() {
         items: sale.items,
         total: sale.totalAmount,
         mode: sale.paymentMode,
+        cryptoType: sale.cryptoType,
         date: sale.formattedDate,
         customerName: sale.customerName
     });
@@ -449,9 +455,12 @@ function POS() {
                                             <p className="font-bold text-sm uppercase italic">#{sale.id.substring(0, 8)}</p>
                                             <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest">{sale.formattedDate}</p>
                                         </div>
-                                        <Badge className="bg-accent/10 text-accent font-black uppercase text-[10px] border-none">
-                                            {sale.paymentMode?.replace('_', ' ')}
-                                        </Badge>
+                                        <div className="flex flex-col items-end gap-1">
+                                            <Badge className="bg-accent/10 text-accent font-black uppercase text-[10px] border-none">
+                                                {sale.paymentMode?.replace('_', ' ')}
+                                            </Badge>
+                                            {sale.cryptoType && <Badge variant="outline" className="text-[8px] font-black uppercase border-accent/20 text-accent/60">{sale.cryptoType}</Badge>}
+                                        </div>
                                     </div>
                                     <div className="flex justify-between items-end">
                                         <div>
@@ -586,7 +595,7 @@ function POS() {
                   onClick={() => setPaymentMode("PI_NETWORK")}
                 >
                   <Coins size={18} />
-                  <span className="text-[9px] font-black uppercase tracking-tighter">Crypto-monnaie</span>
+                  <span className="text-[9px] font-black uppercase tracking-tighter text-center leading-none">Crypto-monnaie (Pi, DKST)</span>
                 </Button>
               </div>
 
@@ -603,9 +612,9 @@ function POS() {
         </div>
       </main>
 
-      {/* Confirmation Dialog */}
+      {/* Confirmation Dialog with Dynamic Crypto Selector */}
       <Dialog open={showConfirmation} onOpenChange={setShowConfirmation}>
-        <DialogContent className="bg-card border-white/10 text-foreground rounded-[2rem]">
+        <DialogContent className="bg-card border-white/10 text-foreground rounded-[2rem] sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="text-2xl font-black italic uppercase text-center">Finaliser le Paiement</DialogTitle>
           </DialogHeader>
@@ -622,29 +631,62 @@ function POS() {
                 />
             </div>
 
-            <div className="text-center pt-4">
+            <div className="text-center pt-2">
               <p className="text-xs text-muted-foreground uppercase font-black tracking-[0.2em] mb-2">Montant à encaisser</p>
               <h2 className="text-5xl font-black text-accent">${total.toFixed(2)}</h2>
               <p className="text-lg font-bold text-white/40 mt-1">≈ {formatCurrency(total * exchangeRate)} Francs Congolais</p>
             </div>
             
-            <div className="w-full p-6 rounded-3xl bg-white/5 border border-white/10 flex flex-col gap-6">
-              <div className="flex justify-between items-center">
-                <span className="font-bold uppercase text-xs">Mode de paiement sélectionné</span>
-                <Badge className="bg-accent/20 text-accent font-black border-none px-4 py-1">{paymentMode === 'PI_NETWORK' ? 'Crypto-monnaie' : paymentMode.replace('_', ' ')}</Badge>
-              </div>
-              {paymentMode === "PI_NETWORK" && (
-                <div className="flex flex-col items-center p-6 bg-black/40 rounded-2xl border border-dashed border-white/20">
-                  <QrCode size={120} className="text-white" />
-                  <p className="text-[10px] mt-4 font-black uppercase tracking-widest text-muted-foreground text-center">Payer avec Pi Network ou DKST</p>
+            {paymentMode === "PI_NETWORK" ? (
+              <div className="w-full p-6 rounded-3xl bg-white/5 border border-accent/20 flex flex-col gap-6 animate-in fade-in zoom-in-95">
+                <div className="flex flex-col items-center gap-4">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-accent">Choisissez le Jeton Crypto</p>
+                  <div className="flex bg-black/40 p-1 rounded-2xl border border-white/10 w-full">
+                    <button 
+                      onClick={() => setCryptoSubMode('pi')}
+                      className={cn(
+                        "flex-1 h-12 rounded-xl font-black uppercase italic text-[10px] flex items-center justify-center gap-2 transition-all",
+                        cryptoSubMode === 'pi' ? "bg-accent text-black shadow-lg" : "text-white/40 hover:text-white"
+                      )}
+                    >
+                      <Globe size={14} /> Pi Network
+                    </button>
+                    <button 
+                      onClick={() => setCryptoSubMode('dkst')}
+                      className={cn(
+                        "flex-1 h-12 rounded-xl font-black uppercase italic text-[10px] flex items-center justify-center gap-2 transition-all",
+                        cryptoSubMode === 'dkst' ? "bg-accent text-black shadow-lg" : "text-white/40 hover:text-white"
+                      )}
+                    >
+                      <Zap size={14} /> DKST (Interne)
+                    </button>
+                  </div>
                 </div>
-              )}
-            </div>
+
+                <div className="flex flex-col items-center p-6 bg-black/60 rounded-[2.5rem] border border-dashed border-accent/30 relative group overflow-hidden">
+                  <div className="absolute inset-0 bg-accent/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <QrCode size={160} className="text-white relative z-10" />
+                  <div className="mt-6 text-center space-y-2 relative z-10">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-white/60">Instructions Scan</p>
+                    <p className="text-sm font-bold text-accent">
+                      {cryptoSubMode === 'pi' 
+                        ? `Payer ${(total / PI_CONVERSION_RATE).toFixed(6)} π via Pi Browser` 
+                        : `Transférer ${total.toFixed(2)} DKST via l'onglet Wallet`}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="w-full p-6 rounded-3xl bg-white/5 border border-white/10 flex justify-between items-center">
+                <span className="font-bold uppercase text-xs">Mode sélectionné</span>
+                <Badge className="bg-accent/20 text-accent font-black border-none px-4 py-1">{paymentMode.replace('_', ' ')}</Badge>
+              </div>
+            )}
           </div>
           <DialogFooter className="gap-3">
             <Button variant="ghost" onClick={() => setShowConfirmation(false)} className="rounded-xl font-bold uppercase text-xs">Annuler</Button>
-            <Button className="bg-accent text-accent-foreground min-w-[160px] rounded-xl font-black uppercase italic" onClick={confirmPayment} disabled={isProcessing}>
-              {isProcessing ? <Loader2 className="animate-spin" /> : "Confirmer la Vente"}
+            <Button className="bg-accent text-accent-foreground min-w-[160px] rounded-xl font-black uppercase italic shadow-xl shadow-accent/20" onClick={confirmPayment} disabled={isProcessing}>
+              {isProcessing ? <Loader2 className="animate-spin" /> : <><CheckCircle2 className="mr-2" size={18}/> Encaisser</>}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -716,13 +758,19 @@ function POS() {
                 <span>TOTAL PAYÉ (FC)</span>
                 <span>{formatCurrency((lastTransaction?.total || 0) * exchangeRate)} FC</span>
               </div>
-              <div className="flex justify-between font-bold opacity-40 text-[8px] mt-1">
-                <span>VALEUR PI (π)</span>
-                <span>{(lastTransaction ? lastTransaction.total / PI_CONVERSION_RATE : 0).toFixed(6)} π</span>
-              </div>
+              {lastTransaction?.mode === 'PI_NETWORK' && lastTransaction.cryptoType === 'pi' && (
+                <div className="flex justify-between font-bold opacity-40 text-[8px] mt-1">
+                  <span>VALEUR PI (π)</span>
+                  <span>{(lastTransaction.total / PI_CONVERSION_RATE).toFixed(6)} π</span>
+                </div>
+              )}
               <div className="flex justify-between mt-2 pt-2 border-t border-gray-100 italic font-black">
                 <span>RÈGLEMENT :</span>
-                <span>{lastTransaction?.mode === 'PI_NETWORK' ? 'Crypto-monnaie (Pi/DKST)' : lastTransaction?.mode.replace('_', ' ')}</span>
+                <span>
+                    {lastTransaction?.mode === 'PI_NETWORK' 
+                        ? `Crypto-monnaie (${lastTransaction.cryptoType?.toUpperCase()})` 
+                        : lastTransaction?.mode.replace('_', ' ')}
+                </span>
               </div>
             </div>
 
