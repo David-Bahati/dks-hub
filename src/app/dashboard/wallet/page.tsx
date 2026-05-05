@@ -50,7 +50,10 @@ import {
     Activity,
     Download,
     FileBadge,
-    Medal
+    Medal,
+    TrendingUp as TrendingUpIcon,
+    Banknote,
+    BarChart3
 } from "lucide-react";
 import { db } from '@/lib/firebase';
 import { collection, query, where, orderBy, updateDoc, doc, addDoc, serverTimestamp, increment, limit, getDocs, Timestamp } from 'firebase/firestore';
@@ -145,6 +148,12 @@ function UniversalWalletPage() {
     }, [user?.uid]);
     const { data: transactions, isLoading: loadingTx } = useCollection(txQuery);
 
+    // Fetch Top Wealthiest Users for Leaderboard
+    const topWealthQuery = useMemoFirebase(() => {
+        return query(collection(db, "users"), orderBy("tokenBalance", "desc"), limit(10));
+    }, []);
+    const { data: topWealthyUsers, isLoading: loadingWealth } = useCollection(topWealthQuery);
+
     const stats = useMemo(() => {
         if (!user) return { totalPoints: 0, redeemableTokens: 0, progress: 0, availablePoints: 0, stakingRewards: 0, income: 0, expense: 0, apr: 5, gcvUSD: 0, totalTokens: 0, wealthHistory: [] };
 
@@ -216,6 +225,13 @@ function UniversalWalletPage() {
             wealthHistory: wealthHistory.slice(-15) 
         };
     }, [user, logs, orders, isStaff, transactions]);
+
+    const globalHubWealth = useMemo(() => {
+        if (!topWealthyUsers) return 0;
+        // Approximation: Somme des soldes visibles pour simuler la fortune globale du Hub
+        const sum = topWealthyUsers.reduce((acc, u) => acc + (u.tokenBalance || 0) + (u.stakedBalance || 0), 0);
+        return sum * GCV_VALUE;
+    }, [topWealthyUsers]);
 
     const handleSyncPi = async () => {
         setIsSyncing(true);
@@ -383,6 +399,13 @@ function UniversalWalletPage() {
         }
     };
 
+    const getWealthTitle = (wealth: number) => {
+        if (wealth >= 1000000000) return { label: "Billionnaire Élite", icon: <Crown className="text-yellow-500" />, color: "text-yellow-500" };
+        if (wealth >= 10000000) return { label: "Multi-Millionnaire", icon: <Gem className="text-accent" />, color: "text-accent" };
+        if (wealth >= 1000000) return { label: "Millionnaire GCV", icon: <Star className="text-primary" />, color: "text-primary" };
+        return { label: "Investisseur Émergeant", icon: <TrendingUpIcon className="text-white/40" />, color: "text-white/40" };
+    };
+
     useEffect(() => {
         const delayDebounce = setTimeout(async () => {
             if (searchQuery.length < 3) { setSearchResults([]); return; }
@@ -540,9 +563,10 @@ function UniversalWalletPage() {
                 </div>
 
                 <Tabs defaultValue="overview" className="space-y-10">
-                    <TabsList className="bg-white/5 border border-white/5 p-1.5 rounded-[1.5rem] h-16 w-full max-w-xl mx-auto flex">
+                    <TabsList className="bg-white/5 border border-white/5 p-1.5 rounded-[1.5rem] h-16 w-full max-w-2xl mx-auto flex">
                         <TabsTrigger value="overview" className="flex-1 rounded-xl font-black uppercase italic text-[10px] data-[state=active]:bg-accent data-[state=active]:text-black transition-all"><Wallet size={14} className="mr-2" /> Vue d'ensemble</TabsTrigger>
                         <TabsTrigger value="vault" className="flex-1 rounded-xl font-black uppercase italic text-[10px] data-[state=active]:bg-accent data-[state=active]:text-black transition-all"><Lock size={14} className="mr-2" /> DKS Vault</TabsTrigger>
+                        <TabsTrigger value="rankings" className="flex-1 rounded-xl font-black uppercase italic text-[10px] data-[state=active]:bg-accent data-[state=active]:text-black transition-all"><BarChart3 size={14} className="mr-2" /> Classement Wealth</TabsTrigger>
                         <TabsTrigger value="history" className="flex-1 rounded-xl font-black uppercase italic text-[10px] data-[state=active]:bg-accent data-[state=active]:text-black transition-all"><History size={14} className="mr-2" /> Registre</TabsTrigger>
                     </TabsList>
 
@@ -719,6 +743,123 @@ function UniversalWalletPage() {
                                                 <div className="space-y-1"><p className="font-bold text-sm uppercase italic tracking-tight">{item.label}</p><p className="text-xs text-muted-foreground leading-relaxed">{item.desc}</p></div>
                                             </div>
                                         ))}
+                                    </div>
+                                </Card>
+                            </div>
+                        </div>
+                    </TabsContent>
+
+                    {/* WEALTH RANKINGS TAB */}
+                    <TabsContent value="rankings" className="space-y-10 animate-in fade-in slide-in-from-bottom-4">
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+                            {/* Global Wealth Metrics */}
+                            <div className="lg:col-span-4 space-y-8">
+                                <Card className="bg-gradient-to-br from-yellow-500/20 to-black border-yellow-500/20 rounded-[3rem] p-10 relative overflow-hidden text-center">
+                                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-yellow-500/10 via-transparent to-transparent opacity-50" />
+                                    <div className="relative z-10 space-y-8">
+                                        <div className="w-20 h-20 rounded-[2rem] bg-yellow-500/20 flex items-center justify-center mx-auto text-yellow-500 shadow-[0_0_30px_rgba(234,179,8,0.3)]">
+                                            <Globe size={40} className="animate-spin-slow" />
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] font-black uppercase text-yellow-500 tracking-[0.4em] mb-3">Fortune Totale du Hub</p>
+                                            <h3 className="text-4xl md:text-5xl font-black text-white italic tracking-tighter">
+                                                ${globalHubWealth.toLocaleString('fr-FR', { maximumFractionDigits: 0 })}
+                                            </h3>
+                                            <p className="text-[9px] font-bold text-white/40 uppercase mt-4 tracking-widest">Valeur Théorique GCV de Bunia</p>
+                                        </div>
+                                    </div>
+                                </Card>
+
+                                <Card className="glossy-card border-none rounded-[3rem] p-10 space-y-8">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-12 h-12 rounded-2xl bg-accent/10 flex items-center justify-center text-accent"><Award size={24} /></div>
+                                        <h4 className="text-lg font-black uppercase italic">Titres Honorifiques</h4>
+                                    </div>
+                                    <div className="space-y-4">
+                                        {[
+                                            { label: "Billionnaire Élite", val: "$1,000,000,000+", icon: <Crown className="text-yellow-500" /> },
+                                            { label: "Multi-Millionnaire", val: "$10,000,000+", icon: <Gem className="text-accent" /> },
+                                            { label: "Millionnaire GCV", val: "$1,000,000+", icon: <Star className="text-primary" /> },
+                                        ].map((r, i) => (
+                                            <div key={i} className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5">
+                                                <div className="flex items-center gap-3">
+                                                    {r.icon}
+                                                    <span className="text-[10px] font-black uppercase">{r.label}</span>
+                                                </div>
+                                                <span className="text-[10px] font-bold text-white/40">{r.val}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </Card>
+                            </div>
+
+                            {/* Wealth Leaderboard */}
+                            <div className="lg:col-span-8">
+                                <Card className="glossy-card border-none rounded-[3rem] overflow-hidden">
+                                    <CardHeader className="p-10 border-b border-white/5 bg-white/5 flex flex-row items-center justify-between">
+                                        <CardTitle className="text-2xl font-black uppercase italic flex items-center gap-4">
+                                            <TrendingUp className="text-accent" /> Hiérarchie des Fortunes GCV
+                                        </CardTitle>
+                                        <Badge className="bg-accent text-black font-black uppercase italic">Top 10 Bunia</Badge>
+                                    </CardHeader>
+                                    <div className="divide-y divide-white/5">
+                                        {loadingWealth ? (
+                                            <div className="p-20 text-center"><Loader2 className="animate-spin text-accent mx-auto h-10 w-10" /></div>
+                                        ) : topWealthyUsers && topWealthyUsers.length > 0 ? (
+                                            topWealthyUsers.map((wUser, index) => {
+                                                const totalTokens = (wUser.tokenBalance || 0) + (wUser.stakedBalance || 0);
+                                                const wealthUSD = totalTokens * GCV_VALUE;
+                                                const rank = getWealthTitle(wealthUSD);
+                                                const isCurrentUser = wUser.id === user?.uid;
+
+                                                return (
+                                                    <div key={wUser.id} className={cn(
+                                                        "p-8 flex flex-col md:flex-row items-center justify-between transition-all group gap-8",
+                                                        isCurrentUser ? "bg-accent/5 border-l-4 border-l-accent" : "hover:bg-white/[0.02]"
+                                                    )}>
+                                                        <div className="flex items-center gap-8 flex-1">
+                                                            <div className={cn(
+                                                                "w-12 h-12 rounded-2xl flex items-center justify-center font-black text-xl italic shadow-lg",
+                                                                index === 0 ? "bg-yellow-500 text-black" : "bg-white/5 text-muted-foreground"
+                                                            )}>
+                                                                {index + 1}
+                                                            </div>
+                                                            <div className="flex items-center gap-5">
+                                                                <div className="w-14 h-14 rounded-[1.5rem] bg-white/5 flex items-center justify-center text-accent group-hover:scale-110 transition-transform">
+                                                                    <UserIcon size={28} />
+                                                                </div>
+                                                                <div>
+                                                                    <div className="flex items-center gap-3">
+                                                                        <h4 className="text-xl font-black uppercase italic tracking-tight">{wUser.name || "Membre Élite"}</h4>
+                                                                        {isCurrentUser && <Badge className="bg-accent/20 text-accent border-accent/20 text-[8px] font-black uppercase">Vous</Badge>}
+                                                                    </div>
+                                                                    <div className="flex items-center gap-2 mt-1">
+                                                                        {rank.icon}
+                                                                        <span className={cn("text-[9px] font-black uppercase tracking-[0.2em]", rank.color)}>{rank.label}</span>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="text-center md:text-right space-y-1 shrink-0">
+                                                            <p className="text-2xl font-black text-white italic tracking-tighter">
+                                                                ${wealthUSD.toLocaleString('fr-FR', { maximumFractionDigits: 0 })}
+                                                            </p>
+                                                            <p className="text-[10px] font-bold text-white/20 uppercase tracking-widest">
+                                                                {totalTokens.toFixed(4)} DKST
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })
+                                        ) : (
+                                            <div className="p-20 text-center opacity-30 italic">Aucune donnée de fortune disponible.</div>
+                                        )}
+                                    </div>
+                                    <div className="p-6 bg-black/20 text-center border-t border-white/5">
+                                        <p className="text-[9px] font-black uppercase text-white/20 tracking-[0.3em] flex items-center justify-center gap-3">
+                                            <ShieldCheck size={12} className="text-green-500" /> Registre Wealth Certifié par DKS Solutions
+                                        </p>
                                     </div>
                                 </Card>
                             </div>
