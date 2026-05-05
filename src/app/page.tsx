@@ -23,7 +23,11 @@ import {
   Gem,
   Award,
   Star,
-  ShoppingCart
+  ShoppingCart,
+  ZapOff,
+  Server,
+  Monitor,
+  Network
 } from 'lucide-react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
@@ -62,6 +66,15 @@ export default function LandingPage() {
       p.category?.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [products, searchTerm]);
+
+  const partners = [
+    { name: "NVIDIA", icon: <Zap size={20} /> },
+    { name: "Starlink", icon: <Globe size={20} /> },
+    { name: "ASUS ROG", icon: <Cpu size={20} /> },
+    { name: "Pi Network", icon: <Coins size={20} /> },
+    { name: "Ubiquiti", icon: <Network size={20} /> },
+    { name: "Intel", icon: <Server size={20} /> }
+  ];
 
   return (
     <div className="min-h-screen bg-background text-foreground selection:bg-accent/30 selection:text-accent">
@@ -136,6 +149,23 @@ export default function LandingPage() {
                     </div>
                 </div>
             </div>
+        </div>
+      </section>
+
+      {/* SECTION PARTENAIRES */}
+      <section className="py-12 bg-black/20 border-b border-white/5">
+        <div className="container max-w-7xl mx-auto px-6">
+          <div className="flex flex-col items-center gap-8">
+            <p className="text-[9px] font-black uppercase tracking-[0.4em] text-white/20">Nos Partenaires Stratégiques</p>
+            <div className="flex flex-wrap justify-center items-center gap-x-16 gap-y-8 opacity-40 hover:opacity-100 transition-opacity duration-700">
+              {partners.map((partner, index) => (
+                <div key={index} className="flex items-center gap-3 group cursor-default">
+                  <div className="text-white group-hover:text-accent transition-colors">{partner.icon}</div>
+                  <span className="font-black uppercase italic text-sm tracking-tighter group-hover:text-white transition-colors">{partner.name}</span>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </section>
 
@@ -413,3 +443,4 @@ export default function LandingPage() {
     </div>
   );
 }
+
