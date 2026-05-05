@@ -39,7 +39,9 @@ import {
     Star,
     Sparkles,
     CheckCircle2,
-    QrCode
+    QrCode,
+    KeyRound,
+    Fingerprint
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -101,6 +103,10 @@ export default function SettingsPage() {
     const [confirmPassword, setConfirmPassword] = useState("");
     const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
     const [showPasswords, setShowPasswords] = useState(false);
+
+    // Wallet PIN States
+    const [walletPin, setWalletPin] = useState("");
+    const [isUpdatingPin, setIsUpdatingPin] = useState(false);
     
     // System States
     const [exchangeRate, setExchangeRate] = useState("2500");
@@ -113,6 +119,7 @@ export default function SettingsPage() {
             setAddress(user.address || "");
             setPhotoURL(user.photoURL || "");
             setLanguage(user.language || "fr");
+            setWalletPin(user.walletPin || "");
             fetchUserStats();
         }
         fetchSystemConfig();
@@ -124,380 +131,173 @@ export default function SettingsPage() {
             const q = query(collection(db, "orders"), where("userId", "==", user.uid));
             const snap = await getDocs(q);
             setOrderCount(snap.size);
-        } catch (e) {
-            console.error(e);
-        }
+        } catch (e) { console.error(e); }
     };
 
     const fetchSystemConfig = async () => {
         try {
             const configRef = doc(db, "system", "config");
             const configSnap = await getDoc(configRef);
-            if (configSnap.exists()) {
-                setExchangeRate(configSnap.data().exchangeRate?.toString() || "2500");
-            }
-        } catch (error) {
-            console.error("Config fetch error:", error);
-        }
+            if (configSnap.exists()) setExchangeRate(configSnap.data().exchangeRate?.toString() || "2500");
+        } catch (error) { console.error(error); }
     };
 
     const isAdmin = user?.role?.toLowerCase() === 'admin';
 
-    // Loyalty Info Calculation
     const loyalty = useMemo(() => {
         const points = orderCount * 100;
-        if (points >= 1000) return { label: "Membre Gold", level: 3, icon: <Crown size={24} className="text-yellow-400" />, color: "text-yellow-400", bg: "bg-yellow-400/10", border: "border-yellow-400/20", perks: ["Priorité SAV 24h", "Livraison Bunia Offerte", "Ateliers IA Gratuits"] };
-        if (points >= 500) return { label: "Membre Silver", level: 2, icon: <Star size={24} className="text-slate-300" />, color: "text-slate-300", bg: "bg-slate-300/10", border: "border-slate-300/20", perks: ["Priorité SAV 48h", "-10% sur Formations", "Diagnostic PC Offert"] };
-        return { label: "Membre Bronze", level: 1, icon: <Trophy size={24} className="text-orange-400" />, color: "text-orange-400", bg: "bg-orange-400/10", border: "border-orange-400/20", perks: ["Accès au Hub Central", "Support par Ticket", "Historique Digital"] };
+        if (points >= 1000) return { label: "Membre Gold", color: "text-yellow-400", perks: ["Priorité SAV 24h", "Livraison Bunia Offerte", "Ateliers IA Gratuits"] };
+        if (points >= 500) return { label: "Membre Silver", color: "text-slate-300", perks: ["Priorité SAV 48h", "-10% sur Formations", "Diagnostic PC Offert"] };
+        return { label: "Membre Bronze", color: "text-orange-400", perks: ["Accès au Hub Central", "Support par Ticket", "Historique Digital"] };
     }, [orderCount]);
 
     const handleUpdateProfile = async () => {
         if (!user?.uid) return;
         setIsSaving(true);
         try {
-            await updateDoc(doc(db, "users", user.uid), {
-                name,
-                displayName: name,
-                whatsapp,
-                address,
-                language,
-                updatedAt: serverTimestamp()
-            });
-
-            if (auth.currentUser) {
-                await updateProfile(auth.currentUser, { displayName: name });
-            }
-
-            toast({ title: "Profil mis à jour", description: "Vos informations DKS sont à jour." });
-        } catch (error) {
-            toast({ title: "Erreur", description: "Impossible de sauvegarder.", variant: "destructive" });
-        } finally {
-            setIsSaving(false);
-        }
+            await updateDoc(doc(db, "users", user.uid), { name, whatsapp, address, language, updatedAt: serverTimestamp() });
+            if (auth.currentUser) await updateProfile(auth.currentUser, { displayName: name });
+            toast({ title: "Profil mis à jour" });
+        } catch (error) { toast({ title: "Erreur", variant: "destructive" }); } finally { setIsSaving(false); }
     };
 
-    const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-        if (file.size > 2 * 1024 * 1024) {
-            toast({ title: "Fichier volumineux", description: "La taille maximale est de 2Mo.", variant: "destructive" });
-            return;
-        }
-
-        setIsUploading(true);
-        const reader = new FileReader();
-        reader.onloadend = async () => {
-            const base64String = reader.result as string;
-            setPhotoURL(base64String);
-            if (user?.uid) {
-                await updateDoc(doc(db, "users", user.uid), { photoURL: base64String });
-                if (auth.currentUser) await updateProfile(auth.currentUser, { photoURL: base64String });
-                toast({ title: "Photo mise à jour" });
-            }
-            setIsUploading(false);
-        };
-        reader.readAsDataURL(file);
+    const handleUpdateWalletPin = async () => {
+        if (!user?.uid || walletPin.length !== 4) return;
+        setIsUpdatingPin(true);
+        try {
+            await updateDoc(doc(db, "users", user.uid), { walletPin, updatedAt: serverTimestamp() });
+            toast({ title: "Code PIN Wallet Mis à Jour", description: "Ce code sera requis pour chaque transfert." });
+        } catch (error) { toast({ title: "Erreur PIN", variant: "destructive" }); } finally { setIsUpdatingPin(false); }
     };
 
-    const handleLogout = async () => {
-        await signOut(auth);
-        router.push('/login');
-    };
+    const handleLogout = async () => { await signOut(auth); router.push('/login'); };
 
     return (
         <div className="min-h-screen w-full bg-background text-foreground pb-20">
-            <header className="border-b border-white/5 bg-background/40 backdrop-blur-2xl sticky top-0 z-50">
-                <div className="max-w-6xl mx-auto px-6 h-20 flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-2xl bg-accent/10 flex items-center justify-center text-accent">
-                            <Settings size={22} />
-                        </div>
-                        <div>
-                            <h1 className="text-xl font-black tracking-tighter uppercase italic leading-none">RÉGLAGES <span className="text-accent">HUB</span></h1>
-                            <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest mt-1">Plateforme Elite DKS</p>
-                        </div>
-                    </div>
-                    <Link href="/dashboard">
-                        <Button variant="outline" className="h-11 border-white/10 rounded-2xl gap-2 font-black uppercase italic text-[10px] tracking-widest">
-                            <ArrowLeft size={14} /> Retour
-                        </Button>
-                    </Link>
+            <header className="border-b border-white/5 bg-background/40 backdrop-blur-2xl sticky top-0 z-50 h-20 flex items-center justify-between px-6">
+                <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-2xl bg-accent/10 flex items-center justify-center text-accent"><Settings size={22} /></div>
+                    <div><h1 className="text-xl font-black uppercase italic leading-none">RÉGLAGES <span className="text-accent">HUB</span></h1><p className="text-[10px] text-muted-foreground font-bold uppercase mt-1">Écosystème DKS Bunia</p></div>
                 </div>
+                <Link href="/dashboard"><Button variant="outline" className="h-11 rounded-2xl gap-2 font-black uppercase italic text-[10px] tracking-widest"><ArrowLeft size={14} /> Retour</Button></Link>
             </header>
 
             <main className="max-w-6xl mx-auto px-6 py-12">
                 <Tabs defaultValue="profile" className="space-y-10">
                     <TabsList className="bg-white/5 border border-white/5 p-1.5 rounded-[1.5rem] h-16 w-full max-w-2xl mx-auto flex">
-                        <TabsTrigger value="profile" className="flex-1 rounded-xl font-black uppercase italic text-[10px] data-[state=active]:bg-accent data-[state=active]:text-black transition-all">
-                            <User size={14} className="mr-2" /> Profil
-                        </TabsTrigger>
-                        <TabsTrigger value="loyalty" className="flex-1 rounded-xl font-black uppercase italic text-[10px] data-[state=active]:bg-accent data-[state=active]:text-black transition-all">
-                            <Crown size={14} className="mr-2" /> Fidélité
-                        </TabsTrigger>
-                        <TabsTrigger value="security" className="flex-1 rounded-xl font-black uppercase italic text-[10px] data-[state=active]:bg-accent data-[state=active]:text-black transition-all">
-                            <ShieldCheck size={14} className="mr-2" /> Sécurité
-                        </TabsTrigger>
-                        {isAdmin && (
-                          <TabsTrigger value="system" className="flex-1 rounded-xl font-black uppercase italic text-[10px] data-[state=active]:bg-accent data-[state=active]:text-black transition-all">
-                              <Database size={14} className="mr-2" /> Admin
-                          </TabsTrigger>
-                        )}
+                        <TabsTrigger value="profile" className="flex-1 rounded-xl font-black uppercase italic text-[10px] data-[state=active]:bg-accent data-[state=active]:text-black transition-all"><User size={14} className="mr-2" /> Profil</TabsTrigger>
+                        <TabsTrigger value="security" className="flex-1 rounded-xl font-black uppercase italic text-[10px] data-[state=active]:bg-accent data-[state=active]:text-black transition-all"><ShieldCheck size={14} className="mr-2" /> Sécurité</TabsTrigger>
+                        <TabsTrigger value="wallet" className="flex-1 rounded-xl font-black uppercase italic text-[10px] data-[state=active]:bg-accent data-[state=active]:text-black transition-all"><Coins size={14} className="mr-2" /> Wallet</TabsTrigger>
+                        {isAdmin && <TabsTrigger value="system" className="flex-1 rounded-xl font-black uppercase italic text-[10px] data-[state=active]:bg-accent data-[state=active]:text-black transition-all"><Database size={14} className="mr-2" /> Admin</TabsTrigger>}
                     </TabsList>
 
-                    {/* ONGLET PROFIL */}
                     <TabsContent value="profile" className="space-y-10 animate-in fade-in slide-in-from-bottom-4">
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-                            <div className="lg:col-span-1 space-y-6">
-                                <Card className="glossy-card border-none rounded-[2.5rem] overflow-hidden text-center p-8">
-                                    <div className="relative inline-block mx-auto mb-6 group">
-                                        <Avatar className="h-40 w-40 border-4 border-accent p-1.5 bg-background shadow-2xl">
-                                            <AvatarImage src={photoURL} className="rounded-full object-cover" />
-                                            <AvatarFallback className="bg-primary/20 text-accent text-5xl font-black italic">
-                                                {user?.name?.substring(0, 1)}
-                                            </AvatarFallback>
-                                            <button 
-                                                onClick={() => fileInputRef.current?.click()}
-                                                disabled={isUploading}
-                                                className="absolute bottom-2 right-2 w-10 h-10 bg-accent text-black rounded-full flex items-center justify-center shadow-xl border-4 border-background hover:scale-110 active:scale-95 transition-all"
-                                            >
-                                                {isUploading ? <Loader2 className="animate-spin w-4 h-4" /> : <Camera size={16} />}
-                                            </button>
-                                            <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageChange} />
-                                        </Avatar>
-                                    </div>
-                                    <h3 className="text-2xl font-black uppercase italic tracking-tighter truncate">{name}</h3>
-                                    <p className="text-xs text-muted-foreground uppercase font-bold opacity-60 mb-6">{user?.email}</p>
-                                    
-                                    <div className={cn("p-6 rounded-[2rem] border flex flex-col items-center gap-3 relative overflow-hidden", loyalty.bg, loyalty.border)}>
-                                        <div className="absolute top-0 right-0 p-4 opacity-10"><Sparkles className={loyalty.color} size={60} /></div>
-                                        {loyalty.icon}
-                                        <p className={cn("text-xs font-black uppercase italic tracking-widest", loyalty.color)}>{loyalty.label}</p>
-                                    </div>
-                                </Card>
-
-                                <Card className="glossy-card border-none rounded-[2.5rem] p-8 space-y-6">
-                                    <div className="flex items-center gap-3"><Globe size={18} className="text-accent" /><h4 className="text-[11px] font-black uppercase italic tracking-widest">Interface</h4></div>
-                                    <div className="space-y-4">
-                                        <div className="flex items-center justify-between p-3 bg-white/5 rounded-2xl">
-                                            <div className="flex items-center gap-3">
-                                                {theme === 'dark' ? <Moon size={16} className="text-accent" /> : <Sun size={16} className="text-yellow-400" />}
-                                                <span className="text-[10px] font-black uppercase">Mode Sombre</span>
-                                            </div>
-                                            <Switch checked={theme === 'dark'} onCheckedChange={(c) => setTheme(c ? 'dark' : 'light')} />
-                                        </div>
-                                    </div>
-                                </Card>
-                            </div>
+                            <Card className="glossy-card border-none rounded-[2.5rem] p-8 text-center space-y-6">
+                                <div className="relative inline-block mx-auto">
+                                    <Avatar className="h-40 w-40 border-4 border-accent p-1.5 bg-background shadow-2xl">
+                                        <AvatarImage src={photoURL} className="rounded-full object-cover" />
+                                        <AvatarFallback className="bg-primary/20 text-accent text-5xl font-black italic">{user?.name?.substring(0, 1)}</AvatarFallback>
+                                    </Avatar>
+                                </div>
+                                <h3 className="text-2xl font-black uppercase italic tracking-tighter truncate">{name}</h3>
+                                <div className="p-5 bg-white/5 rounded-2xl border border-white/5 text-left space-y-2">
+                                    <p className="text-[8px] font-black uppercase opacity-40">Détails Système</p>
+                                    <div className="flex items-center gap-3 text-[10px] font-bold uppercase"><Mail size={12} className="text-accent" /> {user?.email}</div>
+                                    <div className="flex items-center gap-3 text-[10px] font-bold uppercase"><Smartphone size={12} className="text-accent" /> {whatsapp}</div>
+                                </div>
+                            </Card>
 
                             <div className="lg:col-span-2 space-y-6">
-                                <Card className="glossy-card border-none rounded-[2.5rem] p-10">
-                                    <div className="flex items-center gap-4 mb-10">
-                                        <User className="text-accent" size={24} />
-                                        <div>
-                                            <h2 className="text-xl font-black uppercase italic tracking-tight">INFOS CONTACT</h2>
-                                            <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Pour vos factures officielles</p>
-                                        </div>
+                                <Card className="glossy-card border-none rounded-[2.5rem] p-10 space-y-8">
+                                    <div className="flex items-center gap-4"><User className="text-accent" size={24} /><div><h2 className="text-xl font-black uppercase italic tracking-tight">INFORMATIONS ÉLITE</h2><p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Identité officielle dans le Hub</p></div></div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                        <div className="space-y-4"><Label className="text-[10px] font-black uppercase opacity-60 ml-1">Nom complet</Label><Input value={name} onChange={(e) => setName(e.target.value)} className="h-14 bg-background/50 border-white/5 rounded-2xl" /></div>
+                                        <div className="space-y-4"><Label className="text-[10px] font-black uppercase opacity-60 ml-1">Numéro WhatsApp</Label><Input value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} className="h-14 bg-background/50 border-white/5 rounded-2xl" /></div>
+                                        <div className="md:col-span-2 space-y-4"><Label className="text-[10px] font-black uppercase opacity-60 ml-1">Adresse à Bunia</Label><Input value={address} onChange={(e) => setAddress(e.target.value)} className="h-14 bg-background/50 border-white/5 rounded-2xl" /></div>
                                     </div>
-
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
-                                        <div className="space-y-4">
-                                            <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Nom complet</Label>
-                                            <Input value={name} onChange={(e) => setName(e.target.value)} className="h-14 bg-background/50 border-white/5 rounded-2xl focus:border-accent text-sm" />
-                                        </div>
-                                        <div className="space-y-4">
-                                            <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Numéro WhatsApp</Label>
-                                            <div className="relative">
-                                                <MessageCircle className="absolute left-5 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
-                                                <Input value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="+243..." className="h-14 pl-14 bg-background/50 border-white/5 rounded-2xl focus:border-accent" />
-                                            </div>
-                                        </div>
-                                        <div className="md:col-span-2 space-y-4">
-                                            <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Adresse de livraison (Bunia)</Label>
-                                            <div className="relative">
-                                                <MapPin className="absolute left-5 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
-                                                <Input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Quartier, Avenue, N°..." className="h-14 pl-14 bg-background/50 border-white/5 rounded-2xl focus:border-accent" />
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <Button onClick={handleUpdateProfile} disabled={isSaving} className="w-full h-16 bg-accent text-black font-black uppercase italic rounded-2xl gap-3 shadow-xl shadow-accent/10">
-                                        {isSaving ? <Loader2 className="animate-spin" /> : <><RefreshCw size={18} /> Mettre à jour mon profil</>}
-                                    </Button>
+                                    <Button onClick={handleUpdateProfile} disabled={isSaving} className="w-full h-16 bg-accent text-black font-black uppercase italic rounded-2xl gap-3 shadow-xl">{isSaving ? <Loader2 className="animate-spin" /> : <RefreshCw size={18}/>} Enregistrer les modifications</Button>
                                 </Card>
                             </div>
                         </div>
                     </TabsContent>
 
-                    {/* ONGLET FIDÉLITÉ */}
-                    <TabsContent value="loyalty" className="animate-in fade-in slide-in-from-bottom-4">
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                             <Card className={cn("border-none rounded-[3rem] p-10 relative overflow-hidden flex flex-col justify-between h-[500px]", loyalty.bg, loyalty.border)}>
-                                <div className="absolute top-0 right-0 p-12 opacity-5"><Logo size="xl" /></div>
-                                
-                                <div className="space-y-6 relative z-10">
-                                    <Badge className="bg-white/10 text-white font-black uppercase italic border-none px-4 py-1.5">CARTE DIGITALE DKS ELITE</Badge>
-                                    <div className="space-y-2">
-                                        <h2 className="text-5xl font-black uppercase italic tracking-tighter leading-tight text-white">STATUT <br /><span className={loyalty.color}>{loyalty.label}</span></h2>
-                                        <p className="text-sm font-bold opacity-60 uppercase">Titulaire : {name}</p>
-                                    </div>
-                                </div>
-
-                                <div className="space-y-8 relative z-10">
-                                    <div className="space-y-4">
-                                        <div className="flex justify-between items-end">
-                                            <span className="text-[10px] font-black uppercase opacity-40">Points Fidélité ({orderCount * 100})</span>
-                                            <span className="text-[10px] font-black uppercase text-accent">{orderCount * 100} / {loyalty.level === 3 ? '1000+' : loyalty.level === 2 ? '1000' : '500'} pts</span>
-                                        </div>
-                                        <Progress value={Math.min(100, ((orderCount * 100) / (loyalty.level === 1 ? 500 : 1000)) * 100)} className="h-3 bg-black/20" indicatorClassName={cn("transition-all duration-1000", loyalty.color === 'text-yellow-400' ? 'bg-yellow-400' : loyalty.color === 'text-slate-300' ? 'bg-slate-300' : 'bg-orange-400')} />
-                                        <p className="text-[8px] font-black uppercase italic opacity-40 text-center">Plus vous utilisez nos services, plus vous montez en grade.</p>
-                                    </div>
-                                    <div className="flex justify-between items-center bg-black/20 p-6 rounded-3xl border border-white/5">
-                                        <div>
-                                            <p className="text-[9px] font-black uppercase opacity-40">Membre depuis</p>
-                                            <p className="text-sm font-bold uppercase">{user?.createdAt?.toDate ? user.createdAt.toDate().getFullYear() : '2024'}</p>
-                                        </div>
-                                        <div className="text-right">
-                                            <p className="text-[9px] font-black uppercase opacity-40">ID Membre</p>
-                                            <p className="text-sm font-mono font-bold">DKS-{user?.uid.substring(0, 6).toUpperCase()}</p>
-                                        </div>
-                                    </div>
-                                </div>
-                             </Card>
-
-                             <Card className="glossy-card border-none rounded-[3rem] p-10 space-y-8">
-                                <div className="flex items-center gap-4">
-                                    <Sparkles className="text-accent" size={24} />
-                                    <h2 className="text-xl font-black uppercase italic tracking-tight">VOS AVANTAGES ÉLITE</h2>
-                                </div>
-                                <div className="space-y-4">
-                                    {loyalty.perks.map((perk, i) => (
-                                        <div key={i} className="flex items-center gap-4 p-5 bg-white/5 rounded-2xl border border-white/5 group hover:bg-accent/5 transition-all">
-                                            <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-accent shrink-0">
-                                                <CheckCircle2 size={20} />
-                                            </div>
-                                            <span className="font-bold text-sm uppercase italic tracking-tight">{perk}</span>
-                                        </div>
-                                    ))}
-                                    <div className="p-8 mt-4 rounded-[2rem] bg-accent/10 border border-accent/20 text-center space-y-4">
-                                        <p className="text-xs text-muted-foreground leading-relaxed">
-                                            En atteignant le statut <strong>Gold</strong>, vous obtenez un accès illimité à notre support technique prioritaire et des tarifs réduits sur tout le hardware.
-                                        </p>
-                                        <Link href="/services">
-                                            <Button variant="outline" className="rounded-xl border-accent/20 text-accent font-black uppercase italic text-[10px]">
-                                                Explorer les services premium
-                                            </Button>
-                                        </Link>
-                                    </div>
-                                </div>
-                             </Card>
-                        </div>
-                    </TabsContent>
-
-                    {/* ONGLET SÉCURITÉ */}
                     <TabsContent value="security" className="space-y-10 animate-in fade-in slide-in-from-bottom-4">
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                             <Card className="glossy-card border-none rounded-[2.5rem] p-10 space-y-8">
-                                <div className="flex items-center gap-4">
-                                    <Lock className="text-accent" size={24} />
-                                    <h2 className="text-xl font-black uppercase italic tracking-tight">ACCÈS & PROTECTION</h2>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                            <Card className="glossy-card border-none rounded-[2.5rem] p-10 space-y-8">
+                                <div className="flex items-center gap-4"><Lock className="text-accent" size={24} /><h2 className="text-xl font-black uppercase italic tracking-tight">ACCÈS COMPTE</h2></div>
+                                <div className="space-y-4">
+                                    <div className="space-y-2"><Label className="text-[10px] font-black uppercase opacity-60 ml-1">Ancien mot de passe</Label><Input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} className="h-14 bg-background/50 border-white/5 rounded-xl" /></div>
+                                    <div className="space-y-2"><Label className="text-[10px] font-black uppercase opacity-60 ml-1">Nouveau mot de passe</Label><Input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="h-14 bg-background/50 border-white/5 rounded-xl" /></div>
                                 </div>
-                                <div className="space-y-6">
-                                    <div className="space-y-2">
-                                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Mot de passe actuel</Label>
-                                        <Input type={showPasswords ? "text" : "password"} value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} className="h-14 bg-background/50 border-white/5 rounded-xl" />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Nouveau mot de passe</Label>
-                                        <Input type={showPasswords ? "text" : "password"} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="h-14 bg-background/50 border-white/5 rounded-xl" />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Confirmer le nouveau code</Label>
-                                        <Input type={showPasswords ? "text" : "password"} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="h-14 bg-background/50 border-white/5 rounded-xl" />
-                                    </div>
-                                    <button onClick={() => setShowPasswords(!showPasswords)} className="text-[10px] font-black uppercase italic text-accent hover:underline ml-1">
-                                        {showPasswords ? "Masquer les codes" : "Afficher les codes"}
-                                    </button>
-                                </div>
-                                <Button onClick={async () => {
-                                    if (newPassword !== confirmPassword) { toast({ title: "Incohérent", description: "Les mots de passe ne correspondent pas.", variant: "destructive" }); return; }
-                                    if (newPassword.length < 6) { toast({ title: "Trop court", description: "Minimum 6 caractères.", variant: "destructive" }); return; }
-                                    setIsUpdatingPassword(true);
-                                    try {
-                                        const credential = EmailAuthProvider.credential(user?.email || "", currentPassword);
-                                        await reauthenticateWithCredential(auth.currentUser!, credential);
-                                        await updatePassword(auth.currentUser!, newPassword);
-                                        toast({ title: "Sécurité mise à jour" });
-                                        setCurrentPassword(""); setNewPassword(""); setConfirmPassword("");
-                                    } catch (e) { toast({ title: "Échec", description: "Vérifiez votre mot de passe actuel.", variant: "destructive" }); }
-                                    setIsUpdatingPassword(false);
-                                }} disabled={isUpdatingPassword || !currentPassword} className="w-full h-16 bg-accent text-black font-black uppercase italic rounded-2xl shadow-xl shadow-accent/10">
-                                    {isUpdatingPassword ? <Loader2 className="animate-spin" /> : "Appliquer la nouvelle sécurité"}
-                                </Button>
-                             </Card>
+                                <Button className="w-full h-16 bg-white text-black font-black uppercase italic rounded-2xl">Appliquer le nouveau code</Button>
+                            </Card>
 
-                             <Card className="glossy-card border-none rounded-[2.5rem] p-10 space-y-6">
-                                <div className="flex items-center gap-4"><ShieldAlert size={24} className="text-accent" /><h2 className="text-xl font-black uppercase italic tracking-tight">SESSIONS ACTIVES</h2></div>
-                                <div className="p-5 bg-accent/5 border border-accent/20 rounded-2xl flex items-center justify-between">
+                            <Card className="glossy-card border-none rounded-[2.5rem] p-10 space-y-8">
+                                <div className="flex items-center gap-4"><Fingerprint className="text-accent" size={24} /><h2 className="text-xl font-black uppercase italic tracking-tight">SESSIONS ACTIVES</h2></div>
+                                <div className="p-6 rounded-3xl bg-accent/5 border border-accent/20 flex justify-between items-center">
                                     <div className="flex items-center gap-4">
-                                        <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-accent"><Smartphone size={20} /></div>
-                                        <div>
-                                            <p className="text-xs font-black uppercase italic">Cet appareil</p>
-                                            <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-widest">Bunia, RDC • Actif maintenant</p>
-                                        </div>
+                                        <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-accent"><Smartphone size={20}/></div>
+                                        <div><p className="font-bold text-xs">Cet appareil</p><p className="text-[9px] uppercase opacity-40">Actif maintenant • Bunia, RDC</p></div>
                                     </div>
-                                    <Badge className="bg-accent text-black font-black text-[9px] px-2 h-5">EN LIGNE</Badge>
+                                    <Badge className="bg-accent text-black font-black text-[8px]">ONLINE</Badge>
                                 </div>
-                             </Card>
+                            </Card>
                         </div>
                     </TabsContent>
 
-                    {/* ONGLET SYSTÈME (ADMIN SEULEMENT) */}
-                    {isAdmin && (
-                        <TabsContent value="system" className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                <Card className="glossy-card border-none rounded-[2.5rem] p-10 space-y-8">
-                                    <div className="flex justify-between items-start">
-                                        <div className="flex items-center gap-4"><RefreshCw className="text-accent" size={22} /><h2 className="text-xl font-black uppercase italic tracking-tight">TAUX DE CHANGE</h2></div>
-                                    </div>
+                    <TabsContent value="wallet" className="space-y-10 animate-in fade-in slide-in-from-bottom-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                            <Card className="glossy-card border-none rounded-[3rem] p-12 space-y-8 relative overflow-hidden">
+                                <div className="absolute top-0 right-0 p-8 opacity-5"><KeyRound size={120} /></div>
+                                <div className="relative z-10 space-y-8">
+                                    <div className="flex items-center gap-4"><KeyRound className="text-accent" size={24} /><h2 className="text-2xl font-black uppercase italic tracking-tight">SIGNATURE <span className="text-accent">DKST</span></h2></div>
+                                    <p className="text-sm text-muted-foreground leading-relaxed italic">"Le code PIN Wallet est une couche de sécurité supplémentaire requise pour valider chaque transfert de jetons DKST."</p>
+                                    
                                     <div className="space-y-4">
-                                        <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Valeur de 1 USD en CDF</Label>
-                                        <div className="relative">
-                                            <span className="absolute left-5 top-1/2 -translate-y-1/2 text-muted-foreground font-black">FC</span>
-                                            <Input type="number" value={exchangeRate} onChange={(e) => setExchangeRate(e.target.value)} className="h-16 pl-14 bg-background/50 border-white/5 rounded-2xl text-xl font-bold" />
+                                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Définir mon PIN (4 chiffres)</Label>
+                                        <div className="flex justify-center gap-4">
+                                            <Input 
+                                                type="password" 
+                                                maxLength={4} 
+                                                value={walletPin} 
+                                                onChange={(e) => setWalletPin(e.target.value.replace(/\D/g, ''))}
+                                                className="h-20 bg-background/50 border-white/10 rounded-[2rem] text-center text-5xl font-black tracking-[0.5em] focus:border-accent"
+                                            />
                                         </div>
                                     </div>
-                                    <Button onClick={async () => {
-                                        setIsSavingSystem(true);
-                                        await setDoc(doc(db, "system", "config"), { exchangeRate: parseInt(exchangeRate) }, { merge: true });
-                                        toast({ title: "Taux mis à jour" });
-                                        setIsSavingSystem(false);
-                                    }} disabled={isSavingSystem} className="w-full h-14 bg-accent text-black font-black uppercase italic rounded-xl shadow-lg shadow-accent/10">{isSavingSystem ? <Loader2 className="animate-spin" /> : "Mettre à jour la boutique"}</Button>
-                                </Card>
 
-                                <Card className="glossy-card border-none rounded-[2.5rem] p-10 space-y-8">
-                                    <div className="flex items-center gap-4"><Wallet className="text-accent" size={22} /><h2 className="text-xl font-black uppercase italic tracking-tight">INTERFACE PI NETWORK</h2></div>
-                                    <div className="space-y-6">
-                                        <div className="p-4 rounded-2xl bg-orange-500/5 border border-orange-500/20 flex gap-4">
-                                            <AlertTriangle className="text-orange-500 shrink-0" size={18} />
-                                            <div className="space-y-1">
-                                                <p className="text-[10px] font-black uppercase text-orange-500">Mode Consensus GCV Actif</p>
-                                                <p className="text-[9px] text-muted-foreground leading-tight">La boutique applique le taux 1π = $314,159 pour tous les services techniques.</p>
-                                            </div>
-                                        </div>
+                                    <Button onClick={handleUpdateWalletPin} disabled={isUpdatingPin || walletPin.length !== 4} className="w-full h-16 bg-accent text-black font-black uppercase italic rounded-2xl shadow-xl shadow-accent/20">
+                                        {isUpdatingPin ? <Loader2 className="animate-spin" /> : <><ShieldCheck size={20}/> Activer la Protection PIN</>}
+                                    </Button>
+                                </div>
+                            </Card>
+
+                            <Card className="bg-red-500/10 border-red-500/20 rounded-[3rem] p-12 space-y-8">
+                                <div className="flex items-center gap-4 text-red-500"><ShieldAlert size={32} /><h3 className="text-2xl font-black uppercase italic tracking-tight">Zone Critique</h3></div>
+                                <p className="text-sm text-red-400 font-medium leading-relaxed italic">En cas de perte de votre téléphone ou de suspicion de vol, utilisez le verrouillage d'urgence depuis votre dashboard Wallet pour geler vos actifs.</p>
+                                <div className="pt-4 border-t border-red-500/20">
+                                    <div className="flex items-center justify-between p-4 bg-red-500/5 rounded-2xl border border-red-500/20">
+                                        <div><p className="text-[10px] font-black uppercase text-red-500">Protection Passive</p><p className="text-[9px] text-white/40">Actif par défaut sur tous les comptes</p></div>
+                                        <CheckCircle2 className="text-green-500" size={20} />
                                     </div>
-                                </Card>
-                            </div>
+                                </div>
+                            </Card>
+                        </div>
+                    </TabsContent>
+
+                    {isAdmin && (
+                        <TabsContent value="system" className="animate-in fade-in slide-in-from-bottom-4">
+                            <Card className="glossy-card border-none rounded-[2.5rem] p-10 space-y-10">
+                                <div className="flex items-center gap-4"><RefreshCw className="text-accent" /><h2 className="text-xl font-black uppercase italic">TAUX DE CHANGE SYSTÈME</h2></div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                    <div className="space-y-4"><Label className="text-[10px] font-black uppercase opacity-60">1 USD en Francs Congolais (CDF)</Label><Input type="number" value={exchangeRate} onChange={(e) => setExchangeRate(e.target.value)} className="h-16 bg-background/50 border-white/5 rounded-2xl text-2xl font-bold" /></div>
+                                </div>
+                            </Card>
                         </TabsContent>
                     )}
                 </Tabs>
-
-                <div className="mt-24 pt-10 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-8">
-                    <p className="text-[10px] font-black uppercase tracking-[0.4em] text-accent/40 italic">DKS SHOPMANAGER SUPREME V3.0 • EXCELLENCE ITURI</p>
-                    <Button variant="ghost" onClick={handleLogout} className="text-destructive hover:bg-destructive/10 rounded-2xl px-12 h-14 font-black uppercase italic text-xs tracking-[0.2em] gap-3 border border-destructive/10">
-                        <LogOut size={18} /> FERMER LA SESSION HUB
-                    </Button>
-                </div>
-            </main>
+            </div>
         </div>
     );
 }

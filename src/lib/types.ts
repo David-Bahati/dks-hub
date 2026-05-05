@@ -23,6 +23,10 @@ export type AppUser = {
   miningPower?: number;
   completedMissionsToday?: string[];
   lastBlockRarity?: 'common' | 'rare' | 'legendary';
+  walletPin?: string;
+  isWalletLocked?: boolean;
+  dailySpendingLimit?: number;
+  todaySpent?: number;
 };
 
 export type TokenTransaction = {
@@ -85,4 +89,23 @@ export type DailyMission = {
     rewardPoints: number;
     icon: string;
     targetRole?: 'staff' | 'customer' | 'all';
+};
+
+export type SupportMessage = {
+  id: string;
+  senderId: string;
+  senderName: string;
+  senderRole: string;
+  text: string;
+  imageUrl?: string | null;
+  createdAt: any;
+};
+
+export type UsedPart = {
+  id: string;
+  productId: string;
+  name: string;
+  quantity: number;
+  unitPrice: number;
+  createdAt: any;
 };

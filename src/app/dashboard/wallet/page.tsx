@@ -53,7 +53,14 @@ import {
     Medal,
     TrendingUp as TrendingUpIcon,
     Banknote,
-    BarChart3
+    BarChart3,
+    ShieldAlert,
+    KeyRound,
+    Eye,
+    EyeOff,
+    Fingerprint,
+    AlertTriangle,
+    ShieldX
 } from "lucide-react";
 import { db } from '@/lib/firebase';
 import { collection, query, where, orderBy, updateDoc, doc, addDoc, serverTimestamp, increment, limit, getDocs, Timestamp } from 'firebase/firestore';
@@ -73,7 +80,14 @@ import {
     SheetHeader, 
     SheetTitle,
 } from "@/components/ui/sheet";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { 
+    Dialog, 
+    DialogContent, 
+    DialogHeader, 
+    DialogTitle,
+    DialogFooter 
+} from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/tabs";
 import { authenticateWithPi } from '@/lib/pi-payment';
 import { 
     AreaChart, 
@@ -106,6 +120,13 @@ function UniversalWalletPage() {
     const [isProcessingAction, setIsProcessingAction] = useState(false);
     const [tempPiAddress, setTempPiAddress] = useState("");
     
+    // Security States
+    const [isPinVerificationOpen, setIsPinVerificationOpen] = useState(false);
+    const [enteredPin, setEnteredPin] = useState("");
+    const [pendingAction, setPendingAction] = useState<() => void>(() => {});
+    const [showPin, setShowPin] = useState(false);
+    const [isEmergencyLockProcessing, setIsEmergencyLockProcessing] = useState(false);
+
     // UI States
     const [ledgerFilter, setLedgerFilter] = useState("all");
     const [ledgerSearch, setLedgerSearch] = useState("");
@@ -228,7 +249,6 @@ function UniversalWalletPage() {
 
     const globalHubWealth = useMemo(() => {
         if (!topWealthyUsers) return 0;
-        // Approximation: Somme des soldes visibles pour simuler la fortune globale du Hub
         const sum = topWealthyUsers.reduce((acc, u) => acc + (u.tokenBalance || 0) + (u.stakedBalance || 0), 0);
         return sum * GCV_VALUE;
     }, [topWealthyUsers]);
@@ -274,6 +294,60 @@ function UniversalWalletPage() {
 
             toast({ title: "Points Mintés !", description: `${tokens} DKST générés sur votre compte.` });
         } catch (error) { toast({ title: "Erreur Mint", variant: "destructive" }); } finally { setIsMinting(false); }
+    };
+
+    // --- SECURITY WRAPPER ---
+    const secureAction = (action: () => void) => {
+        if (user?.isWalletLocked) {
+            toast({ title: "Wallet Verrouillé", description: "Déverrouillez votre wallet dans le centre de sécurité.", variant: "destructive" });
+            return;
+        }
+        
+        if (!user?.walletPin) {
+            toast({ title: "PIN non configuré", description: "Veuillez configurer un code PIN dans les réglages.", variant: "destructive" });
+            return;
+        }
+
+        setPendingAction(() => action);
+        setIsPinVerificationOpen(true);
+    };
+
+    const handleVerifyPin = () => {
+        if (enteredPin === user?.walletPin) {
+            setIsPinVerificationOpen(false);
+            setEnteredPin("");
+            pendingAction();
+        } else {
+            toast({ title: "Code PIN Incorrect", variant: "destructive" });
+            setEnteredPin("");
+        }
+    };
+
+    const toggleEmergencyLock = async () => {
+        if (!user) return;
+        setIsEmergencyLockProcessing(true);
+        try {
+            const newLockState = !user.isWalletLocked;
+            await updateDoc(doc(db, "users", user.uid), {
+                isWalletLocked: newLockState,
+                updatedAt: serverTimestamp()
+            });
+            
+            await addDoc(collection(db, "notifications"), {
+                userId: user.uid,
+                title: newLockState ? "WALLET VERROUILLÉ" : "WALLET DÉVERROUILLÉ",
+                message: newLockState ? "Sécurité maximale activée. Aucun transfert possible." : "Votre wallet est à nouveau opérationnel.",
+                type: newLockState ? 'error' : 'success',
+                isRead: false,
+                createdAt: serverTimestamp()
+            });
+
+            toast({ title: newLockState ? "Wallet Verrouillé" : "Wallet Déverrouillé", variant: newLockState ? "destructive" : "default" });
+        } catch (e) {
+            toast({ title: "Erreur Sécurité", variant: "destructive" });
+        } finally {
+            setIsEmergencyLockProcessing(false);
+        }
     };
 
     const handleStake = async () => {
@@ -345,12 +419,10 @@ function UniversalWalletPage() {
         } catch (e) { toast({ title: "Erreur Achat", variant: "destructive" }); } finally { setIsProcessingAction(false); }
     };
 
-    const handleTransfer = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const handleTransferProcess = async () => {
         if (!user || !selectedRecipient || !transferAmount) return;
         const amount = parseFloat(transferAmount);
-        if (amount > (user.tokenBalance || 0)) { toast({ title: "Solde insuffisant", variant: "destructive" }); return; }
-
+        
         setIsProcessingAction(true);
         try {
             const piTxId = `PI-P2P-${Math.random().toString(36).substring(2, 12).toUpperCase()}`;
@@ -369,13 +441,7 @@ function UniversalWalletPage() {
                 senderId: user.uid, senderName: user.name, memo: transferMemo, piTxId, createdAt: serverTimestamp()
             });
 
-            await addDoc(collection(db, "notifications"), {
-                userId: selectedRecipient.id, title: "DKST Reçu !",
-                message: `${user.name} vous a envoyé ${amount} DKST.`,
-                type: 'success', isRead: false, createdAt: serverTimestamp(), link: '/dashboard/wallet'
-            });
-
-            toast({ title: "Transfert réussi", description: `${amount} DKST envoyés à ${selectedRecipient.name}` });
+            toast({ title: "Transfert réussi", description: `${amount} DKST envoyés.` });
             setIsTransferSheetOpen(false);
             setTransferAmount("");
             setSelectedRecipient(null);
@@ -391,12 +457,8 @@ function UniversalWalletPage() {
             const pdf = new jsPDF({ orientation: 'landscape', unit: 'px', format: [canvas.width / 2, canvas.height / 2] });
             pdf.addImage(imgData, 'PNG', 0, 0, canvas.width / 2, canvas.height / 2);
             pdf.save(`CERTIFICAT_FORTUNE_DKS_${user?.name?.replace(/\s+/g, '_')}.pdf`);
-            toast({ title: "Certificat de Fortune généré", description: "Félicitations pour votre réussite financière !" });
-        } catch (error) {
-            toast({ title: "Erreur PDF", variant: "destructive" });
-        } finally {
-            setIsGeneratingCert(false);
-        }
+            toast({ title: "Certificat de Fortune généré" });
+        } catch (error) { toast({ title: "Erreur PDF", variant: "destructive" }); } finally { setIsGeneratingCert(false); }
     };
 
     const getWealthTitle = (wealth: number) => {
@@ -441,6 +503,13 @@ function UniversalWalletPage() {
     });
 
     const isMillionaire = stats.gcvUSD >= 1000000;
+    const securityScore = useMemo(() => {
+        let score = 30; // Base email auth
+        if (user?.walletPin) score += 40;
+        if (!user?.isWalletLocked) score += 0; else score += 10;
+        if (user?.piWalletAddress) score += 20;
+        return score;
+    }, [user]);
 
     return (
         <div className="min-h-screen bg-background text-foreground pb-20">
@@ -467,15 +536,6 @@ function UniversalWalletPage() {
                                 Certificat Millionnaire
                             </Button>
                         )}
-                        <Button 
-                            onClick={handleSyncPi}
-                            disabled={isSyncing}
-                            variant="outline"
-                            className="border-orange-500/20 text-orange-500 h-14 px-6 rounded-2xl font-black uppercase italic gap-3 hover:bg-orange-500/10 transition-all"
-                        >
-                            {isSyncing ? <Loader2 className="animate-spin" /> : <Globe size={20} />}
-                            {user?.piWalletAddress ? "Pi Mainnet Synced" : "Connecter Pi SDK"}
-                        </Button>
                         <Button onClick={() => setIsTransferSheetOpen(true)} className="bg-accent text-black hover:bg-accent/90 h-14 px-8 rounded-2xl font-black uppercase italic gap-3 shadow-xl shadow-accent/20">
                             <Send size={20} /> Transférer
                         </Button>
@@ -491,7 +551,7 @@ function UniversalWalletPage() {
                                 <Badge variant="outline" className="border-white/10 text-white/40 uppercase font-black text-[9px] tracking-widest flex items-center gap-2">
                                     <Sparkles size={10} className="text-yellow-500" /> 1 π = $314,159.00
                                 </Badge>
-                                {isMillionaire && <Badge className="bg-white/10 text-yellow-500 border-yellow-500/50 uppercase font-black text-[9px] tracking-widest px-3 h-8 flex items-center gap-2"><Crown size={12}/> Millionnaire Club</Badge>}
+                                {user?.isWalletLocked && <Badge className="bg-red-500 text-white border-none uppercase font-black text-[9px] px-3 h-8 flex items-center gap-2 animate-pulse"><Lock size={12}/> Wallet Verrouillé</Badge>}
                             </div>
 
                             <div className="flex flex-col md:flex-row justify-between items-end gap-10">
@@ -528,46 +588,53 @@ function UniversalWalletPage() {
                     </Card>
 
                     <Card className="lg:col-span-4 glossy-card border-none rounded-[3.5rem] p-10 flex flex-col justify-between overflow-hidden relative">
-                         <div className="absolute bottom-0 right-0 p-8 opacity-5"><Calculator size={100} /></div>
+                         <div className="absolute bottom-0 right-0 p-8 opacity-5"><ShieldCheck size={100} /></div>
                          <div className="space-y-6">
                             <div className="flex items-center gap-3">
-                                <div className="w-12 h-12 rounded-2xl bg-accent text-black flex items-center justify-center shadow-lg"><Calculator size={24} /></div>
-                                <h4 className="text-xl font-black uppercase italic tracking-tight">Calculateur <span className="text-accent">Wealth</span></h4>
+                                <div className="w-12 h-12 rounded-2xl bg-accent text-black flex items-center justify-center shadow-lg"><ShieldCheck size={24} /></div>
+                                <h4 className="text-xl font-black uppercase italic tracking-tight">Security <span className="text-accent">Shield</span></h4>
                             </div>
-                            <p className="text-xs text-muted-foreground leading-relaxed italic">"Simulez l'impact de vos gains sur votre fortune future au taux GCV."</p>
-                            
                             <div className="space-y-4 pt-4">
-                                <div className="space-y-2">
-                                    <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Gain Cible (DKST)</Label>
-                                    <Input 
-                                        type="number" 
-                                        placeholder="Ex: 10" 
-                                        className="h-14 bg-background/50 border-white/10 rounded-2xl text-xl font-black text-center" 
-                                        onChange={(e) => {
-                                            const val = parseFloat(e.target.value) || 0;
-                                            const res = val * GCV_VALUE;
-                                            (document.getElementById('calc-res') as HTMLElement).innerText = `$${res.toLocaleString('fr-FR')}`;
-                                        }}
-                                    />
+                                <div className="flex justify-between items-end">
+                                    <p className="text-[10px] font-black uppercase text-white/40">Protection du Hub</p>
+                                    <span className="text-sm font-black text-accent">{securityScore}% Secured</span>
                                 </div>
-                                <div className="p-6 bg-black/40 rounded-3xl border border-dashed border-accent/30 text-center">
-                                    <p className="text-[8px] font-black uppercase text-accent mb-2">Valeur GCV Potentielle</p>
-                                    <p id="calc-res" className="text-3xl font-black text-white italic">$0</p>
+                                <Progress value={securityScore} className="h-2 bg-white/5" indicatorClassName="bg-accent shadow-[0_0_10px_rgba(56,189,248,0.5)]" />
+                                
+                                <div className="grid grid-cols-1 gap-2">
+                                    <div className="flex items-center gap-3 p-3 bg-white/5 rounded-xl border border-white/5">
+                                        <KeyRound size={14} className={user?.walletPin ? "text-green-400" : "text-white/20"} />
+                                        <span className="text-[9px] font-bold uppercase">Code PIN de Signature</span>
+                                        {user?.walletPin ? <CheckCircle2 size={12} className="ml-auto text-green-400" /> : <Link href="/dashboard/settings" className="ml-auto text-[8px] text-accent underline uppercase">Fixer</Link>}
+                                    </div>
+                                    <div className="flex items-center gap-3 p-3 bg-white/5 rounded-xl border border-white/5">
+                                        <Fingerprint size={14} className={user?.piWalletAddress ? "text-green-400" : "text-white/20"} />
+                                        <span className="text-[9px] font-bold uppercase">Identité Pi Synced</span>
+                                        {user?.piWalletAddress ? <CheckCircle2 size={12} className="ml-auto text-green-400" /> : <ShieldX size={12} className="ml-auto text-red-400" />}
+                                    </div>
                                 </div>
                             </div>
                          </div>
-                         <Button variant="ghost" className="h-10 text-[9px] font-black uppercase tracking-widest text-white/20 mt-6 group">
-                            Comprendre le GCV <ArrowRight size={12} className="ml-2 group-hover:translate-x-2 transition-transform" />
+                         <Button 
+                            onClick={toggleEmergencyLock} 
+                            disabled={isEmergencyLockProcessing}
+                            variant={user?.isWalletLocked ? "default" : "outline"}
+                            className={cn(
+                                "w-full h-14 rounded-2xl font-black uppercase italic text-[10px] gap-3 mt-6 transition-all",
+                                user?.isWalletLocked ? "bg-red-500 text-white" : "border-red-500/20 text-red-400 hover:bg-red-500 hover:text-white"
+                            )}
+                         >
+                            {isEmergencyLockProcessing ? <Loader2 className="animate-spin" /> : user?.isWalletLocked ? <><Lock size={16} /> Déverrouiller le Wallet</> : <><ShieldAlert size={16} /> Verrouillage d'Urgence</>}
                          </Button>
                     </Card>
                 </div>
 
                 <Tabs defaultValue="overview" className="space-y-10">
                     <TabsList className="bg-white/5 border border-white/5 p-1.5 rounded-[1.5rem] h-16 w-full max-w-2xl mx-auto flex">
-                        <TabsTrigger value="overview" className="flex-1 rounded-xl font-black uppercase italic text-[10px] data-[state=active]:bg-accent data-[state=active]:text-black transition-all"><Wallet size={14} className="mr-2" /> Vue d'ensemble</TabsTrigger>
-                        <TabsTrigger value="vault" className="flex-1 rounded-xl font-black uppercase italic text-[10px] data-[state=active]:bg-accent data-[state=active]:text-black transition-all"><Lock size={14} className="mr-2" /> DKS Vault</TabsTrigger>
-                        <TabsTrigger value="rankings" className="flex-1 rounded-xl font-black uppercase italic text-[10px] data-[state=active]:bg-accent data-[state=active]:text-black transition-all"><BarChart3 size={14} className="mr-2" /> Classement Wealth</TabsTrigger>
-                        <TabsTrigger value="history" className="flex-1 rounded-xl font-black uppercase italic text-[10px] data-[state=active]:bg-accent data-[state=active]:text-black transition-all"><History size={14} className="mr-2" /> Registre</TabsTrigger>
+                        <TabsTrigger value="overview" className="flex-1 rounded-xl font-black uppercase italic text-[10px] data-[state=active]:bg-accent data-[state=active]:text-black transition-all"><Wallet size={14} className="mr-2" /> Portefeuille</TabsTrigger>
+                        <TabsTrigger value="vault" className="flex-1 rounded-xl font-black uppercase italic text-[10px] data-[state=active]:bg-accent data-[state=active]:text-black transition-all"><Vault size={14} className="mr-2" /> DKS Vault</TabsTrigger>
+                        <TabsTrigger value="rankings" className="flex-1 rounded-xl font-black uppercase italic text-[10px] data-[state=active]:bg-accent data-[state=active]:text-black transition-all"><BarChart3 size={14} className="mr-2" /> Wealth Rankings</TabsTrigger>
+                        <TabsTrigger value="security" className="flex-1 rounded-xl font-black uppercase italic text-[10px] data-[state=active]:bg-accent data-[state=active]:text-black transition-all"><ShieldCheck size={14} className="mr-2" /> Sécurité</TabsTrigger>
                     </TabsList>
 
                     <TabsContent value="overview" className="space-y-10 animate-in fade-in slide-in-from-bottom-4">
@@ -592,7 +659,7 @@ function UniversalWalletPage() {
                                                     <p className="text-[10px] font-black text-white/20 uppercase">Besoin de {100 - stats.progress} pts de plus</p>
                                                 )}
                                             </div>
-                                            <Button onClick={mintTokens} disabled={isMinting || stats.redeemableTokens < 1} className="w-full h-14 bg-accent text-black font-black uppercase italic rounded-xl gap-2 shadow-xl shadow-accent/10">
+                                            <Button onClick={() => secureAction(mintTokens)} disabled={isMinting || stats.redeemableTokens < 1} className="w-full h-14 bg-accent text-black font-black uppercase italic rounded-xl gap-2 shadow-xl shadow-accent/10">
                                                 {isMinting ? <Loader2 className="animate-spin" /> : <><RefreshCw size={18} /> Lancer le Minting</>}
                                             </Button>
                                         </div>
@@ -605,7 +672,7 @@ function UniversalWalletPage() {
                                         {SHOP_PERKS.map(perk => (
                                             <button 
                                                 key={perk.id}
-                                                onClick={() => handleBuyPerk(perk)}
+                                                onClick={() => secureAction(() => handleBuyPerk(perk))}
                                                 disabled={isProcessingAction}
                                                 className="flex items-center gap-5 p-5 bg-black/40 rounded-2xl border border-white/5 hover:border-primary/50 transition-all text-left group"
                                             >
@@ -661,260 +728,108 @@ function UniversalWalletPage() {
                                         </div>
                                     </div>
                                 </Card>
-
-                                <Card className="glossy-card border-none rounded-[3rem] p-10 h-auto relative overflow-hidden">
-                                    <div className="absolute top-0 right-0 p-8 opacity-5"><ShieldCheck size={120} /></div>
-                                    <div className="relative z-10 space-y-10">
-                                        <div className="flex justify-between items-center">
-                                            <h3 className="text-2xl font-black uppercase italic tracking-tight">Sécurité & <span className="text-accent">Garantie</span></h3>
-                                            <Badge variant="outline" className="border-accent/20 text-accent uppercase font-black text-[8px] tracking-widest">Audit v2.0</Badge>
-                                        </div>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                            <div className="p-6 bg-white/5 rounded-3xl border border-white/5 space-y-4">
-                                                <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-accent"><Smartphone size={20} /></div>
-                                                <h4 className="font-black uppercase italic text-xs">Authentification</h4>
-                                                <p className="text-xs text-muted-foreground leading-relaxed">Votre wallet est protégé par le cryptage DKS. Seules les transactions signées par votre compte sont validées sur le registre.</p>
-                                            </div>
-                                            <div className="p-6 bg-white/5 rounded-3xl border border-white/5 space-y-4">
-                                                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary"><QrCode size={20} /></div>
-                                                <h4 className="font-black uppercase italic text-xs">Identité Digitale</h4>
-                                                <p className="text-xs text-muted-foreground leading-relaxed">Chaque transfert P2P génère un reçu numérique avec hachage blockchain, vérifiable à tout moment en boutique.</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </Card>
                              </div>
                         </div>
                     </TabsContent>
 
-                    <TabsContent value="vault" className="animate-in fade-in slide-in-from-bottom-4">
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-                            <Card className="bg-primary/10 border-primary/20 rounded-[3.5rem] p-12 flex flex-col justify-between h-[600px] relative overflow-hidden group">
-                                <div className="absolute top-0 right-0 p-12 opacity-5 scale-150 group-hover:scale-125 transition-transform duration-[2s]"><Vault size={300} /></div>
-                                <div className="space-y-8 relative z-10">
-                                    <Badge className="bg-primary text-white border-none px-5 py-2 font-black uppercase italic tracking-widest">DKS VAULT V2 • PROFIT MAX</Badge>
-                                    <div className="space-y-2">
-                                        <h2 className="text-5xl md:text-7xl font-black uppercase italic tracking-tighter leading-tight text-white">ÉPARGNEZ <br /><span className="text-primary">GAGNEZ</span></h2>
-                                        <p className="text-lg text-white/60 font-bold uppercase italic">Rendement Annuel Garanti : {stats.apr}% (APR)</p>
-                                    </div>
-                                    <div className="p-8 bg-black/60 backdrop-blur-3xl rounded-[3rem] border border-white/10 space-y-8 shadow-2xl">
-                                        <div className="grid grid-cols-2 gap-8">
-                                            <div className="space-y-1">
-                                                <p className="text-[10px] font-black uppercase opacity-40 tracking-widest">Dépôt Actuel</p>
-                                                <p className="text-4xl font-black text-primary italic">{user?.stakedBalance || "0.00"} <span className="text-xs opacity-40 not-italic">DKST</span></p>
-                                            </div>
-                                            <div className="space-y-1 text-right">
-                                                <p className="text-[10px] font-black uppercase opacity-40 tracking-widest">Intérêts (Real-time)</p>
-                                                <p className="text-2xl font-black text-green-400 italic">+{stats.stakingRewards.toFixed(4)}</p>
-                                            </div>
-                                        </div>
-                                        <Progress value={user?.stakedBalance ? 100 : 0} className="h-1.5 bg-white/5" indicatorClassName="bg-primary" />
-                                        {user?.stakedBalance ? (
-                                            <div className="space-y-4">
-                                                <div className="flex items-center gap-3 p-4 bg-primary/5 border border-primary/20 rounded-2xl">
-                                                    <Timer size={16} className="text-primary animate-pulse" />
-                                                    <p className="text-[10px] font-bold text-white/70 italic">Contrat actif depuis le {user.stakingStartedAt?.toDate ? user.stakingStartedAt.toDate().toLocaleDateString() : '?'}</p>
-                                                </div>
-                                                <Button onClick={handleUnstake} disabled={isProcessingAction} className="w-full h-20 bg-white text-primary font-black uppercase italic rounded-[2rem] shadow-xl text-lg transition-all active:scale-95">Libérer les jetons (Unstake)</Button>
-                                            </div>
+                    <TabsContent value="security" className="space-y-10 animate-in fade-in slide-in-from-bottom-4">
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                            <Card className="glossy-card border-none rounded-[3rem] p-10 space-y-8">
+                                <div className="flex items-center gap-4"><Lock className="text-accent" size={24} /><h3 className="text-xl font-black uppercase italic tracking-tight">Cold Storage</h3></div>
+                                <div className="space-y-6">
+                                    <p className="text-sm text-muted-foreground leading-relaxed italic">"Le verrouillage d'urgence gèle tous vos actifs DKST. Aucun transfert, staking ou échange n'est possible jusqu'au déverrouillage manuel."</p>
+                                    <div className="p-6 bg-white/5 rounded-3xl border border-white/5 text-center">
+                                        <p className="text-[10px] font-black uppercase text-white/40 mb-3">Statut Protection</p>
+                                        {user?.isWalletLocked ? (
+                                            <div className="text-red-500 font-black uppercase italic text-xl flex items-center justify-center gap-3"><Lock size={20}/> LOCK ACTIVE</div>
                                         ) : (
-                                            <div className="space-y-4">
-                                                <div className="relative">
-                                                    <CircleDollarSign className="absolute left-6 top-1/2 -translate-y-1/2 text-primary" />
-                                                    <Input type="number" value={stakeAmount} onChange={(e) => setStakeAmount(e.target.value)} placeholder="Montant à bloquer..." className="h-16 pl-14 bg-background/50 border-white/10 rounded-2xl text-center text-xl font-black" />
-                                                </div>
-                                                <Button onClick={handleStake} disabled={!stakeAmount || isProcessingAction} className="w-full h-20 bg-primary text-white font-black uppercase italic rounded-[2rem] shadow-2xl text-lg transition-all active:scale-95">Activer le Contrat</Button>
-                                            </div>
+                                            <div className="text-green-400 font-black uppercase italic text-xl flex items-center justify-center gap-3"><ShieldCheck size={20}/> STANDBY OK</div>
                                         )}
                                     </div>
+                                    <Button onClick={toggleEmergencyLock} className={cn("w-full h-16 rounded-2xl font-black uppercase italic shadow-xl", user?.isWalletLocked ? "bg-white text-black" : "bg-red-500 text-white")}>
+                                        {user?.isWalletLocked ? "Déverrouiller le coffre" : "Verrouillage Immédiat"}
+                                    </Button>
                                 </div>
                             </Card>
-                            <div className="space-y-8">
-                                <Card className="glossy-card border-none rounded-[3rem] p-10 space-y-8">
-                                    <div className="flex items-center gap-4"><TrendingUp size={24} className="text-primary" /><h2 className="text-xl font-black uppercase italic tracking-tight">Pourquoi Staker vos DKST ?</h2></div>
-                                    <div className="space-y-6">
-                                        {[
-                                            { label: "Rendement Évolutif", desc: "Plus votre grade Elite est haut, plus votre taux APR augmente (jusqu'à 12% pour le grade Gold).", icon: <TrendingUp className="text-accent" /> },
-                                            { label: "Sécurité Maximale", desc: "Vos actifs sont gelés dans un coffre-fort numérique protégé par le Hub, à l'abri des fluctuations.", icon: <ShieldCheck className="text-green-400" /> },
-                                            { label: "Gouvernance Premium", desc: "Les jetons stakés comptent double lors des votes de gouvernance DAO.", icon: <Star className="text-yellow-400" /> },
-                                        ].map((item, i) => (
-                                            <div key={i} className="flex gap-6 p-6 bg-white/5 rounded-3xl border border-white/5 group hover:bg-white/[0.08] transition-all">
-                                                <div className="w-14 h-14 rounded-2xl bg-white/5 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">{item.icon}</div>
-                                                <div className="space-y-1"><p className="font-bold text-sm uppercase italic tracking-tight">{item.label}</p><p className="text-xs text-muted-foreground leading-relaxed">{item.desc}</p></div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </Card>
-                            </div>
-                        </div>
-                    </TabsContent>
 
-                    {/* WEALTH RANKINGS TAB */}
-                    <TabsContent value="rankings" className="space-y-10 animate-in fade-in slide-in-from-bottom-4">
-                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-                            {/* Global Wealth Metrics */}
-                            <div className="lg:col-span-4 space-y-8">
-                                <Card className="bg-gradient-to-br from-yellow-500/20 to-black border-yellow-500/20 rounded-[3rem] p-10 relative overflow-hidden text-center">
-                                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-yellow-500/10 via-transparent to-transparent opacity-50" />
-                                    <div className="relative z-10 space-y-8">
-                                        <div className="w-20 h-20 rounded-[2rem] bg-yellow-500/20 flex items-center justify-center mx-auto text-yellow-500 shadow-[0_0_30px_rgba(234,179,8,0.3)]">
-                                            <Globe size={40} className="animate-spin-slow" />
+                            <Card className="lg:col-span-2 glossy-card border-none rounded-[3rem] overflow-hidden">
+                                <CardHeader className="p-10 border-b border-white/5 bg-white/5 flex flex-row items-center justify-between">
+                                    <CardTitle className="text-xl font-black uppercase italic flex items-center gap-4"><Activity className="text-accent" /> Journal de Sécurité (Audit)</CardTitle>
+                                    <Badge variant="outline" className="border-white/10 text-white/40 uppercase text-[8px] font-black">Live Monitoring</Badge>
+                                </CardHeader>
+                                <div className="divide-y divide-white/5 max-h-[450px] overflow-y-auto custom-scrollbar">
+                                    {transactions?.filter(t => t.type === 'transfer' || t.type === 'exchange' || t.type === 'staking').map((t, i) => (
+                                        <div key={i} className="p-6 flex items-center justify-between hover:bg-white/5 transition-colors">
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-white/20"><ShieldCheck size={18}/></div>
+                                                <div>
+                                                    <p className="text-xs font-bold uppercase italic">Action Signée : {t.type.toUpperCase()}</p>
+                                                    <p className="text-[8px] font-mono text-muted-foreground opacity-40 truncate max-w-[200px]">{t.piTxId}</p>
+                                                </div>
+                                            </div>
+                                            <div className="text-right">
+                                                <Badge className="bg-green-500/10 text-green-400 border-none uppercase text-[7px] font-black">Success</Badge>
+                                                <p className="text-[8px] font-bold opacity-30 mt-1">{t.createdAt?.toDate?.().toLocaleString()}</p>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <p className="text-[10px] font-black uppercase text-yellow-500 tracking-[0.4em] mb-3">Fortune Totale du Hub</p>
-                                            <h3 className="text-4xl md:text-5xl font-black text-white italic tracking-tighter">
-                                                ${globalHubWealth.toLocaleString('fr-FR', { maximumFractionDigits: 0 })}
-                                            </h3>
-                                            <p className="text-[9px] font-bold text-white/40 uppercase mt-4 tracking-widest">Valeur Théorique GCV de Bunia</p>
-                                        </div>
-                                    </div>
-                                </Card>
-
-                                <Card className="glossy-card border-none rounded-[3rem] p-10 space-y-8">
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-12 h-12 rounded-2xl bg-accent/10 flex items-center justify-center text-accent"><Award size={24} /></div>
-                                        <h4 className="text-lg font-black uppercase italic">Titres Honorifiques</h4>
-                                    </div>
-                                    <div className="space-y-4">
-                                        {[
-                                            { label: "Billionnaire Élite", val: "$1,000,000,000+", icon: <Crown className="text-yellow-500" /> },
-                                            { label: "Multi-Millionnaire", val: "$10,000,000+", icon: <Gem className="text-accent" /> },
-                                            { label: "Millionnaire GCV", val: "$1,000,000+", icon: <Star className="text-primary" /> },
-                                        ].map((r, i) => (
-                                            <div key={i} className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5">
-                                                <div className="flex items-center gap-3">
-                                                    {r.icon}
-                                                    <span className="text-[10px] font-black uppercase">{r.label}</span>
-                                                </div>
-                                                <span className="text-[10px] font-bold text-white/40">{r.val}</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </Card>
-                            </div>
-
-                            {/* Wealth Leaderboard */}
-                            <div className="lg:col-span-8">
-                                <Card className="glossy-card border-none rounded-[3rem] overflow-hidden">
-                                    <CardHeader className="p-10 border-b border-white/5 bg-white/5 flex flex-row items-center justify-between">
-                                        <CardTitle className="text-2xl font-black uppercase italic flex items-center gap-4">
-                                            <TrendingUp className="text-accent" /> Hiérarchie des Fortunes GCV
-                                        </CardTitle>
-                                        <Badge className="bg-accent text-black font-black uppercase italic">Top 10 Bunia</Badge>
-                                    </CardHeader>
-                                    <div className="divide-y divide-white/5">
-                                        {loadingWealth ? (
-                                            <div className="p-20 text-center"><Loader2 className="animate-spin text-accent mx-auto h-10 w-10" /></div>
-                                        ) : topWealthyUsers && topWealthyUsers.length > 0 ? (
-                                            topWealthyUsers.map((wUser, index) => {
-                                                const totalTokens = (wUser.tokenBalance || 0) + (wUser.stakedBalance || 0);
-                                                const wealthUSD = totalTokens * GCV_VALUE;
-                                                const rank = getWealthTitle(wealthUSD);
-                                                const isCurrentUser = wUser.id === user?.uid;
-
-                                                return (
-                                                    <div key={wUser.id} className={cn(
-                                                        "p-8 flex flex-col md:flex-row items-center justify-between transition-all group gap-8",
-                                                        isCurrentUser ? "bg-accent/5 border-l-4 border-l-accent" : "hover:bg-white/[0.02]"
-                                                    )}>
-                                                        <div className="flex items-center gap-8 flex-1">
-                                                            <div className={cn(
-                                                                "w-12 h-12 rounded-2xl flex items-center justify-center font-black text-xl italic shadow-lg",
-                                                                index === 0 ? "bg-yellow-500 text-black" : "bg-white/5 text-muted-foreground"
-                                                            )}>
-                                                                {index + 1}
-                                                            </div>
-                                                            <div className="flex items-center gap-5">
-                                                                <div className="w-14 h-14 rounded-[1.5rem] bg-white/5 flex items-center justify-center text-accent group-hover:scale-110 transition-transform">
-                                                                    <UserIcon size={28} />
-                                                                </div>
-                                                                <div>
-                                                                    <div className="flex items-center gap-3">
-                                                                        <h4 className="text-xl font-black uppercase italic tracking-tight">{wUser.name || "Membre Élite"}</h4>
-                                                                        {isCurrentUser && <Badge className="bg-accent/20 text-accent border-accent/20 text-[8px] font-black uppercase">Vous</Badge>}
-                                                                    </div>
-                                                                    <div className="flex items-center gap-2 mt-1">
-                                                                        {rank.icon}
-                                                                        <span className={cn("text-[9px] font-black uppercase tracking-[0.2em]", rank.color)}>{rank.label}</span>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-
-                                                        <div className="text-center md:text-right space-y-1 shrink-0">
-                                                            <p className="text-2xl font-black text-white italic tracking-tighter">
-                                                                ${wealthUSD.toLocaleString('fr-FR', { maximumFractionDigits: 0 })}
-                                                            </p>
-                                                            <p className="text-[10px] font-bold text-white/20 uppercase tracking-widest">
-                                                                {totalTokens.toFixed(4)} DKST
-                                                            </p>
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })
-                                        ) : (
-                                            <div className="p-20 text-center opacity-30 italic">Aucune donnée de fortune disponible.</div>
-                                        )}
-                                    </div>
-                                    <div className="p-6 bg-black/20 text-center border-t border-white/5">
-                                        <p className="text-[9px] font-black uppercase text-white/20 tracking-[0.3em] flex items-center justify-center gap-3">
-                                            <ShieldCheck size={12} className="text-green-500" /> Registre Wealth Certifié par DKS Solutions
-                                        </p>
-                                    </div>
-                                </Card>
-                            </div>
+                                    ))}
+                                    <div className="p-10 text-center opacity-20 italic text-[10px] uppercase font-black">Fin du registre d'audit.</div>
+                                </div>
+                            </Card>
                         </div>
-                    </TabsContent>
-
-                    <TabsContent value="history" className="animate-in fade-in slide-in-from-bottom-4">
-                        <Card className="glossy-card border-none rounded-[3rem] overflow-hidden flex flex-col">
-                            <CardHeader className="p-10 border-b border-white/5 bg-white/[0.02] space-y-8">
-                                <div className="flex flex-col md:flex-row justify-between items-center gap-6">
-                                    <CardTitle className="text-2xl font-black uppercase italic flex items-center gap-4"><History className="text-accent" /> Registre Ledger v2.0</CardTitle>
-                                    <div className="flex bg-white/5 p-1 rounded-2xl border border-white/5">
-                                        {['all', 'mint', 'transfer', 'staking', 'exchange'].map(f => (
-                                            <button key={f} onClick={() => setLedgerFilter(f)} className={cn("px-6 h-10 rounded-xl font-black uppercase italic text-[9px] transition-all", ledgerFilter === f ? "bg-accent text-black shadow-lg" : "text-white/40 hover:text-white")}>{f === 'all' ? 'Tous' : f === 'exchange' ? 'Burn' : f}</button>
-                                        ))}
-                                    </div>
-                                </div>
-                                <div className="relative">
-                                    <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
-                                    <Input placeholder="Chercher une transaction, un mémo ou un identifiant..." className="h-14 pl-14 bg-background/40 border-white/5 rounded-2xl focus:border-accent" value={ledgerSearch} onChange={(e) => setLedgerSearch(e.target.value)} />
-                                </div>
-                            </CardHeader>
-                            <div className="divide-y divide-white/5 max-h-[600px] overflow-y-auto custom-scrollbar">
-                                {loadingTx ? <div className="p-20 text-center"><Loader2 className="animate-spin text-accent mx-auto" /></div> : filteredTransactions && filteredTransactions.length > 0 ? filteredTransactions.map((tx) => {
-                                        const isIncoming = tx.type === 'mint' || tx.type === 'mining' || tx.type === 'unstaking' || (tx.type === 'transfer' && tx.direction === 'received');
-                                        return (
-                                            <div key={tx.id} className="p-8 flex flex-col md:flex-row items-center justify-between hover:bg-white/[0.02] transition-colors group gap-6">
-                                                <div className="flex items-center gap-6 flex-1 w-full">
-                                                    <div className={cn("w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg transition-transform group-hover:scale-110", isIncoming ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-500")}>
-                                                        {tx.type === 'mint' ? <RefreshCw size={24} /> : tx.type === 'staking' ? <Vault size={24} /> : tx.type === 'exchange' ? <Flame size={24} /> : isIncoming ? <ArrowDownLeft size={24} /> : <ArrowUpRight size={24} />}
-                                                    </div>
-                                                    <div className="space-y-1">
-                                                        <div className="flex items-center gap-3">
-                                                            <p className="text-sm font-black uppercase italic tracking-tight">{tx.type.toUpperCase()}</p>
-                                                            <Badge variant="outline" className="text-[7px] font-black uppercase border-white/10 opacity-40">Confirmed</Badge>
-                                                        </div>
-                                                        <div className="flex items-center gap-2">
-                                                            <Lock size={10} className="text-green-500 opacity-60" />
-                                                            <p className="text-[10px] font-mono text-muted-foreground truncate max-w-[200px]">{tx.piTxId || tx.id}</p>
-                                                        </div>
-                                                        {tx.memo && <p className="text-[10px] italic text-white/40 bg-white/5 px-2 py-0.5 rounded-md inline-block">"{tx.memo}"</p>}
-                                                    </div>
-                                                </div>
-                                                <div className="flex flex-col items-center md:items-end gap-1 shrink-0">
-                                                    <p className={cn("text-2xl font-black italic", isIncoming ? "text-green-400" : "text-red-400")}>{isIncoming ? '+' : '-'}{tx.tokenAmount.toFixed(2)} <span className="text-xs not-italic opacity-40">DKST</span></p>
-                                                    <p className="text-[10px] font-bold opacity-30 uppercase tracking-widest">{tx.createdAt?.toDate ? tx.createdAt.toDate().toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'Récemment'}</p>
-                                                </div>
-                                            </div>
-                                        );
-                                    }) : <div className="p-32 text-center flex flex-col items-center gap-6 opacity-20 italic"><History size={64} strokeWidth={1} /><p className="text-xs uppercase font-black tracking-widest">Aucun mouvement détecté sur ce compte</p></div>}
-                            </div>
-                        </Card>
                     </TabsContent>
                 </Tabs>
             </main>
+
+            {/* PIN VERIFICATION DIALOG */}
+            <Dialog open={isPinVerificationOpen} onOpenChange={setIsPinVerificationOpen}>
+                <DialogContent className="bg-card border-white/10 text-foreground rounded-[2.5rem] sm:max-w-md overflow-hidden">
+                    <DialogHeader className="p-8 bg-accent/10 border-b border-white/5">
+                        <div className="flex flex-col items-center gap-6">
+                            <div className="w-20 h-20 rounded-[2.5rem] bg-accent/20 flex items-center justify-center text-accent shadow-xl shadow-accent/10"><Lock size={40} className="animate-pulse" /></div>
+                            <div className="text-center">
+                                <DialogTitle className="text-2xl font-black uppercase italic tracking-tighter">Signature Élite</DialogTitle>
+                                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60 mt-1">Autorisation requise pour transaction</p>
+                            </div>
+                        </div>
+                    </DialogHeader>
+                    
+                    <div className="p-10 space-y-8">
+                        <div className="space-y-4">
+                            <Label className="text-[10px] font-black uppercase tracking-widest text-center block opacity-40">Entrez votre code secret à 4 chiffres</Label>
+                            <div className="flex justify-center gap-4">
+                                <div className="relative w-full max-w-[200px]">
+                                    <Input 
+                                        type={showPin ? "text" : "password"}
+                                        maxLength={4}
+                                        value={enteredPin}
+                                        onChange={(e) => setEnteredPin(e.target.value)}
+                                        className="h-20 bg-background/50 border-white/10 rounded-2xl text-center text-5xl font-black tracking-[0.5em] focus:border-accent"
+                                        autoFocus
+                                    />
+                                    <button 
+                                        onClick={() => setShowPin(!showPin)}
+                                        className="absolute right-4 top-1/2 -translate-y-1/2 text-white/20 hover:text-accent transition-colors"
+                                    >
+                                        {showPin ? <EyeOff size={20}/> : <Eye size={20}/>}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <Button variant="ghost" onClick={() => setIsPinVerificationOpen(false)} className="h-14 rounded-2xl font-black uppercase italic text-xs">Annuler</Button>
+                            <Button 
+                                onClick={handleVerifyPin} 
+                                disabled={enteredPin.length < 4}
+                                className="h-14 bg-accent text-black font-black uppercase italic text-xs rounded-2xl shadow-xl shadow-accent/20"
+                            >
+                                Signer & Valider
+                            </Button>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
 
             {/* TRANSFER SHEET */}
             <Sheet open={isTransferSheetOpen} onOpenChange={setIsTransferSheetOpen}>
@@ -942,7 +857,7 @@ function UniversalWalletPage() {
                                 )}
                             </div>
                         ) : (
-                            <form onSubmit={handleTransfer} className="space-y-10 animate-in slide-in-from-right-4 duration-300">
+                            <form onSubmit={(e) => { e.preventDefault(); secureAction(handleTransferProcess); }} className="space-y-10 animate-in slide-in-from-right-4 duration-300">
                                 <div className="p-6 bg-accent/5 border border-accent/20 rounded-[2.5rem] flex items-center justify-between">
                                     <div className="flex items-center gap-5">
                                         <div className="w-14 h-14 rounded-2xl bg-accent text-black flex items-center justify-center font-black text-xl italic shadow-lg shadow-accent/20">{selectedRecipient.name?.substring(0, 1)}</div>
