@@ -15,6 +15,8 @@
         "loyaltyLevel": { "type": "string", "enum": ["Bronze", "Silver", "Gold"] },
         "points": { "type": "number", "description": "Accumulated prestige points" },
         "tokenBalance": { "type": "number", "description": "DKST Token balance" },
+        "stakedBalance": { "type": "number", "description": "Amount of DKST currently staked" },
+        "stakingStartedAt": { "type": "string", "format": "date-time" },
         "pointsConverted": { "type": "number", "description": "Points already turned into tokens" },
         "piWalletAddress": { "type": "string", "description": "Public address on the Pi blockchain" },
         "lastMiningAt": { "type": "string", "format": "date-time" },
@@ -33,7 +35,7 @@
       "properties": {
         "id": { "type": "string" },
         "userId": { "type": "string" },
-        "type": { "type": "string", "enum": ["mint", "burn", "transfer", "mining"] },
+        "type": { "type": "string", "enum": ["mint", "burn", "transfer", "mining", "staking", "unstaking", "exchange"] },
         "pointsAmount": { "type": "number" },
         "tokenAmount": { "type": "number" },
         "piTxId": { "type": "string", "description": "Pi Blockchain transaction hash" },
@@ -43,6 +45,19 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["userId", "type", "tokenAmount", "createdAt"]
+    },
+    "HallOfFameEntry": {
+        "title": "HallOfFameEntry",
+        "type": "object",
+        "properties": {
+            "id": { "type": "string" },
+            "userId": { "type": "string" },
+            "userName": { "type": "string" },
+            "title": { "type": "string" },
+            "period": { "type": "string" },
+            "achievement": { "type": "string" },
+            "createdAt": { "type": "string", "format": "date-time" }
+        }
     }
   },
   "auth": {
@@ -56,6 +71,10 @@
     "/tokenTransactions/{txId}": {
       "schema": "TokenTransaction",
       "description": "Prestige point conversions and mining events."
+    },
+    "/hallOfFame/{id}": {
+        "schema": "HallOfFameEntry",
+        "description": "Historical records of DKS champions."
     }
   }
 }
