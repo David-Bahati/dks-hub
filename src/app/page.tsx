@@ -148,6 +148,21 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* PARTNERS LOGOS */}
+      <section className="py-20 border-b border-white/5 bg-white/[0.01]">
+        <div className="container max-w-7xl mx-auto px-6">
+          <p className="text-[10px] font-black uppercase tracking-[0.4em] text-center text-white/20 mb-12">Propulsé par les leaders mondiaux</p>
+          <div className="flex flex-wrap justify-center items-center gap-12 md:gap-20 opacity-40 grayscale hover:grayscale-0 transition-all duration-700">
+            {partners.map((p, i) => (
+              <div key={i} className="flex items-center gap-3 group">
+                <div className="text-white group-hover:text-accent transition-colors">{p.icon}</div>
+                <span className="font-black uppercase italic tracking-tighter text-lg">{p.name}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* POLES OF EXCELLENCE */}
       <section className="container max-w-7xl mx-auto px-6 py-32">
         <div className="text-center mb-24 space-y-4">
