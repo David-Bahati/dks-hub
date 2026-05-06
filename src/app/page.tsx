@@ -41,7 +41,10 @@ import {
   FileText,
   Trophy,
   User,
-  Megaphone
+  Megaphone,
+  Rocket,
+  Heart,
+  Monitor
 } from 'lucide-react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
@@ -74,7 +77,6 @@ export default function LandingPage() {
   const { data: config } = useDoc(configRef);
 
   const activeAds = useMemo(() => {
-      // Fallback ads if database is empty or not yet configured
       const defaultAds = [
           {
               id: 'def-1',
@@ -212,6 +214,20 @@ export default function LandingPage() {
         </Carousel>
       </section>
 
+      {/* TRUST PARTNERS - NOVEAU */}
+      <section className="container max-w-7xl mx-auto px-6 py-10 border-b border-white/5">
+          <div className="flex flex-col items-center gap-8">
+              <p className="text-[8px] font-black uppercase tracking-[0.6em] text-white/20">Propulsé par les leaders mondiaux</p>
+              <div className="flex flex-wrap justify-center items-center gap-12 md:gap-24 opacity-30 grayscale hover:grayscale-0 transition-all duration-700">
+                  <span className="text-xl font-black italic tracking-tighter hover:text-green-500 cursor-default transition-colors">NVIDIA</span>
+                  <span className="text-xl font-black italic tracking-tighter hover:text-accent cursor-default transition-colors">STARLINK</span>
+                  <span className="text-xl font-black italic tracking-tighter hover:text-primary cursor-default transition-colors">ASUS ROG</span>
+                  <span className="text-xl font-black italic tracking-tighter hover:text-orange-500 cursor-default transition-colors">PI NETWORK</span>
+                  <span className="text-xl font-black italic tracking-tighter hover:text-blue-400 cursor-default transition-colors">INTEL</span>
+              </div>
+          </div>
+      </section>
+
       {/* POLES OF EXCELLENCE */}
       <section className="container max-w-7xl mx-auto px-6 py-20">
         <div className="text-center mb-24 space-y-4">
@@ -238,6 +254,35 @@ export default function LandingPage() {
                 </Link>
             ))}
         </div>
+      </section>
+
+      {/* HUB IMPACT STATS - NOUVEAU */}
+      <section className="container max-w-7xl mx-auto px-6 py-20">
+          <Card className="bg-white/[0.02] border border-white/5 rounded-[4rem] p-12 md:p-20 relative overflow-hidden group">
+              <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_top_left,_var(--tw-gradient-stops))] from-primary/5 via-transparent to-transparent" />
+              <div className="relative z-10 grid grid-cols-1 md:grid-cols-4 gap-12">
+                  <div className="text-center space-y-3">
+                      <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto text-primary mb-6"><GraduationCap size={24}/></div>
+                      <p className="text-5xl font-black text-white italic tracking-tighter">1,200+</p>
+                      <p className="text-[10px] font-black uppercase text-muted-foreground tracking-[0.2em]">Étudiants Certifiés</p>
+                  </div>
+                  <div className="text-center space-y-3">
+                      <div className="w-12 h-12 rounded-2xl bg-accent/10 flex items-center justify-center mx-auto text-accent mb-6"><Globe size={24}/></div>
+                      <p className="text-5xl font-black text-white italic tracking-tighter">45+</p>
+                      <p className="text-[10px] font-black uppercase text-muted-foreground tracking-[0.2em]">Déploiements Starlink</p>
+                  </div>
+                  <div className="text-center space-y-3">
+                      <div className="w-12 h-12 rounded-2xl bg-green-500/10 flex items-center justify-center mx-auto text-green-400 mb-6"><ShieldCheck size={24}/></div>
+                      <p className="text-5xl font-black text-white italic tracking-tighter">100%</p>
+                      <p className="text-[10px] font-black uppercase text-muted-foreground tracking-[0.2em]">Garantie Hub Bunia</p>
+                  </div>
+                  <div className="text-center space-y-3">
+                      <div className="w-12 h-12 rounded-2xl bg-orange-500/10 flex items-center justify-center mx-auto text-orange-400 mb-6"><Rocket size={24}/></div>
+                      <p className="text-5xl font-black text-white italic tracking-tighter">24/7</p>
+                      <p className="text-[10px] font-black uppercase text-muted-foreground tracking-[0.2em]">Support Expert Direct</p>
+                  </div>
+              </div>
+          </Card>
       </section>
 
       {/* ELITE STOCK SHOWCASE */}
