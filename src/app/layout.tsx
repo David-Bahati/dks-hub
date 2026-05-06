@@ -54,12 +54,17 @@ export default function RootLayout({
         />
       </head>
       <body className={cn("min-h-screen bg-background font-sans antialiased", fontSans.variable)}>
-        {/* Initialisation du SDK Pi en mode SANDBOX pour les tests */}
+        {/* Initialisation sécurisée du SDK Pi pour éviter les timeouts hors Pi Browser */}
         <Script id="pi-init" strategy="afterInteractive">
           {`
             if (window.Pi) {
-              window.Pi.init({ version: "2.0", sandbox: true });
-              console.log("[Pi SDK] Initialisé en mode Sandbox pour DKS Shop");
+              // On n'initialise que si on détecte le Pi Browser pour éviter le timeout de 120s
+              if (/PiBrowser/i.test(navigator.userAgent)) {
+                window.Pi.init({ version: "2.0", sandbox: true });
+                console.log("[Pi SDK] Initialisé pour Pi Browser");
+              } else {
+                console.log("[Pi SDK] Navigation standard détectée - Initialisation différée");
+              }
             }
           `}
         </Script>

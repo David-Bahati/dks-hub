@@ -48,7 +48,6 @@ export function UserGuide({ role }: UserGuideProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const certRef = useRef<HTMLDivElement>(null);
   
-  // Simulation de progression basée sur le profil (en prod on checkerait les champs réels)
   const masteryStats = useMemo(() => {
     let score = 0;
     const steps = {
@@ -89,8 +88,6 @@ export function UserGuide({ role }: UserGuideProps) {
 
   return (
     <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
-      
-      {/* HEADER DU GUIDE AVEC PROGRESSION */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-8">
           <div className="flex items-start gap-4">
             <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shadow-lg shadow-primary/5">
@@ -126,7 +123,6 @@ export function UserGuide({ role }: UserGuideProps) {
       </div>
 
       <Accordion type="single" collapsible className="grid grid-cols-1 md:grid-cols-2 gap-6 space-y-0">
-        {/* SECTION COMMUNE : WALLET */}
         <AccordionItem value="wallet" className="border-none bg-white/[0.03] rounded-[2.5rem] px-8 hover:bg-white/[0.05] transition-all">
           <AccordionTrigger className="hover:no-underline py-8">
             <div className="flex items-center gap-5 text-xs font-black uppercase italic tracking-widest text-accent text-left">
@@ -148,7 +144,6 @@ export function UserGuide({ role }: UserGuideProps) {
           </AccordionContent>
         </AccordionItem>
 
-        {/* ADMIN SPECIFIC */}
         {(r === 'admin') && (
           <>
             <AccordionItem value="economy" className="border-none bg-white/[0.03] rounded-[2.5rem] px-8 hover:bg-white/[0.05] transition-all">
@@ -174,7 +169,6 @@ export function UserGuide({ role }: UserGuideProps) {
           </>
         )}
 
-        {/* SELLER SPECIFIC */}
         {(r === 'admin' || r === 'seller') && (
           <>
             <AccordionItem value="inventory" className="border-none bg-white/[0.03] rounded-[2.5rem] px-8 hover:bg-white/[0.05] transition-all">
@@ -200,7 +194,6 @@ export function UserGuide({ role }: UserGuideProps) {
           </>
         )}
 
-        {/* CASHIER SPECIFIC */}
         {(r === 'admin' || r === 'cashier') && (
           <AccordionItem value="pos-cash" className="border-none bg-white/[0.03] rounded-[2.5rem] px-8 hover:bg-white/[0.05] transition-all">
             <AccordionTrigger className="hover:no-underline py-8">
@@ -214,7 +207,6 @@ export function UserGuide({ role }: UserGuideProps) {
           </AccordionItem>
         )}
 
-        {/* CUSTOMER SPECIFIC */}
         {(r === 'customer') && (
           <>
             <AccordionItem value="academy-edu" className="border-none bg-white/[0.03] rounded-[2.5rem] px-8 hover:bg-white/[0.05] transition-all">
@@ -259,7 +251,6 @@ export function UserGuide({ role }: UserGuideProps) {
         )}
       </Accordion>
 
-      {/* MODÈLE DE CERTIFICAT DE MAÎTRISE CACHÉ */}
       <div style={{ position: 'absolute', left: '-9999px', top: 0 }}>
         <div ref={certRef} className="bg-white text-black p-0 w-[1123px] h-[794px] font-serif relative overflow-hidden flex items-center justify-center">
             <div className="absolute inset-0 border-[40px] border-double border-[#0f172a]" />

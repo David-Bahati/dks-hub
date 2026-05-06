@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from 'react';
@@ -68,14 +67,10 @@ import { auth, db } from '@/lib/firebase';
 import { 
     signOut, 
     updateProfile, 
-    updatePassword, 
-    reauthenticateWithCredential, 
-    EmailAuthProvider 
 } from 'firebase/auth';
-import { doc, updateDoc, serverTimestamp, getDoc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, updateDoc, serverTimestamp, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { PI_CONVERSION_RATE, PI_MERCHANT_WALLET } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import { useTheme } from "next-themes";
 import { Logo } from "@/components/ui/Logo";
@@ -94,14 +89,11 @@ export default function SettingsPage() {
     const [photoURL, setPhotoURL] = useState("");
     const [language, setLanguage] = useState("fr");
     const [isSaving, setIsSaving] = useState(false);
-    const [isUploading, setIsUploading] = useState(false);
     const [orderCount, setOrderCount] = useState(0);
 
     // Security States
     const [currentPassword, setCurrentPassword] = useState("");
     const [newPassword, setNewPassword] = useState("");
-    const [confirmPassword, setConfirmPassword] = useState("");
-    const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
     const [showPasswords, setShowPasswords] = useState(false);
 
     // Wallet PIN States
@@ -110,7 +102,6 @@ export default function SettingsPage() {
     
     // System States
     const [exchangeRate, setExchangeRate] = useState("2500");
-    const [isSavingSystem, setIsSavingSystem] = useState(false);
 
     useEffect(() => {
         if (user) {
