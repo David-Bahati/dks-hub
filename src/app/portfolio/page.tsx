@@ -21,7 +21,8 @@ import {
     Calendar,
     TrendingUp,
     Search,
-    X
+    X,
+    Share2
 } from "lucide-react";
 import { db } from '@/lib/firebase';
 import { collection, query, where, orderBy, updateDoc, doc, increment } from 'firebase/firestore';
@@ -29,6 +30,8 @@ import { useCollection, useMemoFirebase } from '@/firebase';
 import { Project } from '@/lib/types';
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { useToast } from '@/hooks/use-toast';
 
 const ICON_MAP: Record<string, any> = {
     "Zap": Zap,
@@ -42,6 +45,7 @@ const ICON_MAP: Record<string, any> = {
 export default function PortfolioPage() {
   const [sortBy, setSortBy] = useState<'recent' | 'views'>('recent');
   const [searchTerm, setSearchTerm] = useState("");
+  const { toast } = useToast();
 
   const projectsQuery = useMemoFirebase(() => {
     return query(collection(db, "projects"), where("isPublished", "==", true), orderBy("createdAt", "desc"));
@@ -49,13 +53,11 @@ export default function PortfolioPage() {
 
   const { data: projects, isLoading } = useCollection<Project>(projectsQuery);
 
-  // Search & Sorting logic combined
   const filteredAndSortedProjects = useMemo(() => {
     if (!projects) return [];
     
     let items = [...projects];
 
-    // Search Filter
     if (searchTerm.trim()) {
       const term = searchTerm.toLowerCase();
       items = items.filter(p => 
@@ -66,11 +68,9 @@ export default function PortfolioPage() {
       );
     }
 
-    // Sort
     if (sortBy === 'views') {
       items.sort((a, b) => (b.views || 0) - (a.views || 0));
     } else {
-      // Date sort is handled by Firestore but reinforced here
       items.sort((a, b) => {
           const dateA = a.createdAt?.toDate?.() || new Date(0);
           const dateB = b.createdAt?.toDate?.() || new Date(0);
@@ -81,7 +81,6 @@ export default function PortfolioPage() {
     return items;
   }, [projects, sortBy, searchTerm]);
 
-  // Increment views for displayed projects (once per session per project)
   useEffect(() => {
     if (projects && projects.length > 0) {
         projects.forEach(project => {
@@ -96,6 +95,27 @@ export default function PortfolioPage() {
         });
     }
   }, [projects]);
+
+  const handleShare = async (project: Project) => {
+    const shareData = {
+        title: `DKS Excellence: ${project.title}`,
+        text: `Découvrez la réalisation de Double King Shop pour ${project.client} : ${project.description}`,
+        url: window.location.href,
+    };
+
+    if (navigator.share) {
+        try {
+            await navigator.share(shareData);
+            toast({ title: "Partage réussi", description: "Merci de faire rayonner l'excellence DKS." });
+        } catch (err) {
+            console.error("Error sharing:", err);
+        }
+    } else {
+        const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(`${shareData.title} - ${shareData.url}`)}`;
+        window.open(whatsappUrl, '_blank');
+        toast({ title: "Lien WhatsApp ouvert", description: "Partagez la réalisation avec vos contacts." });
+    }
+  };
 
   const getIcon = (name: string) => {
     const IconComp = ICON_MAP[name] || Zap;
@@ -114,7 +134,6 @@ export default function PortfolioPage() {
           </p>
         </div>
 
-        {/* Controls: Search & Sort */}
         <div className="flex flex-col md:flex-row items-center justify-center gap-6 mb-16 max-w-4xl mx-auto">
             <div className="relative w-full flex-1">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" size={20} />
@@ -167,8 +186,14 @@ export default function PortfolioPage() {
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
                     <div className="absolute top-6 right-6 flex flex-col gap-2 items-end">
                         <Badge className="bg-accent text-black font-black uppercase text-[10px]">{project.category}</Badge>
-                        <Badge variant="secondary" className="bg-black/60 text-white border-white/10 text-[8px] font-black gap-1"><Eye size={10} /> {project.views || 0} vues</Badge>
+                        <Badge variant="secondary" className="bg-black/40 text-white border-white/10 text-[8px] font-black gap-1"><Eye size={10} /> {project.views || 0} vues</Badge>
                     </div>
+                    <button 
+                        onClick={() => handleShare(project)}
+                        className="absolute bottom-6 right-6 w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-xl border border-white/10 flex items-center justify-center text-white hover:bg-accent hover:text-black hover:border-accent transition-all opacity-0 group-hover:opacity-100 transform translate-y-4 group-hover:translate-y-0 shadow-2xl"
+                    >
+                        <Share2 size={20} />
+                    </button>
                 </div>
                 <CardHeader className="p-8 pb-4">
                     <CardTitle className="text-2xl font-black uppercase italic leading-tight flex items-center gap-3">

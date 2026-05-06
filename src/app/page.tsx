@@ -47,7 +47,8 @@ import {
   Monitor,
   Video,
   Shield,
-  Eye
+  Eye,
+  Share2
 } from 'lucide-react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
@@ -84,11 +85,9 @@ export default function LandingPage() {
   const { addToCart } = useCart();
   const { toast } = useToast();
 
-  // Fetch Dynamic Configuration (including Ads)
   const configRef = useMemoFirebase(() => doc(db, "system", "config"), []);
   const { data: config } = useDoc(configRef);
 
-  // Fetch Projects for "Excellence en Action"
   const projectsQuery = useMemoFirebase(() => {
     return query(collection(db, "projects"), where("isPublished", "==", true), orderBy("createdAt", "desc"), firestoreLimit(3));
   }, []);
@@ -151,6 +150,25 @@ export default function LandingPage() {
     } finally { setSubmitting(false); }
   };
 
+  const handleShareProject = async (project: Project) => {
+    const shareData = {
+        title: `DKS Excellence: ${project.title}`,
+        text: `Découvrez la réalisation de Double King Shop pour ${project.client}`,
+        url: window.location.origin + '/portfolio',
+    };
+
+    if (navigator.share) {
+        try {
+            await navigator.share(shareData);
+        } catch (err) {
+            console.error("Error sharing:", err);
+        }
+    } else {
+        const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(`${shareData.title} - ${shareData.url}`)}`;
+        window.open(whatsappUrl, '_blank');
+    }
+  };
+
   const getIcon = (name: string) => {
     const IconComp = ICON_MAP[name] || Zap;
     return <IconComp size={24} className="text-accent" />;
@@ -160,7 +178,6 @@ export default function LandingPage() {
     <div className="min-h-screen bg-background text-foreground">
       <Navbar />
 
-      {/* HERO SECTION SUPREME */}
       <section className="relative min-h-[95vh] flex items-center justify-center pt-20 overflow-hidden px-4">
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-accent/10 via-transparent to-transparent opacity-50" />
         <div className="container max-w-6xl mx-auto text-center relative z-10">
@@ -176,7 +193,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* LIVE HUB ACTIVITY TICKER */}
       <section className="bg-accent/5 border-y border-white/5 py-6 overflow-hidden relative group">
           <div className="absolute left-0 top-0 h-full w-20 bg-gradient-to-r from-background to-transparent z-10" />
           <div className="absolute right-0 top-0 h-full w-20 bg-gradient-to-l from-background to-transparent z-10" />
@@ -192,7 +208,6 @@ export default function LandingPage() {
           </div>
       </section>
 
-      {/* KEY INDICATORS */}
       <section className="bg-white/[0.02] border-b border-white/5 py-8">
         <div className="container max-w-7xl mx-auto px-6 flex flex-wrap justify-center md:justify-between items-center gap-10">
             <div className="flex items-center gap-4 group cursor-default"><div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-accent group-hover:scale-110 transition-transform"><Coins size={20} /></div><div><p className="text-[10px] font-black uppercase text-accent tracking-widest">Consensus GCV Pi</p><p className="text-lg font-black text-white italic">1 π = $314,159.00</p></div></div>
@@ -201,7 +216,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ADVERTISEMENT CAROUSEL (DYNAMIC) */}
       <section className="container max-w-7xl mx-auto px-6 py-10">
         <Carousel 
           opts={{ loop: true }} 
@@ -237,7 +251,6 @@ export default function LandingPage() {
         </Carousel>
       </section>
 
-      {/* TRUST PARTNERS */}
       <section className="container max-w-7xl mx-auto px-6 py-10 border-b border-white/5">
           <div className="flex flex-col items-center gap-8">
               <p className="text-[8px] font-black uppercase tracking-[0.6em] text-white/20">Propulsé par les leaders mondiaux</p>
@@ -251,7 +264,6 @@ export default function LandingPage() {
           </div>
       </section>
 
-      {/* POLES OF EXCELLENCE */}
       <section className="container max-w-7xl mx-auto px-6 py-20">
         <div className="text-center mb-24 space-y-4">
             <h2 className="text-4xl md:text-6xl font-black uppercase italic tracking-tighter">NOS <span className="text-accent">PÔLES D'EXCELLENCE</span></h2>
@@ -279,7 +291,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* HUB IMPACT STATS */}
       <section className="container max-w-7xl mx-auto px-6 py-20">
           <Card className="bg-white/[0.02] border border-white/5 rounded-[4rem] p-12 md:p-20 relative overflow-hidden group">
               <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_top_left,_var(--tw-gradient-stops))] from-primary/5 via-transparent to-transparent" />
@@ -308,7 +319,6 @@ export default function LandingPage() {
           </Card>
       </section>
 
-      {/* L'EXCELLENCE EN ACTION (DYNAMIC PROJECTS) */}
       <section className="container max-w-7xl mx-auto px-6 py-20">
           <div className="flex flex-col md:flex-row justify-between items-end gap-6 mb-16">
               <div className="space-y-4">
@@ -332,6 +342,12 @@ export default function LandingPage() {
                              <Badge className="bg-accent text-black font-black uppercase text-[8px] italic tracking-widest w-fit">{project.category}</Badge>
                              <Badge variant="secondary" className="bg-black/40 text-white border-white/10 text-[8px] font-black w-fit gap-1"><Eye size={10} /> {project.views || 0} vues</Badge>
                           </div>
+                          <button 
+                              onClick={() => handleShareProject(project)}
+                              className="absolute top-6 right-6 w-10 h-10 rounded-xl bg-white/10 backdrop-blur-xl border border-white/10 flex items-center justify-center text-white hover:bg-accent hover:text-black opacity-0 group-hover:opacity-100 transition-all shadow-xl"
+                          >
+                              <Share2 size={16} />
+                          </button>
                       </div>
                       <div className="absolute bottom-0 left-0 w-full p-8 space-y-2">
                           <div className="flex items-center gap-3">
@@ -349,7 +365,6 @@ export default function LandingPage() {
           </div>
       </section>
 
-      {/* ELITE STOCK SHOWCASE */}
       <section id="shop" className="py-32 bg-black/20">
         <div className="container max-w-7xl mx-auto px-6">
             <div className="flex flex-col md:flex-row justify-between items-end gap-10 mb-20">
@@ -400,7 +415,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* INSTITUTIONAL FOOTER */}
       <footer className="bg-card/40 border-t border-white/5 pt-32 pb-16 relative overflow-hidden">
         <div className="container max-w-7xl mx-auto px-6 relative z-10">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-20 mb-24">
