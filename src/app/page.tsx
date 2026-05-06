@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
@@ -73,7 +74,7 @@ export default function LandingPage() {
   const { data: config } = useDoc(configRef);
 
   const activeAds = useMemo(() => {
-      if (!config?.ads) return [];
+      if (!config?.ads || !Array.isArray(config.ads)) return [];
       return config.ads.filter((ad: any) => ad.isActive);
   }, [config]);
 
