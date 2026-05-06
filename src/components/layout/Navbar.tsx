@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { Logo } from '@/components/ui/Logo';
 import { useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, where } from 'firebase/firestore';
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 export function Navbar() {
     const { user, isLoading: authLoading } = useAuth();
@@ -120,11 +121,16 @@ export function Navbar() {
                     </Sheet>
 
                     {authLoading ? <Loader2 className="animate-spin h-5 w-5 text-accent" /> : user ? (
-                        <div className="flex items-center gap-2">
-                             <Link href="/dashboard">
-                                <Button variant="ghost" className="h-10 rounded-xl border border-white/5 text-[10px] font-black uppercase italic">Hub</Button>
+                        <div className="flex items-center gap-3">
+                             <Link href="/dashboard/settings">
+                                <Avatar className="h-11 w-11 border-2 border-white/5 hover:border-accent transition-all cursor-pointer">
+                                    <AvatarImage src={user.photoURL} className="object-cover" />
+                                    <AvatarFallback className="bg-accent/20 text-accent font-black italic text-sm">{user.name?.substring(0, 1)}</AvatarFallback>
+                                </Avatar>
                              </Link>
-                             <Button variant="ghost" onClick={handleLogout} className="text-muted-foreground hover:text-destructive h-10 w-10 p-0"><LogOut size={18} /></Button>
+                             <Button variant="ghost" onClick={handleLogout} className="text-muted-foreground hover:text-destructive h-11 w-11 p-0 rounded-2xl bg-white/5 hover:bg-destructive/10">
+                                <LogOut size={20} />
+                             </Button>
                         </div>
                     ) : (
                         <Button asChild className="bg-primary px-6 text-[10px] font-black uppercase italic rounded-xl h-11"><Link href="/login">Connexion</Link></Button>

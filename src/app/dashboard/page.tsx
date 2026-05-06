@@ -3,7 +3,7 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import Link from "next/link";
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   DollarSign,
   Package,
@@ -71,7 +71,8 @@ import {
   Building2,
   Timer,
   CheckCircle,
-  BarChartHorizontal
+  BarChartHorizontal,
+  LogOut
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -98,7 +99,8 @@ import withAuth from '@/components/auth/withAuth';
 import { useAuth } from '@/context/AuthContext';
 import { useCollection, useMemoFirebase, useDoc } from '@/firebase';
 import { collection, query, where, orderBy, limit, addDoc, serverTimestamp, doc, updateDoc, increment, Timestamp, arrayUnion } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { db, auth } from '@/lib/firebase';
+import { signOut } from 'firebase/auth';
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/ui/Logo";
 import { Input } from "@/components/ui/input";
@@ -114,6 +116,7 @@ import {
 } from 'recharts';
 import { Progress } from "@/components/ui/progress";
 import { UserGuide } from "@/components/dashboard/UserGuide";
+import { Separator } from "@/components/ui/separator";
 
 const TOTAL_COMMUNITY_SUPPLY = 32500000;
 
@@ -125,7 +128,7 @@ const DAILY_MISSIONS: DailyMission[] = [
 ];
 
 const navConfig = [
-  { href: "/dashboard", icon: LineChart, label: "Aperçu", roles: ["Admin", "Seller", "Cashier", "customer"] },
+  { href: "/dashboard", icon: Home, label: "Aperçu", roles: ["Admin", "Seller", "Cashier", "customer"] },
   { href: "/dashboard/wallet", icon: Wallet, label: "Mon Wallet DKST", roles: ["Admin", "Seller", "Cashier", "customer"] },
   { href: "/dashboard/finance", icon: BarChartHorizontal, label: "Rapports Financiers", roles: ["Admin"] },
   { href: "/dashboard/governance", icon: Vote, label: "Gouvernance DAO", roles: ["Admin", "Seller", "Cashier", "customer"] },
@@ -159,6 +162,7 @@ const navConfig = [
 function DashboardPage() {
   const { user, isLoading: authLoading } = useAuth();
   const pathname = usePathname();
+  const router = useRouter();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<any>(null);
@@ -179,6 +183,15 @@ function DashboardPage() {
       const userRole = user?.role?.toLowerCase() || "";
       return roles.includes(userRole);
   });
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      router.push('/login');
+    } catch (error) {
+      console.error("Logout error", error);
+    }
+  };
 
   // Fetch Treasury for Community Mining Pool info
   const treasuryRef = useMemoFirebase(() => doc(db, "system", "treasury"), []);
@@ -314,14 +327,21 @@ function DashboardPage() {
   }, [user, isStaff]);
 
   const SidebarContent = () => (
-    <nav className="grid gap-1 p-6 overflow-y-auto custom-scrollbar h-full">
-      <div className="mb-8 px-4"><Logo size="sm" showText /></div>
-      {filteredNavLinks.map(link => (
-        <Link key={link.href} href={link.href} className={cn("group flex items-center gap-3 px-4 py-3 rounded-2xl transition-all text-sm font-bold", pathname === link.href ? 'bg-accent/10 text-accent' : 'text-slate-400 hover:bg-white/5 hover:text-white')}>
-          <link.icon className={cn("h-4 w-4", pathname === link.href ? 'text-accent' : '')} />{link.label}
-        </Link>
-      ))}
-    </nav>
+    <div className="flex flex-col h-full">
+      <nav className="flex-1 grid gap-1 p-6 overflow-y-auto custom-scrollbar">
+        <div className="mb-8 px-4"><Logo size="sm" showText /></div>
+        {filteredNavLinks.map(link => (
+          <Link key={link.href} href={link.href} className={cn("group flex items-center gap-3 px-4 py-3 rounded-2xl transition-all text-sm font-bold", pathname === link.href ? 'bg-accent/10 text-accent' : 'text-slate-400 hover:bg-white/5 hover:text-white')}>
+            <link.icon className={cn("h-4 w-4", pathname === link.href ? 'text-accent' : '')} />{link.label}
+          </Link>
+        ))}
+      </nav>
+      <div className="p-6 border-t border-white/5">
+        <Button onClick={handleLogout} variant="ghost" className="w-full justify-start gap-3 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-2xl h-12 font-bold uppercase italic text-xs">
+          <LogOut size={18} /> Déconnexion
+        </Button>
+      </div>
+    </div>
   );
 
   return (
@@ -335,6 +355,10 @@ function DashboardPage() {
             <Logo size="sm" showText />
             <div className="flex items-center gap-4">
                 <Link href="/dashboard/wallet"><Badge className="bg-accent/20 text-accent border-accent/20 h-10 px-4 rounded-xl gap-2 font-black italic cursor-pointer"><Coins size={16} /> {user?.tokenBalance?.toFixed(2) || 0} DKST</Badge></Link>
+                <Separator orientation="vertical" className="h-8 bg-white/5 hidden sm:block" />
+                <Button onClick={handleLogout} variant="ghost" size="icon" className="h-11 w-11 rounded-2xl text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all hidden sm:flex">
+                    <LogOut size={20} />
+                </Button>
             </div>
         </div>
       </header>
