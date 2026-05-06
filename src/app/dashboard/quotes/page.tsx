@@ -24,7 +24,7 @@ import {
     QrCode
 } from "lucide-react";
 import { db } from '@/lib/firebase';
-import { collection, query, orderBy, updateDoc, doc, addDoc, serverTimestamp, getDocs } from 'firebase/firestore';
+import { collection, query, where, orderBy, updateDoc, doc, addDoc, serverTimestamp, getDocs } from 'firebase/firestore';
 import withAuth from '@/components/auth/withAuth';
 import Link from 'next/link';
 import { useCollection, useMemoFirebase } from '@/firebase';
@@ -253,7 +253,7 @@ function QuotesManagementPage() {
 
                             <div className="space-y-4">
                                 <div className="flex justify-between items-center">
-                                    <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Lignes de Devis</Label>
+                                    <Label className="text-[10px) font-black uppercase tracking-widest opacity-60">Lignes de Devis</Label>
                                     <Button type="button" size="sm" variant="ghost" onClick={handleAddItem} className="h-8 bg-accent/10 text-accent hover:bg-accent hover:text-black rounded-lg text-[9px] font-black uppercase italic gap-2">
                                         <Plus size={12} /> Ajouter une ligne
                                     </Button>
