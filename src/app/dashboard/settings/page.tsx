@@ -80,7 +80,6 @@ export default function SettingsPage() {
     const router = useRouter();
     const { toast } = useToast();
     const { theme, setTheme } = useTheme();
-    const fileInputRef = useRef<HTMLInputElement>(null);
     
     // Profile States
     const [name, setName] = useState("");
@@ -94,7 +93,6 @@ export default function SettingsPage() {
     // Security States
     const [currentPassword, setCurrentPassword] = useState("");
     const [newPassword, setNewPassword] = useState("");
-    const [showPasswords, setShowPasswords] = useState(false);
 
     // Wallet PIN States
     const [walletPin, setWalletPin] = useState("");
@@ -135,13 +133,6 @@ export default function SettingsPage() {
 
     const isAdmin = user?.role?.toLowerCase() === 'admin';
 
-    const loyalty = useMemo(() => {
-        const points = orderCount * 100;
-        if (points >= 1000) return { label: "Membre Gold", color: "text-yellow-400", perks: ["Priorité SAV 24h", "Livraison Bunia Offerte", "Ateliers IA Gratuits"] };
-        if (points >= 500) return { label: "Membre Silver", color: "text-slate-300", perks: ["Priorité SAV 48h", "-10% sur Formations", "Diagnostic PC Offert"] };
-        return { label: "Membre Bronze", color: "text-orange-400", perks: ["Accès au Hub Central", "Support par Ticket", "Historique Digital"] };
-    }, [orderCount]);
-
     const handleUpdateProfile = async () => {
         if (!user?.uid) return;
         setIsSaving(true);
@@ -168,7 +159,10 @@ export default function SettingsPage() {
             <header className="border-b border-white/5 bg-background/40 backdrop-blur-2xl sticky top-0 z-50 h-20 flex items-center justify-between px-6">
                 <div className="flex items-center gap-4">
                     <div className="w-12 h-12 rounded-2xl bg-accent/10 flex items-center justify-center text-accent"><Settings size={22} /></div>
-                    <div><h1 className="text-xl font-black uppercase italic leading-none">RÉGLAGES <span className="text-accent">HUB</span></h1><p className="text-[10px] text-muted-foreground font-bold uppercase mt-1">Écosystème DKS Bunia</p></div>
+                    <div>
+                        <h1 className="text-xl font-black uppercase italic leading-none">RÉGLAGES <span className="text-accent">HUB</span></h1>
+                        <p className="text-[10px] text-muted-foreground font-bold uppercase mt-1">Écosystème DKS Bunia</p>
+                    </div>
                 </div>
                 <Link href="/dashboard"><Button variant="outline" className="h-11 rounded-2xl gap-2 font-black uppercase italic text-[10px] tracking-widest"><ArrowLeft size={14} /> Retour</Button></Link>
             </header>
@@ -199,7 +193,7 @@ export default function SettingsPage() {
                                 </div>
                             </Card>
 
-                            <div className="lg:col-span-2 space-y-6">
+                            <div className="lg:col-span-2">
                                 <Card className="glossy-card border-none rounded-[2.5rem] p-10 space-y-8">
                                     <div className="flex items-center gap-4"><User className="text-accent" size={24} /><div><h2 className="text-xl font-black uppercase italic tracking-tight">INFORMATIONS ÉLITE</h2><p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Identité officielle dans le Hub</p></div></div>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -233,6 +227,7 @@ export default function SettingsPage() {
                                     </div>
                                     <Badge className="bg-accent text-black font-black text-[8px]">ONLINE</Badge>
                                 </div>
+                                <Button onClick={handleLogout} variant="ghost" className="w-full h-12 text-destructive hover:bg-destructive/10 uppercase font-black italic text-xs">Déconnexion Immédiate</Button>
                             </Card>
                         </div>
                     </TabsContent>

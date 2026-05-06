@@ -47,28 +47,24 @@ export default function RootLayout({
   return (
     <html lang="fr" suppressHydrationWarning>
       <head>
-        {/* Chargement du SDK Pi Network avant l'interactivité */}
-        <Script 
-          src="https://sdk.minepi.com/pi-sdk.js" 
-          strategy="beforeInteractive"
-        />
+        {/* Chargement conditionnel du SDK Pi pour éviter le timeout hors Pi Browser */}
+        <script dangerouslySetInnerHTML={{ __html: `
+          (function() {
+            if (/PiBrowser/i.test(navigator.userAgent)) {
+              var s = document.createElement('script');
+              s.src = 'https://sdk.minepi.com/pi-sdk.js';
+              s.onload = function() {
+                if (window.Pi) {
+                  window.Pi.init({ version: "2.0", sandbox: true });
+                  console.log("[Pi SDK] Initialisé dans Pi Browser");
+                }
+              };
+              document.head.appendChild(s);
+            }
+          })();
+        ` }} />
       </head>
       <body className={cn("min-h-screen bg-background font-sans antialiased", fontSans.variable)}>
-        {/* Initialisation sécurisée du SDK Pi pour éviter les timeouts hors Pi Browser */}
-        <Script id="pi-init" strategy="afterInteractive">
-          {`
-            if (window.Pi) {
-              // On n'initialise que si on détecte le Pi Browser pour éviter le timeout de 120s
-              if (/PiBrowser/i.test(navigator.userAgent)) {
-                window.Pi.init({ version: "2.0", sandbox: true });
-                console.log("[Pi SDK] Initialisé pour Pi Browser");
-              } else {
-                console.log("[Pi SDK] Navigation standard détectée - Initialisation différée");
-              }
-            }
-          `}
-        </Script>
-        
         <FirebaseClientProvider>
           <AuthProvider>
             <CartProvider>

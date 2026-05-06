@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useMemo, useState, useEffect, useRef } from 'react';
@@ -63,7 +62,9 @@ import {
     ShieldX,
     HeartPulse,
     UserCheck,
-    Scale
+    Scale,
+    Copy,
+    Check
 } from "lucide-react";
 import { db } from '@/lib/firebase';
 import { collection, query, where, orderBy, updateDoc, doc, addDoc, serverTimestamp, increment, limit, getDocs, Timestamp } from 'firebase/firestore';
@@ -92,7 +93,6 @@ import {
     DialogDescription 
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { authenticateWithPi } from '@/lib/pi-payment';
 import { 
     AreaChart, 
     Area, 
@@ -105,7 +105,6 @@ import {
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import { Logo } from '@/components/ui/Logo';
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { Slider } from "@/components/ui/slider";
@@ -125,6 +124,7 @@ function UniversalWalletPage() {
     const [isMinting, setIsMinting] = useState(false);
     const [isSyncing, setIsSyncing] = useState(false);
     const [isTransferSheetOpen, setIsTransferSheetOpen] = useState(false);
+    const [isReceiveSheetOpen, setIsReceiveSheetOpen] = useState(false);
     const [isProcessingAction, setIsProcessingAction] = useState(false);
     const [tempPiAddress, setTempPiAddress] = useState("");
     
@@ -146,6 +146,7 @@ function UniversalWalletPage() {
     const [selectedRecipient, setSelectedRecipient] = useState<any>(null);
     const [transferAmount, setTransferAmount] = useState("");
     const [transferMemo, setTransferMemo] = useState("");
+    const [hasCopiedId, setHasCopiedId] = useState(false);
 
     // Heritage States
     const [heritageRecipient, setHeritageRecipient] = useState<any>(null);
@@ -310,6 +311,22 @@ function UniversalWalletPage() {
         } catch (e) { toast({ title: "Erreur", variant: "destructive" }); } finally { setIsProcessingAction(false); }
     };
 
+    const handleUnstake = async () => {
+        if (!user || !user.stakedBalance) return;
+        setIsProcessingAction(true);
+        try {
+            const amount = user.stakedBalance;
+            await updateDoc(doc(db, "users", user.uid), {
+                tokenBalance: increment(amount + stats.stakingRewards),
+                stakedBalance: 0,
+                stakingStartedAt: null,
+                updatedAt: serverTimestamp()
+            });
+            await addDoc(collection(db, "tokenTransactions"), { userId: user.uid, type: 'unstaking', tokenAmount: amount + stats.stakingRewards, createdAt: serverTimestamp() });
+            toast({ title: "Capital & Intérêts Retirés" });
+        } catch (e) { toast({ title: "Erreur", variant: "destructive" }); } finally { setIsProcessingAction(false); }
+    };
+
     const handleBuyPerk = async (perk: any) => {
         if (!user || (user.tokenBalance || 0) < perk.cost) return;
         setIsProcessingAction(true);
@@ -318,6 +335,83 @@ function UniversalWalletPage() {
             await addDoc(collection(db, "tokenTransactions"), { userId: user.uid, type: 'exchange', tokenAmount: perk.cost, memo: perk.title, createdAt: serverTimestamp() });
             toast({ title: "Privilège Débloqué" });
         } catch (e) { toast({ title: "Erreur", variant: "destructive" }); } finally { setIsProcessingAction(false); }
+    };
+
+    const handleSaveHeritage = async () => {
+        if (!user || !heritageRecipient) return;
+        setIsProcessingAction(true);
+        try {
+            await updateDoc(doc(db, "users", user.uid), {
+                beneficiaryId: heritageRecipient.id,
+                beneficiaryName: heritageRecipient.name || heritageRecipient.displayName,
+                heritageThresholdDays: parseInt(heritageThreshold),
+                updatedAt: serverTimestamp()
+            });
+            toast({ title: "Testament Numérique Scellé" });
+        } catch (e) { toast({ title: "Erreur", variant: "destructive" }); } finally { setIsProcessingAction(false); }
+    };
+
+    const handleTransferProcess = async () => {
+        if (!user || !selectedRecipient || !transferAmount) return;
+        
+        const amount = parseFloat(transferAmount);
+        if (amount > (user.tokenBalance || 0)) {
+            toast({ title: "Solde insuffisant", variant: "destructive" });
+            return;
+        }
+
+        setIsProcessingAction(true);
+        try {
+            const piTxId = `PI-P2P-${Math.random().toString(36).substring(2, 12).toUpperCase()}`;
+
+            await updateDoc(doc(db, "users", user.uid), {
+                tokenBalance: increment(-amount),
+                updatedAt: serverTimestamp()
+            });
+
+            await updateDoc(doc(db, "users", selectedRecipient.id), {
+                tokenBalance: increment(amount),
+                updatedAt: serverTimestamp()
+            });
+
+            await addDoc(collection(db, "tokenTransactions"), {
+                userId: user.uid,
+                userName: user.name,
+                type: 'transfer',
+                tokenAmount: amount,
+                senderId: user.uid,
+                senderName: user.name,
+                direction: 'sent',
+                recipientId: selectedRecipient.id,
+                recipientName: selectedRecipient.name || selectedRecipient.displayName,
+                memo: transferMemo,
+                piTxId: piTxId,
+                createdAt: serverTimestamp()
+            });
+
+            await addDoc(collection(db, "tokenTransactions"), {
+                userId: selectedRecipient.id,
+                userName: selectedRecipient.name || selectedRecipient.displayName,
+                type: 'transfer',
+                tokenAmount: amount,
+                direction: 'received',
+                senderId: user.uid,
+                senderName: user.name,
+                memo: transferMemo,
+                piTxId: piTxId,
+                createdAt: serverTimestamp()
+            });
+
+            toast({ title: "Transfert réussi", description: `${amount} DKST envoyés à ${selectedRecipient.name || selectedRecipient.displayName}` });
+            setIsTransferSheetOpen(false);
+            setTransferAmount("");
+            setTransferMemo("");
+            setSelectedRecipient(null);
+        } catch (error) {
+            toast({ title: "Erreur transfert", variant: "destructive" });
+        } finally {
+            setIsProcessingAction(false);
+        }
     };
 
     const handleDownloadFortuneCert = async () => {
@@ -329,6 +423,15 @@ function UniversalWalletPage() {
             pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, canvas.width / 2, canvas.height / 2);
             pdf.save(`FORTUNE_DKS_${user?.name}.pdf`);
         } catch (e) { toast({ title: "Erreur PDF", variant: "destructive" }); } finally { setIsGeneratingCert(false); }
+    };
+
+    const copyWalletId = () => {
+        if (user?.uid) {
+            navigator.clipboard.writeText(user.uid);
+            setHasCopiedId(true);
+            toast({ title: "ID Copié", description: "Votre adresse de wallet est prête à être partagée." });
+            setTimeout(() => setHasCopiedId(false), 2000);
+        }
     };
 
     useEffect(() => {
@@ -363,6 +466,7 @@ function UniversalWalletPage() {
                                 {isGeneratingCert ? <Loader2 className="animate-spin" /> : <Medal size={20} />} Certificat Millionnaire
                             </Button>
                         )}
+                        <Button onClick={() => setIsReceiveSheetOpen(true)} variant="outline" className="h-14 px-8 rounded-2xl border-white/10 font-black uppercase italic gap-3 hover:bg-white/5"><ArrowDownLeft size={20} /> Recevoir</Button>
                         <Button onClick={() => setIsTransferSheetOpen(true)} className="bg-accent text-black h-14 px-8 rounded-2xl font-black uppercase italic gap-3 shadow-xl shadow-accent/20"><Send size={20} /> Transférer</Button>
                     </div>
                 </div>
@@ -547,7 +651,7 @@ function UniversalWalletPage() {
                                     <div className="flex items-center gap-4"><HeartPulse className="text-red-500" size={24} /><h3 className="text-xl font-black uppercase italic tracking-tight">Héritage Numérique</h3></div>
                                     <div className="space-y-6">
                                         <div className="space-y-3">
-                                            <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Héritier (Membre DKS)</Label>
+                                            <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Héritier (Membre DKS)</Label>
                                             <div className="relative"><Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} /><Input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Nom ou Email..." className="h-14 pl-12 bg-background/50 border-white/5 rounded-2xl" /></div>
                                             {searchQuery.length >= 3 && (
                                                 <div className="space-y-2 mt-2 max-h-[150px] overflow-y-auto pr-2 custom-scrollbar">
@@ -567,7 +671,7 @@ function UniversalWalletPage() {
                                             </div>
                                         )}
                                         <div className="space-y-3">
-                                            <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Seuil d'Inactivité (Jours)</Label>
+                                            <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Seuil d'Inactivité (Jours)</Label>
                                             <div className="grid grid-cols-3 gap-2">
                                                 {["30", "90", "180"].map(d => (
                                                     <button key={d} onClick={() => setHeritageThreshold(d)} className={cn("h-12 rounded-xl font-black uppercase text-[10px] border transition-all", heritageThreshold === d ? "bg-accent border-accent text-black" : "bg-white/5 border-white/5 text-white/40")}>{d} Jours</button>
@@ -591,21 +695,6 @@ function UniversalWalletPage() {
                                             <p className="text-3xl font-black text-accent italic truncate">{user?.beneficiaryName || "NON DÉFINI"}</p>
                                         </div>
                                     </div>
-                                </div>
-                            </Card>
-                        </div>
-                    </TabsContent>
-
-                    <TabsContent value="rankings" className="space-y-10 animate-in fade-in slide-in-from-bottom-4">
-                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                            <Card className="lg:col-span-4 bg-gradient-to-br from-yellow-500/10 to-background border-yellow-500/20 rounded-[3rem] p-10 space-y-8">
-                                <div className="space-y-4">
-                                    <Badge className="bg-yellow-500 text-black font-black uppercase italic text-[9px] px-4 py-1">Global Wealth Index</Badge>
-                                    <h3 className="text-3xl font-black uppercase italic tracking-tighter leading-none text-white">PIB THÉORIQUE DU HUB</h3>
-                                </div>
-                                <div className="p-8 bg-black/60 rounded-[2.5rem] border border-yellow-500/30 shadow-inner">
-                                    <p className="text-[10px] font-black uppercase text-yellow-500 mb-2 tracking-[0.4em]">Community Net Worth</p>
-                                    <p className="text-4xl font-black text-white italic tracking-tighter">${globalHubWealth.toLocaleString('fr-FR', { maximumFractionDigits: 0 })}</p>
                                 </div>
                             </Card>
                         </div>
@@ -642,6 +731,48 @@ function UniversalWalletPage() {
                     </div>
                 </DialogContent>
             </Dialog>
+
+            {/* RECEIVE SHEET */}
+            <Sheet open={isReceiveSheetOpen} onOpenChange={setIsReceiveSheetOpen}>
+                <SheetContent side="right" className="bg-card/95 backdrop-blur-3xl border-white/10 w-full sm:max-w-md flex flex-col p-0">
+                    <SheetHeader className="p-10 bg-accent/10 border-b border-white/5">
+                        <div className="flex items-center gap-5">
+                            <div className="w-16 h-16 rounded-2xl bg-accent/20 flex items-center justify-center text-accent shadow-xl shadow-accent/10"><ArrowDownLeft size={32} /></div>
+                            <div><SheetTitle className="text-3xl font-black uppercase italic tracking-tighter">Recevoir</SheetTitle><p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Mon Adresse de Wallet DKS</p></div>
+                        </div>
+                    </SheetHeader>
+                    <div className="flex-1 p-10 flex flex-col items-center justify-center gap-10">
+                        <div className="relative group">
+                            <div className="absolute inset-0 bg-accent/20 blur-[40px] rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
+                            <div className="relative bg-white p-8 rounded-[3rem] shadow-2xl">
+                                <QrCode size={200} className="text-black" />
+                            </div>
+                        </div>
+                        
+                        <div className="w-full space-y-6">
+                            <div className="space-y-2">
+                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-40 ml-1">Mon ID Unique</Label>
+                                <div className="flex gap-2">
+                                    <Input readOnly value={user?.uid || ""} className="h-14 bg-white/5 border-white/10 rounded-2xl font-mono text-[10px] text-accent tracking-wider text-center" />
+                                    <Button onClick={copyWalletId} variant="outline" className="h-14 w-14 rounded-2xl border-white/10 hover:bg-accent/10 hover:text-accent p-0 transition-all">
+                                        {hasCopiedId ? <Check size={20}/> : <Copy size={20}/>}
+                                    </Button>
+                                </div>
+                            </div>
+                            
+                            <Card className="bg-accent/5 border-accent/20 p-6 rounded-[2rem] space-y-3">
+                                <div className="flex items-center gap-2 text-accent">
+                                    <Info size={14} />
+                                    <p className="text-[10px] font-black uppercase tracking-widest">Note de transfert</p>
+                                </div>
+                                <p className="text-[11px] text-white/60 italic leading-relaxed">
+                                    Partagez cet ID ou ce code QR pour recevoir des jetons **DKST** d'un autre membre de l'élite. Les transactions sont instantanées et sans frais au sein du Hub.
+                                </p>
+                            </Card>
+                        </div>
+                    </div>
+                </SheetContent>
+            </Sheet>
 
             {/* TRANSFER SHEET */}
             <Sheet open={isTransferSheetOpen} onOpenChange={setIsTransferSheetOpen}>
