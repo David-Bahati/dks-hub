@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { 
@@ -13,64 +13,36 @@ import {
     Lock,
     Smartphone,
     Database,
-    DollarSign,
     Coins,
     RefreshCw,
     Loader2,
-    Camera,
-    MapPin,
-    History,
-    Trash2,
-    MessageCircle,
-    Moon,
-    Sun,
-    Languages,
-    Trophy,
-    Github,
-    Globe,
-    ShieldAlert,
+    KeyRound,
     Eye,
     EyeOff,
-    Wallet,
-    ExternalLink,
-    AlertTriangle,
-    Crown,
-    Star,
-    Sparkles,
+    Fingerprint,
+    ShieldAlert,
     CheckCircle2,
-    QrCode,
-    KeyRound,
-    Fingerprint
+    ShieldX
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
-import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Progress } from "@/components/ui/progress";
 import { 
     Tabs, 
     TabsContent, 
     TabsList, 
     TabsTrigger 
 } from "@/components/ui/tabs";
-import { 
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
 import { useAuth } from '@/context/AuthContext';
 import { auth, db } from '@/lib/firebase';
 import { 
     signOut, 
     updateProfile, 
 } from 'firebase/auth';
-import { doc, updateDoc, serverTimestamp, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, updateDoc, serverTimestamp, getDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { useTheme } from "next-themes";
 import { Logo } from "@/components/ui/Logo";
@@ -79,7 +51,6 @@ export default function SettingsPage() {
     const { user } = useAuth();
     const router = useRouter();
     const { toast } = useToast();
-    const { theme, setTheme } = useTheme();
     
     // Profile States
     const [name, setName] = useState("");
@@ -88,7 +59,6 @@ export default function SettingsPage() {
     const [photoURL, setPhotoURL] = useState("");
     const [language, setLanguage] = useState("fr");
     const [isSaving, setIsSaving] = useState(false);
-    const [orderCount, setOrderCount] = useState(0);
 
     // Security States
     const [currentPassword, setCurrentPassword] = useState("");
@@ -109,19 +79,9 @@ export default function SettingsPage() {
             setPhotoURL(user.photoURL || "");
             setLanguage(user.language || "fr");
             setWalletPin(user.walletPin || "");
-            fetchUserStats();
         }
         fetchSystemConfig();
     }, [user]);
-
-    const fetchUserStats = async () => {
-        if (!user?.uid) return;
-        try {
-            const q = query(collection(db, "orders"), where("userId", "==", user.uid));
-            const snap = await getDocs(q);
-            setOrderCount(snap.size);
-        } catch (e) { console.error(e); }
-    };
 
     const fetchSystemConfig = async () => {
         try {
@@ -275,9 +235,12 @@ export default function SettingsPage() {
                     {isAdmin && (
                         <TabsContent value="system" className="animate-in fade-in slide-in-from-bottom-4">
                             <Card className="glossy-card border-none rounded-[2.5rem] p-10 space-y-10">
-                                <div className="flex items-center gap-4"><RefreshCw className="text-accent" /><h2 className="text-xl font-black uppercase italic">TAUX DE CHANGE SYSTÈME</h2></div>
+                                <div className="flex items-center gap-4"><RefreshCw className="text-accent" size={24}/><h2 className="text-xl font-black uppercase italic">TAUX DE CHANGE SYSTÈME</h2></div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                    <div className="space-y-4"><Label className="text-[10px] font-black uppercase opacity-60">1 USD en Francs Congolais (CDF)</Label><Input type="number" value={exchangeRate} onChange={(e) => setExchangeRate(e.target.value)} className="h-16 bg-background/50 border-white/5 rounded-2xl text-2xl font-bold" /></div>
+                                    <div className="space-y-4">
+                                        <Label className="text-[10px] font-black uppercase opacity-60">1 USD en Francs Congolais (CDF)</Label>
+                                        <Input type="number" value={exchangeRate} onChange={(e) => setExchangeRate(e.target.value)} className="h-16 bg-background/50 border-white/5 rounded-2xl text-2xl font-bold" />
+                                    </div>
                                 </div>
                             </Card>
                         </TabsContent>

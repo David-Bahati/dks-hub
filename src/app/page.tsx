@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
@@ -38,7 +37,8 @@ import {
   Info,
   Plus,
   Loader2,
-  FileText
+  FileText,
+  Trophy
 } from 'lucide-react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
@@ -148,21 +148,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* PARTNERS */}
-      <section className="py-12 bg-black/20">
-        <div className="container max-w-7xl mx-auto px-6 flex flex-col items-center gap-8">
-          <p className="text-[9px] font-black uppercase tracking-[0.4em] text-white/20">Nos Partenaires Stratégiques</p>
-          <div className="flex flex-wrap justify-center items-center gap-x-16 gap-y-8 opacity-40 hover:opacity-100 transition-opacity">
-            {partners.map((p, i) => (
-                <div key={i} className="flex items-center gap-3 text-white group cursor-default">
-                    <div className="group-hover:text-accent transition-colors">{p.icon}</div>
-                    <span className="font-black uppercase italic text-sm tracking-tighter group-hover:text-white transition-colors">{p.name}</span>
-                </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* POLES OF EXCELLENCE */}
       <section className="container max-w-7xl mx-auto px-6 py-32">
         <div className="text-center mb-24 space-y-4">
@@ -242,48 +227,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* DKS PRESS */}
-      <section className="py-32 bg-background">
-        <div className="container max-w-7xl mx-auto px-6">
-            <div className="flex items-center gap-6 mb-16"><h2 className="text-2xl font-black uppercase italic tracking-tighter flex items-center gap-4"><Newspaper className="text-accent" /> DKS <span className="text-accent">PRESS</span></h2><div className="h-px flex-1 bg-white/5" /></div>
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {news.map((item, idx) => (
-                    <Card key={idx} className="bg-white/[0.02] border-white/5 rounded-[2.5rem] overflow-hidden hover:bg-white/[0.05] transition-all group">
-                        <CardContent className="p-8 space-y-6">
-                            <div className="flex justify-between items-start"><div className="w-14 h-14 rounded-2xl bg-white/5 flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">{item.icon}</div><Badge variant="outline" className="border-accent/20 text-accent text-[8px] font-black uppercase px-2">{item.category}</Badge></div>
-                            <div className="space-y-3"><div className="flex items-center gap-2 text-[9px] font-bold text-muted-foreground uppercase"><Calendar size={10} /> {item.date}</div><h3 className="text-xl font-black uppercase italic leading-tight">{item.title}</h3><p className="text-xs text-muted-foreground italic leading-relaxed">"{item.excerpt}"</p></div>
-                        </CardContent>
-                    </Card>
-                ))}
-            </div>
-        </div>
-      </section>
-
-      {/* ACADEMY CTA SUPREME */}
-      <section className="container max-w-7xl mx-auto px-6 py-32">
-        <Card className="bg-primary/10 border-primary/20 rounded-[3rem] p-8 md:p-20 relative overflow-hidden group">
-            <div className="absolute top-0 right-0 p-12 opacity-5 scale-150 rotate-12 group-hover:rotate-0 transition-transform duration-1000"><GraduationCap size={240} /></div>
-            <div className="relative z-10 flex flex-col lg:flex-row items-center gap-12 text-center lg:text-left">
-                <div className="flex-1 space-y-8">
-                    <Badge className="bg-primary text-white font-black uppercase tracking-[0.3em] px-4 py-1.5 italic">ACADEMY 2.0</Badge>
-                    <h2 className="text-5xl md:text-7xl font-black uppercase italic tracking-tighter leading-[0.9] text-white">
-                        REJOIGNEZ L'ÉLITE <br /><span className="text-primary">DU SAVOIR</span>
-                    </h2>
-                    <p className="text-lg text-muted-foreground max-w-2xl leading-relaxed font-medium">
-                        Ne soyez plus spectateur de la révolution IA et Blockchain. Devenez un acteur certifié par Double King Academy à Bunia.
-                    </p>
-                </div>
-                <div className="shrink-0 w-full sm:w-auto">
-                    <Link href="/services">
-                        <Button className="h-24 w-full sm:w-auto px-12 rounded-[2rem] bg-primary text-white font-black uppercase italic text-xl shadow-[0_0_50px_rgba(59,130,246,0.3)] hover:scale-105 active:scale-95 transition-all">
-                            Voir les Cursus <ArrowRight size={28} className="ml-3" />
-                        </Button>
-                    </Link>
-                </div>
-            </div>
-        </Card>
-      </section>
-
       {/* INSTITUTIONAL FOOTER */}
       <footer className="bg-card/40 border-t border-white/5 pt-32 pb-16 relative overflow-hidden">
         <div className="container max-w-7xl mx-auto px-6 relative z-10">
@@ -291,9 +234,6 @@ export default function LandingPage() {
                 <div className="lg:col-span-4 space-y-10">
                     <Logo showText={true} size="lg" />
                     <p className="text-muted-foreground text-sm leading-relaxed italic">"Le premier Hub Technologique Hybride de l'Ituri, alliant commerce de luxe, formation d'élite et déploiements d'infrastructures certifiées."</p>
-                    <div className="flex gap-4">
-                        {[1, 2, 3].map(i => <div key={i} className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 hover:border-accent transition-all cursor-pointer" />)}
-                    </div>
                 </div>
 
                 <div className="lg:col-span-4 grid grid-cols-2 gap-10">
@@ -302,7 +242,7 @@ export default function LandingPage() {
                         <ul className="space-y-4 text-xs font-bold uppercase italic text-muted-foreground">
                             <li><Link href="/" className="hover:text-accent">Stock Hardware</Link></li>
                             <li><Link href="/services" className="hover:text-accent">DKS Academy</Link></li>
-                            <li><Link href="/portfolio" className="hover:text-accent">Portfolio</Link></li>
+                            <li><Link href="/dashboard/hall-of-fame" className="hover:text-accent flex items-center gap-2"><Trophy size={12}/> Hall of Fame</Link></li>
                             <li><Link href="/whitepaper" className="hover:text-accent flex items-center gap-2"><FileText size={12}/> Livre Blanc</Link></li>
                         </ul>
                     </div>
@@ -339,7 +279,6 @@ export default function LandingPage() {
                             </Button>
                         </form>
                     )}
-                    <p className="text-[9px] text-white/20 uppercase font-black tracking-widest">Informez-vous sur les stocks, sessions Academy et opportunités Mining.</p>
                 </div>
             </div>
 

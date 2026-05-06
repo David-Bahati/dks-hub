@@ -50,16 +50,23 @@ export default function RootLayout({
         {/* Chargement conditionnel du SDK Pi pour éviter le timeout hors Pi Browser */}
         <script dangerouslySetInnerHTML={{ __html: `
           (function() {
-            if (/PiBrowser/i.test(navigator.userAgent)) {
+            var isPiBrowser = /PiBrowser/i.test(navigator.userAgent);
+            if (isPiBrowser) {
               var s = document.createElement('script');
               s.src = 'https://sdk.minepi.com/pi-sdk.js';
               s.onload = function() {
                 if (window.Pi) {
-                  window.Pi.init({ version: "2.0", sandbox: true });
-                  console.log("[Pi SDK] Initialisé dans Pi Browser");
+                  try {
+                    window.Pi.init({ version: "2.0", sandbox: true });
+                    console.log("[Pi SDK] Initialisé dans Pi Browser");
+                  } catch(e) {
+                    console.error("[Pi SDK] Erreur init:", e);
+                  }
                 }
               };
               document.head.appendChild(s);
+            } else {
+              console.log("[Pi SDK] Hors Pi Browser : Initialisation ignorée pour éviter le timeout.");
             }
           })();
         ` }} />

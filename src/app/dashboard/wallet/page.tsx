@@ -131,7 +131,7 @@ function UniversalWalletPage() {
     // Security States
     const [isPinVerificationOpen, setIsPinVerificationOpen] = useState(false);
     const [enteredPin, setEnteredPin] = useState("");
-    const [pendingAction, setPendingAction] = useState<() => void>(() => () => {});
+    const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
     const [showPin, setShowPin] = useState(false);
     const [isEmergencyLockProcessing, setIsEmergencyLockProcessing] = useState(false);
 
@@ -229,12 +229,6 @@ function UniversalWalletPage() {
         };
     }, [user, logs, orders, isStaff, transactions]);
 
-    const globalHubWealth = useMemo(() => {
-        if (!topWealthyUsers) return 0;
-        const sum = topWealthyUsers.reduce((acc, u) => acc + (u.tokenBalance || 0) + (u.stakedBalance || 0), 0);
-        return sum * GCV_VALUE;
-    }, [topWealthyUsers]);
-
     const mintTokens = async () => {
         if (!user || stats.redeemableTokens < 1) return;
         setIsMinting(true);
@@ -277,7 +271,7 @@ function UniversalWalletPage() {
         if (enteredPin === user?.walletPin) {
             setIsPinVerificationOpen(false);
             setEnteredPin("");
-            if (typeof pendingAction === 'function') pendingAction();
+            if (pendingAction) pendingAction();
         } else {
             toast({ title: "Code PIN Incorrect", variant: "destructive" });
             setEnteredPin("");
@@ -414,6 +408,15 @@ function UniversalWalletPage() {
         }
     };
 
+    const copyWalletId = () => {
+        if (user?.uid) {
+            navigator.clipboard.writeText(user.uid);
+            setHasCopiedId(true);
+            toast({ title: "ID Copié", description: "Votre adresse de wallet est prête à être partagée." });
+            setTimeout(() => setHasCopiedId(false), 2000);
+        }
+    };
+
     const handleDownloadFortuneCert = async () => {
         if (!certRef.current) return;
         setIsGeneratingCert(true);
@@ -423,15 +426,6 @@ function UniversalWalletPage() {
             pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, canvas.width / 2, canvas.height / 2);
             pdf.save(`FORTUNE_DKS_${user?.name}.pdf`);
         } catch (e) { toast({ title: "Erreur PDF", variant: "destructive" }); } finally { setIsGeneratingCert(false); }
-    };
-
-    const copyWalletId = () => {
-        if (user?.uid) {
-            navigator.clipboard.writeText(user.uid);
-            setHasCopiedId(true);
-            toast({ title: "ID Copié", description: "Votre adresse de wallet est prête à être partagée." });
-            setTimeout(() => setHasCopiedId(false), 2000);
-        }
     };
 
     useEffect(() => {
@@ -454,7 +448,7 @@ function UniversalWalletPage() {
             <main className="max-w-7xl mx-auto px-4 py-12">
                 <div className="flex flex-col md:flex-row justify-between items-start gap-8 mb-12">
                     <div className="flex items-start gap-5">
-                        <Link href="/dashboard"><Button variant="outline" className="h-14 w-14 rounded-2xl border-white/10 p-0 transition-all"><ArrowLeft size={24} /></Button></Link>
+                        <Link href="/dashboard"><Button variant="outline" className="h-14 w-14 rounded-2xl border-white/10 p-0 transition-all hover:bg-accent/10 hover:text-accent"><ArrowLeft size={24} /></Button></Link>
                         <div>
                             <h1 className="text-4xl font-black uppercase italic tracking-tighter">Mon Wallet <span className="text-accent">Élite</span></h1>
                             <p className="text-muted-foreground text-xs uppercase font-black opacity-40 mt-1">Gestionnaire d'actifs numériques & GCV Pi Terminal</p>
@@ -564,7 +558,7 @@ function UniversalWalletPage() {
                                     <div className="h-[400px] w-full">
                                         <ResponsiveContainer width="100%" height="100%">
                                             <AreaChart data={stats.wealthHistory}>
-                                                <defs><linearGradient id="colorWealth" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="hsl(var(--accent))" stopOpacity={0.3}/><stop offset="95%" stopColor="hsl(var(--accent))" stopOpacity={0}/></linearGradient></defs>
+                                                <defs><linearGradient id="colorWealth" x1="0" x2="0" y2="1"><stop offset="5%" stopColor="hsl(var(--accent))" stopOpacity={0.3}/><stop offset="95%" stopColor="hsl(var(--accent))" stopOpacity={0}/></linearGradient></defs>
                                                 <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" vertical={false} />
                                                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 10}} />
                                                 <Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', borderRadius: '12px' }} />
@@ -652,7 +646,7 @@ function UniversalWalletPage() {
                                     <div className="space-y-6">
                                         <div className="space-y-3">
                                             <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Héritier (Membre DKS)</Label>
-                                            <div className="relative"><Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} /><Input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Nom ou Email..." className="h-14 pl-12 bg-background/50 border-white/5 rounded-2xl" /></div>
+                                            <div className="relative"><Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} /><Input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Nom ou Email..." className="h-14 bg-background/50 border-white/5 rounded-2xl" /></div>
                                             {searchQuery.length >= 3 && (
                                                 <div className="space-y-2 mt-2 max-h-[150px] overflow-y-auto pr-2 custom-scrollbar">
                                                     {isSearching ? <div className="p-4 text-center"><Loader2 className="animate-spin h-5 w-5 mx-auto" /></div> : searchResults.map(u => (
@@ -667,7 +661,7 @@ function UniversalWalletPage() {
                                         {heritageRecipient && (
                                             <div className="p-4 bg-accent/10 border border-accent/20 rounded-2xl flex justify-between items-center">
                                                 <span className="text-xs font-black uppercase">{heritageRecipient.name || heritageRecipient.displayName}</span>
-                                                <Button variant="ghost" size="icon" onClick={() => setHeritageRecipient(null)} className="h-6 w-6"><X size={14}/></Button>
+                                                <button onClick={() => setHeritageRecipient(null)} className="h-6 w-6 text-white/40 hover:text-white"><X size={14}/></button>
                                             </div>
                                         )}
                                         <div className="space-y-3">
