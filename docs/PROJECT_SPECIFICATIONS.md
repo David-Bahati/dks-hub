@@ -29,7 +29,7 @@ Le système utilise Firebase Auth et Firestore pour gérer quatre niveaux d'acc�
 
 | Rôle | Description | Accès Clés |
 | :--- | :--- | :--- |
-| **Admin** | Direction Générale | Banque Centrale, Notariat, Gestion Staff, Statistiques Globales. |
+| **Admin** | Direction Générale | Banque Centrale, Notariat, Gestion Staff, Rapports Financiers PDF. |
 | **Vendeur** | Expert Hardware | Gestion du Stock, Assistant IA, SAV Live, Devis Professionnels. |
 | **Caissier** | Gestionnaire Flux | Terminal POS, Encaissement Crypto, Impression de Reçus. |
 | **Customer** | Membre Élite | Wallet DKST, Academy, Parc Hardware, Testament Numérique. |
@@ -56,21 +56,18 @@ Le système utilise Firebase Auth et Firestore pour gérer quatre niveaux d'acc�
 - Soumission de propositions stratégiques par l'Admin.
 - Vote pondéré par le solde de jetons DKST des membres.
 
+### E. Intelligence de Gestion
+- **Assistant IA** : Identifie le matériel par photo et conseille sur le stock.
+- **Bilan Financier** : Consolidation automatique des revenus Hardware et Academy.
+
 ---
 
 ## 5. Stack Technique
-- **Frontend** : Next.js 14 (App Router), React 18, Tailwind CSS.
+- **Framework** : Next.js 14 (App Router), React 18, Tailwind CSS.
 - **UI Components** : ShadCN UI, Lucide Icons, Recharts (Analytique).
 - **Backend/DB** : Firebase Firestore (Temps réel), Firebase Auth.
-- **AI (Genkit)** : Assistant client multilingue, vision par ordinateur, générateur de descriptions marketing.
+- **IA (Genkit)** : Assistant client multilingue, vision par ordinateur, générateur de descriptions marketing.
 - **Document Engine** : html2canvas & jsPDF pour la facturation et les certificats.
-
----
-
-## 6. Roadmap 2024-2025
-1. **Q3 2024** : Consolidation du Mainnet DKST et ouverture du pôle Audit Business.
-2. **Q4 2024** : Lancement de l'application mobile native et intégration NFC pour le Wallet.
-3. **2025** : Expansion régionale du modèle Hub vers d'autres provinces de la RDC.
 
 ---
 *Document certifié par la Direction Technique DKS Solutions - Bunia, Ituri.*

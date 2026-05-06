@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from 'react';
@@ -81,8 +80,7 @@ function SupportPage() {
     const [ticketImage, setTicketImage] = useState<string | null>(null);
     const [chatImage, setChatImage] = useState<string | null>(null);
     
-    // PDF States
-    const [isGeneratingInvoice, setIsGeneratingInvoice] = useState(false);
+    const isGeneratingInvoiceRef = useRef(false);
     const invoiceRef = useRef<HTMLDivElement>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
     const ticketFileInputRef = useRef<HTMLInputElement>(null);
@@ -134,10 +132,6 @@ function SupportPage() {
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, target: 'ticket' | 'chat') => {
         const file = e.target.files?.[0];
         if (!file) return;
-        if (file.size > 2 * 1024 * 1024) {
-            toast({ title: "Fichier trop lourd", description: "Max 2Mo pour le Hub.", variant: "destructive" });
-            return;
-        }
         const reader = new FileReader();
         reader.onloadend = () => {
             if (target === 'ticket') setTicketImage(reader.result as string);
@@ -159,16 +153,6 @@ function SupportPage() {
           };
 
           await addDoc(collection(db, "supportTickets"), ticketData);
-          await addDoc(collection(db, "notifications"), {
-              userId: 'staff',
-              title: "SAV: Nouveau Dossier",
-              message: `${user?.name} a ouvert une demande pour ${values.productName}.`,
-              type: 'warning',
-              isRead: false,
-              createdAt: serverTimestamp(),
-              link: '/dashboard/support'
-          });
-
           toast({ title: "Ticket ouvert", description: "Expertise technique DKS activée." });
           setTicketImage(null);
           setIsSheetOpen(false);
@@ -181,22 +165,12 @@ function SupportPage() {
     const updateTicketStatus = async (ticketId: string, newStatus: string, ticketUserId: string) => {
         try {
             await updateDoc(doc(db, "supportTickets", ticketId), { status: newStatus, updatedAt: serverTimestamp() });
-            await addDoc(collection(db, "notifications"), {
-                userId: ticketUserId,
-                title: "Mise à jour SAV",
-                message: `L'état de votre réparation est : ${newStatus.toUpperCase()}.`,
-                type: 'info',
-                isRead: false,
-                createdAt: serverTimestamp(),
-                link: '/dashboard/support'
-            });
             toast({ title: "Statut mis à jour" });
         } catch (e) { toast({ title: "Erreur", variant: "destructive" }); }
     };
 
     const handleAddPart = async (product: Product) => {
         if (!selectedTicket || product.stockQuantity <= 0) return;
-
         try {
             await addDoc(collection(db, "supportTickets", selectedTicket.id, "usedParts"), {
                 productId: product.id,
@@ -205,35 +179,20 @@ function SupportPage() {
                 unitPrice: product.sellingPrice,
                 createdAt: serverTimestamp()
             });
-
-            await updateDoc(doc(db, "products", product.id), {
-                stockQuantity: increment(-1)
-            });
-
-            await addDoc(collection(db, "supportTickets", selectedTicket.id, "messages"), {
-                senderId: user?.uid,
-                senderName: "Système DKS",
-                senderRole: "system",
-                text: `PIÈCE UTILISÉE : ${product.name} (Quantité: 1)`,
-                createdAt: serverTimestamp()
-            });
-
-            toast({ title: "Pièce ajoutée", description: `Le stock de ${product.name} a été mis à jour.` });
-        } catch (error) {
-            toast({ title: "Erreur Stock", variant: "destructive" });
-        }
+            await updateDoc(doc(db, "products", product.id), { stockQuantity: increment(-1) });
+            toast({ title: "Pièce ajoutée" });
+        } catch (error) { toast({ title: "Erreur Stock", variant: "destructive" }); }
     };
 
     const handleFinalBilling = async () => {
         if (!selectedTicket) return;
-        setIsGeneratingInvoice(true);
+        isGeneratingInvoiceRef.current = true;
 
         const partsTotal = usedParts.reduce((acc, p) => acc + (p.unitPrice * p.quantity), 0);
         const labor = parseFloat(laborCost);
         const grandTotal = partsTotal + labor;
 
         try {
-            // 1. Create final order for cashier
             await addDoc(collection(db, "orders"), {
                 userId: selectedTicket.userId,
                 customerName: selectedTicket.customerName,
@@ -250,31 +209,23 @@ function SupportPage() {
                 sourceId: selectedTicket.id
             });
 
-            // 2. Update ticket status
-            await updateDoc(doc(db, "supportTickets", selectedTicket.id), {
-                status: 'completed',
-                updatedAt: serverTimestamp()
-            });
+            await updateDoc(doc(db, "supportTickets", selectedTicket.id), { status: 'completed', updatedAt: serverTimestamp() });
 
-            // 3. Generate PDF
             setTimeout(async () => {
                 if (invoiceRef.current) {
                     const canvas = await html2canvas(invoiceRef.current, { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
-                    const imgData = canvas.toDataURL('image/png');
                     const pdf = new jsPDF({ orientation: 'portrait', unit: 'px', format: [canvas.width / 2, canvas.height / 2] });
-                    pdf.addImage(imgData, 'PNG', 0, 0, canvas.width / 2, canvas.height / 2);
+                    pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, canvas.width / 2, canvas.height / 2);
                     pdf.save(`FACTURE_SAV_DKS_${selectedTicket.id.substring(0, 8).toUpperCase()}.pdf`);
                 }
-                
-                toast({ title: "Clôture réussie", description: "Facture générée et commande envoyée en caisse." });
+                toast({ title: "Clôture réussie" });
                 setIsBillingDialogOpen(false);
                 setIsChatOpen(false);
-                setIsGeneratingInvoice(false);
+                isGeneratingInvoiceRef.current = false;
             }, 500);
-
         } catch (error) {
             toast({ title: "Erreur Facturation", variant: "destructive" });
-            setIsGeneratingInvoice(false);
+            isGeneratingInvoiceRef.current = false;
         }
     };
 
@@ -316,7 +267,8 @@ function SupportPage() {
         }
     };
 
-    const filteredTickets = tickets?.filter(t => isStaff || t.userId === user?.uid)
+    const filteredTickets = (tickets || [])
+        .filter(t => isStaff || t.userId === user?.uid)
         .filter(t => t.customerName?.toLowerCase().includes(search.toLowerCase()) || t.productName?.toLowerCase().includes(search.toLowerCase()));
 
     return (
@@ -326,7 +278,7 @@ function SupportPage() {
                 <div className="flex flex-col md:flex-row justify-between items-start gap-8 mb-12">
                     <div className="flex items-start gap-5">
                         <Link href="/dashboard">
-                            <Button variant="outline" className="h-14 w-14 rounded-2xl border-white/10 hover:bg-accent/10 hover:text-accent p-0 transition-all">
+                            <Button variant="outline" className="h-14 w-14 rounded-2xl border-white/10 hover:bg-accent/10 hover:text-accent p-0">
                                 <ArrowLeft size={24} />
                             </Button>
                         </Link>
@@ -337,7 +289,7 @@ function SupportPage() {
                     </div>
                     
                     {!isStaff && (
-                        <Button onClick={() => setIsSheetOpen(true)} className="bg-primary hover:bg-primary/90 h-14 px-8 rounded-2xl font-black uppercase italic gap-3 shadow-xl shadow-primary/10">
+                        <Button onClick={() => setIsSheetOpen(true)} className="bg-primary hover:bg-primary/90 h-14 px-8 rounded-2xl font-black uppercase italic gap-3 shadow-xl">
                             <Plus size={20} /> Ouvrir un dossier
                         </Button>
                     )}
@@ -356,61 +308,40 @@ function SupportPage() {
                 <div className="grid grid-cols-1 gap-6">
                     {isLoading ? (
                         <div className="py-20 flex justify-center"><Loader2 className="animate-spin text-accent h-12 w-12" /></div>
-                    ) : filteredTickets && filteredTickets.length > 0 ? (
+                    ) : filteredTickets.length > 0 ? (
                         filteredTickets.map((ticket) => (
                             <Card key={ticket.id} className={cn(
                                 "glossy-card border-none rounded-[2.5rem] overflow-hidden group transition-all relative",
                                 ticket.subscriptionId && "border-l-4 border-l-red-500 bg-red-500/[0.02]"
                             )}>
-                                {ticket.subscriptionId && (
-                                    <div className="absolute top-0 right-0 p-4">
-                                        <Badge className="bg-red-500 text-white border-none uppercase text-[8px] font-black px-3 py-1 flex items-center gap-1 animate-pulse">
-                                            <Zap size={10} /> VIP CONTRAT
-                                        </Badge>
-                                    </div>
-                                )}
-                                
                                 <CardContent className="p-8 flex flex-col md:flex-row items-center gap-8">
-                                    <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center text-accent shrink-0 overflow-hidden relative">
+                                    <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center text-accent shrink-0 overflow-hidden">
                                         {ticket.imageUrl ? <img src={ticket.imageUrl} className="w-full h-full object-cover" alt="Ticket" /> : <Wrench size={28} />}
                                     </div>
-                                    
                                     <div className="flex-1 space-y-3 text-center md:text-left">
                                         <div className="flex flex-wrap justify-center md:justify-start items-center gap-4">
                                             <h3 className="text-xl font-black uppercase italic tracking-tight">{ticket.productName}</h3>
                                             {getStatusBadge(ticket.status)}
-                                            <Badge variant="outline" className="border-white/10 text-[9px] uppercase font-bold opacity-30 tracking-widest">#{ticket.id.substring(0, 8)}</Badge>
                                         </div>
                                         <p className="text-sm text-white/70 italic max-w-2xl line-clamp-2">" {ticket.issueDescription} "</p>
-                                        <div className="flex items-center justify-center md:justify-start gap-5 text-[9px] font-black uppercase italic text-muted-foreground/40 tracking-widest">
+                                        <div className="flex items-center justify-center md:justify-start gap-5 text-[9px] font-black uppercase italic text-muted-foreground/40">
                                             <span className="flex items-center gap-2"><UserIcon size={12} className="text-accent" /> {ticket.customerName}</span>
-                                            <span>•</span>
                                             <span className="flex items-center gap-2"><Clock size={12} /> {ticket.createdAt?.toDate?.().toLocaleDateString('fr-FR') || 'Récemment'}</span>
                                         </div>
                                     </div>
-
                                     <div className="flex flex-col gap-3 shrink-0 min-w-[220px]">
-                                        <Button 
-                                            variant="outline" 
-                                            className={cn(
-                                                "rounded-xl border-accent/20 text-accent hover:bg-accent hover:text-black gap-2 h-12 font-black uppercase italic text-[10px] transition-all",
-                                                ticket.subscriptionId && "border-red-500/20 text-red-500 hover:bg-red-500 hover:text-white"
-                                            )}
-                                            onClick={() => { setSelectedTicket(ticket); setIsChatOpen(true); }}
-                                        >
+                                        <Button variant="outline" className="rounded-xl border-accent/20 text-accent hover:bg-accent hover:text-black gap-2 h-12 font-black uppercase italic text-[10px]" onClick={() => { setSelectedTicket(ticket); setIsChatOpen(true); }}>
                                             <MessageCircle size={16} /> Entrer en Chat Live
                                         </Button>
                                         {isStaff && (
                                             <Select value={ticket.status} onValueChange={(val) => updateTicketStatus(ticket.id, val, ticket.userId)}>
-                                                <SelectTrigger className="h-12 bg-white/5 border-white/10 rounded-xl font-black uppercase italic text-[10px]">
-                                                    <SelectValue placeholder="Statut Tech" />
-                                                </SelectTrigger>
+                                                <SelectTrigger className="h-12 bg-white/5 border-white/10 rounded-xl font-black uppercase italic text-[10px]"><SelectValue placeholder="Statut Tech" /></SelectTrigger>
                                                 <SelectContent className="bg-card border-white/10">
-                                                    <SelectItem value="pending" className="text-[10px] font-black uppercase">Attente</SelectItem>
-                                                    <SelectItem value="diagnosing" className="text-[10px] font-black uppercase">Diagnostic</SelectItem>
-                                                    <SelectItem value="repairing" className="text-[10px] font-black uppercase">Réparation</SelectItem>
-                                                    <SelectItem value="ready" className="text-[10px] font-black uppercase text-green-400">Prêt Retrait</SelectItem>
-                                                    <SelectItem value="completed" className="text-[10px] font-black uppercase opacity-40">Terminé</SelectItem>
+                                                    <SelectItem value="pending">Attente</SelectItem>
+                                                    <SelectItem value="diagnosing">Diagnostic</SelectItem>
+                                                    <SelectItem value="repairing">Réparation</SelectItem>
+                                                    <SelectItem value="ready">Prêt Retrait</SelectItem>
+                                                    <SelectItem value="completed">Terminé</SelectItem>
                                                 </SelectContent>
                                             </Select>
                                         )}
@@ -420,402 +351,71 @@ function SupportPage() {
                         ))
                     ) : (
                         <div className="py-32 text-center bg-white/5 rounded-[3rem] border border-dashed border-white/10 opacity-30 flex flex-col items-center gap-6">
-                            <BadgeAlert size={80} strokeWidth={1} />
-                            <p className="text-xl font-black uppercase italic tracking-tighter">Aucun dossier SAV</p>
+                            <BadgeAlert size={80} strokeWidth={1} /><p className="text-xl font-black uppercase italic tracking-tighter">Aucun dossier SAV</p>
                         </div>
                     )}
                 </div>
             </main>
 
-            {/* NEW TICKET SHEET */}
             <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
                 <SheetContent side="right" className="bg-card/95 backdrop-blur-3xl border-white/10 w-full sm:max-w-xl flex flex-col p-0">
                     <SheetHeader className="p-8 bg-primary/10 border-b border-white/5">
                         <SheetTitle className="text-3xl font-black uppercase italic tracking-tighter">Ouvrir un Dossier SAV</SheetTitle>
-                        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Centre Expertise Bunia</p>
                     </SheetHeader>
-                    
                     <Form {...form}>
                       <form onSubmit={form.handleSubmit(onSubmit)} className="flex-1 p-8 space-y-8 overflow-y-auto">
                         <div className="space-y-6">
-                            <FormField
-                              control={form.control}
-                              name="productName"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Matériel & Modèle</FormLabel>
-                                  <FormControl>
-                                    <Input {...field} placeholder="Ex: Laptop Razer Blade 15, RTX 3080..." className="h-14 bg-background/50 border-white/5 rounded-2xl" />
-                                  </FormControl>
-                                  <FormMessage className="text-[10px]" />
-                                </FormItem>
-                              )}
-                            />
-                            <FormField
-                              control={form.control}
-                              name="priority"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Priorité Intervention</FormLabel>
-                                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                    <FormControl>
-                                      <SelectTrigger className="h-14 bg-background/50 border-white/5 rounded-2xl">
-                                          <SelectValue />
-                                      </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent className="bg-card border-white/10">
-                                        <SelectItem value="low" className="text-[10px] font-black uppercase">Standard</SelectItem>
-                                        <SelectItem value="medium" className="text-[10px] font-black uppercase">Important</SelectItem>
-                                        <SelectItem value="high" className="text-[10px] font-black uppercase text-orange-400">Urgent</SelectItem>
-                                        <SelectItem value="urgent" className="text-[10px] font-black uppercase text-red-500">Critique / Bloquant</SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                  <FormMessage className="text-[10px]" />
-                                </FormItem>
-                              )}
-                            />
-                            <FormField
-                              control={form.control}
-                              name="description"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Description de la panne</FormLabel>
-                                  <FormControl>
-                                    <Textarea {...field} placeholder="Détaillez le problème technique..." className="min-h-[120px] bg-background/50 border-white/5 rounded-2xl" />
-                                  </FormControl>
-                                  <FormMessage className="text-[10px]" />
-                                </FormItem>
-                              )}
-                            />
-                            <div className="space-y-2">
-                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Photo de l'état (Optionnel)</Label>
-                                <div onClick={() => ticketFileInputRef.current?.click()} className="aspect-video rounded-3xl border-2 border-dashed border-white/10 hover:border-accent/50 bg-black/20 flex flex-col items-center justify-center cursor-pointer transition-all overflow-hidden relative group">
-                                    {ticketImage ? (
-                                        <>
-                                            <img src={ticketImage} className="w-full h-full object-cover" alt="Preview" />
-                                            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"><Upload className="text-white" /></div>
-                                            <button type="button" className="absolute top-4 right-4 bg-destructive text-white p-2 rounded-full" onClick={(e) => { e.stopPropagation(); setTicketImage(null); }}><X size={14} /></button>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <ImageIcon className="h-12 w-12 text-muted-foreground mb-3 opacity-20" />
-                                            <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">Cliquer pour joindre une photo</span>
-                                        </>
-                                    )}
-                                </div>
-                                <input type="file" ref={ticketFileInputRef} className="hidden" accept="image/*" onChange={(e) => handleFileChange(e, 'ticket')} />
-                            </div>
+                            <FormField control={form.control} name="productName" render={({ field }) => (
+                                <FormItem><FormLabel className="text-[10px] font-black uppercase tracking-widest opacity-60">Matériel & Modèle</FormLabel><FormControl><Input {...field} className="h-14 bg-background/50 border-white/5 rounded-2xl" /></FormControl><FormMessage className="text-[10px]" /></FormItem>
+                            )} />
+                            <FormField control={form.control} name="priority" render={({ field }) => (
+                                <FormItem><FormLabel className="text-[10px] font-black uppercase tracking-widest opacity-60">Priorité</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger className="h-14 bg-background/50 border-white/5 rounded-2xl"><SelectValue /></SelectTrigger></FormControl><SelectContent className="bg-card border-white/10"><SelectItem value="low">Standard</SelectItem><SelectItem value="medium">Important</SelectItem><SelectItem value="high">Urgent</SelectItem></SelectContent></Select><FormMessage className="text-[10px]" /></FormItem>
+                            )} />
+                            <FormField control={form.control} name="description" render={({ field }) => (
+                                <FormItem><FormLabel className="text-[10px] font-black uppercase tracking-widest opacity-60">Description</FormLabel><FormControl><Textarea {...field} className="min-h-[120px] bg-background/50 border-white/5 rounded-2xl" /></FormControl><FormMessage className="text-[10px]" /></FormItem>
+                            )} />
                         </div>
-                        <div className="pt-8">
-                            <Button type="submit" disabled={form.formState.isSubmitting} className="w-full h-16 bg-primary text-white font-black uppercase italic rounded-2xl shadow-xl shadow-primary/10 text-lg">
-                                {form.formState.isSubmitting ? <Loader2 className="animate-spin" /> : "Soumettre aux Experts DKS"}
-                            </Button>
-                        </div>
+                        <Button type="submit" disabled={form.formState.isSubmitting} className="w-full h-16 bg-primary text-white font-black uppercase italic rounded-2xl text-lg">
+                            {form.formState.isSubmitting ? <Loader2 className="animate-spin" /> : "Soumettre aux Experts DKS"}
+                        </Button>
                       </form>
                     </Form>
                 </SheetContent>
             </Sheet>
 
-            {/* Chat Live Interface */}
             <Dialog open={isChatOpen} onOpenChange={setIsChatOpen}>
-                <DialogContent className="glossy-card border-none rounded-[2.5rem] sm:max-w-2xl h-[85vh] flex flex-col p-0 overflow-hidden">
+                <DialogContent className="glossy-card border-none rounded-[2.5rem] sm:max-w-2xl h-[80vh] flex flex-col p-0 overflow-hidden">
                     <div className="bg-accent/10 p-6 border-b border-white/5 flex justify-between items-center">
-                        <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 rounded-2xl bg-accent/20 flex items-center justify-center text-accent">
-                                <MessageCircle size={24} />
-                            </div>
-                            <div>
-                                <h3 className="font-black uppercase italic tracking-tighter">Support Expert : {selectedTicket?.productName}</h3>
-                                <p className="text-[10px] text-muted-foreground uppercase font-black tracking-widest"># {selectedTicket?.id.substring(0, 8)}</p>
-                            </div>
-                        </div>
-                        <div className="flex gap-2">
-                             {isStaff && (
-                                <>
-                                    <Button 
-                                        variant="outline" 
-                                        size="sm" 
-                                        className="h-10 rounded-xl border-accent/20 text-accent font-black uppercase text-[9px] gap-2 hover:bg-accent hover:text-black"
-                                        onClick={() => setIsPartsSheetOpen(true)}
-                                    >
-                                        <Cpu size={14} /> Pièces
-                                    </Button>
-                                    {selectedTicket?.status !== 'completed' && (
-                                        <Button 
-                                            size="sm" 
-                                            className="h-10 rounded-xl bg-green-500 text-white font-black uppercase text-[9px] gap-2 hover:bg-green-600 shadow-lg"
-                                            onClick={() => setIsBillingDialogOpen(true)}
-                                        >
-                                            <Receipt size={14} /> Facturer & Clôturer
-                                        </Button>
-                                    )}
-                                </>
-                             )}
-                             <Button variant="ghost" size="icon" onClick={() => setIsChatOpen(false)} className="rounded-full hover:bg-white/5 text-white/40"><X size={20}/></Button>
-                        </div>
+                        <div className="flex items-center gap-4"><MessageCircle className="text-accent" /><h3 className="font-black uppercase italic">Support Expert</h3></div>
+                        {isStaff && <Button onClick={() => setIsBillingDialogOpen(true)} className="bg-green-500 text-white h-10 rounded-xl text-[9px] uppercase font-black">Facturer & Clôturer</Button>}
                     </div>
-
-                    <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar bg-black/40" ref={scrollRef}>
-                        {/* Summary of used parts */}
-                        {usedParts.length > 0 && (
-                            <Card className="bg-accent/5 border-accent/10 p-4 rounded-2xl space-y-3 mb-6">
-                                <p className="text-[10px] font-black uppercase text-accent tracking-[0.2em] flex items-center gap-2">
-                                    <Package size={12} /> Liste du Matériel Installé
-                                </p>
-                                <div className="space-y-2">
-                                    {usedParts.map((part) => (
-                                        <div key={part.id} className="flex justify-between items-center bg-black/20 p-2 rounded-xl border border-white/5">
-                                            <span className="text-[11px] font-bold text-white uppercase">{part.name}</span>
-                                            <Badge variant="outline" className="text-[9px] font-black border-accent/20 text-accent">${part.unitPrice}</span>
-                                        </div>
-                                    ))}
+                    <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-black/40" ref={scrollRef}>
+                        {chatMessages.map((msg, i) => (
+                            <div key={i} className={cn("flex flex-col", msg.senderId === user?.uid ? "items-end" : "items-start")}>
+                                <div className={cn("max-w-[85%] p-4 rounded-2xl text-sm shadow-xl", msg.senderId === user?.uid ? "bg-accent text-black font-bold" : "bg-white/5 text-white")}>
+                                    {msg.text}
                                 </div>
-                            </Card>
-                        )}
-
-                        {chatMessages.map((msg) => {
-                            const isMe = msg.senderId === user?.uid;
-                            const isSystem = msg.senderRole === 'system';
-
-                            if (isSystem) {
-                                return (
-                                    <div key={msg.id} className="flex justify-center">
-                                        <Badge className="bg-white/5 text-muted-foreground border-none text-[8px] font-black uppercase tracking-widest px-4 h-6">
-                                            {msg.text}
-                                        </Badge>
-                                    </div>
-                                );
-                            }
-
-                            return (
-                                <div key={msg.id} className={cn("flex flex-col", isMe ? "items-end" : "items-start")}>
-                                    <div className={cn(
-                                        "max-w-[85%] p-4 rounded-2xl text-sm leading-relaxed shadow-xl",
-                                        isMe ? "bg-accent text-black rounded-tr-none font-bold" : "bg-white/5 text-white border border-white/5 rounded-tl-none"
-                                    )}>
-                                        {msg.imageUrl && (
-                                            <div className="mb-3 relative group">
-                                                <img src={msg.imageUrl} className="rounded-xl max-w-full cursor-pointer hover:brightness-90 transition-all" alt="Sent" onClick={() => window.open(msg.imageUrl)} />
-                                            </div>
-                                        )}
-                                        {msg.text && <p className="whitespace-pre-wrap">{msg.text}</p>}
-                                    </div>
-                                    <span className="text-[8px] font-black uppercase opacity-20 mt-2 tracking-widest px-2">{isMe ? 'Moi' : msg.senderName} • {msg.createdAt?.toDate ? msg.createdAt.toDate().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '...'}</span>
-                                </div>
-                            );
-                        })}
-                    </div>
-
-                    <form onSubmit={handleSendMessage} className="p-6 bg-black/60 border-t border-white/5 space-y-4">
-                        {chatImage && (
-                            <div className="relative w-24 h-24 rounded-2xl overflow-hidden border-2 border-accent shadow-2xl animate-in zoom-in-95">
-                                <img src={chatImage} className="w-full h-full object-cover" alt="Chat preview" />
-                                <button type="button" onClick={() => setChatImage(null)} className="absolute top-1 right-1 bg-black/60 rounded-full p-1 text-white hover:bg-destructive"><X size={12}/></button>
                             </div>
-                        )}
-                        <div className="flex gap-3">
-                            <Button type="button" variant="outline" size="icon" className="h-14 w-14 rounded-2xl border-white/10 hover:bg-accent/10 hover:text-accent transition-all" onClick={() => chatFileInputRef.current?.click()}><ImageIcon size={22}/></Button>
-                            <input type="file" ref={chatFileInputRef} className="hidden" accept="image/*" onChange={(e) => handleFileChange(e, 'chat')} />
-                            <Input value={newMessage} onChange={(e) => setNewMessage(e.target.value)} placeholder="Message technique..." className="h-14 bg-background/50 border-white/10 rounded-2xl focus:border-accent font-medium" />
-                            <Button type="submit" size="icon" className="h-14 w-14 rounded-2xl bg-accent text-black shadow-xl shadow-accent/20"><Send size={22}/></Button>
-                        </div>
+                        ))}
+                    </div>
+                    <form onSubmit={handleSendMessage} className="p-6 bg-black/60 border-t border-white/5 flex gap-3">
+                        <Input value={newMessage} onChange={(e) => setNewMessage(e.target.value)} placeholder="Message technique..." className="h-14 bg-background/50 border-white/10 rounded-2xl focus:border-accent" />
+                        <Button type="submit" size="icon" className="h-14 w-14 rounded-2xl bg-accent text-black"><Send size={22}/></Button>
                     </form>
                 </DialogContent>
             </Dialog>
 
-            {/* BILLING CONFIRMATION DIALOG */}
-            <Dialog open={isBillingDialogOpen} onOpenChange={setIsBillingDialogOpen}>
-                <DialogContent className="bg-card border-white/10 text-foreground rounded-[2.5rem] sm:max-w-md">
-                    <DialogHeader>
-                        <DialogTitle className="text-2xl font-black uppercase italic tracking-tighter text-center">Clôture Financière</DialogTitle>
-                    </DialogHeader>
-                    <div className="py-6 space-y-6">
-                        <div className="space-y-2">
-                            <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Frais de Main-d'œuvre ($)</Label>
-                            <Input 
-                                type="number" 
-                                value={laborCost} 
-                                onChange={(e) => setLaborCost(e.target.value)} 
-                                className="h-14 bg-background/50 border-white/10 rounded-xl text-xl font-black text-accent"
-                            />
-                        </div>
-                        
-                        <div className="p-6 bg-white/5 rounded-3xl border border-white/5 space-y-4">
-                            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground italic">Résumé des coûts</p>
-                            <div className="flex justify-between text-sm">
-                                <span>Main d'œuvre</span>
-                                <span className="font-bold">${laborCost}</span>
-                            </div>
-                            <div className="flex justify-between text-sm">
-                                <span>Pièces ({usedParts.length})</span>
-                                <span className="font-bold">${usedParts.reduce((acc, p) => acc + (p.unitPrice * p.quantity), 0).toFixed(2)}</span>
-                            </div>
-                            <div className="pt-4 border-t border-white/10 flex justify-between items-end">
-                                <span className="text-xs font-black uppercase">Total à payer</span>
-                                <span className="text-3xl font-black text-accent">
-                                    ${(parseFloat(laborCost || "0") + usedParts.reduce((acc, p) => acc + (p.unitPrice * p.quantity), 0)).toFixed(2)}
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-                    <DialogFooter className="gap-3">
-                        <Button variant="ghost" onClick={() => setIsBillingDialogOpen(false)} className="rounded-xl font-bold uppercase text-[10px]">Annuler</Button>
-                        <Button 
-                            className="bg-accent text-black font-black uppercase italic rounded-xl px-8"
-                            onClick={handleFinalBilling}
-                            disabled={isGeneratingInvoice}
-                        >
-                            {isGeneratingInvoice ? <Loader2 className="animate-spin" /> : <><CheckCircle2 className="mr-2" size={16} /> Valider & Facturer</>}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-
-            {/* Spare Parts Selection Sheet */}
-            <Sheet open={isPartsSheetOpen} onOpenChange={setIsPartsSheetOpen}>
-                <SheetContent side="right" className="bg-card/95 backdrop-blur-3xl border-white/10 w-full sm:max-w-md flex flex-col p-0">
-                    <SheetHeader className="p-8 bg-accent/10 border-b border-white/5">
-                        <SheetTitle className="text-2xl font-black uppercase italic tracking-tighter">Stock de Pièces</SheetTitle>
-                        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Consommation Matériel SAV</p>
-                    </SheetHeader>
-                    
-                    <div className="p-6 border-b border-white/5">
-                        <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={14} />
-                            <Input 
-                                placeholder="Chercher une pièce (ex: RAM, Ecran...)" 
-                                className="h-12 pl-10 bg-white/5 border-white/10 rounded-xl text-xs"
-                                value={partSearch}
-                                onChange={(e) => setPartSearch(e.target.value)}
-                            />
-                        </div>
-                    </div>
-
-                    <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
-                        {filteredParts.length === 0 ? (
-                            <div className="text-center py-20 opacity-20 italic">
-                                <Package size={48} className="mx-auto mb-4" />
-                                <p>Aucun article trouvé</p>
-                            </div>
-                        ) : filteredParts.map(product => (
-                            <div key={product.id} className={cn(
-                                "p-4 rounded-2xl bg-white/5 border border-white/5 flex justify-between items-center transition-all",
-                                product.stockQuantity <= 0 ? "opacity-40 grayscale" : "hover:border-accent/30"
-                            )}>
-                                <div className="space-y-1">
-                                    <p className="font-bold text-sm uppercase">{product.name}</p>
-                                    <p className="text-[10px] text-muted-foreground font-black uppercase">Stock: <span className={cn(product.stockQuantity < 5 ? "text-orange-400" : "text-accent")}>{product.stockQuantity} UNITÉS</span></p>
-                                </div>
-                                <Button 
-                                    size="sm" 
-                                    className="h-10 px-4 bg-accent text-black font-black uppercase italic text-[9px] rounded-xl gap-2 shadow-lg"
-                                    onClick={() => handleAddPart(product)}
-                                    disabled={product.stockQuantity <= 0}
-                                >
-                                    <PlusCircle size={14} /> Déduire
-                                </Button>
-                            </div>
-                        ))}
-                    </div>
-                </SheetContent>
-            </Sheet>
-
-            {/* MODÈLE DE FACTURE SAV PDF (HIDDEN) */}
             <div style={{ position: 'absolute', left: '-9999px', top: 0 }}>
                 {selectedTicket && (
                     <div ref={invoiceRef} className="bg-white text-black p-16 w-[800px] font-sans">
                         <header className="flex justify-between items-start border-b-4 border-black pb-10 mb-12">
-                            <div className="space-y-4">
-                                <div className="bg-black text-white px-6 py-2 inline-block font-black text-3xl italic tracking-tighter">DKS SAV</div>
-                                <div className="text-sm font-bold uppercase tracking-widest text-gray-500">Expertise & Réparation</div>
-                                <div className="text-[11px] leading-relaxed mt-4 font-medium">
-                                    <p>Immeuble Bahati, Bunia, RDC</p>
-                                    <p>Tél: +243 823 038 945</p>
-                                    <p>Support Elite: support@dks-shop.com</p>
-                                </div>
-                            </div>
-                            <div className="text-right">
-                                <h2 className="text-5xl font-black uppercase italic tracking-tighter mb-2">FACTURE SAV</h2>
-                                <p className="text-xs font-bold text-gray-400 uppercase tracking-[0.2em]">Dossier: #{selectedTicket.id.substring(0, 10).toUpperCase()}</p>
-                                <div className="mt-8">
-                                    <p className="text-[10px] font-black uppercase text-gray-400">Date de clôture</p>
-                                    <p className="text-lg font-bold">{new Date().toLocaleDateString('fr-FR')}</p>
-                                </div>
-                            </div>
+                            <div className="space-y-4"><div className="bg-black text-white px-6 py-2 inline-block font-black text-3xl italic tracking-tighter">DKS SAV</div><p className="text-sm font-bold uppercase tracking-widest text-gray-500">Expertise & Réparation • Bunia</p></div>
+                            <div className="text-right"><h2 className="text-5xl font-black uppercase italic tracking-tighter mb-2">FACTURE</h2><p className="text-lg font-bold">{new Date().toLocaleDateString('fr-FR')}</p></div>
                         </header>
-
                         <div className="grid grid-cols-2 gap-20 mb-12">
-                            <div className="space-y-4">
-                                <h3 className="text-[10px] font-black uppercase text-gray-400 border-b pb-2 tracking-widest">Client</h3>
-                                <div className="space-y-1">
-                                    <p className="text-xl font-black uppercase italic">{selectedTicket.customerName}</p>
-                                    <p className="text-sm text-gray-600">Matériel: {selectedTicket.productName}</p>
-                                </div>
-                            </div>
-                            <div className="space-y-4">
-                                <h3 className="text-[10px] font-black uppercase text-gray-400 border-b pb-2 tracking-widest">Garantie Intervention</h3>
-                                <div className="space-y-1">
-                                    <p className="text-sm font-bold">Durée : <span className="uppercase text-green-600">30 JOURS (Pièces & MO)</span></p>
-                                    <p className="text-[10px] leading-relaxed text-gray-500 italic">La garantie ne couvre pas les chocs ou l'oxydation.</p>
-                                </div>
-                            </div>
+                            <div><h3 className="text-[10px] font-black uppercase text-gray-400 border-b pb-2 mb-4">Client</h3><p className="text-xl font-black uppercase italic">{selectedTicket.customerName}</p></div>
+                            <div className="text-right"><p className="text-sm font-bold">TOTAL À RÉGLER</p><p className="text-4xl font-black tracking-tighter">${(parseFloat(laborCost) + usedParts.reduce((acc, p) => acc + (p.unitPrice * p.quantity), 0)).toFixed(2)}</p></div>
                         </div>
-
-                        <table className="w-full mb-12">
-                            <thead>
-                                <tr className="bg-gray-100 text-[10px] font-black uppercase tracking-widest">
-                                    <th className="text-left p-4">Description de l'intervention / Composant</th>
-                                    <th className="text-center p-4">Qté</th>
-                                    <th className="text-right p-4">Prix Unitaire</th>
-                                    <th className="text-right p-4">Total</th>
-                                </tr>
-                            </thead>
-                            <tbody className="text-sm">
-                                <tr className="border-b border-gray-100">
-                                    <td className="p-4 font-bold uppercase italic">Main-d'œuvre technique (Diagnostic + Réparation)</td>
-                                    <td className="p-4 text-center">1</td>
-                                    <td className="p-4 text-right">${parseFloat(laborCost).toFixed(2)}</td>
-                                    <td className="p-4 text-right font-black">${parseFloat(laborCost).toFixed(2)}</td>
-                                </tr>
-                                {usedParts.map((part, idx) => (
-                                    <tr key={idx} className="border-b border-gray-100">
-                                        <td className="p-4 font-bold uppercase italic">Composant: {part.name}</td>
-                                        <td className="p-4 text-center">{part.quantity}</td>
-                                        <td className="p-4 text-right">${part.unitPrice.toFixed(2)}</td>
-                                        <td className="p-4 text-right font-black">${(part.unitPrice * part.quantity).toFixed(2)}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-
-                        <div className="flex justify-end">
-                            <div className="w-80 space-y-4">
-                                <div className="flex justify-between items-end border-b-2 border-black pb-4">
-                                    <span className="text-lg font-black uppercase italic">TOTAL À RÉGLER</span>
-                                    <span className="text-4xl font-black tracking-tighter">
-                                        ${(parseFloat(laborCost || "0") + usedParts.reduce((acc, p) => acc + (p.unitPrice * p.quantity), 0)).toFixed(2)}
-                                    </span>
-                                </div>
-                                <div className="pt-4">
-                                    <p className="text-[9px] font-black uppercase text-gray-400 mb-2">Note Technique</p>
-                                    <p className="text-[10px] italic text-gray-600">"{selectedTicket.issueDescription}" résolu avec succès.</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <footer className="mt-20 pt-10 border-t border-gray-100 flex justify-between items-center">
-                            <div className="flex items-center gap-6">
-                                <QrCode size={60} className="opacity-20" />
-                                <p className="text-[9px] font-bold text-gray-400 uppercase leading-relaxed max-w-[250px]">
-                                    Cette facture SAV fait foi pour la garantie d'intervention. <br />
-                                    Merci d'avoir choisi l'expertise DKS.
-                                </p>
-                            </div>
-                            <div className="text-right space-y-4">
-                                <div className="h-16 w-32 border-2 border-gray-100 rounded-lg flex items-center justify-center italic text-gray-300 text-[8px] uppercase font-black">Cachet Labo DKS</div>
-                                <p className="text-[8px] font-bold text-gray-300 uppercase tracking-widest">Solutions Lab Hub v3.0</p>
-                            </div>
-                        </footer>
                     </div>
                 )}
             </div>
