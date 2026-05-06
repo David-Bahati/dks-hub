@@ -181,7 +181,6 @@ function ServiceManagementPage() {
 
     const handleDownloadCertificate = async (booking: any) => {
         setSelectedBookingForCert(booking);
-        // Attendre le rendu du DOM pour html2canvas
         setTimeout(async () => {
             if (!certRef.current) return;
             setIsGeneratingCert(true);
@@ -239,7 +238,7 @@ function ServiceManagementPage() {
         }
     };
 
-    const filteredBookings = bookings?.filter(b => {
+    const filteredBookings = (bookings || []).filter(b => {
         const matchesSearch = b.customerName?.toLowerCase().includes(search.toLowerCase()) || b.serviceTitle?.toLowerCase().includes(search.toLowerCase());
         const matchesStatus = statusFilter === "all" || b.status === statusFilter;
         const matchesUser = isStaff || b.userId === user?.uid;
@@ -279,7 +278,11 @@ function ServiceManagementPage() {
                 </div>
 
                 <div className="grid grid-cols-1 gap-6">
-                    {isLoading ? <div className="py-20 flex justify-center"><Loader2 className="animate-spin text-accent h-12 w-12" /></div> : filteredBookings && filteredBookings.length > 0 ? (
+                    {isLoading ? (
+                        <div className="py-20 flex justify-center">
+                            <Loader2 className="animate-spin text-accent h-12 w-12" />
+                        </div>
+                    ) : filteredBookings.length > 0 ? (
                         filteredBookings.map((booking) => (
                             <Card key={booking.id} className="glossy-card border-none rounded-[2.5rem] overflow-hidden group">
                                 <CardContent className="p-8 flex flex-col lg:flex-row items-center gap-8">
@@ -297,7 +300,7 @@ function ServiceManagementPage() {
                                         </div>
                                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-y-2 gap-x-6 text-[10px] font-black uppercase italic text-muted-foreground/60">
                                             <div className="flex items-center gap-2"><User size={12} className="text-primary"/> {booking.customerName}</div>
-                                            <div className="flex items-center gap-2"><Calendar size={12} className="text-accent"/> {booking.scheduledDate || 'Date à fixer'}</div>
+                                            <div className="flex items-center gap-2"><Calendar size={12} className="text-accent"/> {booking.scheduledDate ? new Date(booking.scheduledDate).toLocaleDateString() : 'Date à fixer'}</div>
                                             <div className="flex items-center gap-2"><Receipt size={12} className="text-accent"/> Total: ${booking.totalAmount || 'Calcul...'}</div>
                                             <div className="flex items-center gap-2"><UserCheck size={12} className="text-primary"/> Expert: {booking.technicianName || 'Non assigné'}</div>
                                         </div>
@@ -379,84 +382,18 @@ function ServiceManagementPage() {
                                                 </Button>
                                             </div>
                                         )}
-                                    </CardContent>
-                                </Card>
-                            ))
-                        ) : (
-                            <div className="py-32 text-center bg-white/5 rounded-[3rem] border border-dashed border-white/10 opacity-30 flex flex-col items-center gap-6">
-                                <GraduationCap size={80} strokeWidth={1} /><p className="text-xl font-black uppercase italic tracking-tighter">Aucun cursus actif</p>
-                            </div>
-                        )}
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        ))
+                    ) : (
+                        <div className="py-32 text-center bg-white/5 rounded-[3rem] border border-dashed border-white/10 opacity-30 flex flex-col items-center gap-6">
+                            <GraduationCap size={80} strokeWidth={1} /><p className="text-xl font-black uppercase italic tracking-tighter">Aucun cursus actif</p>
+                        </div>
+                    )}
                 </div>
             </main>
 
-            {/* MODÈLE DE CERTIFICAT CACHÉ POUR GÉNÉRATION PDF (DYNAMIQUE INDIVIDUEL/GROUPE) */}
-            <div style={{ position: 'absolute', left: '-9999px', top: 0 }}>
-                {selectedBookingForCert && (
-                    <div ref={certRef} className="bg-white text-black p-0 w-[1123px] h-[794px] font-serif relative overflow-hidden flex items-center justify-center">
-                        <div className="absolute inset-0 border-[30px] border-double border-[#0f172a]" />
-                        <div className="absolute inset-10 border-4 border-[#3b82f6]/20" />
-                        <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none"><Logo size="xl" /></div>
-
-                        <div className="relative z-10 text-center w-full px-40 space-y-12">
-                            <div className="flex flex-col items-center gap-6">
-                                <Logo size="lg" />
-                                <div className="space-y-1">
-                                    <h2 className="text-sm font-bold tracking-[0.4em] uppercase text-[#3b82f6]">Double King Academy</h2>
-                                    <p className="text-[10px] font-medium uppercase tracking-[0.2em] opacity-40">Excellence Technologique • Bunia, RDC</p>
-                                </div>
-                            </div>
-
-                            <div className="space-y-4">
-                                <h1 className="text-6xl font-black uppercase italic tracking-tighter text-[#0f172a]">
-                                    {selectedBookingForCert.groupSize > 1 ? "CERTIFICAT COLLECTIF" : "CERTIFICAT"}
-                                </h1>
-                                <p className="text-xl font-light italic text-gray-500">DE RÉUSSITE ACADÉMIQUE</p>
-                            </div>
-
-                            <div className="space-y-6 py-8">
-                                <p className="text-lg font-medium text-gray-400">Le présent certificat est fièrement décerné à</p>
-                                <h3 className="text-5xl font-black uppercase tracking-tight border-b-2 border-gray-100 inline-block pb-2 px-10">
-                                    {selectedBookingForCert.groupSize > 1 
-                                        ? `${selectedBookingForCert.customerName} & Groupe (x${selectedBookingForCert.groupSize})` 
-                                        : selectedBookingForCert.customerName}
-                                </h3>
-                                <p className="text-lg font-medium text-gray-500 max-w-2xl mx-auto leading-relaxed">
-                                    {selectedBookingForCert.groupSize > 1 
-                                        ? `Pour avoir complété avec brio une session de formation d'élite et démontré une cohésion d'expertise exceptionnelle lors du cursus :`
-                                        : `Pour avoir complété avec succès et démontré une expertise exceptionnelle lors du cursus intensif :`}
-                                </p>
-                                <h4 className="text-3xl font-bold italic text-[#3b82f6] uppercase tracking-wide">
-                                    {selectedBookingForCert.serviceTitle}
-                                </h4>
-                            </div>
-
-                            <div className="grid grid-cols-3 items-end pt-12">
-                                <div className="text-center space-y-2">
-                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Date de délivrance</p>
-                                    <p className="text-sm font-bold">{new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
-                                </div>
-                                <div className="flex flex-col items-center gap-4">
-                                    <div className="p-3 border-2 border-gray-100 rounded-2xl bg-gray-50/50"><QrCode size={60} className="opacity-20" /></div>
-                                    <p className="text-[8px] font-bold text-gray-300 uppercase tracking-tighter">ID: DKS-CERT-{selectedBookingForCert.id.substring(0, 8).toUpperCase()}</p>
-                                </div>
-                                <div className="text-center space-y-2">
-                                    <div className="w-40 h-px bg-gray-200 mx-auto" />
-                                    <div className="flex flex-col items-center">
-                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Direction Technique</p>
-                                        <p className="text-sm font-black italic">Expert Double King</p>
-                                        <ShieldCheck size={24} className="text-[#3b82f6] mt-2 opacity-30" />
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="absolute top-0 left-0 w-40 h-40 bg-[#3b82f6]/5 rounded-br-full" />
-                        <div className="absolute bottom-0 right-0 w-40 h-40 bg-[#0f172a]/5 rounded-tl-full" />
-                    </div>
-                )}
-            </div>
-
-            {/* SHEET POUR LAISSER UN AVIS */}
             <Sheet open={isReviewSheetOpen} onOpenChange={setIsReviewSheetOpen}>
                 <SheetContent side="right" className="bg-card/95 backdrop-blur-3xl border-white/10 w-full sm:max-w-md flex flex-col p-0">
                     <SheetHeader className="p-10 bg-accent/10 border-b border-white/5">
@@ -471,50 +408,46 @@ function ServiceManagementPage() {
                         </div>
                         <Badge className="w-fit bg-accent text-black border-none uppercase font-black italic">{selectedBookingForReview?.serviceTitle}</Badge>
                     </SheetHeader>
-
                     <div className="flex-1 p-10 space-y-10 overflow-y-auto custom-scrollbar">
                         <div className="space-y-6">
                             <div className="space-y-4 text-center">
                                 <Label className="text-[10px] font-black uppercase tracking-widest text-center block opacity-40">Votre Note Élite</Label>
                                 <div className="flex justify-center gap-3">
                                     {[1, 2, 3, 4, 5].map((s) => (
-                                        <button 
-                                            key={s} 
-                                            onClick={() => setRating(s)}
-                                            className={cn(
-                                                "w-12 h-12 rounded-xl flex items-center justify-center transition-all",
-                                                s <= rating ? "bg-accent/20 text-accent scale-110" : "bg-white/5 text-white/20"
-                                            )}
-                                        >
+                                        <button key={s} onClick={() => setRating(s)} className={cn("w-12 h-12 rounded-xl flex items-center justify-center transition-all", s <= rating ? "bg-accent/20 text-accent scale-110" : "bg-white/5 text-white/20")}>
                                             <Star size={24} fill={s <= rating ? "currentColor" : "none"} />
                                         </button>
                                     ))}
                                 </div>
                             </div>
-
                             <div className="space-y-4">
                                 <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Témoignage (Optionnel)</Label>
-                                <Textarea 
-                                    placeholder="Racontez-nous comment cette formation a transformé vos compétences..." 
-                                    className="min-h-[150px] bg-background/50 border-white/5 rounded-2xl italic text-sm"
-                                    value={comment}
-                                    onChange={(e) => setComment(e.target.value)}
-                                />
+                                <Textarea placeholder="Racontez-nous votre succès..." className="min-h-[150px] bg-background/50 border-white/5 rounded-2xl italic text-sm" value={comment} onChange={(e) => setComment(e.target.value)} />
                             </div>
                         </div>
-
                         <div className="pt-8">
-                            <Button 
-                                onClick={handleSubmitReview}
-                                disabled={isReviewSubmitting}
-                                className="w-full h-16 bg-accent text-black font-black uppercase italic rounded-2xl shadow-xl shadow-accent/20 text-lg gap-2"
-                            >
+                            <Button onClick={handleSubmitReview} disabled={isReviewSubmitting} className="w-full h-16 bg-accent text-black font-black uppercase italic rounded-2xl shadow-xl shadow-accent/20 text-lg gap-2">
                                 {isReviewSubmitting ? <Loader2 className="animate-spin" /> : <><Send size={20} /> Partager mon Témoignage</>}
                             </Button>
                         </div>
                     </div>
                 </SheetContent>
             </Sheet>
+
+            <div style={{ position: 'absolute', left: '-9999px', top: 0 }}>
+                {selectedBookingForCert && (
+                    <div ref={certRef} className="bg-white text-black p-0 w-[1123px] h-[794px] font-serif relative overflow-hidden flex items-center justify-center">
+                        <div className="absolute inset-0 border-[30px] border-double border-[#0f172a]" />
+                        <div className="absolute inset-10 border-4 border-[#3b82f6]/20" />
+                        <div className="relative z-10 text-center w-full px-40 space-y-12">
+                            <div className="flex flex-col items-center gap-6"><Logo size="lg" /><div className="space-y-1"><h2 className="text-sm font-bold tracking-[0.4em] uppercase text-[#3b82f6]">Double King Academy</h2><p className="text-[10px] font-medium uppercase tracking-[0.2em] opacity-40">Excellence Technologique • Bunia, RDC</p></div></div>
+                            <div className="space-y-4"><h1 className="text-6xl font-black uppercase italic tracking-tighter text-[#0f172a]">{selectedBookingForCert.groupSize > 1 ? "CERTIFICAT COLLECTIF" : "CERTIFICAT"}</h1><p className="text-xl font-light italic text-gray-500">DE RÉUSSITE ACADÉMIQUE</p></div>
+                            <div className="space-y-6 py-8"><p className="text-lg font-medium text-gray-400">Le présent certificat est décerné à</p><h3 className="text-5xl font-black uppercase tracking-tight border-b-2 border-gray-100 inline-block pb-2 px-10">{selectedBookingForCert.customerName}</h3><h4 className="text-3xl font-bold italic text-[#3b82f6] uppercase mt-4">{selectedBookingForCert.serviceTitle}</h4></div>
+                            <div className="grid grid-cols-3 items-end pt-12"><div className="text-center space-y-2"><p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Date de délivrance</p><p className="text-sm font-bold">{new Date().toLocaleDateString('fr-FR')}</p></div><div className="flex flex-col items-center gap-4"><div className="p-3 border-2 border-gray-100 rounded-2xl bg-gray-50/50"><QrCode size={60} className="opacity-20" /></div><p className="text-[8px] font-bold text-gray-300 uppercase tracking-tighter">ID: DKS-CERT-{selectedBookingForCert.id.substring(0, 8).toUpperCase()}</p></div><div className="text-center space-y-2"><div className="w-40 h-px bg-gray-200 mx-auto" /><div className="flex flex-col items-center"><p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Direction Technique</p><p className="text-sm font-black italic">Expert Double King</p></div></div></div>
+                        </div>
+                    </div>
+                )}
+            </div>
         </div>
     );
 }
