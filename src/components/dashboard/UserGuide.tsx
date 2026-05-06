@@ -1,7 +1,7 @@
-
 'use client';
 
 import { useState, useRef, useMemo } from 'react';
+import Link from 'next/link';
 import {
   Accordion,
   AccordionContent,
