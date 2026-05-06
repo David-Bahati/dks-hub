@@ -3,7 +3,7 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { Navbar } from "@/components/layout/Navbar";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { 
     Globe, 
@@ -19,13 +19,16 @@ import {
     Eye,
     SortDesc,
     Calendar,
-    TrendingUp
+    TrendingUp,
+    Search,
+    X
 } from "lucide-react";
 import { db } from '@/lib/firebase';
 import { collection, query, where, orderBy, updateDoc, doc, increment } from 'firebase/firestore';
 import { useCollection, useMemoFirebase } from '@/firebase';
 import { Project } from '@/lib/types';
 import { cn } from "@/lib/utils";
+import { Input } from "@/components/ui/input";
 
 const ICON_MAP: Record<string, any> = {
     "Zap": Zap,
@@ -38,6 +41,7 @@ const ICON_MAP: Record<string, any> = {
 
 export default function PortfolioPage() {
   const [sortBy, setSortBy] = useState<'recent' | 'views'>('recent');
+  const [searchTerm, setSearchTerm] = useState("");
 
   const projectsQuery = useMemoFirebase(() => {
     return query(collection(db, "projects"), where("isPublished", "==", true), orderBy("createdAt", "desc"));
@@ -45,16 +49,37 @@ export default function PortfolioPage() {
 
   const { data: projects, isLoading } = useCollection<Project>(projectsQuery);
 
-  // Sorting logic
-  const sortedProjects = useMemo(() => {
+  // Search & Sorting logic combined
+  const filteredAndSortedProjects = useMemo(() => {
     if (!projects) return [];
-    const items = [...projects];
-    if (sortBy === 'views') {
-      return items.sort((a, b) => (b.views || 0) - (a.views || 0));
+    
+    let items = [...projects];
+
+    // Search Filter
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase();
+      items = items.filter(p => 
+        p.title?.toLowerCase().includes(term) ||
+        p.client?.toLowerCase().includes(term) ||
+        p.category?.toLowerCase().includes(term) ||
+        p.tags?.some(tag => tag.toLowerCase().includes(term))
+      );
     }
-    // Default is already by date from Firestore query, but we ensure it here
+
+    // Sort
+    if (sortBy === 'views') {
+      items.sort((a, b) => (b.views || 0) - (a.views || 0));
+    } else {
+      // Date sort is handled by Firestore but reinforced here
+      items.sort((a, b) => {
+          const dateA = a.createdAt?.toDate?.() || new Date(0);
+          const dateB = b.createdAt?.toDate?.() || new Date(0);
+          return dateB - dateA;
+      });
+    }
+
     return items;
-  }, [projects, sortBy]);
+  }, [projects, sortBy, searchTerm]);
 
   // Increment views for displayed projects (once per session per project)
   useEffect(() => {
@@ -89,9 +114,27 @@ export default function PortfolioPage() {
           </p>
         </div>
 
-        {/* Sorting Controls */}
-        <div className="flex justify-center mb-12">
-            <div className="bg-white/5 border border-white/10 p-1.5 rounded-[1.5rem] flex items-center gap-2">
+        {/* Controls: Search & Sort */}
+        <div className="flex flex-col md:flex-row items-center justify-center gap-6 mb-16 max-w-4xl mx-auto">
+            <div className="relative w-full flex-1">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" size={20} />
+                <Input 
+                    placeholder="Chercher un client, une technologie..." 
+                    className="h-16 pl-12 pr-12 bg-white/5 border-white/10 rounded-2xl focus:border-accent transition-all font-medium"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                />
+                {searchTerm && (
+                    <button 
+                        onClick={() => setSearchTerm("")}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-white transition-colors"
+                    >
+                        <X size={20} />
+                    </button>
+                )}
+            </div>
+
+            <div className="bg-white/5 border border-white/10 p-1.5 rounded-[1.5rem] flex items-center gap-2 shrink-0">
                 <button 
                     onClick={() => setSortBy('recent')}
                     className={cn(
@@ -99,7 +142,7 @@ export default function PortfolioPage() {
                         sortBy === 'recent' ? "bg-accent text-black shadow-lg" : "text-white/40 hover:text-white"
                     )}
                 >
-                    <Calendar size={14} /> Les plus récents
+                    <Calendar size={14} /> Récents
                 </button>
                 <button 
                     onClick={() => setSortBy('views')}
@@ -108,16 +151,16 @@ export default function PortfolioPage() {
                         sortBy === 'views' ? "bg-accent text-black shadow-lg" : "text-white/40 hover:text-white"
                     )}
                 >
-                    <TrendingUp size={14} /> Les plus vus
+                    <TrendingUp size={14} /> Populaires
                 </button>
             </div>
         </div>
 
         {isLoading ? (
             <div className="py-20 flex justify-center"><Loader2 className="animate-spin text-accent h-12 w-12" /></div>
-        ) : sortedProjects.length > 0 ? (
+        ) : filteredAndSortedProjects.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
-            {sortedProjects.map((project) => (
+            {filteredAndSortedProjects.map((project) => (
                 <Card key={project.id} className="glossy-card border-none rounded-[3rem] overflow-hidden group">
                 <div className="aspect-video relative overflow-hidden">
                     <img src={project.imageUrl} alt={project.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
@@ -135,7 +178,7 @@ export default function PortfolioPage() {
                     <p className="text-[10px] text-accent font-bold uppercase tracking-widest mt-1">Client: {project.client}</p>
                 </CardHeader>
                 <CardContent className="p-8 pt-0 space-y-6">
-                    <p className="text-sm text-muted-foreground leading-relaxed italic">"{project.description}"</p>
+                    <p className="text-sm text-muted-foreground leading-relaxed italic line-clamp-3">"{project.description}"</p>
                     <div className="flex flex-wrap gap-2">
                     {project.tags?.map(tag => (
                         <Badge key={tag} variant="outline" className="border-white/10 text-[9px] uppercase font-bold text-white/40">{tag}</Badge>
@@ -147,8 +190,11 @@ export default function PortfolioPage() {
             </div>
         ) : (
             <div className="py-32 text-center bg-white/5 rounded-[3rem] border border-dashed border-white/10 opacity-30 flex flex-col items-center gap-6">
-                <Layout size={80} strokeWidth={1} />
-                <p className="text-xl font-black uppercase italic tracking-tighter">Portfolio en cours de mise à jour...</p>
+                {searchTerm ? <Search size={80} strokeWidth={1} /> : <Layout size={80} strokeWidth={1} />}
+                <p className="text-xl font-black uppercase italic tracking-tighter">
+                    {searchTerm ? "Aucun résultat trouvé" : "Portfolio en cours de mise à jour..."}
+                </p>
+                {searchTerm && <Button onClick={() => setSearchTerm("")} variant="link" className="text-accent uppercase font-black italic">Effacer la recherche</Button>}
             </div>
         )}
 
