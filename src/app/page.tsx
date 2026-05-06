@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
@@ -38,7 +39,8 @@ import {
   Plus,
   Loader2,
   FileText,
-  Trophy
+  Trophy,
+  User
 } from 'lucide-react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
@@ -257,6 +259,7 @@ export default function LandingPage() {
                         <ul className="space-y-4 text-xs font-bold uppercase italic text-muted-foreground">
                             <li><Link href="/" className="hover:text-accent">Stock Hardware</Link></li>
                             <li><Link href="/services" className="hover:text-accent">DKS Academy</Link></li>
+                            <li><Link href="/founder" className="hover:text-accent flex items-center gap-2"><User size={12}/> Le Fondateur</Link></li>
                             <li><Link href="/dashboard/hall-of-fame" className="hover:text-accent flex items-center gap-2"><Trophy size={12}/> Hall of Fame</Link></li>
                             <li><Link href="/whitepaper" className="hover:text-accent flex items-center gap-2"><FileText size={12}/> Livre Blanc</Link></li>
                         </ul>
