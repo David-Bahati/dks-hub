@@ -1,4 +1,3 @@
-
 "use client";
 
 import { Navbar } from "@/components/layout/Navbar";
@@ -23,7 +22,8 @@ import {
     Zap,
     MessageSquare,
     Terminal,
-    History
+    History,
+    Send
 } from "lucide-react";
 import Link from 'next/link';
 import { Badge } from "@/components/ui/badge";
@@ -60,7 +60,7 @@ export default function FounderPage() {
                         "Prendre les valeurs de sérieux et d'apprentissage pour traduire les acquisitions en résultats palpables pour l'avenir technologique de l'Ituri."
                     </p>
 
-                    <div className="flex flex-wrap justify-center gap-6 mt-12">
+                    <div className="flex flex-wrap justify-center gap-6 mt-12 mb-12">
                         <div className="flex items-center gap-3 text-[10px] font-black uppercase tracking-widest text-white/40">
                             <Mail size={14} className="text-accent" /> bahatinyeke@gmail.com
                         </div>
@@ -71,6 +71,12 @@ export default function FounderPage() {
                             <MapPin size={14} className="text-accent" /> Bunia, Ituri, RDC
                         </div>
                     </div>
+
+                    <Link href="/dashboard/support">
+                        <Button className="h-16 px-10 rounded-2xl bg-accent text-black font-black uppercase italic shadow-xl shadow-accent/20 gap-3 hover:scale-105 transition-all">
+                            <MessageSquare size={20} /> Contacter le CEO via le Hub
+                        </Button>
+                    </Link>
                 </div>
             </header>
 

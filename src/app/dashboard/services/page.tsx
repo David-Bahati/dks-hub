@@ -31,7 +31,8 @@ import {
     MessageSquareText,
     Send,
     UsersRound,
-    FileText
+    FileText,
+    Trophy
 } from "lucide-react";
 import { db } from '@/lib/firebase';
 import { collection, query, orderBy, updateDoc, doc, addDoc, serverTimestamp, onSnapshot, where } from 'firebase/firestore';
@@ -327,7 +328,7 @@ function ServiceManagementPage() {
                                                         <SelectContent className="bg-card border-white/10">
                                                             <SelectItem value="pending">En attente</SelectItem>
                                                             <SelectItem value="confirmed">Admettre / Confirmer</SelectItem>
-                                                            <SelectItem value="in_progress">Démarrer Session</SelectItem>
+                                                            <SelectItem value="in_progress">En cours</SelectItem>
                                                             <SelectItem value="completed">Diplômer & Facturer</SelectItem>
                                                             <SelectItem value="cancelled">Refuser / Annuler</SelectItem>
                                                         </SelectContent>
