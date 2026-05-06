@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
@@ -39,7 +40,8 @@ import {
   Loader2,
   FileText,
   Trophy,
-  User
+  User,
+  Megaphone
 } from 'lucide-react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
@@ -189,6 +191,27 @@ export default function LandingPage() {
                     </Card>
                 </Link>
             ))}
+        </div>
+      </section>
+
+      {/* ADVERTISEMENT BANNER */}
+      <section className="container max-w-7xl mx-auto px-6 py-10">
+        <div className="bg-gradient-to-r from-accent/20 to-primary/20 border border-white/10 rounded-[2.5rem] p-8 md:p-10 flex flex-col md:flex-row items-center justify-between gap-8 backdrop-blur-xl shadow-2xl relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-4 opacity-5"><Megaphone size={120} /></div>
+          <div className="flex items-center gap-6 relative z-10">
+            <div className="w-16 h-16 rounded-[1.5rem] bg-accent text-black flex items-center justify-center shrink-0 shadow-xl shadow-accent/20">
+              <Megaphone size={32} />
+            </div>
+            <div className="space-y-1">
+              <p className="text-[10px] font-black uppercase text-accent tracking-[0.4em]">Annonce Spéciale Hub</p>
+              <h3 className="text-xl md:text-2xl font-black uppercase italic tracking-tighter text-white leading-tight">
+                -20% SUR LE SETUP GAMING COMPLET <br /><span className="text-white/60 text-sm italic">Offre valable uniquement pour les paiements en Pi Network (GCV).</span>
+              </h3>
+            </div>
+          </div>
+          <Button className="h-16 px-10 rounded-2xl bg-white text-black font-black uppercase italic hover:bg-accent transition-all shrink-0 shadow-lg relative z-10" asChild>
+            <Link href="/services">Voir l'offre <ArrowRight size={18} className="ml-2" /></Link>
+          </Button>
         </div>
       </section>
 
