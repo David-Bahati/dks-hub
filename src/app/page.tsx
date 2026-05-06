@@ -74,8 +74,32 @@ export default function LandingPage() {
   const { data: config } = useDoc(configRef);
 
   const activeAds = useMemo(() => {
-      if (!config?.ads || !Array.isArray(config.ads)) return [];
-      return config.ads.filter((ad: any) => ad.isActive);
+      // Fallback ads if database is empty or not yet configured
+      const defaultAds = [
+          {
+              id: 'def-1',
+              title: "Arrivage Spécial RTX 4090",
+              subtitle: "Les cartes graphiques les plus puissantes du monde sont arrivées à Bunia.",
+              buttonText: "Voir le Stock",
+              link: "#shop",
+              isActive: true
+          },
+          {
+              id: 'def-2',
+              title: "DKS Academy : Inscriptions Ouvertes",
+              subtitle: "Devenez un expert en Intelligence Artificielle et Blockchain dès aujourd'hui.",
+              buttonText: "S'inscrire",
+              link: "/services",
+              isActive: true
+          }
+      ];
+
+      if (!config?.ads || !Array.isArray(config.ads) || config.ads.length === 0) {
+          return defaultAds;
+      }
+      
+      const filtered = config.ads.filter((ad: any) => ad.isActive);
+      return filtered.length > 0 ? filtered : defaultAds;
   }, [config]);
 
   useEffect(() => {
@@ -106,15 +130,6 @@ export default function LandingPage() {
         toast({ title: "Erreur", variant: "destructive" });
     } finally { setSubmitting(false); }
   };
-
-  const partners = [
-    { name: "NVIDIA", icon: <Zap size={20} /> },
-    { name: "Starlink", icon: <Globe size={20} /> },
-    { name: "ASUS ROG", icon: <Cpu size={20} /> },
-    { name: "Pi Network", icon: <Coins size={20} /> },
-    { name: "Ubiquiti", icon: <Network size={20} /> },
-    { name: "Intel", icon: <Server size={20} /> }
-  ];
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -162,45 +177,43 @@ export default function LandingPage() {
       </section>
 
       {/* ADVERTISEMENT CAROUSEL (DYNAMIC) */}
-      {activeAds.length > 0 && (
-        <section className="container max-w-7xl mx-auto px-6 py-10">
-          <Carousel 
-            opts={{ loop: true }} 
-            plugins={[Autoplay({ delay: 4000 })]} 
-            className="w-full"
-          >
-            <CarouselContent>
-              {activeAds.map((ad: any) => (
-                <CarouselItem key={ad.id}>
-                  <div className="bg-gradient-to-r from-accent/20 to-primary/20 border border-white/10 rounded-[2.5rem] p-8 md:p-10 flex flex-col md:flex-row items-center justify-between gap-8 backdrop-blur-xl shadow-2xl relative overflow-hidden group h-full">
-                    <div className="absolute top-0 right-0 p-4 opacity-5"><Megaphone size={120} /></div>
-                    <div className="flex items-center gap-6 relative z-10">
-                      <div className="w-16 h-16 rounded-[1.5rem] bg-accent text-black flex items-center justify-center shrink-0 shadow-xl shadow-accent/20">
-                        <Megaphone size={32} />
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-[10px] font-black uppercase text-accent tracking-[0.4em]">Annonce Spéciale Hub</p>
-                        <h3 className="text-xl md:text-2xl font-black uppercase italic tracking-tighter text-white leading-tight">
-                          {ad.title} <br />
-                          <span className="text-white/60 text-sm italic">{ad.subtitle}</span>
-                        </h3>
-                      </div>
+      <section className="container max-w-7xl mx-auto px-6 py-10">
+        <Carousel 
+          opts={{ loop: true }} 
+          plugins={[Autoplay({ delay: 4000 })]} 
+          className="w-full"
+        >
+          <CarouselContent>
+            {activeAds.map((ad: any) => (
+              <CarouselItem key={ad.id}>
+                <div className="bg-gradient-to-r from-accent/20 to-primary/20 border border-white/10 rounded-[2.5rem] p-8 md:p-10 flex flex-col md:flex-row items-center justify-between gap-8 backdrop-blur-xl shadow-2xl relative overflow-hidden group h-full">
+                  <div className="absolute top-0 right-0 p-4 opacity-5"><Megaphone size={120} /></div>
+                  <div className="flex items-center gap-6 relative z-10">
+                    <div className="w-16 h-16 rounded-[1.5rem] bg-accent text-black flex items-center justify-center shrink-0 shadow-xl shadow-accent/20">
+                      <Megaphone size={32} />
                     </div>
-                    <Button className="h-16 px-10 rounded-2xl bg-white text-black font-black uppercase italic hover:bg-accent transition-all shrink-0 shadow-lg relative z-10" asChild>
-                      <Link href={ad.link}>
-                        {ad.buttonText} <ArrowRight size={18} className="ml-2" />
-                      </Link>
-                    </Button>
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-black uppercase text-accent tracking-[0.4em]">Annonce Spéciale Hub</p>
+                      <h3 className="text-xl md:text-2xl font-black uppercase italic tracking-tighter text-white leading-tight">
+                        {ad.title} <br />
+                        <span className="text-white/60 text-sm italic">{ad.subtitle}</span>
+                      </h3>
+                    </div>
                   </div>
-                </CarouselItem>
-              ))}
-            </CarouselContent>
-          </Carousel>
-        </section>
-      )}
+                  <Button className="h-16 px-10 rounded-2xl bg-white text-black font-black uppercase italic hover:bg-accent transition-all shrink-0 shadow-lg relative z-10" asChild>
+                    <Link href={ad.link}>
+                      {ad.buttonText} <ArrowRight size={18} className="ml-2" />
+                    </Link>
+                  </Button>
+                </div>
+              </CarouselItem>
+            ))}
+          </CarouselContent>
+        </Carousel>
+      </section>
 
       {/* POLES OF EXCELLENCE */}
-      <section className="container max-w-7xl mx-auto px-6 py-32">
+      <section className="container max-w-7xl mx-auto px-6 py-20">
         <div className="text-center mb-24 space-y-4">
             <h2 className="text-4xl md:text-6xl font-black uppercase italic tracking-tighter">NOS <span className="text-accent">PÔLES D'EXCELLENCE</span></h2>
             <p className="text-muted-foreground text-sm uppercase font-bold tracking-[0.3em]">L'écosystème technologique le plus avancé de l'Ituri</p>
