@@ -4,8 +4,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Navbar } from '@/components/layout/Navbar';
 import { Button } from '@/components/ui/button';
-import { Product } from '@/lib/types';
-import { collection, query, where, getDocs, limit as firestoreLimit, addDoc, serverTimestamp, doc } from 'firebase/firestore';
+import { Product, Project } from '@/lib/types';
+import { collection, query, where, getDocs, limit as firestoreLimit, addDoc, serverTimestamp, doc, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useCart } from '@/context/CartContext';
 import { 
@@ -55,7 +55,7 @@ import { Logo } from '@/components/ui/Logo';
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
-import { useDoc, useMemoFirebase } from '@/firebase';
+import { useCollection, useDoc, useMemoFirebase } from '@/firebase';
 import { 
     Carousel, 
     CarouselContent, 
@@ -63,29 +63,14 @@ import {
 } from "@/components/ui/carousel";
 import Autoplay from "embla-carousel-autoplay";
 
-const PREVIEW_PROJECTS = [
-  {
-    title: "Wi-Fi Maillé Immeuble Bahati",
-    category: "Réseau",
-    client: "Direction Bahati",
-    icon: <Network className="text-accent" />,
-    image: "https://picsum.photos/seed/net1/800/600"
-  },
-  {
-    title: "Vidéosurveillance 8K Hub",
-    category: "Sécurité",
-    client: "DKS Solutions",
-    icon: <Video className="text-primary" />,
-    image: "https://picsum.photos/seed/sec1/800/600"
-  },
-  {
-    title: "Setup Gaming Elite 2024",
-    category: "Custom Build",
-    client: "Client Privé",
-    icon: <Zap className="text-yellow-500" />,
-    image: "https://picsum.photos/seed/build1/800/600"
-  }
-];
+const ICON_MAP: Record<string, any> = {
+    "Zap": Zap,
+    "Globe": Globe,
+    "Video": Video,
+    "Network": Network,
+    "Cpu": Cpu,
+    "Layout": Layout,
+};
 
 export default function LandingPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -101,6 +86,12 @@ export default function LandingPage() {
   // Fetch Dynamic Configuration (including Ads)
   const configRef = useMemoFirebase(() => doc(db, "system", "config"), []);
   const { data: config } = useDoc(configRef);
+
+  // Fetch Projects for "Excellence en Action"
+  const projectsQuery = useMemoFirebase(() => {
+    return query(collection(db, "projects"), where("isPublished", "==", true), orderBy("createdAt", "desc"), firestoreLimit(3));
+  }, []);
+  const { data: latestProjects, isLoading: loadingProjects } = useCollection<Project>(projectsQuery);
 
   const activeAds = useMemo(() => {
       const defaultAds = [
@@ -157,6 +148,11 @@ export default function LandingPage() {
     } catch (e) {
         toast({ title: "Erreur", variant: "destructive" });
     } finally { setSubmitting(false); }
+  };
+
+  const getIcon = (name: string) => {
+    const IconComp = ICON_MAP[name] || Zap;
+    return <IconComp size={24} className="text-accent" />;
   };
 
   return (
@@ -311,12 +307,12 @@ export default function LandingPage() {
           </Card>
       </section>
 
-      {/* L'EXCELLENCE EN ACTION (CURRENT PROJECTS) */}
+      {/* L'EXCELLENCE EN ACTION (DYNAMIC PROJECTS) */}
       <section className="container max-w-7xl mx-auto px-6 py-20">
           <div className="flex flex-col md:flex-row justify-between items-end gap-6 mb-16">
               <div className="space-y-4">
                   <h2 className="text-4xl md:text-5xl font-black uppercase italic tracking-tighter">L'EXCELLENCE <span className="text-accent">EN ACTION</span></h2>
-                  <p className="text-muted-foreground text-sm uppercase font-bold tracking-[0.3em]">Déploiements récents et chantiers technologiques</p>
+                  <p className="text-muted-foreground text-sm uppercase font-bold tracking-[0.3em]">dernières réalisations et chantiers technologiques</p>
               </div>
               <Button variant="ghost" className="text-accent font-black uppercase italic text-xs tracking-widest hover:bg-accent/10" asChild>
                   <Link href="/portfolio">Tout voir <ArrowRight className="ml-2" size={14} /></Link>
@@ -324,24 +320,28 @@ export default function LandingPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              {PREVIEW_PROJECTS.map((project, idx) => (
-                  <Card key={idx} className="glossy-card border-none rounded-[3rem] overflow-hidden group relative">
+              {loadingProjects ? (
+                  <div className="col-span-full flex justify-center py-20"><Loader2 className="animate-spin text-accent h-10 w-10" /></div>
+              ) : latestProjects && latestProjects.length > 0 ? latestProjects.map((project) => (
+                  <Card key={project.id} className="glossy-card border-none rounded-[3rem] overflow-hidden group relative">
                       <div className="aspect-[4/3] relative overflow-hidden">
-                          <img src={project.image} alt={project.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
+                          <img src={project.imageUrl} alt={project.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
                           <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
                           <Badge className="absolute top-6 right-6 bg-accent text-black font-black uppercase text-[8px] italic tracking-widest">{project.category}</Badge>
                       </div>
                       <div className="absolute bottom-0 left-0 w-full p-8 space-y-2">
                           <div className="flex items-center gap-3">
                               <div className="w-8 h-8 rounded-xl bg-white/10 flex items-center justify-center backdrop-blur-md">
-                                  {project.icon}
+                                  {getIcon(project.iconName)}
                               </div>
                               <h3 className="text-xl font-black uppercase italic text-white leading-tight">{project.title}</h3>
                           </div>
                           <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest ml-11">Client: {project.client}</p>
                       </div>
                   </Card>
-              ))}
+              )) : (
+                  <div className="col-span-full py-20 text-center opacity-20 italic">Aucune réalisation affichée.</div>
+              )}
           </div>
       </section>
 
@@ -445,7 +445,7 @@ export default function LandingPage() {
                                 className="h-16 pl-6 pr-16 bg-white/5 border-white/10 rounded-2xl focus:border-accent transition-all"
                             />
                             <Button type="submit" disabled={submitting} className="absolute right-2 top-1/2 -translate-y-1/2 h-12 w-12 rounded-xl bg-accent text-black p-0 shadow-lg shadow-accent/20">
-                                {submitting ? <Loader2 className="animate-spin h-5 w-5" /> : <Send size={20} />}
+                                {submitting ? <Loader2 className="animate-spin h-5 w-5" /> : <><Send size={20} /></>}
                             </Button>
                         </form>
                     )}

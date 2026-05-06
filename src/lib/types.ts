@@ -87,6 +87,20 @@ export type Product = {
   purchasePrice?: number;
 };
 
+export type Project = {
+  id: string;
+  title: string;
+  client: string;
+  category: string;
+  description: string;
+  imageUrl: string;
+  iconName: string;
+  tags: string[];
+  isPublished: boolean;
+  createdAt: any;
+  updatedAt: any;
+};
+
 export type DailyMission = {
     id: string;
     title: string;

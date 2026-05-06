@@ -133,6 +133,7 @@ const navConfig = [
   { href: "/dashboard/tokens", icon: Coins, label: "Économie Hub", roles: ["Admin", "Seller", "Cashier"] },
   { href: "/dashboard/notary", icon: Scale, label: "Notaire du Hub", roles: ["Admin"] },
   { href: "/dashboard/calendar", icon: CalendarIcon, label: "Agenda Hub", roles: ["Admin", "Seller", "Cashier"] },
+  { href: "/dashboard/portfolio", icon: Layout, label: "Gestion Portfolio", roles: ["Admin", "Seller"] },
   { href: "/dashboard/products", icon: Package, label: "Produits / Stock", roles: ["Admin", "Seller"] },
   { href: "/dashboard/categories", icon: Tags, label: "Catégories", roles: ["Admin", "Seller"] },
   { href: "/dashboard/maintenance", icon: FlaskConical, label: "Stocks Labo", roles: ["Admin", "Seller"] },
