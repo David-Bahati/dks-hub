@@ -44,7 +44,9 @@ import {
   Megaphone,
   Rocket,
   Heart,
-  Monitor
+  Monitor,
+  Video,
+  Shield
 } from 'lucide-react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
@@ -60,6 +62,30 @@ import {
     CarouselItem 
 } from "@/components/ui/carousel";
 import Autoplay from "embla-carousel-autoplay";
+
+const PREVIEW_PROJECTS = [
+  {
+    title: "Wi-Fi Maillé Immeuble Bahati",
+    category: "Réseau",
+    client: "Direction Bahati",
+    icon: <Network className="text-accent" />,
+    image: "https://picsum.photos/seed/net1/800/600"
+  },
+  {
+    title: "Vidéosurveillance 8K Hub",
+    category: "Sécurité",
+    client: "DKS Solutions",
+    icon: <Video className="text-primary" />,
+    image: "https://picsum.photos/seed/sec1/800/600"
+  },
+  {
+    title: "Setup Gaming Elite 2024",
+    category: "Custom Build",
+    client: "Client Privé",
+    icon: <Zap className="text-yellow-500" />,
+    image: "https://picsum.photos/seed/build1/800/600"
+  }
+];
 
 export default function LandingPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -214,7 +240,7 @@ export default function LandingPage() {
         </Carousel>
       </section>
 
-      {/* TRUST PARTNERS - NOVEAU */}
+      {/* TRUST PARTNERS */}
       <section className="container max-w-7xl mx-auto px-6 py-10 border-b border-white/5">
           <div className="flex flex-col items-center gap-8">
               <p className="text-[8px] font-black uppercase tracking-[0.6em] text-white/20">Propulsé par les leaders mondiaux</p>
@@ -256,7 +282,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* HUB IMPACT STATS - NOUVEAU */}
+      {/* HUB IMPACT STATS */}
       <section className="container max-w-7xl mx-auto px-6 py-20">
           <Card className="bg-white/[0.02] border border-white/5 rounded-[4rem] p-12 md:p-20 relative overflow-hidden group">
               <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_top_left,_var(--tw-gradient-stops))] from-primary/5 via-transparent to-transparent" />
@@ -283,6 +309,40 @@ export default function LandingPage() {
                   </div>
               </div>
           </Card>
+      </section>
+
+      {/* L'EXCELLENCE EN ACTION (CURRENT PROJECTS) */}
+      <section className="container max-w-7xl mx-auto px-6 py-20">
+          <div className="flex flex-col md:flex-row justify-between items-end gap-6 mb-16">
+              <div className="space-y-4">
+                  <h2 className="text-4xl md:text-5xl font-black uppercase italic tracking-tighter">L'EXCELLENCE <span className="text-accent">EN ACTION</span></h2>
+                  <p className="text-muted-foreground text-sm uppercase font-bold tracking-[0.3em]">Déploiements récents et chantiers technologiques</p>
+              </div>
+              <Button variant="ghost" className="text-accent font-black uppercase italic text-xs tracking-widest hover:bg-accent/10" asChild>
+                  <Link href="/portfolio">Tout voir <ArrowRight className="ml-2" size={14} /></Link>
+              </Button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {PREVIEW_PROJECTS.map((project, idx) => (
+                  <Card key={idx} className="glossy-card border-none rounded-[3rem] overflow-hidden group relative">
+                      <div className="aspect-[4/3] relative overflow-hidden">
+                          <img src={project.image} alt={project.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
+                          <Badge className="absolute top-6 right-6 bg-accent text-black font-black uppercase text-[8px] italic tracking-widest">{project.category}</Badge>
+                      </div>
+                      <div className="absolute bottom-0 left-0 w-full p-8 space-y-2">
+                          <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-xl bg-white/10 flex items-center justify-center backdrop-blur-md">
+                                  {project.icon}
+                              </div>
+                              <h3 className="text-xl font-black uppercase italic text-white leading-tight">{project.title}</h3>
+                          </div>
+                          <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest ml-11">Client: {project.client}</p>
+                      </div>
+                  </Card>
+              ))}
+          </div>
       </section>
 
       {/* ELITE STOCK SHOWCASE */}
