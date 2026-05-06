@@ -21,7 +21,8 @@ import {
     MessageSquare,
     AlertCircle,
     BadgeCheck,
-    Coins
+    Coins,
+    Send
 } from "lucide-react";
 import { db } from '@/lib/firebase';
 import { collection, query, orderBy, addDoc, serverTimestamp, doc, updateDoc, increment, setDoc } from 'firebase/firestore';

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useRef, useMemo } from 'react';
@@ -276,7 +277,7 @@ export function UserGuide({ role }: UserGuideProps) {
                     <h3 className="text-5xl font-black uppercase tracking-tight border-b-2 border-gray-100 inline-block pb-2 px-10 italic">
                         {user?.name}
                     </h3>
-                    <p className="text-lg font-medium text-gray-500 max-w-2xl mx-auto leading-relaxed italic">
+                    <p className="text-lg font-medium text-gray-400 max-w-2xl mx-auto leading-relaxed italic">
                         Pour avoir démontré une maîtrise exceptionnelle des protocoles financiers, sécuritaires et techniques de l'écosystème **Double King Shop**.
                     </p>
                 </div>
