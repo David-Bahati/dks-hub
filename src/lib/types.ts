@@ -97,6 +97,7 @@ export type Project = {
   iconName: string;
   tags: string[];
   isPublished: boolean;
+  views?: number;
   createdAt: any;
   updatedAt: any;
 };

@@ -29,6 +29,7 @@ import * as z from "zod";
 import { Project } from '@/lib/types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { cn } from "@/lib/utils";
 
 const projectSchema = z.object({
   title: z.string().min(5, "Le titre est trop court"),
@@ -111,6 +112,7 @@ function PortfolioManagementPage() {
       } else {
         await addDoc(collection(db, "projects"), {
           ...projectData,
+          views: 0,
           createdAt: serverTimestamp()
         });
         toast({ title: "Réalisation ajoutée au Portfolio" });
@@ -172,15 +174,18 @@ function PortfolioManagementPage() {
                        <img src={project.imageUrl} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt={project.title} />
                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
                        <div className="absolute top-4 right-4 flex gap-2">
+                           <Badge variant="secondary" className="bg-black/60 text-white border-none text-[8px] font-black gap-1"><Eye size={10} /> {project.views || 0}</Badge>
                            <Badge className={cn("border-none text-[8px] font-black uppercase px-2", project.isPublished ? "bg-green-500/80 text-white" : "bg-orange-500/80 text-white")}>
                                {project.isPublished ? "Publié" : "Brouillon"}
                            </Badge>
                        </div>
                    </div>
                    <CardContent className="p-8 space-y-4">
-                       <div className="flex items-center gap-3">
-                           <div className="text-accent">{getIcon(project.iconName)}</div>
-                           <h3 className="text-xl font-black uppercase italic tracking-tight truncate">{project.title}</h3>
+                       <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                              <div className="text-accent">{getIcon(project.iconName)}</div>
+                              <h3 className="text-xl font-black uppercase italic tracking-tight truncate">{project.title}</h3>
+                          </div>
                        </div>
                        <p className="text-[10px] text-white/40 font-bold uppercase tracking-widest">Client: {project.client}</p>
                        <p className="text-xs text-muted-foreground line-clamp-2 italic">"{project.description}"</p>

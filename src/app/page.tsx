@@ -46,7 +46,8 @@ import {
   Heart,
   Monitor,
   Video,
-  Shield
+  Shield,
+  Eye
 } from 'lucide-react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
@@ -327,7 +328,10 @@ export default function LandingPage() {
                       <div className="aspect-[4/3] relative overflow-hidden">
                           <img src={project.imageUrl} alt={project.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
                           <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
-                          <Badge className="absolute top-6 right-6 bg-accent text-black font-black uppercase text-[8px] italic tracking-widest">{project.category}</Badge>
+                          <div className="absolute top-6 left-6 flex flex-col gap-2">
+                             <Badge className="bg-accent text-black font-black uppercase text-[8px] italic tracking-widest w-fit">{project.category}</Badge>
+                             <Badge variant="secondary" className="bg-black/40 text-white border-white/10 text-[8px] font-black w-fit gap-1"><Eye size={10} /> {project.views || 0} vues</Badge>
+                          </div>
                       </div>
                       <div className="absolute bottom-0 left-0 w-full p-8 space-y-2">
                           <div className="flex items-center gap-3">

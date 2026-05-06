@@ -1,12 +1,13 @@
 
 'use client';
 
+import { useEffect } from 'react';
 import { Navbar } from "@/components/layout/Navbar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Globe, Cpu, ShieldCheck, Zap, Laptop, ArrowRight, Loader2, Network, Video, Layout } from "lucide-react";
+import { Globe, Cpu, ShieldCheck, Zap, Laptop, ArrowRight, Loader2, Network, Video, Layout, Eye } from "lucide-react";
 import { db } from '@/lib/firebase';
-import { collection, query, where, orderBy } from 'firebase/firestore';
+import { collection, query, where, orderBy, updateDoc, doc, increment } from 'firebase/firestore';
 import { useCollection, useMemoFirebase } from '@/firebase';
 import { Project } from '@/lib/types';
 
@@ -25,6 +26,22 @@ export default function PortfolioPage() {
   }, []);
 
   const { data: projects, isLoading } = useCollection<Project>(projectsQuery);
+
+  // Increment views for displayed projects (once per session per project)
+  useEffect(() => {
+    if (projects && projects.length > 0) {
+        projects.forEach(project => {
+            const sessionKey = `viewed_project_${project.id}`;
+            if (!sessionStorage.getItem(sessionKey)) {
+                const projectRef = doc(db, "projects", project.id);
+                updateDoc(projectRef, {
+                    views: increment(1)
+                }).catch(e => console.error("Error incrementing views:", e));
+                sessionStorage.setItem(sessionKey, 'true');
+            }
+        });
+    }
+  }, [projects]);
 
   const getIcon = (name: string) => {
     const IconComp = ICON_MAP[name] || Zap;
@@ -52,7 +69,10 @@ export default function PortfolioPage() {
                 <div className="aspect-video relative overflow-hidden">
                     <img src={project.imageUrl} alt={project.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
-                    <Badge className="absolute top-6 right-6 bg-accent text-black font-black uppercase text-[10px]">{project.category}</Badge>
+                    <div className="absolute top-6 right-6 flex flex-col gap-2 items-end">
+                        <Badge className="bg-accent text-black font-black uppercase text-[10px]">{project.category}</Badge>
+                        <Badge variant="secondary" className="bg-black/60 text-white border-white/10 text-[8px] font-black gap-1"><Eye size={10} /> {project.views || 0} vues</Badge>
+                    </div>
                 </div>
                 <CardHeader className="p-8 pb-4">
                     <CardTitle className="text-2xl font-black uppercase italic leading-tight flex items-center gap-3">
