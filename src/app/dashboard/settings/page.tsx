@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -22,7 +23,9 @@ import {
     Fingerprint,
     ShieldAlert,
     CheckCircle2,
-    ShieldX
+    ShieldX,
+    Megaphone,
+    ExternalLink
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -41,12 +44,11 @@ import {
     signOut, 
     updateProfile, 
 } from 'firebase/auth';
-import { doc, updateDoc, serverTimestamp, getDoc } from 'firebase/firestore';
+import { doc, updateDoc, serverTimestamp, getDoc, setDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import { useTheme } from "next-themes";
-import { Logo } from "@/components/ui/Logo";
+import { Switch } from "@/components/ui/switch";
 
 export default function SettingsPage() {
     const { user } = useAuth();
@@ -71,6 +73,14 @@ export default function SettingsPage() {
     
     // System States
     const [exchangeRate, setExchangeRate] = useState("2500");
+    const [isSavingSystem, setIsSavingSystem] = useState(false);
+
+    // Ad States
+    const [adTitle, setAdTitle] = useState("");
+    const [adSubtitle, setAdSubtitle] = useState("");
+    const [adButtonText, setAdButtonText] = useState("");
+    const [adLink, setAdLink] = useState("");
+    const [adIsActive, setAdIsActive] = useState(true);
 
     useEffect(() => {
         if (user) {
@@ -88,7 +98,15 @@ export default function SettingsPage() {
         try {
             const configRef = doc(db, "system", "config");
             const configSnap = await getDoc(configRef);
-            if (configSnap.exists()) setExchangeRate(configSnap.data().exchangeRate?.toString() || "2500");
+            if (configSnap.exists()) {
+                const data = configSnap.data();
+                setExchangeRate(data.exchangeRate?.toString() || "2500");
+                setAdTitle(data.adTitle || "");
+                setAdSubtitle(data.adSubtitle || "");
+                setAdButtonText(data.adButtonText || "");
+                setAdLink(data.adLink || "");
+                setAdIsActive(data.adIsActive !== false);
+            }
         } catch (error) { console.error(error); }
     };
 
@@ -111,6 +129,27 @@ export default function SettingsPage() {
             await updateDoc(doc(db, "users", user.uid), { walletPin, updatedAt: serverTimestamp() });
             toast({ title: "Code PIN Wallet Mis à Jour", description: "Ce code sera requis pour chaque transfert." });
         } catch (error) { toast({ title: "Erreur PIN", variant: "destructive" }); } finally { setIsUpdatingPin(false); }
+    };
+
+    const handleSaveSystemConfig = async () => {
+        setIsSavingSystem(true);
+        try {
+            const configRef = doc(db, "system", "config");
+            await setDoc(configRef, {
+                exchangeRate: parseFloat(exchangeRate),
+                adTitle,
+                adSubtitle,
+                adButtonText,
+                adLink,
+                adIsActive,
+                updatedAt: serverTimestamp()
+            }, { merge: true });
+            toast({ title: "Configuration Système Mise à Jour" });
+        } catch (error) {
+            toast({ title: "Erreur Système", variant: "destructive" });
+        } finally {
+            setIsSavingSystem(false);
+        }
     };
 
     const handleLogout = async () => { await signOut(auth); router.push('/login'); };
@@ -234,15 +273,67 @@ export default function SettingsPage() {
                     </TabsContent>
 
                     {isAdmin && (
-                        <TabsContent value="system" className="animate-in fade-in slide-in-from-bottom-4">
+                        <TabsContent value="system" className="space-y-10 animate-in fade-in slide-in-from-bottom-4">
                             <Card className="glossy-card border-none rounded-[2.5rem] p-10 space-y-10">
-                                <div className="flex items-center gap-4"><RefreshCw className="text-accent" size={24}/><h2 className="text-xl font-black uppercase italic">TAUX DE CHANGE SYSTÈME</h2></div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                    <div className="space-y-4">
-                                        <Label className="text-[10px] font-black uppercase opacity-60">1 USD en Francs Congolais (CDF)</Label>
-                                        <Input type="number" value={exchangeRate} onChange={(e) => setExchangeRate(e.target.value)} className="h-16 bg-background/50 border-white/5 rounded-2xl text-2xl font-bold" />
+                                <div className="flex items-center gap-4">
+                                    <RefreshCw className="text-accent" size={24}/>
+                                    <div>
+                                        <h2 className="text-xl font-black uppercase italic">CONFIGURATION HUB</h2>
+                                        <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Paramètres globaux de l'écosystème</p>
                                     </div>
                                 </div>
+                                
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+                                    {/* TAUX DE CHANGE */}
+                                    <div className="space-y-6">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center text-accent"><Coins size={16}/></div>
+                                            <h3 className="text-sm font-black uppercase italic">Taux de Change</h3>
+                                        </div>
+                                        <div className="space-y-4">
+                                            <Label className="text-[10px] font-black uppercase opacity-60">1 USD en Francs Congolais (CDF)</Label>
+                                            <Input type="number" value={exchangeRate} onChange={(e) => setExchangeRate(e.target.value)} className="h-16 bg-background/50 border-white/5 rounded-2xl text-2xl font-bold" />
+                                        </div>
+                                    </div>
+
+                                    {/* GESTION PUBLICITÉ */}
+                                    <div className="space-y-6">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary"><Megaphone size={16}/></div>
+                                                <h3 className="text-sm font-black uppercase italic">Gestion Publicité</h3>
+                                            </div>
+                                            <div className="flex items-center gap-3">
+                                                <Label className="text-[10px] font-black uppercase opacity-60">Activé</Label>
+                                                <Switch checked={adIsActive} onCheckedChange={setAdIsActive} className="data-[state=checked]:bg-accent" />
+                                            </div>
+                                        </div>
+                                        <div className="space-y-4">
+                                            <div className="space-y-2">
+                                                <Label className="text-[10px] font-black uppercase opacity-40 ml-1">Titre Accrocheur</Label>
+                                                <Input value={adTitle} onChange={(e) => setAdTitle(e.target.value)} placeholder="Ex: -20% SUR LE SETUP GAMING" className="h-12 bg-background/50 border-white/5 rounded-xl font-bold" />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label className="text-[10px] font-black uppercase opacity-40 ml-1">Sous-titre / Détails</Label>
+                                                <Input value={adSubtitle} onChange={(e) => setAdSubtitle(e.target.value)} placeholder="Ex: Offre valable via Pi Network GCV" className="h-12 bg-background/50 border-white/5 rounded-xl text-xs italic" />
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div className="space-y-2">
+                                                    <Label className="text-[10px] font-black uppercase opacity-40 ml-1">Texte Bouton</Label>
+                                                    <Input value={adButtonText} onChange={(e) => setAdButtonText(e.target.value)} placeholder="Ex: Voir l'offre" className="h-12 bg-background/50 border-white/5 rounded-xl font-black uppercase text-[10px]" />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <Label className="text-[10px] font-black uppercase opacity-40 ml-1">Lien de redirection</Label>
+                                                    <Input value={adLink} onChange={(e) => setAdLink(e.target.value)} placeholder="Ex: /services" className="h-12 bg-background/50 border-white/5 rounded-xl font-mono text-[10px]" />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <Button onClick={handleSaveSystemConfig} disabled={isSavingSystem} className="w-full h-16 bg-accent text-black font-black uppercase italic rounded-2xl shadow-xl shadow-accent/20 gap-3">
+                                    {isSavingSystem ? <Loader2 className="animate-spin" /> : <><ShieldCheck size={20}/> Appliquer les changements globaux</>}
+                                </Button>
                             </Card>
                         </TabsContent>
                     )}
