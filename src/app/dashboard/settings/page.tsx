@@ -26,7 +26,8 @@ import {
     Megaphone,
     Plus,
     Trash2,
-    Save
+    Save,
+    Camera
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -118,8 +119,20 @@ export default function SettingsPage() {
         if (!user?.uid) return;
         setIsSaving(true);
         try {
-            await updateDoc(doc(db, "users", user.uid), { name, whatsapp, address, language, updatedAt: serverTimestamp() });
-            if (auth.currentUser) await updateProfile(auth.currentUser, { displayName: name });
+            await updateDoc(doc(db, "users", user.uid), { 
+                name, 
+                whatsapp, 
+                address, 
+                photoURL,
+                language, 
+                updatedAt: serverTimestamp() 
+            });
+            if (auth.currentUser) {
+                await updateProfile(auth.currentUser, { 
+                    displayName: name,
+                    photoURL: photoURL 
+                });
+            }
             toast({ title: "Profil mis à jour" });
         } catch (error) { toast({ title: "Erreur", variant: "destructive" }); } finally { setIsSaving(false); }
     };
@@ -197,11 +210,14 @@ export default function SettingsPage() {
                     <TabsContent value="profile" className="space-y-10 animate-in fade-in slide-in-from-bottom-4">
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
                             <Card className="glossy-card border-none rounded-[2.5rem] p-8 text-center space-y-6">
-                                <div className="relative inline-block mx-auto">
-                                    <Avatar className="h-40 w-40 border-4 border-accent p-1.5 bg-background shadow-2xl">
+                                <div className="relative inline-block mx-auto group">
+                                    <Avatar className="h-40 w-40 border-4 border-accent p-1.5 bg-background shadow-2xl transition-transform group-hover:scale-105 duration-500">
                                         <AvatarImage src={photoURL} className="rounded-full object-cover" />
                                         <AvatarFallback className="bg-primary/20 text-accent text-5xl font-black italic">{user?.name?.substring(0, 1)}</AvatarFallback>
                                     </Avatar>
+                                    <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer border-4 border-accent/20">
+                                        <Camera size={32} className="text-white" />
+                                    </div>
                                 </div>
                                 <h3 className="text-2xl font-black uppercase italic tracking-tighter truncate">{name}</h3>
                                 <div className="p-5 bg-white/5 rounded-2xl border border-white/5 text-left space-y-2">
@@ -215,11 +231,24 @@ export default function SettingsPage() {
                                 <Card className="glossy-card border-none rounded-[2.5rem] p-10 space-y-8">
                                     <div className="flex items-center gap-4"><User className="text-accent" size={24} /><div><h2 className="text-xl font-black uppercase italic tracking-tight">INFORMATIONS ÉLITE</h2><p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Identité officielle dans le Hub</p></div></div>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                        <div className="space-y-4"><Label className="text-[10px] font-black uppercase opacity-60 ml-1">Nom complet</Label><Input value={name} onChange={(e) => setName(e.target.value)} className="h-14 bg-background/50 border-white/5 rounded-2xl" /></div>
-                                        <div className="space-y-4"><Label className="text-[10px] font-black uppercase opacity-60 ml-1">Numéro WhatsApp</Label><Input value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} className="h-14 bg-background/50 border-white/5 rounded-2xl" /></div>
-                                        <div className="md:col-span-2 space-y-4"><Label className="text-[10px] font-black uppercase opacity-60 ml-1">Adresse à Bunia</Label><Input value={address} onChange={(e) => setAddress(e.target.value)} className="h-14 bg-background/50 border-white/5 rounded-2xl" /></div>
+                                        <div className="space-y-4">
+                                            <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Nom complet</Label>
+                                            <Input value={name} onChange={(e) => setName(e.target.value)} className="h-14 bg-background/50 border-white/5 rounded-2xl" />
+                                        </div>
+                                        <div className="space-y-4">
+                                            <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Numéro WhatsApp</Label>
+                                            <Input value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} className="h-14 bg-background/50 border-white/5 rounded-2xl" />
+                                        </div>
+                                        <div className="md:col-span-2 space-y-4">
+                                            <Label className="text-[10px] font-black uppercase opacity-60 ml-1">URL de Photo de Profil</Label>
+                                            <Input value={photoURL} onChange={(e) => setPhotoURL(e.target.value)} placeholder="https://..." className="h-14 bg-background/50 border-white/5 rounded-2xl font-mono text-[10px]" />
+                                        </div>
+                                        <div className="md:col-span-2 space-y-4">
+                                            <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Adresse à Bunia</Label>
+                                            <Input value={address} onChange={(e) => setAddress(e.target.value)} className="h-14 bg-background/50 border-white/5 rounded-2xl" />
+                                        </div>
                                     </div>
-                                    <Button onClick={handleUpdateProfile} disabled={isSaving} className="w-full h-16 bg-accent text-black font-black uppercase italic rounded-2xl gap-3 shadow-xl">{isSaving ? <Loader2 className="animate-spin" /> : <RefreshCw size={18}/>} Enregistrer les modifications</Button>
+                                    <Button onClick={handleUpdateProfile} disabled={isSaving} className="w-full h-16 bg-accent text-black font-black uppercase italic rounded-2xl gap-3 shadow-xl">{isSaving ? <Loader2 className="animate-spin" /> : <Save size={18}/>} Enregistrer les modifications</Button>
                                 </Card>
                             </div>
                         </div>

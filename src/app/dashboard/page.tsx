@@ -117,6 +117,7 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { UserGuide } from "@/components/dashboard/UserGuide";
 import { Separator } from "@/components/ui/separator";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const TOTAL_COMMUNITY_SUPPLY = 32500000;
 
@@ -352,10 +353,21 @@ function DashboardPage() {
             <SheetContent side="left" className="sm:max-w-xs bg-card/95 backdrop-blur-3xl border-r border-white/5 p-0"><SidebarContent /></SheetContent>
           </Sheet>
         <div className="flex-1 flex items-center justify-between">
-            <Logo size="sm" showText />
+            <div className="flex items-center gap-4">
+                <Logo size="sm" showText />
+            </div>
             <div className="flex items-center gap-4">
                 <Link href="/dashboard/wallet"><Badge className="bg-accent/20 text-accent border-accent/20 h-10 px-4 rounded-xl gap-2 font-black italic cursor-pointer"><Coins size={16} /> {user?.tokenBalance?.toFixed(2) || 0} DKST</Badge></Link>
                 <Separator orientation="vertical" className="h-8 bg-white/5 hidden sm:block" />
+                
+                {/* Profile Avatar & Quick Settings */}
+                <Link href="/dashboard/settings">
+                    <Avatar className="h-10 w-10 border-2 border-white/10 hover:border-accent transition-all cursor-pointer shadow-lg">
+                        <AvatarImage src={user?.photoURL} className="object-cover" />
+                        <AvatarFallback className="bg-accent/20 text-accent font-black text-xs italic">{user?.name?.substring(0, 1)}</AvatarFallback>
+                    </Avatar>
+                </Link>
+
                 <Button onClick={handleLogout} variant="ghost" size="icon" className="h-11 w-11 rounded-2xl text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all hidden sm:flex">
                     <LogOut size={20} />
                 </Button>
@@ -364,6 +376,23 @@ function DashboardPage() {
       </header>
 
       <main className="flex-1 p-4 md:p-8 space-y-12 pb-24 max-w-[1600px] mx-auto w-full">
+          {/* Welcome Section */}
+          <div className="flex flex-col md:flex-row items-center gap-8 mb-12 p-10 bg-white/[0.02] border border-white/5 rounded-[3rem] relative overflow-hidden group">
+              <div className="absolute top-0 right-0 p-8 opacity-5"><Sparkles size={160} className="text-accent animate-pulse" /></div>
+              <Avatar className="h-32 w-32 border-4 border-accent p-1.5 bg-background shadow-2xl transition-transform group-hover:scale-105 duration-500">
+                  <AvatarImage src={user?.photoURL} className="rounded-full object-cover" />
+                  <AvatarFallback className="bg-primary/20 text-accent text-4xl font-black italic">{user?.name?.substring(0, 1)}</AvatarFallback>
+              </Avatar>
+              <div className="text-center md:text-left space-y-2 relative z-10">
+                  <div className="flex flex-wrap items-center justify-center md:justify-start gap-3">
+                      <Badge className="bg-accent text-black font-black uppercase italic text-[8px] tracking-[0.3em] px-4 py-1">Membre {user?.loyaltyLevel || 'Bronze'}</Badge>
+                      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest opacity-40">Dernière activité: {user?.lastActivityAt?.toDate ? format(user.lastActivityAt.toDate(), "dd MMM HH:mm", { locale: fr }) : "Maintenant"}</span>
+                  </div>
+                  <h1 className="text-4xl md:text-5xl font-black uppercase italic tracking-tighter">Bienvenue, <span className="text-accent">{user?.name?.split(' ')[0]}</span></h1>
+                  <p className="text-sm text-white/60 font-medium italic">"Prêt à dominer l'économie technologique aujourd'hui ?"</p>
+              </div>
+          </div>
+
           <div className="grid gap-6 grid-cols-1 lg:grid-cols-12">
               <Card className="lg:col-span-5 bg-gradient-to-br from-accent/10 via-background to-black border-accent/20 rounded-[3rem] p-10 relative overflow-hidden group shadow-2xl">
                   <div className="absolute top-0 right-0 p-8 opacity-5 scale-150 rotate-45 group-hover:rotate-0 transition-transform duration-1000"><Pickaxe size={200} className="text-accent" /></div>

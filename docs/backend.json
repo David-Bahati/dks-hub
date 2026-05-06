@@ -11,6 +11,7 @@
         "firstName": { "type": "string" },
         "lastName": { "type": "string" },
         "displayName": { "type": "string" },
+        "photoURL": { "type": "string", "description": "URL of the profile picture" },
         "role": { "type": "string", "enum": ["Admin", "Seller", "Cashier", "customer"] },
         "loyaltyLevel": { "type": "string", "enum": ["Bronze", "Silver", "Gold"] },
         "points": { "type": "number", "description": "Accumulated prestige points" },
