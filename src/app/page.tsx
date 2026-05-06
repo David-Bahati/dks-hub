@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
@@ -51,6 +50,12 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { useDoc, useMemoFirebase } from '@/firebase';
+import { 
+    Carousel, 
+    CarouselContent, 
+    CarouselItem 
+} from "@/components/ui/carousel";
+import Autoplay from "embla-carousel-autoplay";
 
 export default function LandingPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -63,9 +68,14 @@ export default function LandingPage() {
   const { addToCart } = useCart();
   const { toast } = useToast();
 
-  // Fetch Dynamic Advertisement
-  const adRef = useMemoFirebase(() => doc(db, "system", "config"), []);
-  const { data: adConfig } = useDoc(adRef);
+  // Fetch Dynamic Configuration (including Ads)
+  const configRef = useMemoFirebase(() => doc(db, "system", "config"), []);
+  const { data: config } = useDoc(configRef);
+
+  const activeAds = useMemo(() => {
+      if (!config?.ads) return [];
+      return config.ads.filter((ad: any) => ad.isActive);
+  }, [config]);
 
   useEffect(() => {
     async function fetchData() {
@@ -103,12 +113,6 @@ export default function LandingPage() {
     { name: "Pi Network", icon: <Coins size={20} /> },
     { name: "Ubiquiti", icon: <Network size={20} /> },
     { name: "Intel", icon: <Server size={20} /> }
-  ];
-
-  const news = [
-    { date: "12 Mai 2024", category: "Communiqué", title: "DKS Solutions devient Installateur Certifié Starlink en Ituri", excerpt: "Une nouvelle ère de connectivité s'ouvre pour les entreprises de Bunia.", icon: <Globe className="text-accent" /> },
-    { date: "08 Mai 2024", category: "Arrivage", title: "Stock RTX 4090 Founders Edition disponible au Hub", excerpt: "Le fleuron de NVIDIA arrive enfin dans notre boutique.", icon: <Cpu className="text-primary" /> },
-    { date: "01 Mai 2024", category: "Événement", title: "Succès du premier Atelier IA 'Prompt Engineering'", excerpt: "Plus de 50 participants formés à la maîtrise des outils génératifs.", icon: <Sparkles className="text-yellow-500" /> }
   ];
 
   return (
@@ -156,20 +160,43 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* PARTNERS LOGOS */}
-      <section className="py-20 border-b border-white/5 bg-white/[0.01]">
-        <div className="container max-w-7xl mx-auto px-6">
-          <p className="text-[10px] font-black uppercase tracking-[0.4em] text-center text-white/20 mb-12">Propulsé par les leaders mondiaux</p>
-          <div className="flex flex-wrap justify-center items-center gap-12 md:gap-20 opacity-40 grayscale hover:grayscale-0 transition-all duration-700">
-            {partners.map((p, i) => (
-              <div key={i} className="flex items-center gap-3 group">
-                <div className="text-white group-hover:text-accent transition-colors">{p.icon}</div>
-                <span className="font-black uppercase italic tracking-tighter text-lg">{p.name}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+      {/* ADVERTISEMENT CAROUSEL (DYNAMIC) */}
+      {activeAds.length > 0 && (
+        <section className="container max-w-7xl mx-auto px-6 py-10">
+          <Carousel 
+            opts={{ loop: true }} 
+            plugins={[Autoplay({ delay: 4000 })]} 
+            className="w-full"
+          >
+            <CarouselContent>
+              {activeAds.map((ad: any) => (
+                <CarouselItem key={ad.id}>
+                  <div className="bg-gradient-to-r from-accent/20 to-primary/20 border border-white/10 rounded-[2.5rem] p-8 md:p-10 flex flex-col md:flex-row items-center justify-between gap-8 backdrop-blur-xl shadow-2xl relative overflow-hidden group h-full">
+                    <div className="absolute top-0 right-0 p-4 opacity-5"><Megaphone size={120} /></div>
+                    <div className="flex items-center gap-6 relative z-10">
+                      <div className="w-16 h-16 rounded-[1.5rem] bg-accent text-black flex items-center justify-center shrink-0 shadow-xl shadow-accent/20">
+                        <Megaphone size={32} />
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-[10px] font-black uppercase text-accent tracking-[0.4em]">Annonce Spéciale Hub</p>
+                        <h3 className="text-xl md:text-2xl font-black uppercase italic tracking-tighter text-white leading-tight">
+                          {ad.title} <br />
+                          <span className="text-white/60 text-sm italic">{ad.subtitle}</span>
+                        </h3>
+                      </div>
+                    </div>
+                    <Button className="h-16 px-10 rounded-2xl bg-white text-black font-black uppercase italic hover:bg-accent transition-all shrink-0 shadow-lg relative z-10" asChild>
+                      <Link href={ad.link}>
+                        {ad.buttonText} <ArrowRight size={18} className="ml-2" />
+                      </Link>
+                    </Button>
+                  </div>
+                </CarouselItem>
+              ))}
+            </CarouselContent>
+          </Carousel>
+        </section>
+      )}
 
       {/* POLES OF EXCELLENCE */}
       <section className="container max-w-7xl mx-auto px-6 py-32">
@@ -198,32 +225,6 @@ export default function LandingPage() {
             ))}
         </div>
       </section>
-
-      {/* ADVERTISEMENT BANNER (DYNAMIC) */}
-      {(adConfig?.adIsActive !== false) && (
-        <section className="container max-w-7xl mx-auto px-6 py-10">
-          <div className="bg-gradient-to-r from-accent/20 to-primary/20 border border-white/10 rounded-[2.5rem] p-8 md:p-10 flex flex-col md:flex-row items-center justify-between gap-8 backdrop-blur-xl shadow-2xl relative overflow-hidden group">
-            <div className="absolute top-0 right-0 p-4 opacity-5"><Megaphone size={120} /></div>
-            <div className="flex items-center gap-6 relative z-10">
-              <div className="w-16 h-16 rounded-[1.5rem] bg-accent text-black flex items-center justify-center shrink-0 shadow-xl shadow-accent/20">
-                <Megaphone size={32} />
-              </div>
-              <div className="space-y-1">
-                <p className="text-[10px] font-black uppercase text-accent tracking-[0.4em]">Annonce Spéciale Hub</p>
-                <h3 className="text-xl md:text-2xl font-black uppercase italic tracking-tighter text-white leading-tight">
-                  {adConfig?.adTitle || "-20% SUR LE SETUP GAMING COMPLET"} <br />
-                  <span className="text-white/60 text-sm italic">{adConfig?.adSubtitle || "Offre valable uniquement pour les paiements en Pi Network (GCV)."}</span>
-                </h3>
-              </div>
-            </div>
-            <Button className="h-16 px-10 rounded-2xl bg-white text-black font-black uppercase italic hover:bg-accent transition-all shrink-0 shadow-lg relative z-10" asChild>
-              <Link href={adConfig?.adLink || "/services"}>
-                {adConfig?.adButtonText || "Voir l'offre"} <ArrowRight size={18} className="ml-2" />
-              </Link>
-            </Button>
-          </div>
-        </section>
-      )}
 
       {/* ELITE STOCK SHOWCASE */}
       <section id="shop" className="py-32 bg-black/20">

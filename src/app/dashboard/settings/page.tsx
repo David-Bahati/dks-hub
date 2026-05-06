@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -23,9 +22,10 @@ import {
     Fingerprint,
     ShieldAlert,
     CheckCircle2,
-    ShieldX,
     Megaphone,
-    ExternalLink
+    Plus,
+    Trash2,
+    Save
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -49,6 +49,15 @@ import { useToast } from '@/hooks/use-toast';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { Switch } from "@/components/ui/switch";
+
+interface Ad {
+    id: string;
+    title: string;
+    subtitle: string;
+    buttonText: string;
+    link: string;
+    isActive: boolean;
+}
 
 export default function SettingsPage() {
     const { user } = useAuth();
@@ -75,12 +84,8 @@ export default function SettingsPage() {
     const [exchangeRate, setExchangeRate] = useState("2500");
     const [isSavingSystem, setIsSavingSystem] = useState(false);
 
-    // Ad States
-    const [adTitle, setAdTitle] = useState("");
-    const [adSubtitle, setAdSubtitle] = useState("");
-    const [adButtonText, setAdButtonText] = useState("");
-    const [adLink, setAdLink] = useState("");
-    const [adIsActive, setAdIsActive] = useState(true);
+    // Multi-Ad States
+    const [ads, setAds] = useState<Ad[]>([]);
 
     useEffect(() => {
         if (user) {
@@ -101,11 +106,7 @@ export default function SettingsPage() {
             if (configSnap.exists()) {
                 const data = configSnap.data();
                 setExchangeRate(data.exchangeRate?.toString() || "2500");
-                setAdTitle(data.adTitle || "");
-                setAdSubtitle(data.adSubtitle || "");
-                setAdButtonText(data.adButtonText || "");
-                setAdLink(data.adLink || "");
-                setAdIsActive(data.adIsActive !== false);
+                setAds(data.ads || []);
             }
         } catch (error) { console.error(error); }
     };
@@ -131,17 +132,33 @@ export default function SettingsPage() {
         } catch (error) { toast({ title: "Erreur PIN", variant: "destructive" }); } finally { setIsUpdatingPin(false); }
     };
 
+    const handleAddAd = () => {
+        const newAd: Ad = {
+            id: Math.random().toString(36).substring(7),
+            title: "Nouvelle Offre Élite",
+            subtitle: "Détails de l'offre promotionnelle",
+            buttonText: "Voir",
+            link: "/services",
+            isActive: true
+        };
+        setAds([...ads, newAd]);
+    };
+
+    const handleRemoveAd = (id: string) => {
+        setAds(ads.filter(a => a.id !== id));
+    };
+
+    const handleUpdateAd = (id: string, fields: Partial<Ad>) => {
+        setAds(ads.map(a => a.id === id ? { ...a, ...fields } : a));
+    };
+
     const handleSaveSystemConfig = async () => {
         setIsSavingSystem(true);
         try {
             const configRef = doc(db, "system", "config");
             await setDoc(configRef, {
                 exchangeRate: parseFloat(exchangeRate),
-                adTitle,
-                adSubtitle,
-                adButtonText,
-                adLink,
-                adIsActive,
+                ads,
                 updatedAt: serverTimestamp()
             }, { merge: true });
             toast({ title: "Configuration Système Mise à Jour" });
@@ -283,7 +300,7 @@ export default function SettingsPage() {
                                     </div>
                                 </div>
                                 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
                                     {/* TAUX DE CHANGE */}
                                     <div className="space-y-6">
                                         <div className="flex items-center gap-3">
@@ -296,43 +313,86 @@ export default function SettingsPage() {
                                         </div>
                                     </div>
 
-                                    {/* GESTION PUBLICITÉ */}
+                                    {/* GESTION PUBLICITÉ MULTI-ANNONCES */}
                                     <div className="space-y-6">
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center gap-3">
                                                 <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary"><Megaphone size={16}/></div>
-                                                <h3 className="text-sm font-black uppercase italic">Gestion Publicité</h3>
+                                                <h3 className="text-sm font-black uppercase italic">Carousel Publicitaire</h3>
                                             </div>
-                                            <div className="flex items-center gap-3">
-                                                <Label className="text-[10px] font-black uppercase opacity-60">Activé</Label>
-                                                <Switch checked={adIsActive} onCheckedChange={setAdIsActive} className="data-[state=checked]:bg-accent" />
-                                            </div>
+                                            <Button onClick={handleAddAd} size="sm" className="bg-accent text-black font-black uppercase text-[10px] rounded-xl h-10 px-4">
+                                                <Plus size={14} className="mr-2" /> Ajouter une Annonce
+                                            </Button>
                                         </div>
-                                        <div className="space-y-4">
-                                            <div className="space-y-2">
-                                                <Label className="text-[10px] font-black uppercase opacity-40 ml-1">Titre Accrocheur</Label>
-                                                <Input value={adTitle} onChange={(e) => setAdTitle(e.target.value)} placeholder="Ex: -20% SUR LE SETUP GAMING" className="h-12 bg-background/50 border-white/5 rounded-xl font-bold" />
-                                            </div>
-                                            <div className="space-y-2">
-                                                <Label className="text-[10px] font-black uppercase opacity-40 ml-1">Sous-titre / Détails</Label>
-                                                <Input value={adSubtitle} onChange={(e) => setAdSubtitle(e.target.value)} placeholder="Ex: Offre valable via Pi Network GCV" className="h-12 bg-background/50 border-white/5 rounded-xl text-xs italic" />
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div className="space-y-2">
-                                                    <Label className="text-[10px] font-black uppercase opacity-40 ml-1">Texte Bouton</Label>
-                                                    <Input value={adButtonText} onChange={(e) => setAdButtonText(e.target.value)} placeholder="Ex: Voir l'offre" className="h-12 bg-background/50 border-white/5 rounded-xl font-black uppercase text-[10px]" />
+
+                                        <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
+                                            {ads.map((ad) => (
+                                                <div key={ad.id} className="p-6 rounded-3xl bg-white/5 border border-white/5 space-y-4 relative group">
+                                                    <div className="flex justify-between items-center border-b border-white/5 pb-3">
+                                                        <Badge variant="outline" className="text-[8px] font-black uppercase border-accent/20 text-accent">Annonce ID: {ad.id}</Badge>
+                                                        <div className="flex items-center gap-4">
+                                                            <div className="flex items-center gap-2">
+                                                                <Label className="text-[8px] font-black uppercase opacity-40">Actif</Label>
+                                                                <Switch 
+                                                                    checked={ad.isActive} 
+                                                                    onCheckedChange={(val) => handleUpdateAd(ad.id, { isActive: val })} 
+                                                                    className="data-[state=checked]:bg-accent scale-75"
+                                                                />
+                                                            </div>
+                                                            <button onClick={() => handleRemoveAd(ad.id)} className="text-white/20 hover:text-red-500 transition-colors">
+                                                                <Trash2 size={14} />
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                        <div className="space-y-2">
+                                                            <Label className="text-[8px] font-black uppercase opacity-40">Titre</Label>
+                                                            <Input 
+                                                                value={ad.title} 
+                                                                onChange={(e) => handleUpdateAd(ad.id, { title: e.target.value })} 
+                                                                className="h-10 bg-background/50 border-white/5 text-xs font-bold" 
+                                                            />
+                                                        </div>
+                                                        <div className="space-y-2">
+                                                            <Label className="text-[8px] font-black uppercase opacity-40">Bouton</Label>
+                                                            <Input 
+                                                                value={ad.buttonText} 
+                                                                onChange={(e) => handleUpdateAd(ad.id, { buttonText: e.target.value })} 
+                                                                className="h-10 bg-background/50 border-white/5 text-[9px] font-black uppercase" 
+                                                            />
+                                                        </div>
+                                                        <div className="space-y-2 md:col-span-2">
+                                                            <Label className="text-[8px] font-black uppercase opacity-40">Sous-titre</Label>
+                                                            <Input 
+                                                                value={ad.subtitle} 
+                                                                onChange={(e) => handleUpdateAd(ad.id, { subtitle: e.target.value })} 
+                                                                className="h-10 bg-background/50 border-white/5 text-[10px] italic" 
+                                                            />
+                                                        </div>
+                                                        <div className="space-y-2 md:col-span-2">
+                                                            <Label className="text-[8px] font-black uppercase opacity-40">Lien</Label>
+                                                            <Input 
+                                                                value={ad.link} 
+                                                                onChange={(e) => handleUpdateAd(ad.id, { link: e.target.value })} 
+                                                                className="h-10 bg-background/50 border-white/5 text-[9px] font-mono" 
+                                                            />
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                                <div className="space-y-2">
-                                                    <Label className="text-[10px] font-black uppercase opacity-40 ml-1">Lien de redirection</Label>
-                                                    <Input value={adLink} onChange={(e) => setAdLink(e.target.value)} placeholder="Ex: /services" className="h-12 bg-background/50 border-white/5 rounded-xl font-mono text-[10px]" />
+                                            ))}
+
+                                            {ads.length === 0 && (
+                                                <div className="py-20 text-center bg-white/5 rounded-[2rem] border border-dashed border-white/10 opacity-30 italic text-xs uppercase font-black">
+                                                    Aucune annonce configurée.
                                                 </div>
-                                            </div>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
 
                                 <Button onClick={handleSaveSystemConfig} disabled={isSavingSystem} className="w-full h-16 bg-accent text-black font-black uppercase italic rounded-2xl shadow-xl shadow-accent/20 gap-3">
-                                    {isSavingSystem ? <Loader2 className="animate-spin" /> : <><ShieldCheck size={20}/> Appliquer les changements globaux</>}
+                                    {isSavingSystem ? <Loader2 className="animate-spin" /> : <><Save size={20}/> Sauvegarder la Configuration Hub</>}
                                 </Button>
                             </Card>
                         </TabsContent>
