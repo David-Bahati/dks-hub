@@ -1,9 +1,9 @@
 
 "use client";
 
-import { useState, useEffect } from 'react';
-import Link from 'next/link';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { 
     User, 
     ShieldCheck, 
@@ -27,7 +27,8 @@ import {
     Plus,
     Trash2,
     Save,
-    Camera
+    Camera,
+    Upload
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -65,6 +66,7 @@ export default function SettingsPage() {
     const { user } = useAuth();
     const router = useRouter();
     const { toast } = useToast();
+    const fileInputRef = useRef<HTMLInputElement>(null);
     
     // Profile States
     const [name, setName] = useState("");
@@ -115,6 +117,21 @@ export default function SettingsPage() {
 
     const isAdmin = user?.role?.toLowerCase() === 'admin';
 
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            if (file.size > 2 * 1024 * 1024) {
+                toast({ title: "Fichier trop lourd", description: "L'image ne doit pas dépasser 2Mo.", variant: "destructive" });
+                return;
+            }
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setPhotoURL(reader.result as string);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
     const handleUpdateProfile = async () => {
         if (!user?.uid) return;
         setIsSaving(true);
@@ -133,7 +150,7 @@ export default function SettingsPage() {
                     photoURL: photoURL 
                 });
             }
-            toast({ title: "Profil mis à jour" });
+            toast({ title: "Profil mis à jour", description: "Vos informations ont été enregistrées avec succès." });
         } catch (error) { toast({ title: "Erreur", variant: "destructive" }); } finally { setIsSaving(false); }
     };
 
@@ -211,15 +228,35 @@ export default function SettingsPage() {
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
                             <Card className="glossy-card border-none rounded-[2.5rem] p-8 text-center space-y-6">
                                 <div className="relative inline-block mx-auto group">
-                                    <Avatar className="h-40 w-40 border-4 border-accent p-1.5 bg-background shadow-2xl transition-transform group-hover:scale-105 duration-500">
-                                        <AvatarImage src={photoURL} className="rounded-full object-cover" />
+                                    <Avatar className="h-40 w-40 border-4 border-accent p-1.5 bg-background shadow-2xl transition-transform group-hover:scale-105 duration-500 overflow-hidden">
+                                        <AvatarImage src={photoURL} className="rounded-full object-cover h-full w-full" />
                                         <AvatarFallback className="bg-primary/20 text-accent text-5xl font-black italic">{user?.name?.substring(0, 1)}</AvatarFallback>
                                     </Avatar>
-                                    <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer border-4 border-accent/20">
+                                    <button 
+                                        onClick={() => fileInputRef.current?.click()}
+                                        className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer border-4 border-accent/20 z-10"
+                                    >
                                         <Camera size={32} className="text-white" />
-                                    </div>
+                                    </button>
+                                    <input 
+                                        type="file" 
+                                        ref={fileInputRef} 
+                                        className="hidden" 
+                                        accept="image/*" 
+                                        onChange={handleFileChange} 
+                                    />
                                 </div>
-                                <h3 className="text-2xl font-black uppercase italic tracking-tighter truncate">{name}</h3>
+                                <div className="space-y-2">
+                                    <h3 className="text-2xl font-black uppercase italic tracking-tighter truncate">{name}</h3>
+                                    <Button 
+                                        variant="outline" 
+                                        size="sm" 
+                                        onClick={() => fileInputRef.current?.click()}
+                                        className="h-9 px-4 rounded-xl border-white/10 hover:bg-accent/10 hover:text-accent font-black uppercase italic text-[9px] gap-2"
+                                    >
+                                        <Upload size={12} /> Changer la photo
+                                    </Button>
+                                </div>
                                 <div className="p-5 bg-white/5 rounded-2xl border border-white/5 text-left space-y-2">
                                     <p className="text-[8px] font-black uppercase opacity-40">Détails Système</p>
                                     <div className="flex items-center gap-3 text-[10px] font-bold uppercase"><Mail size={12} className="text-accent" /> {user?.email}</div>
@@ -240,8 +277,8 @@ export default function SettingsPage() {
                                             <Input value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} className="h-14 bg-background/50 border-white/5 rounded-2xl" />
                                         </div>
                                         <div className="md:col-span-2 space-y-4">
-                                            <Label className="text-[10px] font-black uppercase opacity-60 ml-1">URL de Photo de Profil</Label>
-                                            <Input value={photoURL} onChange={(e) => setPhotoURL(e.target.value)} placeholder="https://..." className="h-14 bg-background/50 border-white/5 rounded-2xl font-mono text-[10px]" />
+                                            <Label className="text-[10px] font-black uppercase opacity-60 ml-1">URL de Photo de Profil (ou via sélecteur à gauche)</Label>
+                                            <Input value={photoURL} onChange={(e) => setPhotoURL(e.target.value)} placeholder="data:image/... ou https://..." className="h-14 bg-background/50 border-white/5 rounded-2xl font-mono text-[9px] opacity-60" />
                                         </div>
                                         <div className="md:col-span-2 space-y-4">
                                             <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Adresse à Bunia</Label>
@@ -432,3 +469,4 @@ export default function SettingsPage() {
         </div>
     );
 }
+
