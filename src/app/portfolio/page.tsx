@@ -1,15 +1,31 @@
 
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Navbar } from "@/components/layout/Navbar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Globe, Cpu, ShieldCheck, Zap, Laptop, ArrowRight, Loader2, Network, Video, Layout, Eye } from "lucide-react";
+import { 
+    Globe, 
+    Cpu, 
+    ShieldCheck, 
+    Zap, 
+    Laptop, 
+    ArrowRight, 
+    Loader2, 
+    Network, 
+    Video, 
+    Layout, 
+    Eye,
+    SortDesc,
+    Calendar,
+    TrendingUp
+} from "lucide-react";
 import { db } from '@/lib/firebase';
 import { collection, query, where, orderBy, updateDoc, doc, increment } from 'firebase/firestore';
 import { useCollection, useMemoFirebase } from '@/firebase';
 import { Project } from '@/lib/types';
+import { cn } from "@/lib/utils";
 
 const ICON_MAP: Record<string, any> = {
     "Zap": Zap,
@@ -21,11 +37,24 @@ const ICON_MAP: Record<string, any> = {
 };
 
 export default function PortfolioPage() {
+  const [sortBy, setSortBy] = useState<'recent' | 'views'>('recent');
+
   const projectsQuery = useMemoFirebase(() => {
     return query(collection(db, "projects"), where("isPublished", "==", true), orderBy("createdAt", "desc"));
   }, []);
 
   const { data: projects, isLoading } = useCollection<Project>(projectsQuery);
+
+  // Sorting logic
+  const sortedProjects = useMemo(() => {
+    if (!projects) return [];
+    const items = [...projects];
+    if (sortBy === 'views') {
+      return items.sort((a, b) => (b.views || 0) - (a.views || 0));
+    }
+    // Default is already by date from Firestore query, but we ensure it here
+    return items;
+  }, [projects, sortBy]);
 
   // Increment views for displayed projects (once per session per project)
   useEffect(() => {
@@ -52,7 +81,7 @@ export default function PortfolioPage() {
     <div className="min-h-screen bg-background text-foreground">
       <Navbar />
       <main className="max-w-7xl mx-auto px-6 py-20">
-        <div className="text-center mb-20 space-y-4">
+        <div className="text-center mb-16 space-y-4">
           <Badge className="bg-accent/20 text-accent border-none font-black uppercase tracking-[0.2em] px-5 py-2">Nos Réalisations</Badge>
           <h1 className="text-6xl md:text-8xl font-black uppercase italic tracking-tighter leading-none">DKS <span className="text-accent">EXCELLENCE</span></h1>
           <p className="text-xl text-muted-foreground font-light max-w-2xl mx-auto">
@@ -60,11 +89,35 @@ export default function PortfolioPage() {
           </p>
         </div>
 
+        {/* Sorting Controls */}
+        <div className="flex justify-center mb-12">
+            <div className="bg-white/5 border border-white/10 p-1.5 rounded-[1.5rem] flex items-center gap-2">
+                <button 
+                    onClick={() => setSortBy('recent')}
+                    className={cn(
+                        "px-6 h-12 rounded-xl font-black uppercase italic text-[10px] flex items-center gap-2 transition-all",
+                        sortBy === 'recent' ? "bg-accent text-black shadow-lg" : "text-white/40 hover:text-white"
+                    )}
+                >
+                    <Calendar size={14} /> Les plus récents
+                </button>
+                <button 
+                    onClick={() => setSortBy('views')}
+                    className={cn(
+                        "px-6 h-12 rounded-xl font-black uppercase italic text-[10px] flex items-center gap-2 transition-all",
+                        sortBy === 'views' ? "bg-accent text-black shadow-lg" : "text-white/40 hover:text-white"
+                    )}
+                >
+                    <TrendingUp size={14} /> Les plus vus
+                </button>
+            </div>
+        </div>
+
         {isLoading ? (
             <div className="py-20 flex justify-center"><Loader2 className="animate-spin text-accent h-12 w-12" /></div>
-        ) : projects && projects.length > 0 ? (
+        ) : sortedProjects.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
-            {projects.map((project) => (
+            {sortedProjects.map((project) => (
                 <Card key={project.id} className="glossy-card border-none rounded-[3rem] overflow-hidden group">
                 <div className="aspect-video relative overflow-hidden">
                     <img src={project.imageUrl} alt={project.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
