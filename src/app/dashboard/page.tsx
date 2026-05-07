@@ -62,6 +62,7 @@ import {
   Target,
   Flame,
   Layout,
+  LayoutDashboard,
   Gem,
   ArrowUpCircle,
   Heart,
@@ -358,7 +359,7 @@ function DashboardPage() {
                         <ShoppingBag size={14} /> Boutique
                     </Button>
                 </Link>
-                <Link href="/dashboard/wallet"><Badge className="bg-accent/20 text-accent border-accent/20 h-10 px-4 rounded-xl gap-2 font-black italic cursor-pointer hover:bg-accent/30 transition-all"><Coins size={16} /> {user?.tokenBalance?.toFixed(2) || 0} DKST</Badge></Link>
+                <Link href="/dashboard/wallet"><Badge className="bg-accent/20 text-accent border-accent/20 h-10 px-4 rounded-xl gap-2 font-black italic cursor-pointer hover:bg-accent/30 transition-all hidden sm:flex"><Coins size={16} /> {user?.tokenBalance?.toFixed(2) || 0} DKST</Badge></Link>
                 <Separator orientation="vertical" className="h-8 bg-white/5 hidden sm:block" />
                 
                 <Link href="/dashboard/settings">
