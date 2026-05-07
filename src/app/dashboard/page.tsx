@@ -595,7 +595,7 @@ const navConfig = [
   { href: "/dashboard/hardware", icon: Laptop, label: "Parc Hardware", roles: ["Admin", "Seller", "Cashier", "customer"] },
   { href: "/dashboard/customers", icon: Users, label: "Base Clients", roles: ["Admin", "Seller", "Cashier"] },
   { href: "/dashboard/users", icon: UsersRound, label: "Équipe DKS", roles: ["Admin"] },
-  { href: "/dashboard/settings", icon: Settings, label: "Réglages", roles: ["Admin", "customer"] },
+  { href: "/dashboard/settings", icon: Settings, label: "Réglages", roles: ["Admin", "Seller", "Cashier", "customer"] },
 ];
 
 export default withAuth(DashboardPage);
