@@ -481,9 +481,9 @@ export default function OrdersPage() {
                                 <div className="w-32 h-32 rounded-full border-[3px] border-double border-blue-900 flex flex-col items-center justify-center relative p-1 rotate-[-5deg] opacity-95">
                                     <div className="absolute inset-0 border border-blue-900/20 rounded-full scale-[0.95]" />
                                     {/* Texte de sécurité circulaire simulé */}
-                                    <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full animate-spin-slow opacity-30">
+                                    <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full animate-spin-slow opacity-80">
                                         <path id="circlePath" d="M 50, 50 m -37, 0 a 37,37 0 1,1 74,0 a 37,37 0 1,1 -74,0" fill="transparent" />
-                                        <text className="text-[3px] font-black fill-blue-900 uppercase">
+                                        <text className="text-[4.5px] font-black fill-blue-900 uppercase">
                                             <textPath xlinkHref="#circlePath">
                                                 CERTIFIED BY DOUBLE KING SHOP • ORIGINAL DOCUMENT • CERTIFIED BY DOUBLE KING SHOP • ORIGINAL DOCUMENT • 
                                             </textPath>
@@ -582,4 +582,3 @@ export default function OrdersPage() {
     </div>
   );
 }
-

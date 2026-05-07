@@ -380,7 +380,7 @@ function POS() {
           <DialogHeader><DialogTitle className="text-2xl font-black italic uppercase text-center">Paiement</DialogTitle></DialogHeader>
           <div className="py-6 flex flex-col gap-6">
             <div className="space-y-4">
-                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Client</Label>
+                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Client</Label>
                 <Input placeholder="Nom du client" className="h-14 bg-background/50 border-white/10 rounded-xl font-bold" value={customerName} onChange={(e) => setCustomerName(e.target.value)} />
             </div>
             <div className="text-center">
@@ -448,9 +448,9 @@ function POS() {
             <div className="mt-8 flex flex-col items-center gap-4 pt-6 border-t-2 border-dashed border-gray-200 relative">
               <div className="w-28 h-28 rounded-full border-[3px] border-double border-blue-900 flex flex-col items-center justify-center p-1 rotate-[-12deg] opacity-95 relative">
                 <div className="absolute inset-0 border border-blue-900/20 rounded-full scale-[0.95]" />
-                <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full opacity-30">
+                <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full opacity-60">
                   <path id="receiptCirclePath" d="M 50, 50 m -37, 0 a 37,37 0 1,1 74,0 a 37,37 0 1,1 -74,0" fill="transparent" />
-                  <text className="text-[3px] font-black fill-blue-900 uppercase">
+                  <text className="text-[4px] font-black fill-blue-900 uppercase">
                     <textPath xlinkHref="#receiptCirclePath">
                       CERTIFIED BY DOUBLE KING SHOP • ORIGINAL DOCUMENT • CERTIFIED BY DOUBLE KING SHOP • 
                     </textPath>
