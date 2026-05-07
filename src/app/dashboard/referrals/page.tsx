@@ -1,9 +1,8 @@
-
 "use client";
 
 import { useState, useMemo, useRef } from 'react';
 import { Navbar } from "@/components/layout/Navbar";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { 
     Trophy, 
@@ -25,9 +24,7 @@ import {
     ShieldCheck,
     QrCode,
     Activity,
-    Flame,
     Clock,
-    UserCheck,
     Search
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
@@ -55,7 +52,7 @@ function AmbassadorProgramPage() {
     const [searchTerm, setSearchTerm] = useState("");
     const certRef = useRef<HTMLDivElement>(null);
 
-    // Fetch referred users
+    // Récupération des membres parrainés
     const referralsQuery = useMemoFirebase(() => {
         if (!user?.uid) return null;
         return query(
@@ -115,8 +112,8 @@ function AmbassadorProgramPage() {
     const filteredReferrals = useMemo(() => {
         if (!referrals) return [];
         return referrals.filter(r => 
-            r.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-            r.email?.toLowerCase().includes(searchTerm.toLowerCase())
+            (r.name || r.displayName || "").toLowerCase().includes(searchTerm.toLowerCase()) || 
+            (r.email || "").toLowerCase().includes(searchTerm.toLowerCase())
         );
     }, [referrals, searchTerm]);
 
@@ -147,7 +144,6 @@ function AmbassadorProgramPage() {
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-                    {/* Carte Statut Ambassadeur */}
                     <div className="lg:col-span-4 space-y-8">
                         <Card className="bg-gradient-to-br from-accent/20 via-background to-black border-accent/20 rounded-[3.5rem] p-10 text-center relative overflow-hidden shadow-2xl">
                             <div className="absolute top-0 right-0 p-6 opacity-10 scale-150 rotate-12"><Logo size="xl" /></div>
@@ -186,14 +182,13 @@ function AmbassadorProgramPage() {
                                     <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center shrink-0"><Coins size={24} className="text-orange-400" /></div>
                                     <div>
                                         <p className="font-black text-xs uppercase italic">Bonus Points</p>
-                                        <p className="text-[9px] text-white/40 uppercase font-bold mt-1">+500 PTS par admission</p>
+                                        <p className="text-[9px] text-white/40 uppercase font-bold mt-1">+100 PTS par admission</p>
                                     </div>
                                 </div>
                             </div>
                         </Card>
                     </div>
 
-                    {/* Zone de Partage et Liste des Filleuls */}
                     <div className="lg:col-span-8 space-y-10">
                         <Card className="bg-primary/10 border-primary/20 rounded-[3.5rem] p-10 md:p-14 relative overflow-hidden group shadow-2xl">
                             <div className="absolute -bottom-20 -right-20 w-80 h-80 bg-primary/20 rounded-full blur-[120px]" />
@@ -209,7 +204,7 @@ function AmbassadorProgramPage() {
                                     <div className="flex-1 space-y-2">
                                         <p className="text-[9px] font-black uppercase text-primary tracking-[0.4em] ml-1">Partagez l'écosystème</p>
                                         <div className="p-3 bg-white/5 rounded-xl border border-white/5 overflow-hidden">
-                                            <p className="text-[10px] font-mono text-primary truncate">{typeof window !== 'undefined' ? `${window.location.origin}/register?ref=${referralCode}` : '...'}</p>
+                                            <p className="text-[10px] font-mono text-primary truncate mb-1">{typeof window !== 'undefined' ? `${window.location.origin}/register?ref=${referralCode}` : '...'}</p>
                                         </div>
                                     </div>
                                     <Button onClick={copyToClipboard} className="h-16 px-8 rounded-2xl bg-primary text-white font-black uppercase italic gap-3 shadow-xl shadow-primary/30 hover:scale-105 active:scale-95 transition-all text-sm shrink-0">
@@ -219,7 +214,6 @@ function AmbassadorProgramPage() {
                             </div>
                         </Card>
 
-                        {/* LISTE DES MEMBRES INVITÉS */}
                         <div className="space-y-6">
                             <div className="flex flex-col md:flex-row justify-between items-center gap-4 px-4">
                                 <div className="flex items-center gap-3">
@@ -298,7 +292,7 @@ function AmbassadorProgramPage() {
                 </div>
             </main>
 
-            {/* MODÈLE DE CERTIFICAT CACHÉ */}
+            {/* MODÈLE DE CERTIFICAT PARTENAIRE CACHÉ */}
             <div style={{ position: 'absolute', left: '-9999px', top: 0 }}>
                 <div ref={certRef} className="bg-white text-black p-0 w-[1123px] h-[794px] font-serif relative overflow-hidden flex items-center justify-center">
                     <div className="absolute inset-0 border-[40px] border-double border-[#1e293b]" />
@@ -324,13 +318,13 @@ function AmbassadorProgramPage() {
                         </div>
                         <div className="grid grid-cols-3 items-end pt-12">
                             <div className="text-center space-y-2"><p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Délivré le</p><p className="text-sm font-bold">{new Date().toLocaleDateString('fr-FR')}</p></div>
-                            <div className="flex flex-col items-center gap-4"><div className="p-3 border-2 border-gray-100 rounded-2xl bg-white shadow-xl"><QrCode size={60} className="opacity-20" /></div><p className="text-[8px] font-bold text-gray-300 uppercase tracking-tighter">ID-PARTNER: {user?.uid.substring(0, 10).toUpperCase()}</p></div>
+                            <div className="flex flex-col items-center gap-4"><div className="p-3 border-2 border-gray-100 rounded-2xl bg-white shadow-xl"><QrCode size={60} className="opacity-20" /></div><p className="text-[8px] font-bold text-gray-300 uppercase tracking-tighter">ID-PARTNER: {user?.uid?.substring(0, 10).toUpperCase()}</p></div>
                             <div className="text-center space-y-4"><div className="w-40 h-px bg-gray-200 mx-auto" /><div className="flex flex-col items-center"><p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Direction Générale</p><p className="text-sm font-black italic">Expert Bahati Nyeke</p><ShieldCheck size={24} className="text-yellow-600 mt-2 opacity-30" /></div></div>
                         </div>
                     </div>
                 </div>
             </div>
-        </main>
+        </div>
     );
 }
 
