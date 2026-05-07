@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -25,8 +26,15 @@ export default function CheckoutPage() {
 
     const handlePlaceOrder = async () => {
         if (!user) {
-            toast({ title: "Connexion requise", description: "Veuillez vous connecter pour commander." });
-            router.push('/login');
+            toast({ title: "Connexion requise", description: "Veuillez vous connecter pour valider votre commande." });
+            // Send redirect param so user comes back after login
+            router.push('/login?redirect=/checkout');
+            return;
+        }
+
+        if (cartItems.length === 0) {
+            toast({ title: "Panier vide", description: "Veuillez ajouter des articles avant de payer." });
+            router.push('/#shop');
             return;
         }
 
@@ -52,7 +60,7 @@ export default function CheckoutPage() {
             });
             router.push('/dashboard/orders');
         } catch (error) {
-            toast({ title: "Erreur", variant: "destructive" });
+            toast({ title: "Erreur", description: "Impossible d'enregistrer la commande. Réessayez.", variant: "destructive" });
         } finally {
             setIsProcessing(false);
         }
@@ -67,12 +75,14 @@ export default function CheckoutPage() {
                     <Card className="glossy-card border-none p-8 space-y-6">
                         <CardHeader className="p-0"><CardTitle className="text-sm font-black uppercase italic tracking-widest text-accent">Résumé de commande</CardTitle></CardHeader>
                         <CardContent className="p-0 space-y-4">
-                            {cartItems.map(item => (
+                            {cartItems.length > 0 ? cartItems.map(item => (
                                 <div key={item.id} className="flex justify-between text-sm">
                                     <span className="opacity-60">{item.name} x{item.quantity}</span>
-                                    <span className="font-bold">${(item.price * item.quantity).toFixed(2)}</span>
+                                    <span className="font-bold">${((item.price || 0) * item.quantity).toFixed(2)}</span>
                                 </div>
-                            ))}
+                            )) : (
+                                <p className="text-center opacity-20 italic">Aucun article sélectionné</p>
+                            )}
                             <div className="pt-4 border-t border-white/5 flex justify-between text-2xl font-black">
                                 <span>TOTAL</span>
                                 <span>${totalPrice.toFixed(2)}</span>

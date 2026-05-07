@@ -6,7 +6,7 @@ import { Product } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { db } from '@/lib/firebase';
-import { doc, onSnapshot, setDoc, getDoc } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, getDoc, updateDoc } from 'firebase/firestore';
 
 export interface CartItem extends Product {
   quantity: number;
@@ -29,26 +29,62 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
   const { user } = useAuth();
   const { toast } = useToast();
 
-  // 1. Initial Load: Sync from Firestore (if logged in) or LocalStorage
+  // 1. Initial Load and Sync Logic
   useEffect(() => {
     let unsubscribe: (() => void) | null = null;
 
     if (user) {
       const cartRef = doc(db, 'carts', user.uid);
-      unsubscribe = onSnapshot(cartRef, (docSnap) => {
-        if (docSnap.exists()) {
-          setCartItems(docSnap.data().items || []);
-        } else {
-          // If no cloud cart, check local storage and upload it
-          const localCart = localStorage.getItem('cart_dks');
-          if (localCart) {
-            const parsed = JSON.parse(localCart);
-            setCartItems(parsed);
-            setDoc(cartRef, { items: parsed, updatedAt: new Date().toISOString() });
+      
+      // On connection, we first check if there's a local cart to merge
+      const syncLocalToCloud = async () => {
+        const localCartStr = localStorage.getItem('cart_dks');
+        if (localCartStr) {
+          try {
+            const localItems: CartItem[] = JSON.parse(localCartStr);
+            if (localItems.length > 0) {
+              const cloudSnap = await getDoc(cartRef);
+              let finalItems = localItems;
+              
+              if (cloudSnap.exists()) {
+                const cloudItems: CartItem[] = cloudSnap.data().items || [];
+                // Simple merge logic: combine and unique by ID
+                const merged = [...cloudItems];
+                localItems.forEach(lItem => {
+                  const existing = merged.find(m => m.id === lItem.id);
+                  if (existing) {
+                    existing.quantity += lItem.quantity;
+                  } else {
+                    merged.push(lItem);
+                  }
+                });
+                finalItems = merged;
+              }
+              
+              await setDoc(cartRef, { 
+                items: finalItems, 
+                updatedAt: new Date().toISOString() 
+              }, { merge: true });
+              
+              // Clear local storage after successful merge
+              localStorage.removeItem('cart_dks');
+            }
+          } catch (e) {
+            console.error("Error merging carts", e);
           }
         }
+      };
+
+      syncLocalToCloud().then(() => {
+        unsubscribe = onSnapshot(cartRef, (docSnap) => {
+          if (docSnap.exists()) {
+            setCartItems(docSnap.data().items || []);
+          }
+        });
       });
+
     } else {
+      // Not logged in: use local storage
       const savedCart = localStorage.getItem('cart_dks');
       if (savedCart) {
         try {
@@ -64,7 +100,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
     };
   }, [user]);
 
-  // 2. Persist changes to Cloud or LocalStorage
+  // 2. Persist changes
   const persistCart = async (items: CartItem[]) => {
     if (user) {
       const cartRef = doc(db, 'carts', user.uid);
@@ -86,7 +122,6 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
       let newItems;
       
       if (existingItem) {
-        // Check stock limit if info is available
         if (product.stockQuantity && existingItem.quantity >= product.stockQuantity) {
           toast({ 
             title: "Stock Limité", 

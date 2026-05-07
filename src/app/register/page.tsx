@@ -1,7 +1,8 @@
+
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,6 +21,7 @@ export default function RegisterPage() {
   const [referralCode, setReferralCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
 
   const { auth, firestore } = initializeFirebase();
@@ -66,14 +68,12 @@ export default function RegisterPage() {
           referrerId = referrerDoc.id;
           referrerName = referrerDoc.data().name || referrerDoc.data().displayName;
 
-          // Créditer le parrain
           await updateDoc(doc(firestore, 'users', referrerId), {
             referralCount: increment(1),
-            points: increment(100), // Bonus de bienvenue pour le parrain
+            points: increment(100), 
             updatedAt: serverTimestamp()
           });
 
-          // Notifier le parrain
           await addDoc(collection(firestore, 'notifications'), {
             userId: referrerId,
             title: "Nouveau Parrainage !",
@@ -86,7 +86,7 @@ export default function RegisterPage() {
         }
       }
 
-      // 3. Création du document utilisateur avec son propre code de parrainage
+      // 3. Création du document utilisateur 
       const myReferralCode = `DKS-${name.substring(0, 3).toUpperCase()}-${firebaseUser.uid.substring(0, 4).toUpperCase()}`;
 
       await setDoc(doc(firestore, 'users', firebaseUser.uid), {
@@ -112,10 +112,15 @@ export default function RegisterPage() {
         title: 'Bienvenue chez DKS !',
         description: referrerName 
           ? `Compte créé. Merci à ${referrerName} de vous avoir parrainé !` 
-          : 'Votre compte a été créé avec succès. Bon shopping !',
+          : 'Votre compte a été créé avec succès.',
       });
 
-      router.push('/dashboard');
+      const redirect = searchParams.get('redirect');
+      if (redirect) {
+        router.push(redirect);
+      } else {
+        router.push('/dashboard');
+      }
     } catch (error: any) {
       console.error(error);
       let message = "Une erreur est survenue lors de l'inscription.";
@@ -134,7 +139,6 @@ export default function RegisterPage() {
 
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-background relative p-4 overflow-hidden">
-      {/* Background Decorative Effects */}
       <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-primary/5 rounded-full blur-[140px] -z-10 animate-pulse" />
       <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-accent/5 rounded-full blur-[140px] -z-10 animate-pulse delay-1000" />
 
@@ -230,7 +234,7 @@ export default function RegisterPage() {
         <div className="text-center">
           <p className="text-xs text-muted-foreground font-bold uppercase tracking-[0.2em] opacity-40">
             Déjà inscrit ?{" "}
-            <Link href="/login" className="text-accent hover:underline ml-2 opacity-100">
+            <Link href={searchParams.get('redirect') ? `/login?redirect=${searchParams.get('redirect')}` : "/login"} className="text-accent hover:underline ml-2 opacity-100">
               Se connecter
             </Link>
           </p>

@@ -2,7 +2,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,6 +28,7 @@ export default function LoginPage() {
   const [isSocialLoading, setIsSocialLoading] = useState<string | null>(null);
   const [isSettingUp, setIsSettingUp] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
 
   const { auth, firestore } = initializeFirebase();
@@ -47,7 +48,14 @@ export default function LoginPage() {
     try {
       await signInWithEmailAndPassword(auth, email, password);
       toast({ title: 'Connexion réussie', description: 'Ravi de vous revoir !' });
-      router.push('/dashboard');
+      
+      // Smart Redirect: check for redirect param
+      const redirect = searchParams.get('redirect');
+      if (redirect) {
+        router.push(redirect);
+      } else {
+        router.push('/dashboard');
+      }
     } catch (error: any) {
       console.error(error);
       toast({
@@ -89,7 +97,13 @@ export default function LoginPage() {
         title: 'Connexion réussie', 
         description: `Bienvenue, ${firebaseUser.displayName || 'cher client'} !` 
       });
-      router.push('/dashboard');
+
+      const redirect = searchParams.get('redirect');
+      if (redirect) {
+        router.push(redirect);
+      } else {
+        router.push('/dashboard');
+      }
     } catch (error: any) {
       console.error(error);
       toast({
@@ -133,7 +147,7 @@ export default function LoginPage() {
             lastName: testUser.name.split(' ')[1] || 'DKS',
             displayName: testUser.name,
             name: testUser.name,
-            role: testUser.role, // lowercase for consistency
+            role: testUser.role, 
             updatedAt: serverTimestamp(),
           }, { merge: true });
         }
@@ -258,7 +272,7 @@ export default function LoginPage() {
             <div className="text-center">
               <p className="text-xs text-muted-foreground font-bold uppercase tracking-[0.2em] opacity-40">
                 Pas encore membre ?{" "}
-                <Link href="/register" className="text-accent hover:underline ml-2 opacity-100">
+                <Link href={searchParams.get('redirect') ? `/register?redirect=${searchParams.get('redirect')}` : "/register"} className="text-accent hover:underline ml-2 opacity-100">
                   Créer un compte
                 </Link>
               </p>
