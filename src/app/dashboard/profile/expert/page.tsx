@@ -47,187 +47,23 @@ import { useAuth } from "@/context/AuthContext";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
-import { 
-    Radar, 
-    RadarChart, 
-    PolarGrid, 
-    PolarAngleAxis, 
-    PolarRadiusAxis, 
-    ResponsiveContainer 
-} from 'recharts';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import { Logo } from '@/components/ui/Logo';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from "@/components/ui/input";
 
-const POINTS_PER_TOKEN = 100;
-
 function ExpertProfilePage() {
     const { user } = useAuth();
     const { toast } = useToast();
     const [isGenerating, setIsGenerating] = useState(false);
-    const [isMinting, setIsMinting] = useState(false);
-    const [isSyncing, setIsSyncing] = useState(false);
-    const [tempPiAddress, setTempPiAddress] = useState("");
     const reportRef = useRef<HTMLDivElement>(null);
 
-    // Fetch User Logs
     const logsQuery = useMemoFirebase(() => {
         if (!user?.uid) return null;
         return query(collection(db, "technicianLogs"), where("userId", "==", user.uid), orderBy("createdAt", "desc"));
     }, [user?.uid]);
-    const { data: logs, isLoading: loadingLogs } = useCollection(logsQuery);
-
-    // Fetch User Academy sessions
-    const academyQuery = useMemoFirebase(() => {
-        if (!user?.uid) return null;
-        return query(collection(db, "serviceBookings"), where("userId", "==", user.uid), where("status", "==", "completed"));
-    }, [user?.uid]);
-    const { data: academySessions, isLoading: loadingAcademy } = useCollection(academyQuery);
-
-    // Fetch SAV tickets
-    const savQuery = useMemoFirebase(() => {
-        return query(collection(db, "supportTickets"), where("status", "==", "completed"));
-    }, []);
-    const { data: savTickets, isLoading: loadingSAV } = useCollection(savQuery);
-
-    // Fetch Sales
-    const salesQuery = useMemoFirebase(() => {
-        if (!user?.uid) return null;
-        return query(collection(db, "sales"), where("userId", "==", user.uid));
-    }, [user?.uid]);
-    const { data: sales, isLoading: loadingSales } = useCollection(salesQuery);
-
-    // Fetch Token Transactions
-    const txQuery = useMemoFirebase(() => {
-        if (!user?.uid) return null;
-        return query(collection(db, "tokenTransactions"), where("userId", "==", user.uid), orderBy("createdAt", "desc"), limit(10));
-    }, [user?.uid]);
-    const { data: transactions } = useCollection(txQuery);
-
-    const careerStats = useMemo(() => {
-        if (!user || !logs) return null;
-
-        const myLogs = logs || [];
-        const myAcademy = academySessions || [];
-        const mySAVCount = savTickets?.filter(t => t.technicianId === user.uid).length || 0;
-        const mySales = sales || [];
-        const myTotalSalesAmount = mySales.reduce((acc, s) => acc + (s.totalAmount || 0), 0);
-
-        let totalPoints = myLogs.length * 10;
-        totalPoints += myAcademy.length * 50;
-        totalPoints += mySAVCount * 30;
-        mySales.forEach(sale => {
-            if (sale.totalAmount >= 1000) totalPoints += 100;
-            else if (sale.totalAmount >= 500) totalPoints += 50;
-            else totalPoints += 20;
-        });
-
-        const stats = {
-            logs: myLogs.length,
-            academy: myAcademy.length,
-            sav: mySAVCount,
-            sales: mySales.length,
-            totalSalesAmount: myTotalSalesAmount,
-            totalPoints,
-            totalActions: myLogs.length + myAcademy.length + mySAVCount + mySales.length
-        };
-
-        const badges = [];
-        
-        // 1. Career Badges
-        if (stats.totalActions >= 100) badges.push({ id: 'legend', label: 'Légende DKS', icon: <Crown size={14} />, color: 'bg-yellow-500/20 text-yellow-500', desc: "Pilier historique de l'écosystème." });
-        else if (stats.totalActions >= 50) badges.push({ id: 'expert', label: 'Expert Senior', icon: <ShieldCheck size={14} />, color: 'bg-accent/20 text-accent', desc: "Compétences techniques validées." });
-        
-        // 2. Achievements (Gamified)
-        if (myAcademy.some(s => s.serviceId === 'ia-mastery')) {
-            badges.push({ id: 'ai_architect', label: 'AI Architect', icon: <Sparkles size={14} />, color: 'bg-purple-500/20 text-purple-400', desc: "Maîtrise de l'IA générative." });
-        }
-        if (myAcademy.some(s => s.serviceId === 'network-pro')) {
-            badges.push({ id: 'starlink_pioneer', label: 'Starlink Pioneer', icon: <Globe size={14} />, color: 'bg-blue-500/20 text-blue-400', desc: "Expert en connectivité spatiale." });
-        }
-        if (user.tokenBalance && user.tokenBalance > 100) {
-            badges.push({ id: 'whale', label: 'Whale Investor', icon: <Coins size={14} />, color: 'bg-yellow-400/20 text-yellow-400', desc: "Détenteur majeur de DKST." });
-        }
-        if (user.miningPower && user.miningPower > 5) {
-            badges.push({ id: 'master_miner', label: 'Master Miner', icon: <Flame size={14} />, color: 'bg-orange-500/20 text-orange-400', desc: "Puissance d'extraction élevée." });
-        }
-
-        const radarData = [
-            { subject: 'SAV', A: Math.min(100, stats.sav * 10), fullMark: 100 },
-            { subject: 'Academy', A: Math.min(100, stats.academy * 20), fullMark: 100 },
-            { subject: 'Documentation', A: Math.min(100, stats.logs * 2), fullMark: 100 },
-            { subject: 'Commercial', A: Math.min(100, stats.sales * 5), fullMark: 100 },
-            { subject: 'Qualité', A: 95, fullMark: 100 },
-        ];
-
-        return { stats, badges, radarData };
-    }, [user, logs, academySessions, savTickets, sales]);
-
-    const handleSavePiWallet = async () => {
-        if (!user || !tempPiAddress) return;
-        setIsSyncing(true);
-        try {
-            await updateDoc(doc(db, "users", user.uid), {
-                piWalletAddress: tempPiAddress,
-                updatedAt: serverTimestamp()
-            });
-            toast({ title: "Wallet Pi Associé", description: "Votre identité blockchain est liée à votre profil Expert." });
-            setTempPiAddress("");
-        } catch (error) {
-            toast({ title: "Erreur", variant: "destructive" });
-        } finally {
-            setIsSyncing(false);
-        }
-    };
-
-    const mintTokens = async () => {
-        if (!user || !careerStats) return;
-        const availablePoints = careerStats.stats.totalPoints - (user.pointsConverted || 0);
-        
-        if (availablePoints < POINTS_PER_TOKEN) {
-            toast({ 
-                title: "Points insuffisants", 
-                description: `Il vous faut au moins ${POINTS_PER_TOKEN} points pour frapper 1 DKST.`,
-                variant: "destructive"
-            });
-            return;
-        }
-
-        const tokensToMint = Math.floor(availablePoints / POINTS_PER_TOKEN);
-        const pointsToConvert = tokensToMint * POINTS_PER_TOKEN;
-
-        setIsMinting(true);
-        try {
-            const simulatedPiTxId = `PI-TX-${Math.random().toString(36).substring(2, 15).toUpperCase()}`;
-
-            const userRef = doc(db, "users", user.uid);
-            await updateDoc(userRef, {
-                tokenBalance: increment(tokensToMint),
-                pointsConverted: increment(pointsToConvert),
-                updatedAt: serverTimestamp()
-            });
-
-            await addDoc(collection(db, "tokenTransactions"), {
-                userId: user.uid,
-                type: 'mint',
-                pointsAmount: pointsToConvert,
-                tokenAmount: tokensToMint,
-                piTxId: simulatedPiTxId,
-                createdAt: serverTimestamp()
-            });
-
-            toast({ 
-                title: "Points Blockchain-Verified !", 
-                description: `Vous avez généré ${tokensToMint} DKST. Transaction enregistrée sur le simulateur Pi.` 
-            });
-        } catch (error) {
-            toast({ title: "Erreur de frappe", variant: "destructive" });
-        } finally {
-            setIsMinting(false);
-        }
-    };
+    const { data: logs } = useCollection(logsQuery);
 
     const handleExportReport = async () => {
         if (!reportRef.current) return;
@@ -238,7 +74,7 @@ function ExpertProfilePage() {
             const pdf = new jsPDF({ orientation: 'portrait', unit: 'px', format: [canvas.width / 2, canvas.height / 2] });
             pdf.addImage(imgData, 'PNG', 0, 0, canvas.width / 2, canvas.height / 2);
             pdf.save(`BILAN_EXPERT_DKS_${user?.name?.replace(/\s+/g, '_')}.pdf`);
-            toast({ title: "Bilan exporté", description: "Le document de performance est prêt." });
+            toast({ title: "Bilan exporté" });
         } catch (error) {
             toast({ title: "Erreur PDF", variant: "destructive" });
         } finally {
@@ -246,332 +82,59 @@ function ExpertProfilePage() {
         }
     };
 
-    if (loadingLogs || loadingAcademy || loadingSAV || loadingSales) {
-        return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin text-accent" /></div>;
-    }
-
-    const redeemableTokens = Math.floor(((careerStats?.stats.totalPoints || 0) - (user?.pointsConverted || 0)) / POINTS_PER_TOKEN);
-
     return (
         <div className="min-h-screen bg-background text-foreground pb-20">
             <Navbar />
             <main className="max-w-7xl mx-auto px-4 py-12">
-                <div className="flex flex-col md:flex-row justify-between items-start gap-8 mb-12">
-                    <div className="flex items-start gap-5">
-                        <Link href="/dashboard">
-                            <Button variant="outline" className="h-14 w-14 rounded-2xl border-white/10 hover:bg-accent/10 hover:text-accent p-0 transition-all">
-                                <ArrowLeft size={24} />
-                            </Button>
-                        </Link>
-                        <div>
-                            <h1 className="text-4xl font-black uppercase italic tracking-tighter">Profil <span className="text-accent">Expert Élite</span></h1>
-                            <p className="text-muted-foreground text-xs uppercase font-black opacity-40 mt-1">Traçabilité & Historique Blockchain Technologique</p>
-                        </div>
-                    </div>
-
-                    <div className="flex gap-3">
-                        <Button 
-                            onClick={handleExportReport} 
-                            disabled={isGenerating}
-                            variant="outline"
-                            className="border-white/10 h-14 px-8 rounded-2xl font-black uppercase italic gap-3 hover:bg-white/5 transition-all"
-                        >
-                            {isGenerating ? <Loader2 className="animate-spin" /> : <><FileDown size={20} /> Bilan PDF</>}
-                        </Button>
-                    </div>
-                </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                    {/* Colonne Gauche: Identité & Wallet */}
-                    <div className="lg:col-span-4 space-y-8">
-                        <Card className="glossy-card border-none rounded-[3rem] p-10 text-center relative overflow-hidden">
-                            <div className="absolute top-0 right-0 p-8 opacity-5"><Cpu size={120} /></div>
-                            <div className="relative z-10">
-                                <div className="w-32 h-32 rounded-[2.5rem] bg-accent/20 flex items-center justify-center mx-auto mb-8 text-accent shadow-[0_0_40px_rgba(56,189,248,0.2)]">
-                                    <UserIcon size={64} />
-                                </div>
-                                <Badge className="bg-accent text-black font-black uppercase italic px-4 py-1 mb-4 text-[10px] tracking-widest">
-                                    {user?.role?.toUpperCase()} CERTIFIÉ
-                                </Badge>
-                                <h3 className="text-3xl font-black uppercase italic tracking-tight">{user?.name}</h3>
-                                <p className="text-xs text-muted-foreground font-bold uppercase mt-2 opacity-60">ID EXPERT: DKS-{user?.uid.substring(0, 8).toUpperCase()}</p>
-                                
-                                <div className="mt-10 pt-10 border-t border-white/5 grid grid-cols-2 gap-y-8">
-                                    <div className="text-center">
-                                        <p className="text-2xl font-black text-white">{careerStats?.stats.sav}</p>
-                                        <p className="text-[8px] font-black uppercase opacity-40">Tickets SAV</p>
-                                    </div>
-                                    <div className="text-center">
-                                        <p className="text-2xl font-black text-primary">{careerStats?.stats.academy}</p>
-                                        <p className="text-[8px] font-black uppercase opacity-40">Cours Academy</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </Card>
-
-                        {/* PI BLOCKCHAIN WALLET SECTION */}
-                        <Card className="bg-accent/10 border-accent/20 rounded-[3rem] p-10 space-y-8 relative overflow-hidden group">
-                            <div className="absolute top-0 right-0 p-6 opacity-10"><Globe size={80} className="text-accent animate-spin-slow" /></div>
-                            <div className="relative z-10 space-y-6">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 rounded-xl bg-accent text-black flex items-center justify-center shadow-lg"><Coins size={20}/></div>
-                                        <h4 className="text-lg font-black uppercase italic tracking-tight">DKS Token Wallet</h4>
-                                    </div>
-                                    {user?.piWalletAddress && <Badge className="bg-green-500 text-white border-none uppercase text-[8px] font-black">Linked to Pi</Badge>}
-                                </div>
-
-                                <div className="space-y-1">
-                                    <p className="text-[10px] font-black uppercase text-accent/60 tracking-widest">Solde Actuel</p>
-                                    <p className="text-5xl font-black text-white italic">{user?.tokenBalance?.toFixed(2) || 0} <span className="text-sm font-light opacity-40 not-italic">DKST</span></p>
-                                </div>
-
-                                {!user?.piWalletAddress ? (
-                                    <div className="p-6 bg-black/40 rounded-2xl border border-dashed border-accent/20 space-y-4">
-                                        <p className="text-[9px] font-bold text-accent uppercase text-center">Associer mon adresse Pi Blockchain</p>
-                                        <div className="flex gap-2">
-                                            <Input 
-                                                value={tempPiAddress} 
-                                                onChange={(e) => setTempPiAddress(e.target.value)}
-                                                placeholder="G..." 
-                                                className="bg-background/50 border-white/5 h-10 text-[10px] font-mono" 
-                                            />
-                                            <Button onClick={handleSavePiWallet} disabled={isSyncing} className="h-10 bg-accent text-black px-4 rounded-lg">
-                                                {isSyncing ? <Loader2 className="animate-spin w-4 h-4" /> : <CheckCircle2 size={16} />}
-                                            </Button>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="p-4 bg-accent/5 rounded-2xl border border-accent/20 flex items-center justify-between">
-                                        <div className="flex items-center gap-3">
-                                            <Lock size={14} className="text-accent opacity-40" />
-                                            <p className="text-[9px] font-mono text-white/40 truncate max-w-[150px]">{user.piWalletAddress}</p>
-                                        </div>
-                                        <button className="text-[8px] font-black uppercase text-accent hover:underline">Modifier</button>
-                                    </div>
-                                )}
-
-                                <div className="p-6 bg-black/40 rounded-2xl border border-white/5 space-y-4">
-                                    <div className="flex justify-between items-end">
-                                        <p className="text-[8px] font-black uppercase opacity-40">Points convertibles</p>
-                                        <span className="text-xs font-bold text-accent">{(careerStats?.stats.totalPoints || 0) - (user?.pointsConverted || 0)} / {POINTS_PER_TOKEN}</span>
-                                    </div>
-                                    <Progress value={Math.min(100, (((careerStats?.stats.totalPoints || 0) - (user?.pointsConverted || 0)) / POINTS_PER_TOKEN) * 100)} className="h-1.5 bg-white/5" indicatorClassName="bg-accent" />
-                                    
-                                    <Button 
-                                        onClick={mintTokens} 
-                                        disabled={isMinting || redeemableTokens < 1}
-                                        className="w-full h-12 bg-accent text-black font-black uppercase italic text-[10px] rounded-xl gap-2 shadow-xl shadow-accent/10 mt-2"
-                                    >
-                                        {isMinting ? <Loader2 className="animate-spin h-4 w-4" /> : <><RefreshCw size={14} /> Frapper sur Blockchain (Mint)</>}
-                                    </Button>
-                                </div>
-                            </div>
-                        </Card>
-
-                        <Card className="glossy-card border-none rounded-[2.5rem] p-10 space-y-6">
-                            <h4 className="text-[10px] font-black uppercase tracking-widest opacity-40 italic flex items-center gap-2">
-                                <Medal size={14} className="text-accent" /> Mur des Distinctions
-                            </h4>
-                            <div className="grid grid-cols-1 gap-3">
-                                {careerStats?.badges.map((b, i) => (
-                                    <div key={i} className={cn("p-4 rounded-2xl flex items-center gap-4 border transition-all hover:scale-[1.02] shadow-lg", b.color, "border-white/5")}>
-                                        <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center shrink-0">
-                                            {b.icon}
-                                        </div>
-                                        <div>
-                                            <p className="text-[10px] font-black uppercase italic leading-none">{b.label}</p>
-                                            <p className="text-[8px] font-bold uppercase opacity-60 mt-1 tracking-widest">{b.desc}</p>
-                                        </div>
-                                    </div>
-                                ))}
-                                {careerStats?.badges.length === 0 && (
-                                    <p className="text-[9px] text-center opacity-30 italic py-4">Relevez des défis pour débloquer vos badges.</p>
-                                )}
-                            </div>
-                        </Card>
-                    </div>
-
-                    {/* Colonne Droite: Graphique & Timeline */}
-                    <div className="lg:col-span-8 space-y-8">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                            <Card className="glossy-card border-none rounded-[3rem] p-8 flex flex-col items-center">
-                                <h4 className="text-[10px] font-black uppercase tracking-widest opacity-40 mb-6 w-full text-left">Matrice d'Expertise</h4>
-                                <div className="h-[250px] w-full">
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <RadarChart cx="50%" cy="50%" outerRadius="80%" data={careerStats?.radarData}>
-                                            <PolarGrid stroke="#ffffff10" />
-                                            <PolarAngleAxis dataKey="subject" tick={{ fill: '#94a3b8', fontSize: 10 }} />
-                                            <Radar
-                                                name="Expertise"
-                                                dataKey="A"
-                                                stroke="hsl(var(--accent))"
-                                                fill="hsl(var(--accent))"
-                                                fillOpacity={0.2}
-                                            />
-                                        </RadarChart>
-                                    </ResponsiveContainer>
-                                </div>
-                            </Card>
-
-                            <div className="space-y-6">
-                                <Card className="bg-accent/5 border border-accent/20 rounded-[2.5rem] p-8 space-y-4">
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-12 h-12 rounded-2xl bg-accent text-black flex items-center justify-center"><Target size={24} /></div>
-                                        <div>
-                                            <p className="text-[8px] font-black uppercase opacity-40">Volume Commercial</p>
-                                            <p className="text-sm font-black uppercase italic">Ventes Elite: {careerStats?.stats.totalSalesAmount.toLocaleString()}$</p>
-                                        </div>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <div className="flex justify-between text-[8px] font-black uppercase">
-                                            <span>Progression Closer</span>
-                                            <span>{careerStats?.stats.sales} / 20 ventes</span>
-                                        </div>
-                                        <Progress value={(careerStats?.stats.sales || 0) / 20 * 100} className="h-2 bg-white/5" indicatorClassName="bg-accent" />
-                                    </div>
-                                </Card>
-
-                                <Card className="bg-primary/5 border border-primary/20 rounded-[2.5rem] p-8 space-y-4">
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-12 h-12 rounded-2xl bg-primary text-white flex items-center justify-center"><Zap size={24} /></div>
-                                        <div>
-                                            <p className="text-[8px] font-black uppercase opacity-40">Pôle Technique</p>
-                                            <p className="text-sm font-black uppercase italic">Expert Infrastructure & SAV</p>
-                                        </div>
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <Badge variant="outline" className="text-[8px] font-black uppercase border-primary/20 text-primary">Réseaux</Badge>
-                                        <Badge variant="outline" className="text-[8px] font-black uppercase border-primary/20 text-primary">Hardware 8K</Badge>
-                                    </div>
-                                </Card>
-                            </div>
-                        </div>
-
-                        {/* BLOCKCHAIN LEDGER PREVIEW */}
-                        <Card className="glossy-card border-none rounded-[3rem] overflow-hidden">
-                            <CardHeader className="p-10 border-b border-white/5 bg-accent/5">
-                                <div className="flex justify-between items-center">
-                                    <CardTitle className="text-xl font-black uppercase italic flex items-center gap-4">
-                                        <Globe className="text-accent" /> Registre Blockchain Pi
-                                    </CardTitle>
-                                    <Badge variant="outline" className="border-accent/20 text-accent text-[8px] font-black uppercase">Simulated Mainnet</Badge>
-                                </div>
-                            </CardHeader>
-                            <div className="divide-y divide-white/5">
-                                {transactions && transactions.length > 0 ? transactions.map((tx) => (
-                                    <div key={tx.id} className="p-6 flex items-center justify-between hover:bg-white/[0.02] transition-colors">
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-accent">
-                                                <RefreshCw size={18} />
-                                            </div>
-                                            <div>
-                                                <p className="text-sm font-bold uppercase italic">Minting {tx.tokenAmount} DKST</p>
-                                                <div className="flex items-center gap-2 mt-1">
-                                                    <Lock size={10} className="text-green-500" />
-                                                    <p className="text-[8px] font-mono text-muted-foreground truncate max-w-[200px]">{tx.piTxId || "Hachage en attente..."}</p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div className="text-right">
-                                            <p className="text-[10px] font-black text-accent uppercase">Confirmed</p>
-                                            <p className="text-[8px] font-bold opacity-30 uppercase">{tx.createdAt?.toDate ? tx.createdAt.toDate().toLocaleString() : 'Récemment'}</p>
-                                        </div>
-                                    </div>
-                                )) : (
-                                    <div className="p-20 text-center opacity-20 italic text-xs uppercase font-black tracking-widest">Aucune transaction blockchain enregistrée.</div>
-                                )}
-                            </div>
-                        </Card>
-                    </div>
+                <div className="flex justify-between items-center mb-12">
+                    <h1 className="text-4xl font-black uppercase italic tracking-tighter">Profil <span className="text-accent">Expert</span></h1>
+                    <Button onClick={handleExportReport} disabled={isGenerating} variant="outline">
+                        {isGenerating ? <Loader2 className="animate-spin" /> : "Exporter Rapport"}
+                    </Button>
                 </div>
             </main>
 
-            {/* HIDDEN PERFORMANCE REPORT FOR PDF GENERATION */}
+            {/* HIDDEN REPORT TEMPLATE */}
             <div style={{ position: 'absolute', left: '-9999px', top: 0 }}>
-                {user && careerStats && (
+                {user && (
                     <div ref={reportRef} className="bg-white text-black p-16 w-[800px] font-sans">
                         <header className="flex justify-between items-start border-b-4 border-black pb-10 mb-12">
-                            <div className="space-y-4">
-                                <div className="bg-black text-white px-6 py-2 inline-block font-black text-3xl italic tracking-tighter">DKS ELITE HUB</div>
-                                <div className="text-sm font-bold uppercase tracking-widest text-gray-500">Direction des Ressources Techniques</div>
-                                <div className="text-[11px] leading-relaxed mt-4 font-medium">
-                                    <p>Immeuble Bahati, Bunia, RDC</p>
-                                    <p>Évaluation de Performance Individuelle</p>
-                                    <p>Document Confidentiel • ISO-DKS 2024</p>
-                                </div>
-                            </div>
+                            <Logo size="lg" />
                             <div className="text-right">
-                                <h2 className="text-5xl font-black uppercase italic tracking-tighter mb-2 leading-none">RAPPORT<br/>EXPERT</h2>
-                                <p className="text-xs font-bold text-gray-400 uppercase tracking-[0.2em]">Période: {new Date().toLocaleString('fr-FR', { month: 'long', year: 'numeric' }).toUpperCase()}</p>
-                                <div className="mt-8">
-                                    <p className="text-[10px] font-black uppercase text-gray-400">Date de génération</p>
-                                    <p className="text-lg font-bold">{new Date().toLocaleDateString('fr-FR')}</p>
-                                </div>
+                                <h2 className="text-5xl font-black uppercase italic tracking-tighter mb-2">RAPPORT EXPERT</h2>
+                                <p className="text-lg font-bold">{user.name}</p>
                             </div>
                         </header>
 
-                        <div className="grid grid-cols-2 gap-10 mb-12">
-                            <div className="p-8 bg-gray-50 rounded-[2rem] border border-gray-100 flex flex-col justify-center">
-                                <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-4">Identification de l'Expert</p>
-                                <h3 className="text-3xl font-black uppercase italic leading-none mb-2">{user.name}</h3>
-                                <p className="text-sm font-bold text-blue-600 uppercase tracking-widest">{user.role} Certifié DKS</p>
-                                <p className="text-[9px] font-mono text-gray-400 mt-4 uppercase">ID: DKS-EXP-{user.uid.substring(0, 10).toUpperCase()}</p>
-                            </div>
-                            <div className="p-8 bg-gray-50 rounded-[2rem] border border-gray-100 space-y-6">
-                                <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Prestige & Titres</p>
-                                <div className="flex flex-wrap gap-2">
-                                    {careerStats.badges.map((b, i) => (
-                                        <div key={i} className="px-3 py-1 bg-white border border-gray-200 rounded-lg text-[9px] font-black uppercase italic">{b.label}</div>
-                                    ))}
-                                    {careerStats.badges.length === 0 && <p className="text-xs italic text-gray-400">En cours d'acquisition...</p>}
-                                </div>
-                            </div>
+                        <div className="py-20 flex flex-col items-center justify-center text-center space-y-10">
+                            <p className="text-xl italic text-gray-400">Attestation de performance certifiée</p>
+                            <QrCode size={100} className="opacity-100 text-black" />
                         </div>
 
-                        <div className="grid grid-cols-4 gap-4 mb-12">
-                            {[
-                                { l: "Tickets SAV", v: careerStats.stats.sav, c: "text-blue-600" },
-                                { l: "Academy", v: careerStats.stats.academy, c: "text-purple-600" },
-                                { l: "Points Prestige", v: careerStats.stats.totalPoints, c: "text-orange-600" },
-                                { l: "Ventes (Qty)", v: careerStats.stats.sales, c: "text-green-600" }
-                            ].map((stat, i) => (
-                                <div key={i} className="p-6 text-center border-2 border-gray-50 rounded-2xl">
-                                    <p className="text-[8px] font-black uppercase text-gray-400 tracking-widest mb-1">{stat.l}</p>
-                                    <p className={cn("text-3xl font-black italic", stat.c)}>{stat.v}</p>
+                        <footer className="mt-32 pt-10 border-t border-gray-100 flex justify-between items-end">
+                            <div className="text-right space-y-4 relative">
+                                <div className="absolute top-[-100px] right-0 flex flex-col items-center">
+                                    {/* CACHET SÉCURITÉ MIDNIGHT BLUE */}
+                                    <div className="w-28 h-28 rounded-full border-[3px] border-double border-blue-900 flex flex-col items-center justify-center p-1 rotate-[-5deg] opacity-95 relative">
+                                        <div className="absolute inset-0 border border-blue-900/20 rounded-full scale-[0.95]" />
+                                        <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full opacity-30">
+                                            <path id="expertCirclePath" d="M 50, 50 m -37, 0 a 37,37 0 1,1 74,0 a 37,37 0 1,1 -74,0" fill="transparent" />
+                                            <text className="text-[3px] font-black fill-blue-900 uppercase">
+                                                <textPath xlinkHref="#expertCirclePath">
+                                                    CERTIFIED BY DOUBLE KING SHOP • ORIGINAL DOCUMENT • CERTIFIED BY DOUBLE KING SHOP • 
+                                                </textPath>
+                                            </text>
+                                        </svg>
+                                        <p className="text-[5px] font-black text-blue-900 uppercase leading-none">DKS EXPERT CERT</p>
+                                        <ShieldCheck size={18} className="text-blue-900 my-0.5" />
+                                        <p className="text-[4px] font-bold text-blue-900 uppercase">OFFICIAL SEAL</p>
+                                        <p className="text-[6px] font-black text-blue-900 uppercase tracking-widest mt-0.5">BUNIA</p>
+                                    </div>
+                                    <div className="w-32 h-8 text-blue-950 mt-[-20px] rotate-[3deg]">
+                                        <svg viewBox="0 0 200 60" className="w-full h-full"><path d="M20,40 Q50,10 80,40 T140,30 Q160,20 180,45" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" /></svg>
+                                    </div>
                                 </div>
-                            ))}
-                        </div>
-
-                        <section className="mb-12">
-                            <h3 className="text-sm font-black uppercase italic border-b-2 border-black pb-2 mb-6 flex items-center gap-2">
-                                <Zap size={16} /> Synthèse des Compétences
-                            </h3>
-                            <div className="bg-gray-50 p-10 rounded-[3rem] border border-gray-100 flex flex-col items-center">
-                                <div className="w-full h-40 grid grid-cols-5 gap-4">
-                                    {careerStats.radarData.map((d, i) => (
-                                        <div key={i} className="flex flex-col items-center gap-4">
-                                            <div className="flex-1 w-full bg-gray-200 rounded-full relative overflow-hidden flex items-end">
-                                                <div className="w-full bg-black" style={{ height: `${d.A}%` }} />
-                                            </div>
-                                            <p className="text-[8px] font-black uppercase text-gray-400">{d.subject}</p>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        </section>
-
-                        <footer className="mt-20 pt-10 border-t border-gray-100 flex justify-between items-end">
-                            <div className="flex items-center gap-6">
-                                <QrCode size={60} className="opacity-10" />
-                                <p className="text-[8px] font-bold text-gray-400 uppercase leading-relaxed max-w-[250px]">
-                                    Ce document fait foi de l'historique de carrière de l'agent au sein du Double King Hub. <br />
-                                    Certification de compétence technique certifiée DKS-HR-2024.
-                                </p>
-                            </div>
-                            <div className="text-right space-y-4">
-                                <div className="h-16 w-32 border-2 border-gray-100 rounded-lg flex items-center justify-center italic text-gray-200 text-[8px] uppercase font-black">Visa Direction Technique</div>
-                                <p className="text-[8px] font-bold text-gray-300 uppercase tracking-widest">Solutions RH Expert v3.0</p>
+                                <p className="text-[8px] font-bold text-gray-300 uppercase tracking-widest">Visa Direction Technique Hub</p>
                             </div>
                         </footer>
                     </div>

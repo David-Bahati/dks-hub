@@ -33,7 +33,8 @@ import {
     Send,
     UsersRound,
     FileText,
-    Trophy
+    Trophy,
+    Lock
 } from "lucide-react";
 import { db } from '@/lib/firebase';
 import { collection, query, orderBy, updateDoc, doc, addDoc, serverTimestamp, onSnapshot, where } from 'firebase/firestore';
@@ -258,24 +259,6 @@ function ServiceManagementPage() {
                             <p className="text-muted-foreground font-light mt-1">Gestion des admissions et déploiements techniques DKS.</p>
                         </div>
                     </div>
-                    {!isStaff && <Link href="/services"><Button className="bg-primary hover:bg-primary/90 h-14 px-8 rounded-2xl font-black uppercase italic gap-3 shadow-xl"><Plus size={20} /> Nouvelle admission</Button></Link>}
-                </div>
-
-                <div className="flex flex-col md:flex-row gap-4 mb-10">
-                    <div className="relative flex-1">
-                        <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-muted-foreground" size={20} />
-                        <Input placeholder="Rechercher un étudiant ou un projet..." className="h-16 pl-14 bg-white/5 border-white/10 rounded-2xl focus:border-accent" value={search} onChange={(e) => setSearch(e.target.value)} />
-                    </div>
-                    <Select value={statusFilter} onValueChange={setStatusFilter}>
-                        <SelectTrigger className="h-16 w-full md:w-[200px] bg-white/5 border-white/10 rounded-2xl font-black uppercase italic text-[10px]"><Filter className="mr-2 h-4 w-4" /><SelectValue placeholder="Filtrer" /></SelectTrigger>
-                        <SelectContent className="bg-card border-white/10">
-                            <SelectItem value="all">Tout voir</SelectItem>
-                            <SelectItem value="pending">Candidatures</SelectItem>
-                            <SelectItem value="confirmed">Confirmés</SelectItem>
-                            <SelectItem value="in_progress">En cours</SelectItem>
-                            <SelectItem value="completed">Terminés</SelectItem>
-                        </SelectContent>
-                    </Select>
                 </div>
 
                 <div className="grid grid-cols-1 gap-6">
@@ -293,11 +276,6 @@ function ServiceManagementPage() {
                                         <div className="flex flex-wrap justify-center md:justify-start items-center gap-3">
                                             <h3 className="text-xl font-black uppercase italic tracking-tight">{booking.serviceTitle}</h3>
                                             {getStatusBadge(booking.status)}
-                                            {booking.groupSize > 1 && (
-                                                <Badge className="bg-accent/10 text-accent border-accent/20 text-[9px] font-black uppercase px-2 flex items-center gap-1">
-                                                    <UsersRound size={10} /> Effectif: {booking.groupSize}
-                                                </Badge>
-                                            )}
                                         </div>
                                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-y-2 gap-x-6 text-[10px] font-black uppercase italic text-muted-foreground/60">
                                             <div className="flex items-center gap-2"><User size={12} className="text-primary"/> {booking.customerName}</div>
@@ -305,7 +283,6 @@ function ServiceManagementPage() {
                                             <div className="flex items-center gap-2"><Receipt size={12} className="text-accent"/> Total: ${booking.totalAmount || 'Calcul...'}</div>
                                             <div className="flex items-center gap-2"><UserCheck size={12} className="text-primary"/> Expert: {booking.technicianName || 'Non assigné'}</div>
                                         </div>
-                                        {booking.notes && <p className="text-xs italic text-muted-foreground line-clamp-1 border-t border-white/5 pt-2">Objectif: "{booking.notes}"</p>}
                                     </div>
 
                                     <div className="flex flex-col gap-3 shrink-0 min-w-[220px]">
@@ -341,40 +318,23 @@ function ServiceManagementPage() {
                                                             className={cn("h-10 w-10 border-accent/20 text-accent", booking.groupSize > 1 && "bg-accent/10")}
                                                             onClick={() => handleDownloadCertificate(booking)}
                                                             disabled={isGeneratingCert}
-                                                            title={booking.groupSize > 1 ? "Certificat de Groupe" : "Certificat Individuel"}
                                                         >
-                                                            {isGeneratingCert ? <Loader2 className="animate-spin h-4 w-4" /> : booking.groupSize > 1 ? <FileText size={16} /> : <Download size={16} />}
+                                                            {isGeneratingCert ? <Loader2 className="animate-spin h-4 w-4" /> : <Download size={16} />}
                                                         </Button>
                                                     )}
                                                 </div>
                                             </div>
                                         ) : (
                                             <div className="flex flex-col gap-2">
-                                                {booking.status === 'completed' && (
-                                                    <>
-                                                        {booking.category === 'formation' && (
-                                                            <Button 
-                                                                className="bg-accent text-black h-12 rounded-xl font-black uppercase italic text-[10px] gap-2 shadow-lg"
-                                                                onClick={() => handleDownloadCertificate(booking)}
-                                                                disabled={isGeneratingCert}
-                                                            >
-                                                                {isGeneratingCert ? <Loader2 className="animate-spin h-4 w-4" /> : <FileBadge size={16} />}
-                                                                {booking.groupSize > 1 ? "Télécharger Certificat Collectif" : "Télécharger mon Diplôme"}
-                                                            </Button>
-                                                        )}
-                                                        {!booking.hasReview && (
-                                                            <Button 
-                                                                variant="outline"
-                                                                className="rounded-xl border-accent/20 text-accent hover:bg-accent/10 h-10 font-black uppercase italic text-[9px] gap-2"
-                                                                onClick={() => {
-                                                                    setSelectedBookingForReview(booking);
-                                                                    setIsReviewSheetOpen(true);
-                                                                }}
-                                                            >
-                                                                <MessageSquareText size={14} /> Laisser un avis
-                                                            </Button>
-                                                        )}
-                                                    </>
+                                                {booking.status === 'completed' && booking.category === 'formation' && (
+                                                    <Button 
+                                                        className="bg-accent text-black h-12 rounded-xl font-black uppercase italic text-[10px] gap-2 shadow-lg"
+                                                        onClick={() => handleDownloadCertificate(booking)}
+                                                        disabled={isGeneratingCert}
+                                                    >
+                                                        {isGeneratingCert ? <Loader2 className="animate-spin h-4 w-4" /> : <FileBadge size={16} />}
+                                                        Télécharger mon Diplôme
+                                                    </Button>
                                                 )}
                                                 <Button variant="outline" className="rounded-xl border-primary/20 text-primary hover:bg-primary/10 gap-2 h-12 font-black uppercase italic text-[10px]" asChild>
                                                     <a href={`https://wa.me/243823038945?text=Bonjour,%20je%20suis%20inscrit%20à%20l'Academy%20DKS%20pour%20le%20cursus%20${booking.serviceTitle}.`} target="_blank" rel="noopener noreferrer">
@@ -395,56 +355,16 @@ function ServiceManagementPage() {
                 </div>
             </main>
 
-            <Sheet open={isReviewSheetOpen} onOpenChange={setIsReviewSheetOpen}>
-                <SheetContent side="right" className="bg-card/95 backdrop-blur-3xl border-white/10 w-full sm:max-w-md flex flex-col p-0">
-                    <SheetHeader className="p-10 bg-accent/10 border-b border-white/5">
-                        <div className="flex items-center gap-5 mb-4">
-                            <div className="w-16 h-16 rounded-2xl bg-accent/20 flex items-center justify-center text-accent shadow-xl shadow-accent/10">
-                                <MessageSquareText size={32} />
-                            </div>
-                            <div>
-                                <SheetTitle className="text-3xl font-black uppercase italic tracking-tighter text-accent">Votre Expérience</SheetTitle>
-                                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">DKS Academy Community</p>
-                            </div>
-                        </div>
-                        <Badge className="w-fit bg-accent text-black border-none uppercase font-black italic">{selectedBookingForReview?.serviceTitle}</Badge>
-                    </SheetHeader>
-                    <div className="flex-1 p-10 space-y-10 overflow-y-auto custom-scrollbar">
-                        <div className="space-y-6">
-                            <div className="space-y-4 text-center">
-                                <Label className="text-[10px] font-black uppercase tracking-widest text-center block opacity-40">Votre Note Élite</Label>
-                                <div className="flex justify-center gap-3">
-                                    {[1, 2, 3, 4, 5].map((s) => (
-                                        <button key={s} onClick={() => setRating(s)} className={cn("w-12 h-12 rounded-xl flex items-center justify-center transition-all", s <= rating ? "bg-accent/20 text-accent scale-110" : "bg-white/5 text-white/20")}>
-                                            <Star size={24} fill={s <= rating ? "currentColor" : "none"} />
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-                            <div className="space-y-4">
-                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Témoignage (Optionnel)</Label>
-                                <Textarea placeholder="Racontez-nous votre succès..." className="min-h-[150px] bg-background/50 border-white/5 rounded-2xl italic text-sm" value={comment} onChange={(e) => setComment(e.target.value)} />
-                            </div>
-                        </div>
-                        <div className="pt-8">
-                            <Button onClick={handleSubmitReview} disabled={isReviewSubmitting} className="w-full h-16 bg-accent text-black font-black uppercase italic rounded-2xl shadow-xl shadow-accent/20 text-lg gap-2">
-                                {isReviewSubmitting ? <Loader2 className="animate-spin" /> : <><Send size={20} /> Partager mon Témoignage</>}
-                            </Button>
-                        </div>
-                    </div>
-                </SheetContent>
-            </Sheet>
-
-            {/* MODÈLE DE CERTIFICAT ACADEMY AVEC CACHET AUTOMATIQUE */}
+            {/* MODÈLE DE CERTIFICAT ACADEMY AVEC CACHET HAUTE SÉCURITÉ */}
             <div style={{ position: 'absolute', left: '-9999px', top: 0 }}>
                 {selectedBookingForCert && (
                     <div ref={certRef} className="bg-white text-black p-0 w-[1123px] h-[794px] font-serif relative overflow-hidden flex items-center justify-center">
                         <div className="absolute inset-0 border-[30px] border-double border-[#0f172a]" />
-                        <div className="absolute inset-10 border-4 border-[#3b82f6]/20" />
+                        <div className="absolute inset-10 border-4 border-blue-900/10" />
                         <div className="relative z-10 text-center w-full px-40 space-y-12">
-                            <div className="flex flex-col items-center gap-6"><Logo size="lg" /><div className="space-y-1"><h2 className="text-sm font-bold tracking-[0.4em] uppercase text-[#3b82f6]">Double King Academy</h2><p className="text-[10px] font-medium uppercase tracking-[0.2em] opacity-40">Excellence Technologique • Bunia, RDC</p></div></div>
+                            <div className="flex flex-col items-center gap-6"><Logo size="lg" /><div className="space-y-1"><h2 className="text-sm font-bold tracking-[0.4em] uppercase text-blue-900">Double King Academy</h2><p className="text-[10px] font-medium uppercase tracking-[0.2em] opacity-40">Excellence Technologique • Bunia, RDC</p></div></div>
                             <div className="space-y-4"><h1 className="text-6xl font-black uppercase italic tracking-tighter text-[#0f172a]">{selectedBookingForCert.groupSize > 1 ? "CERTIFICAT COLLECTIF" : "CERTIFICAT"}</h1><p className="text-xl font-light italic text-gray-500">DE RÉUSSITE ACADÉMIQUE</p></div>
-                            <div className="space-y-6 py-8"><p className="text-lg font-medium text-gray-400">Le présent certificat est décerné à</p><h3 className="text-5xl font-black uppercase tracking-tight border-b-2 border-gray-100 inline-block pb-2 px-10">{selectedBookingForCert.customerName}</h3><h4 className="text-3xl font-bold italic text-[#3b82f6] uppercase mt-4">{selectedBookingForCert.serviceTitle}</h4></div>
+                            <div className="space-y-6 py-8"><p className="text-lg font-medium text-gray-400">Le présent certificat est décerné à</p><h3 className="text-5xl font-black uppercase tracking-tight border-b-2 border-gray-100 inline-block pb-2 px-10 italic">{selectedBookingForCert.customerName}</h3><h4 className="text-3xl font-bold italic text-blue-900 uppercase mt-4">{selectedBookingForCert.serviceTitle}</h4></div>
                             
                             <div className="grid grid-cols-3 items-end pt-12">
                                 <div className="text-center space-y-2">
@@ -452,22 +372,29 @@ function ServiceManagementPage() {
                                     <p className="text-sm font-bold">{new Date().toLocaleDateString('fr-FR')}</p>
                                 </div>
                                 <div className="flex flex-col items-center gap-4">
-                                    <div className="p-3 border-2 border-gray-100 rounded-2xl bg-gray-50/50"><QrCode size={60} className="opacity-20" /></div>
+                                    <div className="p-3 border-2 border-gray-100 rounded-2xl bg-white"><QrCode size={60} className="opacity-100 text-black" /></div>
                                     <p className="text-[8px] font-bold text-gray-300 uppercase tracking-tighter">ID: DKS-CERT-{selectedBookingForCert.id.substring(0, 8).toUpperCase()}</p>
                                 </div>
                                 
-                                {/* BLOC SIGNATURE & CACHET AUTOMATIQUE */}
                                 <div className="text-center space-y-4 relative">
-                                    <div className="absolute top-[-100px] left-1/2 -translate-x-1/2 flex flex-col items-center opacity-80">
-                                        {/* Cachet "Encre Bleue" */}
-                                        <div className="w-24 h-24 rounded-full border-[3px] border-double border-blue-600 flex flex-col items-center justify-center p-1 rotate-[15deg]">
-                                            <p className="text-[5px] font-black text-blue-600 uppercase leading-none">DKS ACADEMY</p>
-                                            <ShieldCheck size={18} className="text-blue-600 my-0.5" />
-                                            <p className="text-[4px] font-bold text-blue-600 uppercase">OFFICIAL SEAL</p>
-                                            <p className="text-[6px] font-black text-blue-600 uppercase tracking-widest mt-0.5">BUNIA</p>
+                                    <div className="absolute top-[-100px] left-1/2 -translate-x-1/2 flex flex-col items-center">
+                                        {/* CACHET HAUTE SÉCURITÉ MIDNIGHT BLUE */}
+                                        <div className="w-28 h-28 rounded-full border-[3px] border-double border-blue-900 flex flex-col items-center justify-center p-1 rotate-[15deg] opacity-95 relative">
+                                            <div className="absolute inset-0 border border-blue-900/20 rounded-full scale-[0.95]" />
+                                            <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full opacity-30">
+                                                <path id="certCirclePath" d="M 50, 50 m -37, 0 a 37,37 0 1,1 74,0 a 37,37 0 1,1 -74,0" fill="transparent" />
+                                                <text className="text-[3px] font-black fill-blue-900 uppercase">
+                                                    <textPath xlinkHref="#certCirclePath">
+                                                        CERTIFIED BY DOUBLE KING SHOP • ORIGINAL DOCUMENT • CERTIFIED BY DOUBLE KING SHOP • 
+                                                    </textPath>
+                                                </text>
+                                            </svg>
+                                            <p className="text-[5px] font-black text-blue-900 uppercase leading-none">DKS ACADEMY</p>
+                                            <ShieldCheck size={18} className="text-blue-900 my-0.5" />
+                                            <p className="text-[4px] font-bold text-blue-900 uppercase">OFFICIAL SEAL</p>
+                                            <p className="text-[6px] font-black text-blue-900 uppercase tracking-widest mt-0.5">BUNIA</p>
                                         </div>
-                                        {/* Signature Manuscrite SVG */}
-                                        <div className="w-32 h-8 text-blue-900 mt-[-20px] rotate-[-5deg]">
+                                        <div className="w-32 h-8 text-blue-950 mt-[-20px] rotate-[-5deg]">
                                             <svg viewBox="0 0 200 60" className="w-full h-full">
                                                 <path d="M20,40 Q50,10 80,40 T140,30 Q160,20 180,45" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
                                             </svg>

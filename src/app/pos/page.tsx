@@ -128,42 +128,6 @@ function POS() {
     return () => unsubscribeProds();
   }, []);
 
-  useEffect(() => {
-    const q = query(collection(db, "sales"), orderBy("createdAt", "desc"), limit(10));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const sales = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        formattedDate: doc.data().createdAt?.toDate ? doc.data().createdAt.toDate().toLocaleString('fr-FR') : "Date inconnue"
-      }));
-      setRecentSales(sales);
-    });
-    return () => unsubscribe();
-  }, []);
-
-  useEffect(() => {
-    const q = query(
-      collection(db, "orders"), 
-      where("status", "in", ["pending", "pending_payment", "en attente", "En attente", "attente", "attente_paiement"])
-    );
-    
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const orders = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }))
-      .sort((a: any, b: any) => {
-        const dateA = a.createdAt?.toDate?.() || new Date(0);
-        const dateB = b.createdAt?.toDate?.() || new Date(0);
-        return dateB - dateA;
-      });
-
-      setPendingOrders(orders);
-    });
-    
-    return () => unsubscribe();
-  }, []);
-
   const addToCart = (product: Product) => {
     if (product.stockQuantity <= 0) {
         toast({ title: "Rupture de stock", description: "Cet article n'est plus disponible.", variant: "destructive" });
@@ -181,35 +145,6 @@ function POS() {
       }
       return [...prev, { ...product, quantity: 1 }];
     });
-  };
-
-  const loadOrderInPOS = (order: any) => {
-    if (cart.length > 0) {
-        if (!window.confirm("Le panier actuel sera remplacé par le contenu de la commande. Continuer ?")) return;
-    }
-
-    const itemsToLoad = order.items.map((item: any) => {
-        const product = products.find(p => p.id === item.id || p.id === item.productId);
-        return {
-            ...product,
-            id: item.id || item.productId,
-            name: item.name,
-            sellingPrice: item.price,
-            price: item.price,
-            quantity: item.quantity,
-            imageUrl: product?.imageUrl || ''
-        } as CartItem;
-    });
-
-    setCart(itemsToLoad);
-    setCustomerName(order.customerName);
-    setActiveOrderId(order.id);
-    toast({ title: "Commande chargée", description: `Commande #${order.id.substring(0, 8)} de ${order.customerName}` });
-  };
-
-  const directCollect = (order: any) => {
-      loadOrderInPOS(order);
-      setShowConfirmation(true);
   };
 
   const removeFromCart = (id: string) => {
@@ -246,20 +181,6 @@ function POS() {
     );
   }, [products, search]);
 
-  const filteredPendingOrders = useMemo(() => {
-    if (!orderSearch.trim()) return pendingOrders;
-    const term = orderSearch.toLowerCase();
-    return pendingOrders.filter(o => 
-      o.customerName?.toLowerCase().includes(term) ||
-      o.id.toLowerCase().includes(term)
-    );
-  }, [pendingOrders, orderSearch]);
-
-  const handleCheckout = () => {
-    if (cart.length === 0) return;
-    setShowConfirmation(true);
-  };
-
   const confirmPayment = async () => {
     setIsProcessing(true);
     const finalCustomerName = customerName.trim() || "Client Comptoir";
@@ -295,23 +216,6 @@ function POS() {
             });
         }));
 
-        if (activeOrderId) {
-            await updateDoc(doc(db, "orders", activeOrderId), {
-                status: 'payée',
-                piTxId: piTxId,
-                updatedAt: serverTimestamp()
-            });
-
-            await addDoc(collection(db, "notifications"), {
-                userId: 'staff',
-                title: "Commande Payée (Caisse)",
-                message: `La commande #${activeOrderId.substring(0, 8)} de ${finalCustomerName} a été encaissée.`,
-                type: 'success',
-                isRead: false,
-                createdAt: serverTimestamp()
-            });
-        }
-
         const now = new Date().toLocaleString('fr-FR');
         setLastTransaction({
             id: saleRef.id,
@@ -343,21 +247,6 @@ function POS() {
     }
   };
 
-  const reprintReceipt = (sale: any) => {
-    setLastTransaction({
-        id: sale.id,
-        items: sale.items,
-        total: sale.totalAmount,
-        totalCDF: sale.totalCDF || (sale.totalAmount * exchangeRate),
-        mode: sale.paymentMode,
-        cryptoType: sale.cryptoType,
-        piTxId: sale.piTxId,
-        date: sale.formattedDate,
-        customerName: sale.customerName
-    });
-    setShowReceipt(true);
-  };
-
   const handleDownloadReceiptPDF = async () => {
       if (!receiptRef.current || !lastTransaction) return;
       setIsGeneratingPDF(true);
@@ -383,15 +272,10 @@ function POS() {
     <div className="min-h-screen bg-background flex flex-col">
       <Navbar />
       
-      {/* Styles pour l'impression */}
       <style jsx global>{`
         @media print {
-          body * {
-            visibility: hidden;
-          }
-          #printable-receipt-area, #printable-receipt-area * {
-            visibility: visible;
-          }
+          body * { visibility: hidden; }
+          #printable-receipt-area, #printable-receipt-area * { visibility: visible; }
           #printable-receipt-area {
             position: absolute;
             left: 0;
@@ -400,9 +284,7 @@ function POS() {
             background: white !important;
             color: black !important;
           }
-          .no-print {
-            display: none !important;
-          }
+          .no-print { display: none !important; }
         }
       `}</style>
 
@@ -418,130 +300,9 @@ function POS() {
                   onChange={(e) => setSearch(e.target.value)}
                 />
             </div>
-            
-            <div className="flex gap-2">
-                <Sheet>
-                    <SheetTrigger asChild>
-                        <Button variant="outline" className="h-14 px-5 rounded-2xl border-white/10 hover:bg-accent/10 hover:text-accent gap-3 font-black uppercase italic text-xs">
-                            <ShoppingBag size={20} />
-                            <span className="hidden sm:inline">Commandes Web</span>
-                            {pendingOrders.length > 0 && (
-                                <Badge className="bg-accent text-black font-black text-[10px] h-5 min-w-[20px] flex items-center justify-center p-0 rounded-full">{pendingOrders.length}</Badge>
-                            )}
-                        </Button>
-                    </SheetTrigger>
-                    <SheetContent className="bg-card/95 backdrop-blur-3xl border-white/10 w-full sm:max-w-md flex flex-col p-0">
-                        <SheetHeader className="p-8 bg-accent/10 border-b border-white/5">
-                            <SheetTitle className="text-xl font-black uppercase italic flex items-center gap-3">
-                                <ShoppingBag className="text-accent" /> Commandes Web
-                            </SheetTitle>
-                            <div className="relative mt-4">
-                              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={14} />
-                              <Input 
-                                placeholder="Rechercher par nom ou #ID..." 
-                                className="h-10 pl-10 bg-background/50 border-white/10 rounded-xl text-xs"
-                                value={orderSearch}
-                                onChange={(e) => setOrderSearch(e.target.value)}
-                              />
-                            </div>
-                        </SheetHeader>
-                        <div className="flex-1 space-y-4 overflow-y-auto p-6 custom-scrollbar">
-                            {filteredPendingOrders.length === 0 ? (
-                                <div className="text-center py-20 opacity-20 italic">
-                                    <ShoppingBag size={48} className="mx-auto mb-4" />
-                                    <p>Aucune commande correspondante</p>
-                                </div>
-                            ) : filteredPendingOrders.map(order => (
-                                <div key={order.id} className="p-5 rounded-2xl bg-white/5 border border-white/5 space-y-4 hover:border-accent/20 transition-all group">
-                                    <div className="flex justify-between items-start">
-                                        <div>
-                                            <p className="font-black text-sm uppercase italic">#{order.id.substring(0, 8)}</p>
-                                            <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">{order.customerName}</p>
-                                        </div>
-                                        <Badge className="bg-orange-500/10 text-orange-400 border-none uppercase text-[9px] font-black">{order.status}</Badge>
-                                    </div>
-                                    <div className="flex justify-between items-end pt-2 border-t border-white/5">
-                                        <div>
-                                            <p className="text-[9px] text-muted-foreground uppercase font-black">Total</p>
-                                            <p className="text-xl font-black text-white">${order.total?.toFixed(2)}</p>
-                                        </div>
-                                        <div className="flex gap-2">
-                                            <Button 
-                                                variant="outline"
-                                                className="border-white/10 text-white font-black uppercase italic text-[9px] h-10 px-3 rounded-xl gap-2 hover:bg-white/5"
-                                                onClick={() => loadOrderInPOS(order)}
-                                            >
-                                                <ExternalLink size={12} /> Charger
-                                            </Button>
-                                            <Button 
-                                                className="bg-accent text-black font-black uppercase italic text-[9px] h-10 px-4 rounded-xl gap-2 shadow-lg"
-                                                onClick={() => directCollect(order)}
-                                            >
-                                                <CheckCircle2 size={14} /> Encaisser
-                                            </Button>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </SheetContent>
-                </Sheet>
-
-                <Sheet>
-                    <SheetTrigger asChild>
-                        <Button variant="outline" className="h-14 w-14 rounded-2xl border-white/10 hover:bg-accent/10 hover:text-accent p-0">
-                            <History size={24} />
-                        </Button>
-                    </SheetTrigger>
-                    <SheetContent className="bg-card/95 backdrop-blur-3xl border-white/10 w-full sm:max-w-md p-0">
-                        <SheetHeader className="p-8 bg-white/5 border-b border-white/5">
-                            <SheetTitle className="text-xl font-black uppercase italic flex items-center gap-3">
-                                <Clock className="text-accent" /> Historique Ventes
-                            </SheetTitle>
-                        </SheetHeader>
-                        <div className="p-6 space-y-4 overflow-y-auto max-h-[85vh] custom-scrollbar">
-                            {recentSales.map(sale => (
-                                <div key={sale.id} className="p-4 rounded-2xl bg-white/5 border border-white/5 space-y-3 hover:border-accent/20 transition-all group">
-                                    <div className="flex justify-between items-start">
-                                        <div>
-                                            <p className="font-bold text-sm uppercase italic">#{sale.id.substring(0, 8)}</p>
-                                            <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest">{sale.formattedDate}</p>
-                                        </div>
-                                        <div className="flex flex-col items-end gap-1">
-                                            <Badge className="bg-accent/10 text-accent font-black uppercase text-[10px] border-none">
-                                                {sale.paymentMode?.replace('_', ' ')}
-                                            </Badge>
-                                            {sale.cryptoType && <Badge variant="outline" className="text-[8px] font-black uppercase border-accent/20 text-accent/60">{sale.cryptoType}</Badge>}
-                                        </div>
-                                    </div>
-                                    <div className="flex justify-between items-end">
-                                        <div>
-                                            <p className="text-xs text-white/60">Client: {sale.customerName}</p>
-                                            <p className="text-lg font-black text-white">${sale.totalAmount.toFixed(2)}</p>
-                                        </div>
-                                        <Button 
-                                            variant="ghost" 
-                                            size="sm" 
-                                            className="h-9 gap-2 font-black uppercase italic text-[10px] bg-white/5 hover:bg-accent hover:text-black rounded-xl"
-                                            onClick={() => reprintReceipt(sale)}
-                                        >
-                                            <Printer size={14} /> Reçu
-                                        </Button>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </SheetContent>
-                </Sheet>
-            </div>
           </div>
           
-          {loadingProducts ? (
-              <div className="flex-1 flex items-center justify-center opacity-50">
-                  <Loader2 className="animate-spin h-10 w-10 text-accent" />
-              </div>
-          ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4 overflow-y-auto max-h-[calc(100vh-250px)] pb-10 scrollbar-hide">
+          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4 overflow-y-auto max-h-[calc(100vh-250px)] pb-10">
                 {filteredProducts.map(product => (
                 <Card 
                     key={product.id} 
@@ -553,12 +314,6 @@ function POS() {
                 >
                     <div className="aspect-square relative overflow-hidden rounded-t-2xl">
                     <img src={product.imageUrl || '/placeholder.png'} alt={product.name} className="object-cover w-full h-full group-hover:scale-105 transition-transform" />
-                    <div className={cn(
-                        "absolute top-2 right-2 backdrop-blur-md px-2 py-1 rounded-lg text-[10px] font-black uppercase",
-                        product.stockQuantity < 5 ? "bg-destructive/80 text-white" : "bg-black/60 text-accent"
-                    )}>
-                        {product.stockQuantity} dispos
-                    </div>
                     </div>
                     <CardContent className="p-4">
                     <h3 className="font-bold text-sm line-clamp-1">{product.name}</h3>
@@ -566,25 +321,18 @@ function POS() {
                     </CardContent>
                 </Card>
                 ))}
-            </div>
-          )}
+          </div>
         </div>
 
         <div className="flex flex-col gap-4">
           <Card className="glossy-card border-none flex-1 flex flex-col overflow-hidden">
             <CardHeader className="border-b border-white/5 bg-white/5">
-              <div className="flex items-center justify-between">
                 <CardTitle className="text-lg flex items-center gap-2 font-black italic uppercase">
                   <ShoppingCart size={20} className="text-accent" />
                   Panier Caisse
                 </CardTitle>
-                <div className="flex gap-2">
-                    {activeOrderId && <Badge className="bg-orange-500 text-white font-black animate-pulse">WEB ORDER</Badge>}
-                    <Badge className="bg-accent text-accent-foreground font-black">{cart.length} ITEMS</Badge>
-                </div>
-              </div>
             </CardHeader>
-            <CardContent className="flex-1 overflow-y-auto p-0 scrollbar-hide">
+            <CardContent className="flex-1 overflow-y-auto p-0">
               {cart.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full opacity-30 p-10 text-center">
                   <ShoppingCart size={48} className="mb-4" />
@@ -593,297 +341,138 @@ function POS() {
               ) : (
                 <div className="divide-y divide-white/5">
                   {cart.map(item => (
-                    <div key={item.id} className="p-4 flex items-center justify-between group bg-white/5 hover:bg-white/10 transition-colors">
+                    <div key={item.id} className="p-4 flex items-center justify-between group bg-white/5">
                       <div className="flex-1">
                         <h4 className="text-sm font-bold">{item.name}</h4>
-                        <p className="text-[10px] text-muted-foreground uppercase font-bold">
-                            ${(item.sellingPrice || item.price || 0).toFixed(2)} x {item.quantity}
-                        </p>
+                        <p className="text-[10px] text-muted-foreground uppercase font-bold">${(item.sellingPrice || item.price || 0).toFixed(2)} x {item.quantity}</p>
                       </div>
                       <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-2 bg-black/40 rounded-xl px-2 py-1 border border-white/5">
-                          <button onClick={() => updateQuantity(item.id, -1)} className="hover:text-accent transition-colors"><Minus size={14}/></button>
+                        <div className="flex items-center gap-2 bg-black/40 rounded-xl px-2 py-1">
+                          <button onClick={() => updateQuantity(item.id, -1)}><Minus size={14}/></button>
                           <span className="w-6 text-center text-sm font-black">{item.quantity}</span>
-                          <button onClick={() => updateQuantity(item.id, 1)} className="hover:text-accent transition-colors"><Plus size={14}/></button>
+                          <button onClick={() => updateQuantity(item.id, 1)}><Plus size={14}/></button>
                         </div>
-                        <button onClick={() => removeFromCart(item.id)} className="text-muted-foreground hover:text-destructive transition-colors"><Trash2 size={16}/></button>
+                        <button onClick={() => removeFromCart(item.id)}><Trash2 size={16}/></button>
                       </div>
                     </div>
                   ))}
                 </div>
               )}
             </CardContent>
-            <CardFooter className="flex-col border-t border-white/5 p-6 gap-6 bg-black/40 backdrop-blur-xl">
-              <div className="w-full space-y-2">
-                <div className="flex justify-between items-end">
-                  <span className="text-xs font-black uppercase text-muted-foreground tracking-widest">Total Transaction</span>
-                  <div className="text-right">
-                    <span className="text-3xl font-black text-accent">${total.toFixed(2)}</span>
-                    <p className="text-[10px] font-bold text-muted-foreground uppercase">≈ {formatCurrency(total * exchangeRate)} FC</p>
-                  </div>
+            <CardFooter className="flex-col border-t border-white/5 p-6 gap-6 bg-black/40">
+              <div className="flex justify-between items-end w-full">
+                <span className="text-xs font-black uppercase text-muted-foreground">Total</span>
+                <div className="text-right">
+                  <span className="text-3xl font-black text-accent">${total.toFixed(2)}</span>
                 </div>
               </div>
-
-              <div className="w-full grid grid-cols-3 gap-2">
-                <Button 
-                  variant="outline"
-                  className={cn("flex-col h-16 gap-1 border-white/10 rounded-2xl transition-all", paymentMode === "CASH" ? "bg-primary border-primary text-white" : "bg-white/5")}
-                  onClick={() => setPaymentMode("CASH")}
-                >
-                  <Banknote size={18} />
-                  <span className="text-[9px] font-black uppercase tracking-tighter">Cash</span>
-                </Button>
-                <Button 
-                  variant="outline"
-                  className={cn("flex-col h-16 gap-1 border-white/10 rounded-2xl transition-all", paymentMode === "MOBILE_MONEY" ? "bg-primary border-primary text-white" : "bg-white/5")}
-                  onClick={() => setPaymentMode("MOBILE_MONEY")}
-                >
-                  <Smartphone size={18} />
-                  <span className="text-[9px] font-black uppercase tracking-tighter">M-Money</span>
-                </Button>
-                <Button 
-                  variant="outline"
-                  className={cn("flex-col h-16 gap-1 border-white/10 rounded-2xl transition-all", paymentMode === "PI_NETWORK" ? "bg-primary border-primary text-white" : "bg-white/5")}
-                  onClick={() => setPaymentMode("PI_NETWORK")}
-                >
-                  <Coins size={18} />
-                  <span className="text-[9px] font-black uppercase tracking-tighter text-center leading-none">Crypto-monnaie (Pi, DKST)</span>
-                </Button>
-              </div>
-
-              <Button 
-                className="w-full h-16 bg-accent text-accent-foreground hover:bg-accent/90 text-lg font-black gap-3 rounded-2xl neon-glow uppercase italic"
-                disabled={cart.length === 0 || isProcessing}
-                onClick={handleCheckout}
-              >
-                {isProcessing ? <Loader2 className="animate-spin" /> : <><CheckCircle2 className="mr-2" size={20} /> {activeOrderId ? "Encaisser Commande Web" : "Valider la Vente"}</>}
+              <Button className="w-full h-16 bg-accent text-black font-black uppercase italic rounded-2xl" disabled={cart.length === 0 || isProcessing} onClick={() => setShowConfirmation(true)}>
+                {isProcessing ? <Loader2 className="animate-spin" /> : "Valider la Vente"}
               </Button>
             </CardFooter>
           </Card>
         </div>
       </main>
 
-      {/* Confirmation Dialog with Dynamic Crypto Selector */}
+      {/* Confirmation Dialog */}
       <Dialog open={showConfirmation} onOpenChange={setShowConfirmation}>
         <DialogContent className="bg-card border-white/10 text-foreground rounded-[2rem] sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="text-2xl font-black italic uppercase text-center">Finaliser le Paiement</DialogTitle>
-          </DialogHeader>
+          <DialogHeader><DialogTitle className="text-2xl font-black italic uppercase text-center">Paiement</DialogTitle></DialogHeader>
           <div className="py-6 flex flex-col gap-6">
             <div className="space-y-4">
-                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 flex items-center gap-2">
-                    <UserIcon size={12} className="text-accent" /> Nom du Client (Optionnel)
-                </Label>
-                <Input 
-                    placeholder="Ex: John Doe" 
-                    className="h-14 bg-background/50 border-white/10 rounded-xl font-bold"
-                    value={customerName}
-                    onChange={(e) => setCustomerName(e.target.value)}
-                />
+                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Client</Label>
+                <Input placeholder="Nom du client" className="h-14 bg-background/50 border-white/10 rounded-xl font-bold" value={customerName} onChange={(e) => setCustomerName(e.target.value)} />
             </div>
-
-            <div className="text-center pt-2">
-              <p className="text-xs text-muted-foreground uppercase font-black tracking-[0.2em] mb-2">Montant à encaisser</p>
+            <div className="text-center">
               <h2 className="text-5xl font-black text-accent">${total.toFixed(2)}</h2>
-              <p className="text-lg font-bold text-white/40 mt-1">≈ {formatCurrency(total * exchangeRate)} Francs Congolais</p>
             </div>
-            
-            {paymentMode === "PI_NETWORK" ? (
-              <div className="w-full p-6 rounded-3xl bg-white/5 border border-accent/20 flex flex-col gap-6 animate-in fade-in zoom-in-95">
-                <div className="flex flex-col items-center gap-4">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-accent">Choisissez le Jeton Crypto</p>
-                  <div className="flex bg-black/40 p-1 rounded-2xl border border-white/10 w-full">
-                    <button 
-                      onClick={() => setCryptoSubMode('pi')}
-                      className={cn(
-                        "flex-1 h-12 rounded-xl font-black uppercase italic text-[10px] flex items-center justify-center gap-2 transition-all",
-                        cryptoSubMode === 'pi' ? "bg-accent text-black shadow-lg" : "text-white/40 hover:text-white"
-                      )}
-                    >
-                      <Globe size={14} /> Pi Network
-                    </button>
-                    <button 
-                      onClick={() => setCryptoSubMode('dkst')}
-                      className={cn(
-                        "flex-1 h-12 rounded-xl font-black uppercase italic text-[10px] flex items-center justify-center gap-2 transition-all",
-                        cryptoSubMode === 'dkst' ? "bg-accent text-black shadow-lg" : "text-white/40 hover:text-white"
-                      )}
-                    >
-                      <Zap size={14} /> DKST (Interne)
-                    </button>
-                  </div>
-                </div>
-
-                <div className="flex flex-col items-center p-6 bg-black/60 rounded-[2.5rem] border border-dashed border-accent/30 relative group overflow-hidden">
-                  <div className="absolute inset-0 bg-accent/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                  <QrCode size={160} className="text-white relative z-10" />
-                  <div className="mt-6 text-center space-y-2 relative z-10">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-white/60">Instructions Scan</p>
-                    <p className="text-sm font-bold text-accent">
-                      {cryptoSubMode === 'pi' 
-                        ? `Payer ${(total / PI_GCV).toFixed(8)} π via Pi Browser` 
-                        : `Transférer ${total.toFixed(2)} DKST via l'onglet Wallet`}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="w-full p-6 rounded-3xl bg-white/5 border border-white/10 flex justify-between items-center">
-                <span className="font-bold uppercase text-xs">Mode sélectionné</span>
-                <Badge className="bg-accent/20 text-accent font-black border-none px-4 py-1">{paymentMode.replace('_', ' ')}</Badge>
-              </div>
-            )}
+            <div className="grid grid-cols-3 gap-2">
+                <Button variant={paymentMode === 'CASH' ? 'default' : 'outline'} onClick={() => setPaymentMode('CASH')}>Cash</Button>
+                <Button variant={paymentMode === 'MOBILE_MONEY' ? 'default' : 'outline'} onClick={() => setPaymentMode('MOBILE_MONEY')}>M-Money</Button>
+                <Button variant={paymentMode === 'PI_NETWORK' ? 'default' : 'outline'} onClick={() => setPaymentMode('PI_NETWORK')}>Crypto</Button>
+            </div>
           </div>
-          <DialogFooter className="gap-3">
-            <Button variant="ghost" onClick={() => setShowConfirmation(false)} className="rounded-xl font-bold uppercase text-xs">Annuler</Button>
-            <Button className="bg-accent text-accent-foreground min-w-[160px] rounded-xl font-black uppercase italic shadow-xl shadow-accent/20" onClick={confirmPayment} disabled={isProcessing}>
-              {isProcessing ? <Loader2 className="animate-spin" /> : <><CheckCircle2 className="mr-2" size={18}/> Encaisser</>}
-            </Button>
-          </DialogFooter>
+          <DialogFooter><Button className="w-full bg-accent text-black font-black" onClick={confirmPayment} disabled={isProcessing}>Confirmer</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Receipt Dialog */}
       <Dialog open={showReceipt} onOpenChange={setShowReceipt}>
-        <DialogContent className="bg-white text-black p-0 overflow-hidden sm:max-w-[420px] rounded-[2rem] shadow-2xl border-none flex flex-col max-h-[95vh] relative">
-          {/* Bouton de fermeture (Nouvelle Vente) */}
-          <button 
-              onClick={() => setShowReceipt(false)} 
-              className="absolute top-4 right-4 z-50 w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-200 transition-colors no-print"
-          >
-              <X size={20} />
-          </button>
+        <DialogContent className="bg-white text-black p-0 overflow-hidden sm:max-w-[420px] rounded-[2rem] shadow-2xl border-none flex flex-col relative">
+          <button onClick={() => setShowReceipt(false)} className="absolute top-4 right-4 z-50 w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-200 no-print"><X size={20} /></button>
 
-          <div ref={receiptRef} id="printable-receipt-area" className="flex-1 overflow-y-auto p-8 font-mono text-[11px] leading-tight custom-scrollbar">
+          <div ref={receiptRef} id="printable-receipt-area" className="flex-1 overflow-y-auto p-8 font-mono text-[11px] leading-tight bg-white">
             <div className="text-center mb-6 border-b-2 border-dashed border-gray-300 pb-6">
               <div className="flex justify-center mb-3">
                  <div className="bg-black text-white px-4 py-1.5 font-black text-xl italic tracking-tighter rounded-md">DKS SHOP</div>
               </div>
               <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60">Excellence Technologique</p>
-              <div className="mt-4 space-y-1 text-[9px] font-bold uppercase">
-                <p>Immeuble Bahati, Blvd Libération</p>
-                <p>Bunia, RDC | Tél: +243 823 038 945</p>
-              </div>
+              <div className="mt-4 space-y-1 text-[9px] font-bold uppercase"><p>Immeuble Bahati, Bunia, RDC</p></div>
 
               <div className="mt-6 flex flex-col items-center gap-2">
                 <div className="p-2 border-2 border-black rounded-xl bg-white shadow-sm">
-                    <QrCode size={70} />
+                    <QrCode size={70} className="text-black opacity-100" />
                 </div>
-                <p className="text-[8px] font-black uppercase tracking-widest opacity-40">Vérifier l'authenticité</p>
+                <p className="text-[8px] font-black uppercase tracking-widest opacity-40">Authenticité Certifiée</p>
               </div>
 
               <div className="mt-6 p-2 bg-gray-100 rounded-xl inline-block w-full text-center">
                 <p className="text-[9px] font-black">REÇU: #{lastTransaction?.id.toUpperCase().substring(0, 10)}</p>
-                <p className="text-[9px] font-black">CLIENT: {lastTransaction?.customerName.toUpperCase()}</p>
               </div>
               <p className="text-[8px] mt-2 opacity-40 font-black tracking-widest">{lastTransaction?.date}</p>
             </div>
             
             <div className="space-y-3 mb-6">
-              <div className="flex justify-between font-black border-b-2 border-gray-100 pb-2 mb-2 uppercase text-[10px]">
-                <span>Désignation</span>
-                <span>Total</span>
-              </div>
-              {lastTransaction?.items.map((item, idx) => {
-                const unitPrice = item.price || item.sellingPrice || 0;
-                return (
-                  <div key={idx} className="flex justify-between items-start">
-                    <div className="flex-1 pr-4">
-                      <div className="font-bold text-[10px]">{(item.name || "Produit").toUpperCase()}</div>
-                      <div className="text-[9px] opacity-60 italic mt-0.5">
-                        {item.quantity}x @ ${unitPrice.toFixed(2)}
-                      </div>
-                    </div>
-                    <span className="font-bold text-[10px]">${(unitPrice * item.quantity).toFixed(2)}</span>
-                  </div>
-                );
-              })}
+              {lastTransaction?.items.map((item, idx) => (
+                <div key={idx} className="flex justify-between items-start">
+                  <div className="flex-1 pr-4"><div className="font-bold text-[10px] uppercase">{item.name}</div><div className="text-[9px] opacity-60 italic">{item.quantity}x @ ${item.price?.toFixed(2)}</div></div>
+                  <span className="font-bold text-[10px]">${((item.price || 0) * item.quantity).toFixed(2)}</span>
+                </div>
+              ))}
             </div>
 
             <div className="border-t-2 border-gray-100 pt-4 space-y-2">
-              <div className="flex justify-between font-bold text-[9px]">
-                <span>SOUS-TOTAL (USD)</span>
-                <span>${lastTransaction?.total.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between font-bold text-[9px] opacity-40">
-                <span>REMISE / TAXE</span>
-                <span>$0.00</span>
-              </div>
-              <div className="flex justify-between text-lg font-black border-t-2 border-dashed border-gray-300 pt-3 mt-2">
+              <div className="flex justify-between text-lg font-black border-t-2 border-dashed border-gray-300 pt-3">
                 <span>TOTAL PAYÉ ($)</span>
                 <span>${lastTransaction?.total.toFixed(2)}</span>
               </div>
-              <div className="flex justify-between font-black opacity-60 text-[10px] mt-1 border-b border-gray-100 pb-3">
-                <span>VALEUR EN CDF</span>
-                <span>{formatCurrency(lastTransaction?.totalCDF || 0)} FC</span>
-              </div>
-              
-              {lastTransaction?.mode === 'PI_NETWORK' && (
-                <div className="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-2xl space-y-3">
-                  <div className="flex justify-between font-black text-[10px]">
-                    <span className="flex items-center gap-1.5"><Globe size={12}/> CONVERSION PI (GCV)</span>
-                    <span className="text-blue-600">{(lastTransaction.total / PI_GCV).toFixed(8)} π</span>
-                  </div>
-                  {lastTransaction.piTxId && (
-                    <div className="pt-2 border-t border-gray-200">
-                      <p className="text-[8px] font-black uppercase text-gray-400 mb-1.5 flex items-center gap-1.5"><Lock size={10}/> HACHARAGE BLOCKCHAIN</p>
-                      <p className="text-[8px] font-mono break-all leading-tight opacity-70 bg-white p-2 rounded-lg border border-gray-100">{lastTransaction.piTxId}</p>
-                    </div>
-                  )}
+              {lastTransaction?.mode === 'PI_NETWORK' && lastTransaction.piTxId && (
+                <div className="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-2xl space-y-2">
+                  <p className="text-[8px] font-black uppercase text-gray-400 flex items-center gap-1.5"><Lock size={10}/> HACHARAGE BLOCKCHAIN</p>
+                  <p className="text-[8px] font-mono break-all leading-tight opacity-70">{lastTransaction.piTxId}</p>
                 </div>
               )}
-
-              <div className="flex justify-between mt-4 pt-3 border-t border-gray-100 italic font-black text-[10px]">
-                <span>MODE DE RÈGLEMENT :</span>
-                <span className="text-blue-700">
-                    {lastTransaction?.mode === 'PI_NETWORK' 
-                        ? `CRYPTO (${lastTransaction.cryptoType?.toUpperCase()})` 
-                        : lastTransaction?.mode.replace('_', ' ')}
-                </span>
-              </div>
             </div>
 
-            {/* CACHET AUTOMATIQUE POS (FORMAT TICKET) */}
-            <div className="mt-8 flex flex-col items-center gap-4 pt-6 border-t-2 border-dashed border-gray-200">
-              <div className="w-28 h-28 rounded-full border-[3px] border-double border-blue-600 flex flex-col items-center justify-center p-1 rotate-[-12deg] opacity-80">
-                <p className="text-[6px] font-black text-blue-600 leading-none tracking-tighter">DOUBLE KING SHOP</p>
-                <ShieldCheck size={26} className="text-blue-600 my-1.5" />
-                <p className="text-[6px] font-bold text-blue-600 uppercase">CERTIFIED POS</p>
-                <p className="text-[7px] font-black text-blue-600 uppercase tracking-widest mt-1">BUNIA</p>
+            {/* CACHET AUTOMATIQUE HAUTE SÉCURITÉ */}
+            <div className="mt-8 flex flex-col items-center gap-4 pt-6 border-t-2 border-dashed border-gray-200 relative">
+              <div className="w-28 h-28 rounded-full border-[3px] border-double border-blue-900 flex flex-col items-center justify-center p-1 rotate-[-12deg] opacity-95 relative">
+                <div className="absolute inset-0 border border-blue-900/20 rounded-full scale-[0.95]" />
+                <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full opacity-30">
+                  <path id="receiptCirclePath" d="M 50, 50 m -37, 0 a 37,37 0 1,1 74,0 a 37,37 0 1,1 -74,0" fill="transparent" />
+                  <text className="text-[3px] font-black fill-blue-900 uppercase">
+                    <textPath xlinkHref="#receiptCirclePath">
+                      CERTIFIED BY DOUBLE KING SHOP • ORIGINAL DOCUMENT • CERTIFIED BY DOUBLE KING SHOP • 
+                    </textPath>
+                  </text>
+                </svg>
+                <p className="text-[6px] font-black text-blue-900 leading-none">DOUBLE KING SHOP</p>
+                <ShieldCheck size={26} className="text-blue-900 my-1.5" />
+                <p className="text-[6px] font-bold text-blue-900 uppercase">CERTIFIED POS</p>
+                <p className="text-[7px] font-black text-blue-900 uppercase tracking-widest mt-1">BUNIA</p>
               </div>
               
-              <div className="text-center space-y-1">
+              <div className="text-center">
                   <p className="text-[9px] font-black uppercase italic text-blue-900">Expert Bahati Nyeke</p>
                   <p className="text-[7px] font-bold text-gray-400 uppercase tracking-[0.3em]">Validateur de Caisse</p>
               </div>
-
-              <p className="text-[8px] font-black uppercase tracking-tighter opacity-40 italic border-y border-gray-100 py-1.5 w-full text-center">
-                Les marchandises ne sont ni reprises ni échangées
-              </p>
-            </div>
-
-            <div className="text-center pt-6">
-              <div className="bg-black text-white px-6 py-2 inline-block font-black uppercase italic tracking-[0.2em] text-[10px] mb-3 rounded-md">
-                 MERCI DE VOTRE CONFIANCE
-              </div>
-              <p className="text-[8px] font-bold opacity-40 uppercase tracking-widest">À bientôt chez DKS HUB</p>
             </div>
           </div>
 
           <div className="bg-gray-50 p-6 flex gap-4 no-print border-t border-gray-200">
-            <Button 
-                className="flex-1 gap-3 bg-black text-white hover:bg-black/90 rounded-2xl font-black uppercase italic text-[11px] h-16 shadow-xl" 
-                onClick={() => window.print()}
-            >
-              <Printer size={20} /> Imprimer Reçu
-            </Button>
-            <Button 
-                className="flex-1 gap-3 border-gray-200 bg-white text-black hover:bg-gray-100 rounded-2xl font-black uppercase italic text-[11px] h-16 shadow-lg" 
-                variant="outline" 
-                onClick={handleDownloadReceiptPDF}
-                disabled={isGeneratingPDF}
-            >
-              {isGeneratingPDF ? <Loader2 className="animate-spin w-5 h-5" /> : <><Download size={20} /> Télécharger PDF</>}
+            <Button className="flex-1 bg-black text-white rounded-xl" onClick={() => window.print()}><Printer size={20} /> Imprimer</Button>
+            <Button className="flex-1 bg-white text-black border-gray-200" variant="outline" onClick={handleDownloadReceiptPDF} disabled={isGeneratingPDF}>
+              {isGeneratingPDF ? <Loader2 className="animate-spin" /> : <Download size={20} />} PDF
             </Button>
           </div>
         </DialogContent>

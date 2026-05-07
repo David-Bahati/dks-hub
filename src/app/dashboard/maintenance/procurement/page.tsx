@@ -17,7 +17,8 @@ import {
     QrCode,
     Zap,
     FlaskConical,
-    DollarSign
+    DollarSign,
+    ShieldCheck
 } from "lucide-react";
 import { db } from '@/lib/firebase';
 import { collection, query, orderBy } from 'firebase/firestore';
@@ -94,10 +95,6 @@ function ProcurementPage() {
                     
                     {procurementList.length > 0 && (
                         <div className="flex gap-4">
-                            <Card className="bg-accent/10 border-accent/20 px-6 py-2 rounded-2xl flex flex-col justify-center">
-                                <p className="text-[8px] font-black uppercase opacity-60">Budget Estimé</p>
-                                <p className="text-2xl font-black text-accent">${totalEstimatedBudget.toLocaleString()}</p>
-                            </Card>
                             <Button 
                                 onClick={handleDownloadOrder} 
                                 disabled={isGenerating}
@@ -125,18 +122,9 @@ function ProcurementPage() {
                                             <h3 className="text-2xl font-black uppercase italic tracking-tight">{item.name}</h3>
                                             <Badge variant="outline" className="bg-red-500/10 text-red-400 border-none uppercase text-[8px] font-black px-2">Critique</Badge>
                                         </div>
-                                        <div className="flex flex-wrap items-center justify-center md:justify-start gap-6 text-[10px] font-black uppercase italic text-muted-foreground/60 tracking-widest">
-                                            <span className="flex items-center gap-2"><Zap size={12} className="text-accent" /> {item.category}</span>
-                                            <span className="flex items-center gap-2"><DollarSign size={12} /> Coût Unitaire: ${item.unitCost}</span>
-                                            <span className="flex items-center gap-2"> Stock: {item.quantity} {item.unit}</span>
-                                        </div>
                                     </div>
 
                                     <div className="flex items-center gap-8 shrink-0">
-                                        <div className="text-center md:text-right bg-black/20 p-6 rounded-3xl border border-white/5 min-w-[150px]">
-                                            <p className="text-[9px] font-black uppercase text-muted-foreground mb-1 tracking-widest">Réappro suggéré</p>
-                                            <p className="text-3xl font-black text-white italic">+{item.qtyToOrder} <span className="text-sm font-light opacity-40 not-italic">{item.unit}</span></p>
-                                        </div>
                                         <div className="text-right">
                                             <p className="text-[9px] font-black uppercase text-accent mb-1 tracking-widest">Coût Estimé</p>
                                             <p className="text-2xl font-black text-white">${item.estimatedCost.toLocaleString()}</p>
@@ -149,7 +137,6 @@ function ProcurementPage() {
                         <div className="py-32 text-center bg-white/5 rounded-[3rem] border border-dashed border-white/10 opacity-30 flex flex-col items-center gap-6">
                             <CheckCircle2 size={80} strokeWidth={1} className="text-green-400" />
                             <p className="text-xl font-black uppercase italic tracking-tighter">Stocks au maximum</p>
-                            <p className="text-xs max-w-sm uppercase font-black tracking-widest leading-relaxed">Toutes les ressources de laboratoire sont au-dessus de leur seuil de sécurité.</p>
                         </div>
                     )}
                 </div>
@@ -163,82 +150,64 @@ function ProcurementPage() {
                             <div className="space-y-4">
                                 <div className="bg-black text-white px-6 py-2 inline-block font-black text-3xl italic tracking-tighter">DKS SOLUTIONS</div>
                                 <div className="text-sm font-bold uppercase tracking-widest text-gray-500">Logistique Labo & Maintenance</div>
-                                <div className="text-[11px] leading-relaxed mt-4 font-medium">
-                                    <p>Immeuble Bahati, Bunia, RDC</p>
-                                    <p>Expertise Hardware Certifiée</p>
-                                    <p>Email: supply@dks-shop.com</p>
-                                </div>
                             </div>
                             <div className="text-right">
                                 <h2 className="text-5xl font-black uppercase italic tracking-tighter mb-2 leading-none">BON DE<br/>COMMANDE</h2>
-                                <p className="text-xs font-bold text-gray-400 uppercase tracking-[0.2em]">Réf: REAPPRO-{new Date().getFullYear()}-{Math.floor(Math.random() * 1000)}</p>
-                                <div className="mt-8">
-                                    <p className="text-[10px] font-black uppercase text-gray-400">Date de génération</p>
-                                    <p className="text-lg font-bold">{new Date().toLocaleDateString('fr-FR')}</p>
-                                </div>
+                                <p className="text-lg font-bold">{new Date().toLocaleDateString('fr-FR')}</p>
                             </div>
                         </header>
 
-                        <div className="p-8 bg-gray-50 rounded-2xl mb-12 border border-gray-100">
-                            <h3 className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-4">Résumé Logistique & Financier</h3>
-                            <div className="grid grid-cols-3 gap-10">
-                                <div>
-                                    <p className="text-[8px] font-bold text-gray-400 uppercase">Articles à réappro.</p>
-                                    <p className="text-2xl font-black">{procurementList.length}</p>
-                                </div>
-                                <div>
-                                    <p className="text-[8px] font-bold text-gray-400 uppercase">Budget Estimé</p>
-                                    <p className="text-2xl font-black text-blue-600">${totalEstimatedBudget.toLocaleString()}</p>
-                                </div>
-                                <div>
-                                    <p className="text-[8px] font-bold text-gray-400 uppercase">Destination</p>
-                                    <p className="text-xl font-bold uppercase">Labo Bunia</p>
-                                </div>
-                            </div>
-                        </div>
-
                         <table className="w-full mb-12">
                             <thead>
-                                <tr className="bg-black text-white text-[10px] font-black uppercase tracking-widest">
+                                <tr className="bg-gray-100 text-[10px] font-black uppercase tracking-widest">
                                     <th className="text-left p-4">Désignation</th>
                                     <th className="text-center p-4">Qté</th>
-                                    <th className="text-right p-4">Coût Unit.</th>
-                                    <th className="text-right p-4">Total Ligne</th>
+                                    <th className="text-right p-4">Prix Unit.</th>
+                                    <th className="text-right p-4">Total</th>
                                 </tr>
                             </thead>
                             <tbody className="text-sm">
                                 {procurementList.map((item, idx) => (
                                     <tr key={idx} className="border-b border-gray-100">
-                                        <td className="p-4">
-                                            <p className="font-bold uppercase italic">{item.name}</p>
-                                            <p className="text-[9px] text-gray-400 uppercase mt-1">Catégorie: {item.category}</p>
-                                        </td>
+                                        <td className="p-4 font-bold uppercase italic">{item.name}</td>
                                         <td className="p-4 text-center font-bold">{item.qtyToOrder} {item.unit}</td>
-                                        <td className="p-4 text-right font-medium text-gray-400">${item.unitCost?.toFixed(2)}</td>
-                                        <td className="p-4 text-right font-black text-lg italic">${item.estimatedCost.toFixed(2)}</td>
+                                        <td className="p-4 text-right">${item.unitCost?.toFixed(2)}</td>
+                                        <td className="p-4 text-right font-black">${item.estimatedCost.toFixed(2)}</td>
                                     </tr>
                                 ))}
                             </tbody>
                         </table>
 
-                        <section className="bg-gray-50 p-8 rounded-[2rem] border border-gray-100 mb-12">
-                            <h3 className="text-sm font-black uppercase italic mb-3 flex items-center gap-2">
-                                <Zap size={16} className="text-black" /> Note Logistique
-                            </h3>
-                            <p className="text-[11px] leading-relaxed text-gray-600 font-medium italic">
-                                "Ce document est généré par le système intelligent DKS Hub. Les quantités suggérées correspondent à 3 fois le seuil critique pour garantir une autonomie de 90 jours au laboratoire de Bunia. Les prix sont basés sur les derniers coûts unitaires enregistrés."
-                            </p>
-                        </section>
-
                         <footer className="mt-20 pt-10 border-t border-gray-100 flex justify-between items-end">
                             <div className="flex items-center gap-6">
-                                <QrCode size={60} className="opacity-20" />
+                                <QrCode size={60} className="opacity-100 text-black" />
                                 <p className="text-[8px] font-bold text-gray-400 uppercase leading-relaxed max-w-[250px]">
                                     Document officiel de gestion de stock Double King Shop. <br />
                                     Certification Logistique DKS-LOG-2024.
                                 </p>
                             </div>
-                            <div className="text-right space-y-4">
+                            <div className="text-right space-y-4 relative">
+                                <div className="absolute top-[-80px] right-0 flex flex-col items-center">
+                                    {/* CACHET SÉCURITÉ MIDNIGHT BLUE */}
+                                    <div className="w-28 h-28 rounded-full border-[3px] border-double border-blue-900 flex flex-col items-center justify-center p-1 rotate-[5deg] opacity-95 relative">
+                                        <div className="absolute inset-0 border border-blue-900/20 rounded-full scale-[0.95]" />
+                                        <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full opacity-30">
+                                            <path id="orderCirclePath" d="M 50, 50 m -37, 0 a 37,37 0 1,1 74,0 a 37,37 0 1,1 -74,0" fill="transparent" />
+                                            <text className="text-[3px] font-black fill-blue-900 uppercase">
+                                                <textPath xlinkHref="#orderCirclePath">
+                                                    CERTIFIED BY DOUBLE KING SHOP • ORIGINAL DOCUMENT • CERTIFIED BY DOUBLE KING SHOP • 
+                                                </textPath>
+                                            </text>
+                                        </svg>
+                                        <p className="text-[5px] font-black text-blue-900 uppercase leading-none">DKS LOGISTICS</p>
+                                        <ShieldCheck size={18} className="text-blue-900 my-0.5" />
+                                        <p className="text-[4px] font-bold text-blue-900 uppercase">OFFICIAL SEAL</p>
+                                        <p className="text-[6px] font-black text-blue-900 uppercase tracking-widest mt-0.5">BUNIA</p>
+                                    </div>
+                                    <div className="w-32 h-8 text-blue-950 mt-[-20px] rotate-[-5deg]">
+                                        <svg viewBox="0 0 200 60" className="w-full h-full"><path d="M20,40 Q50,10 80,40 T140,30 Q160,20 180,45" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" /></svg>
+                                    </div>
+                                </div>
                                 <div className="h-16 w-32 border-2 border-gray-100 rounded-lg flex items-center justify-center italic text-gray-300 text-[8px] uppercase font-black">Visa Direction</div>
                                 <p className="text-[8px] font-bold text-gray-300 uppercase tracking-widest">Solutions Lab Hub v3.0</p>
                             </div>

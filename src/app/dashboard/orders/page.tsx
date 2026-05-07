@@ -474,32 +474,42 @@ export default function OrdersPage() {
                     </table>
 
                     <div className="flex justify-end gap-20">
-                        {/* CACHET AUTOMATIQUE "FLOTTANT" SANS CADRE */}
+                        {/* ZONE CACHET ET SIGNATURE FLOTTANTS */}
                         <div className="flex flex-col items-center justify-center p-6 min-w-[280px] relative">
                             <div className="relative flex flex-col items-center text-center">
-                                {/* Sceau Circulaire imitant l'encre réelle */}
-                                <div className="w-32 h-32 rounded-full border-[3px] border-double border-blue-600 flex flex-col items-center justify-center relative p-1 mb-4 rotate-[-5deg]">
-                                    <div className="absolute inset-0 border border-blue-600/30 rounded-full scale-[0.92]" />
-                                    <p className="text-[7px] font-black text-blue-600 uppercase leading-none tracking-tighter">DOUBLE KING SHOP</p>
-                                    <div className="my-1">
-                                        <ShieldCheck className="text-blue-600" size={24} />
+                                {/* CACHET HAUTE SÉCURITÉ MIDNIGHT BLUE */}
+                                <div className="w-32 h-32 rounded-full border-[3px] border-double border-blue-900 flex flex-col items-center justify-center relative p-1 rotate-[-5deg] opacity-95">
+                                    <div className="absolute inset-0 border border-blue-900/20 rounded-full scale-[0.95]" />
+                                    {/* Texte de sécurité circulaire simulé */}
+                                    <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full animate-spin-slow opacity-30">
+                                        <path id="circlePath" d="M 50, 50 m -37, 0 a 37,37 0 1,1 74,0 a 37,37 0 1,1 -74,0" fill="transparent" />
+                                        <text className="text-[3px] font-black fill-blue-900 uppercase">
+                                            <textPath xlinkHref="#circlePath">
+                                                CERTIFIED BY DOUBLE KING SHOP • ORIGINAL DOCUMENT • CERTIFIED BY DOUBLE KING SHOP • ORIGINAL DOCUMENT • 
+                                            </textPath>
+                                        </text>
+                                    </svg>
+                                    
+                                    <p className="text-[8px] font-black text-blue-900 uppercase leading-none tracking-tighter z-10">DOUBLE KING SHOP</p>
+                                    <div className="my-1 z-10">
+                                        <ShieldCheck className="text-blue-900" size={24} />
                                     </div>
-                                    <p className="text-[6px] font-bold text-blue-600 uppercase leading-none">CERTIFIED HUB</p>
-                                    <p className="text-[8px] font-black text-blue-600 uppercase tracking-widest mt-0.5">BUNIA</p>
+                                    <p className="text-[6px] font-bold text-blue-900 uppercase leading-none z-10">OFFICIAL HUB</p>
+                                    <p className="text-[7px] font-black text-blue-900 uppercase tracking-widest mt-0.5 z-10">BUNIA • RDC</p>
                                 </div>
 
-                                <div className="space-y-1">
+                                <div className="space-y-1 mt-4">
                                     <p className="text-[8px] font-black text-gray-400 italic">Signature Autorisée</p>
                                     {/* Signature manuscrite SVG "flottante" */}
                                     <div className="h-10 w-40 flex items-center justify-center">
-                                        <svg viewBox="0 0 200 60" className="w-full h-full text-blue-800 opacity-80" style={{ filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.1))' }}>
+                                        <svg viewBox="0 0 200 60" className="w-full h-full text-blue-900 opacity-80" style={{ filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.1))' }}>
                                             <path d="M20,40 Q50,10 80,40 T140,30 Q160,20 180,45" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
                                             <path d="M40,30 Q60,50 90,25" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" opacity="0.6" />
                                             <path d="M110,40 Q130,10 150,50" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" opacity="0.6" />
                                         </svg>
                                     </div>
                                     <p className="text-[10px] font-black uppercase italic tracking-tighter text-blue-900">Expert Bahati Nyeke</p>
-                                    <div className="w-24 h-[1px] bg-blue-600/30 mx-auto mt-1" />
+                                    <div className="w-24 h-[1px] bg-blue-900/20 mx-auto mt-1" />
                                 </div>
                             </div>
                         </div>
@@ -555,7 +565,7 @@ export default function OrdersPage() {
 
                     <footer className="mt-20 pt-10 border-t border-gray-100 flex justify-between items-center">
                         <div className="flex items-center gap-6">
-                            <QrCode size={60} className="opacity-20" />
+                            <QrCode size={60} className="opacity-100 text-black" />
                             <p className="text-[9px] font-bold text-gray-400 uppercase leading-relaxed max-w-[250px]">
                                 Cette facture est un document officiel de Double King Shop. <br />
                                 Les prestations de service ne sont pas remboursables après exécution.
@@ -572,3 +582,4 @@ export default function OrdersPage() {
     </div>
   );
 }
+
