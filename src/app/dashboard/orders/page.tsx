@@ -404,7 +404,7 @@ export default function OrdersPage() {
             </DialogContent>
         </Dialog>
 
-        {/* FACTURE PDF CACHÉE AVEC CACHET ET SIGNATURE AUTOMATIQUES */}
+        {/* FACTURE PDF CACHÉE AVEC CACHET ET SIGNATURE AUTOMATIQUES - LOOK "PAPIER" */}
         <div style={{ position: 'absolute', left: '-9999px', top: 0 }}>
             {selectedOrderForPDF && (
                 <div ref={invoiceRef} className="bg-white text-black p-16 w-[800px] font-sans">
@@ -474,14 +474,10 @@ export default function OrdersPage() {
                     </table>
 
                     <div className="flex justify-end gap-20">
-                        {/* CACHET AUTOMATIQUE DÉTAILLÉ */}
-                        <div className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-blue-600/20 rounded-3xl min-w-[280px] relative overflow-hidden bg-blue-50/10">
-                            <div className="absolute inset-0 flex items-center justify-center opacity-[0.05] pointer-events-none rotate-12">
-                                <Logo size="xl" />
-                            </div>
-                            
-                            <div className="relative z-10 flex flex-col items-center text-center">
-                                {/* Sceau Circulaire imitant l'encre */}
+                        {/* CACHET AUTOMATIQUE "FLOTTANT" SANS CADRE */}
+                        <div className="flex flex-col items-center justify-center p-6 min-w-[280px] relative">
+                            <div className="relative flex flex-col items-center text-center">
+                                {/* Sceau Circulaire imitant l'encre réelle */}
                                 <div className="w-32 h-32 rounded-full border-[3px] border-double border-blue-600 flex flex-col items-center justify-center relative p-1 mb-4 rotate-[-5deg]">
                                     <div className="absolute inset-0 border border-blue-600/30 rounded-full scale-[0.92]" />
                                     <p className="text-[7px] font-black text-blue-600 uppercase leading-none tracking-tighter">DOUBLE KING SHOP</p>
@@ -494,7 +490,7 @@ export default function OrdersPage() {
 
                                 <div className="space-y-1">
                                     <p className="text-[8px] font-black text-gray-400 italic">Signature Autorisée</p>
-                                    {/* Signature manuscrite SVG automatique */}
+                                    {/* Signature manuscrite SVG "flottante" */}
                                     <div className="h-10 w-40 flex items-center justify-center">
                                         <svg viewBox="0 0 200 60" className="w-full h-full text-blue-800 opacity-80" style={{ filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.1))' }}>
                                             <path d="M20,40 Q50,10 80,40 T140,30 Q160,20 180,45" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
