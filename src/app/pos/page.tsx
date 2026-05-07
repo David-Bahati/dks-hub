@@ -61,6 +61,7 @@ import { db } from "@/lib/firebase";
 import { collection, onSnapshot, doc, updateDoc, addDoc, serverTimestamp, increment, query, orderBy, limit, getDoc, where } from "firebase/firestore";
 import { useAuth } from "@/context/AuthContext";
 import withAuth from "@/components/auth/withAuth";
+import { Logo } from "@/components/ui/Logo";
 
 interface CartItem extends Product {
   quantity: number;
@@ -793,15 +794,20 @@ function POS() {
               </div>
             </div>
 
-            <div className="mt-6 flex flex-col items-center gap-3">
-              <div className="w-full p-3 border border-gray-100 rounded-xl flex items-center justify-between">
-                <div className="flex flex-col">
-                  <p className="text-[6px] font-black uppercase text-gray-300">Cachet Numérique</p>
-                  <p className="text-[8px] font-black text-blue-600">CERTIFIED DKS HUB</p>
-                </div>
-                <ShieldCheck size={20} className="text-blue-600 opacity-20" />
+            {/* CACHET AUTOMATIQUE POS (FORMAT TICKET) */}
+            <div className="mt-6 flex flex-col items-center gap-4 pt-4 border-t border-gray-100">
+              <div className="w-24 h-24 rounded-full border-2 border-blue-600 flex flex-col items-center justify-center p-1 rotate-[-10deg] opacity-70">
+                <p className="text-[5px] font-black text-blue-600 leading-none">DKS SHOP BUNIA</p>
+                <ShieldCheck size={20} className="text-blue-600 my-1" />
+                <p className="text-[5px] font-bold text-blue-600">OFFICIAL POS</p>
               </div>
-              <p className="text-[8px] font-black uppercase tracking-tighter opacity-40 italic border-y border-gray-100 py-1 w-full text-center">
+              
+              <div className="text-center space-y-0.5">
+                  <p className="text-[8px] font-black uppercase italic text-blue-800">Expert Bahati Nyeke</p>
+                  <p className="text-[6px] font-bold text-gray-400 uppercase tracking-widest">Validateur Certifié</p>
+              </div>
+
+              <p className="text-[7px] font-black uppercase tracking-tighter opacity-40 italic border-y border-gray-100 py-1 w-full text-center">
                 Ni repris, ni échangés après sortie
               </p>
             </div>
@@ -836,3 +842,4 @@ function POS() {
 }
 
 export default withAuth(POS);
+

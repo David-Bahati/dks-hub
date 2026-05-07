@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
@@ -434,6 +435,7 @@ function ServiceManagementPage() {
                 </SheetContent>
             </Sheet>
 
+            {/* MODÈLE DE CERTIFICAT ACADEMY AVEC CACHET AUTOMATIQUE */}
             <div style={{ position: 'absolute', left: '-9999px', top: 0 }}>
                 {selectedBookingForCert && (
                     <div ref={certRef} className="bg-white text-black p-0 w-[1123px] h-[794px] font-serif relative overflow-hidden flex items-center justify-center">
@@ -443,7 +445,41 @@ function ServiceManagementPage() {
                             <div className="flex flex-col items-center gap-6"><Logo size="lg" /><div className="space-y-1"><h2 className="text-sm font-bold tracking-[0.4em] uppercase text-[#3b82f6]">Double King Academy</h2><p className="text-[10px] font-medium uppercase tracking-[0.2em] opacity-40">Excellence Technologique • Bunia, RDC</p></div></div>
                             <div className="space-y-4"><h1 className="text-6xl font-black uppercase italic tracking-tighter text-[#0f172a]">{selectedBookingForCert.groupSize > 1 ? "CERTIFICAT COLLECTIF" : "CERTIFICAT"}</h1><p className="text-xl font-light italic text-gray-500">DE RÉUSSITE ACADÉMIQUE</p></div>
                             <div className="space-y-6 py-8"><p className="text-lg font-medium text-gray-400">Le présent certificat est décerné à</p><h3 className="text-5xl font-black uppercase tracking-tight border-b-2 border-gray-100 inline-block pb-2 px-10">{selectedBookingForCert.customerName}</h3><h4 className="text-3xl font-bold italic text-[#3b82f6] uppercase mt-4">{selectedBookingForCert.serviceTitle}</h4></div>
-                            <div className="grid grid-cols-3 items-end pt-12"><div className="text-center space-y-2"><p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Date de délivrance</p><p className="text-sm font-bold">{new Date().toLocaleDateString('fr-FR')}</p></div><div className="flex flex-col items-center gap-4"><div className="p-3 border-2 border-gray-100 rounded-2xl bg-gray-50/50"><QrCode size={60} className="opacity-20" /></div><p className="text-[8px] font-bold text-gray-300 uppercase tracking-tighter">ID: DKS-CERT-{selectedBookingForCert.id.substring(0, 8).toUpperCase()}</p></div><div className="text-center space-y-2"><div className="w-40 h-px bg-gray-200 mx-auto" /><div className="flex flex-col items-center"><p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Direction Technique</p><p className="text-sm font-black italic">Expert Double King</p></div></div></div>
+                            
+                            <div className="grid grid-cols-3 items-end pt-12">
+                                <div className="text-center space-y-2">
+                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Date de délivrance</p>
+                                    <p className="text-sm font-bold">{new Date().toLocaleDateString('fr-FR')}</p>
+                                </div>
+                                <div className="flex flex-col items-center gap-4">
+                                    <div className="p-3 border-2 border-gray-100 rounded-2xl bg-gray-50/50"><QrCode size={60} className="opacity-20" /></div>
+                                    <p className="text-[8px] font-bold text-gray-300 uppercase tracking-tighter">ID: DKS-CERT-{selectedBookingForCert.id.substring(0, 8).toUpperCase()}</p>
+                                </div>
+                                
+                                {/* BLOC SIGNATURE & CACHET AUTOMATIQUE */}
+                                <div className="text-center space-y-4 relative">
+                                    <div className="absolute top-[-100px] left-1/2 -translate-x-1/2 flex flex-col items-center opacity-80">
+                                        {/* Cachet "Encre Bleue" */}
+                                        <div className="w-24 h-24 rounded-full border-[3px] border-double border-blue-600 flex flex-col items-center justify-center p-1 rotate-[15deg]">
+                                            <p className="text-[5px] font-black text-blue-600 uppercase leading-none">DKS ACADEMY</p>
+                                            <ShieldCheck size={18} className="text-blue-600 my-0.5" />
+                                            <p className="text-[4px] font-bold text-blue-600 uppercase">OFFICIAL SEAL</p>
+                                            <p className="text-[6px] font-black text-blue-600 uppercase tracking-widest mt-0.5">BUNIA</p>
+                                        </div>
+                                        {/* Signature Manuscrite SVG */}
+                                        <div className="w-32 h-8 text-blue-900 mt-[-20px] rotate-[-5deg]">
+                                            <svg viewBox="0 0 200 60" className="w-full h-full">
+                                                <path d="M20,40 Q50,10 80,40 T140,30 Q160,20 180,45" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    <div className="w-40 h-px bg-gray-200 mx-auto" />
+                                    <div className="flex flex-col items-center">
+                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Direction Technique</p>
+                                        <p className="text-sm font-black italic text-[#0f172a]">Expert Bahati Nyeke</p>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 )}

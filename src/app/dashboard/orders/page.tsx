@@ -470,22 +470,37 @@ export default function OrdersPage() {
                     </table>
 
                     <div className="flex justify-end gap-20">
-                        <div className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-gray-100 rounded-3xl min-w-[240px]">
-                            <div className="w-full border-b border-gray-100 mb-4 pb-1 text-center">
-                                <p className="text-[8px] font-black uppercase text-gray-300 tracking-[0.2em]">Cachet Officiel DKS Hub</p>
+                        {/* CACHET AUTOMATIQUE DÉTAILLÉ */}
+                        <div className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-blue-600/20 rounded-3xl min-w-[280px] relative overflow-hidden bg-blue-50/10">
+                            <div className="absolute inset-0 flex items-center justify-center opacity-[0.05] pointer-events-none rotate-12">
+                                <Logo size="xl" />
                             </div>
-                            <div className="h-24 w-full flex items-center justify-center relative">
-                                <div className="absolute inset-0 border-2 border-blue-600/10 rounded-full flex items-center justify-center rotate-[-10deg]">
-                                    <div className="text-center">
-                                        <p className="text-[10px] font-black text-blue-600 uppercase leading-none">DOUBLE KING SHOP</p>
-                                        <p className="text-[8px] font-bold text-blue-600 uppercase tracking-tighter mt-1">CERTIFIED HUB BUNIA</p>
+                            
+                            <div className="relative z-10 flex flex-col items-center text-center">
+                                {/* Sceau Circulaire imitant l'encre */}
+                                <div className="w-32 h-32 rounded-full border-[3px] border-double border-blue-600 flex flex-col items-center justify-center relative p-1 mb-4 rotate-[-5deg]">
+                                    <div className="absolute inset-0 border border-blue-600/30 rounded-full scale-[0.92]" />
+                                    <p className="text-[7px] font-black text-blue-600 uppercase leading-none tracking-tighter">DOUBLE KING SHOP</p>
+                                    <div className="my-1">
+                                        <ShieldCheck className="text-blue-600" size={24} />
                                     </div>
+                                    <p className="text-[6px] font-bold text-blue-600 uppercase leading-none">CERTIFIED HUB</p>
+                                    <p className="text-[8px] font-black text-blue-600 uppercase tracking-widest mt-0.5">BUNIA</p>
                                 </div>
-                                <ShieldCheck className="text-blue-600/20 absolute" size={64} />
-                            </div>
-                            <div className="mt-4 text-center">
-                                <p className="text-[8px] font-black text-gray-300 italic">Signature de la Direction</p>
-                                <div className="h-10 w-32 border-b border-gray-200 mx-auto mt-2" />
+
+                                <div className="space-y-1">
+                                    <p className="text-[8px] font-black text-gray-400 italic">Signature Autorisée</p>
+                                    {/* Signature manuscrite SVG automatique */}
+                                    <div className="h-10 w-40 flex items-center justify-center">
+                                        <svg viewBox="0 0 200 60" className="w-full h-full text-blue-800 opacity-80" style={{ filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.1))' }}>
+                                            <path d="M20,40 Q50,10 80,40 T140,30 Q160,20 180,45" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                                            <path d="M40,30 Q60,50 90,25" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" opacity="0.6" />
+                                            <path d="M110,40 Q130,10 150,50" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" opacity="0.6" />
+                                        </svg>
+                                    </div>
+                                    <p className="text-[10px] font-black uppercase italic tracking-tighter text-blue-900">Expert Bahati Nyeke</p>
+                                    <div className="w-24 h-[1px] bg-blue-600/30 mx-auto mt-1" />
+                                </div>
                             </div>
                         </div>
 
@@ -557,3 +572,4 @@ export default function OrdersPage() {
     </div>
   );
 }
+
