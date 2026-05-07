@@ -15,7 +15,7 @@ import {
     Lock, 
     ShieldCheck, 
     History,
-    Search,
+    Search, 
     QrCode,
     Zap,
     TrendingUp,
@@ -54,6 +54,7 @@ import {
 } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const TOTAL_SUPPLY = 50000000;
 const DISTRIBUTION = {
