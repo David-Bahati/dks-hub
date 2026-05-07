@@ -33,6 +33,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
 
 type PaymentMethod = 'pi' | 'dkst' | 'mobile_money' | 'visa';
 
@@ -54,7 +56,7 @@ export default function CheckoutPage() {
     const [phoneNumber, setPhone] = useState("");
     const [cardNumber, setCardNumber] = useState("");
 
-    const validateOrder = async () => {
+    const validateOrder = () => {
         if (!user) {
             toast({ title: "Connexion requise", description: "Veuillez vous connecter pour valider l'achat." });
             router.push(`/login?redirect=/checkout`);
@@ -62,39 +64,46 @@ export default function CheckoutPage() {
         }
 
         if (method === 'dkst') {
+            const currentBalance = user.tokenBalance || 0;
+            
+            // 1. Vérification du solde
+            if (currentBalance < totalPrice) {
+                toast({ 
+                    title: "Solde insuffisant", 
+                    description: `Il vous manque ${(totalPrice - currentBalance).toFixed(2)} DKST pour cette commande.`,
+                    variant: "destructive" 
+                });
+                return;
+            }
+
+            // 2. Vérification de la configuration du PIN
             if (!user.walletPin) {
-                toast({ title: "PIN non configuré", description: "Veuillez définir un code PIN dans vos réglages de sécurité." });
+                toast({ 
+                    title: "PIN non configuré", 
+                    description: "Veuillez définir un code PIN dans vos réglages pour valider les paiements DKST.",
+                    variant: "destructive"
+                });
                 router.push('/dashboard/settings');
                 return;
             }
-            if ((user.tokenBalance || 0) < totalPrice) {
-                toast({ title: "Solde DKST insuffisant", variant: "destructive" });
-                return;
-            }
+
+            // 3. Si tout est OK, on demande le PIN
             setIsPinOpen(true);
         } else if (method === 'pi') {
             handlePiPayment();
         } else {
-            // Mobile Money / Visa simulation
             executeOrder();
         }
     };
 
-    const handlePiPayment = async () => {
+    const handlePiPayment = () => {
         setIsProcessing(true);
-        // Simulate Pi SDK Call or use real window.Pi if available
         const isPiBrowser = typeof window !== 'undefined' && /PiBrowser/i.test(navigator.userAgent);
         
         if (isPiBrowser && (window as any).Pi) {
-            try {
-                toast({ title: "Ouverture du Pi Wallet...", description: "Veuillez confirmer la transaction dans votre Pi Browser." });
-                // En production, on appellerait Pi.createPayment(...)
-                // Simulation pour le prototype :
-                setTimeout(() => executeOrder(), 3000);
-            } catch (e) {
-                setIsProcessing(false);
-                toast({ title: "Erreur Pi SDK", variant: "destructive" });
-            }
+            toast({ title: "Ouverture du Pi Wallet...", description: "Veuillez confirmer la transaction dans votre Pi Browser." });
+            // Simulation du délai SDK
+            setTimeout(() => executeOrder(), 3000);
         } else {
             toast({ 
                 title: "Hors Pi Browser", 
@@ -104,7 +113,7 @@ export default function CheckoutPage() {
         }
     };
 
-    const confirmPinAndPay = async () => {
+    const confirmPinAndPay = () => {
         if (pin === user?.walletPin) {
             setIsPinOpen(false);
             executeOrder();
@@ -114,52 +123,78 @@ export default function CheckoutPage() {
         }
     };
 
-    const executeOrder = async () => {
+    const executeOrder = () => {
         setIsProcessing(true);
-        try {
-            const orderData = {
-                userId: user?.uid,
-                customerName: user?.name,
-                customerEmail: user?.email,
-                items: cartItems,
-                total: totalPrice,
-                status: method === 'dkst' || method === 'visa' || method === 'mobile_money' ? "paid" : "pending_payment",
-                paymentMethod: method.toUpperCase(),
-                createdAt: serverTimestamp(),
-                updatedAt: serverTimestamp()
-            };
+        
+        const orderData = {
+            userId: user?.uid,
+            customerName: user?.name,
+            customerEmail: user?.email,
+            items: cartItems,
+            total: totalPrice,
+            status: method === 'dkst' || method === 'visa' || method === 'mobile_money' ? "paid" : "pending_payment",
+            paymentMethod: method.toUpperCase(),
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
+        };
 
-            const orderRef = await addDoc(collection(db, "orders"), orderData);
+        const ordersRef = collection(db, "orders");
+        
+        // Mutation non-bloquante pour la commande
+        addDoc(ordersRef, orderData)
+            .then((orderRef) => {
+                // Si DKST, on déduit le solde de manière non-bloquante
+                if (method === 'dkst' && user?.uid) {
+                    const userRef = doc(db, "users", user.uid);
+                    const txRef = collection(db, "tokenTransactions");
 
-            // Deduct tokens if DKST
-            if (method === 'dkst' && user?.uid) {
-                await updateDoc(doc(db, "users", user.uid), {
-                    tokenBalance: increment(-totalPrice),
-                    updatedAt: serverTimestamp()
+                    const balanceUpdate = {
+                        tokenBalance: increment(-totalPrice),
+                        updatedAt: serverTimestamp()
+                    };
+
+                    updateDoc(userRef, balanceUpdate).catch(async (err) => {
+                        errorEmitter.emit('permission-error', new FirestorePermissionError({
+                            path: userRef.path,
+                            operation: 'update',
+                            requestResourceData: balanceUpdate
+                        }));
+                    });
+
+                    const txData = {
+                        userId: user.uid,
+                        userName: user.name,
+                        type: 'exchange',
+                        tokenAmount: totalPrice,
+                        memo: `Achat Boutique DKS #${orderRef.id.substring(0, 8)}`,
+                        createdAt: serverTimestamp()
+                    };
+
+                    addDoc(txRef, txData).catch(async (err) => {
+                        errorEmitter.emit('permission-error', new FirestorePermissionError({
+                            path: txRef.path,
+                            operation: 'create',
+                            requestResourceData: txData
+                        }));
+                    });
+                }
+
+                toast({ 
+                    title: "Commande confirmée !", 
+                    description: "Votre reçu est disponible dans votre dashboard." 
                 });
-
-                await addDoc(collection(db, "tokenTransactions"), {
-                    userId: user.uid,
-                    userName: user.name,
-                    type: 'exchange',
-                    tokenAmount: totalPrice,
-                    memo: `Achat Boutique DKS #${orderRef.id.substring(0, 8)}`,
-                    createdAt: serverTimestamp()
-                });
-            }
-
-            toast({ 
-                title: "Commande confirmée !", 
-                description: "Votre reçu est disponible dans votre dashboard." 
+                
+                clearCart();
+                router.push('/dashboard/orders');
+            })
+            .catch(async (error) => {
+                setIsProcessing(false);
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
+                    path: ordersRef.path,
+                    operation: 'create',
+                    requestResourceData: orderData
+                }));
             });
-            
-            clearCart();
-            router.push('/dashboard/orders');
-        } catch (error) {
-            toast({ title: "Erreur", description: "Impossible de valider la commande.", variant: "destructive" });
-        } finally {
-            setIsProcessing(false);
-        }
     };
 
     if (cartItems.length === 0 && !isProcessing) {
@@ -171,6 +206,8 @@ export default function CheckoutPage() {
             </div>
         );
     }
+
+    const isBalanceInsufficient = method === 'dkst' && (user?.tokenBalance || 0) < totalPrice;
 
     return (
         <div className="min-h-screen bg-background text-foreground pb-20">
@@ -338,16 +375,35 @@ export default function CheckoutPage() {
                                             Le montant sera déduit de votre solde miné. Votre **Signature PIN** sera demandée à l'étape suivante.
                                         </p>
                                     </div>
-                                    <div className="flex items-center gap-2">
-                                        <Badge className="bg-accent text-black font-black uppercase text-[10px]">Solde: {user?.tokenBalance?.toFixed(2) || 0} DKST</Badge>
+                                    
+                                    <div className="w-full max-w-xs space-y-4">
+                                        <div className={cn(
+                                            "flex items-center justify-between p-4 rounded-2xl border transition-all",
+                                            isBalanceInsufficient ? "bg-red-500/10 border-red-500/30" : "bg-black/40 border-white/5"
+                                        )}>
+                                            <span className="text-[10px] font-black uppercase opacity-40">Votre Solde</span>
+                                            <span className={cn("text-lg font-black", isBalanceInsufficient ? "text-red-500" : "text-accent")}>
+                                                {user?.tokenBalance?.toFixed(2) || 0} DKST
+                                            </span>
+                                        </div>
+                                        
+                                        {isBalanceInsufficient && (
+                                            <div className="flex items-center gap-2 text-red-500 justify-center">
+                                                <AlertCircle size={14} />
+                                                <p className="text-[10px] font-black uppercase">Solde insuffisant pour cet achat</p>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             )}
 
                             <Button 
                                 onClick={validateOrder} 
-                                disabled={isProcessing}
-                                className="w-full h-20 bg-accent text-black font-black uppercase italic rounded-2xl shadow-xl shadow-accent/20 text-lg mt-10 gap-3 hover:scale-[1.02] transition-all"
+                                disabled={isProcessing || isBalanceInsufficient}
+                                className={cn(
+                                    "w-full h-20 font-black uppercase italic rounded-2xl shadow-xl text-lg mt-10 gap-3 hover:scale-[1.02] transition-all",
+                                    isBalanceInsufficient ? "bg-white/5 text-white/20" : "bg-accent text-black shadow-accent/20"
+                                )}
                             >
                                 {isProcessing ? <Loader2 className="animate-spin" /> : <><CheckCircle2 size={24} /> Confirmer & Payer ${totalPrice.toFixed(2)}</>}
                             </Button>
