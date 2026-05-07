@@ -11,7 +11,6 @@ import {
   Settings,
   ShoppingCart,
   TrendingUp,
-  LineChart,
   Users,
   UsersRound,
   ShoppingBag,
@@ -32,81 +31,38 @@ import {
   BarChart3,
   Calendar as CalendarIcon,
   MonitorSmartphone,
-  PieChart as PieChartIcon,
   Bell,
   CheckCircle2,
-  AlertCircle,
-  Search,
-  Command,
-  Share2,
-  ShieldCheck,
-  FileText,
-  CreditCard,
-  FlaskConical,
-  PackagePlus,
-  Trash2,
-  Hammer,
-  BookText,
-  User as UserIcon,
-  Medal,
-  Send,
-  MailCheck,
-  Download,
-  QrCode,
-  Coins,
-  Wallet,
-  Gift,
-  Award,
-  Cpu,
+  LogOut,
   Pickaxe,
-  Target,
   Flame,
-  Layout,
-  LayoutDashboard,
-  Gem,
-  ArrowUpCircle,
-  Heart,
   Activity,
-  Vote,
-  Scale,
-  Building2,
   Timer,
+  Building2,
+  Target,
   CheckCircle,
   BarChartHorizontal,
-  LogOut,
-  ChevronRight,
-  ZapOff
+  LayoutDashboard
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import {
   Sheet,
   SheetContent,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { 
-    getExchangeRate,
-    getDashboardStats,
-    getLowStockItems,
-    getRevenueChartData,
-} from '@/lib/data';
-import { Product, DailyMission } from '@/lib/types';
 import withAuth from '@/components/auth/withAuth';
 import { useAuth } from '@/context/AuthContext';
 import { useCollection, useMemoFirebase, useDoc } from '@/firebase';
-import { collection, query, where, orderBy, limit, addDoc, serverTimestamp, doc, updateDoc, increment, Timestamp, arrayUnion, setDoc } from 'firebase/firestore';
+import { collection, query, where, addDoc, serverTimestamp, doc, updateDoc, increment, Timestamp, arrayUnion, setDoc } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
 import { signOut } from 'firebase/auth';
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/ui/Logo";
-import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Progress } from "@/components/ui/progress";
 import { UserGuide } from "@/components/dashboard/UserGuide";
@@ -119,7 +75,7 @@ import { FirestorePermissionError } from '@/firebase/errors';
 
 const TOTAL_COMMUNITY_SUPPLY = 32500000;
 
-const DAILY_MISSIONS: DailyMission[] = [
+const DAILY_MISSIONS = [
     { id: 'm1', title: 'Consultation Stock', description: 'Visiter le catalogue hardware pour voir les nouveautés.', rewardPoints: 10, icon: '📦', targetRole: 'all' },
     { id: 'm2', title: 'Alerte Labo', description: 'Consulter le journal de bord pour les mises à jour techniques.', rewardPoints: 20, icon: '📑', targetRole: 'staff' },
     { id: 'm3', title: 'Ambassadeur DKS', description: 'Partager votre code de parrainage sur WhatsApp.', rewardPoints: 50, icon: '📱', targetRole: 'customer' },
@@ -168,6 +124,7 @@ function DashboardPage() {
     const totalPower = (activeMiners?.reduce((acc, u) => acc + (u.miningPower || 1), 0) || 0);
     const luckMultiplier = Math.min(2, 1 + (count / 10));
     const minted = treasury?.totalMinted || 0;
+    // On s'assure que remaining n'est jamais bloquant s'il n'est pas encore chargé
     const remaining = Math.max(0, TOTAL_COMMUNITY_SUPPLY - minted);
     const depletedPct = (minted / TOTAL_COMMUNITY_SUPPLY) * 100;
     
@@ -194,6 +151,7 @@ function DashboardPage() {
         return;
     }
     const interval = setInterval(() => {
+        // Support pour Timestamp Firestore ou Date String
         const lastMining = user.lastMiningAt?.toDate ? user.lastMiningAt.toDate() : new Date(user.lastMiningAt);
         const nextMining = new Date(lastMining.getTime() + 24 * 60 * 60 * 1000);
         const now = new Date();
@@ -213,7 +171,8 @@ function DashboardPage() {
             const progress = (elapsed / (24 * 60 * 60 * 1000)) * 100;
             setMiningProgress(progress);
 
-            if (now.getTime() - lastMining.getTime() < 30000) {
+            // Simulation visuelle de gain
+            if (now.getTime() - lastMining.getTime() < 60000) {
                 setRealTimeGain(prev => prev + 0.00003);
             }
         }
@@ -222,8 +181,9 @@ function DashboardPage() {
   }, [user?.lastMiningAt]);
 
   const handleStartMining = () => {
-    if (!user || miningTimeLeft || poolStats.remaining <= 0) return;
+    if (!user || miningTimeLeft) return;
     
+    // Feedback tactile si possible
     if (typeof navigator !== 'undefined' && navigator.vibrate) {
         navigator.vibrate(50);
     }
@@ -236,7 +196,7 @@ function DashboardPage() {
     else if (random < 0.20 * poolStats.luckMultiplier) { rarity = 'rare'; multiplier = 2; }
 
     const baseReward = user.loyaltyLevel === 'Gold' ? 0.5 : user.loyaltyLevel === 'Silver' ? 0.2 : 0.1;
-    const finalReward = Math.min(poolStats.remaining, baseReward * multiplier * poolStats.halvingFactor);
+    const finalReward = Math.min(poolStats.remaining || 0.1, baseReward * multiplier * poolStats.halvingFactor);
 
     const userRef = doc(db, "users", user.uid);
     const treasuryDocRef = doc(db, "system", "treasury");
@@ -251,11 +211,12 @@ function DashboardPage() {
         updatedAt: serverTimestamp()
     };
 
-    // Mutation Non-bloquante
+    // Mise à jour Non-bloquante du profil
     updateDoc(userRef, updateData).catch(async (err) => {
         errorEmitter.emit('permission-error', new FirestorePermissionError({ path: userRef.path, operation: 'update', requestResourceData: updateData }));
     });
 
+    // Mise à jour de la pool globale (Trésorerie)
     setDoc(treasuryDocRef, {
         totalMinted: increment(finalReward),
         updatedAt: serverTimestamp()
@@ -263,9 +224,14 @@ function DashboardPage() {
         errorEmitter.emit('permission-error', new FirestorePermissionError({ path: treasuryDocRef.path, operation: 'write', requestResourceData: { totalMinted: finalReward } }));
     });
 
+    // Enregistrement de la transaction de minage
     const txData = {
-        userId: user.uid, userName: user.name, type: 'mining',
-        tokenAmount: finalReward, rarity: rarity, createdAt: serverTimestamp(),
+        userId: user.uid, 
+        userName: user.name, 
+        type: 'mining',
+        tokenAmount: finalReward, 
+        rarity: rarity, 
+        createdAt: serverTimestamp(),
         memo: `Mining Pool DKS - Bloc ${rarity.toUpperCase()} (Halving: x${poolStats.halvingFactor})`
     };
 
@@ -281,7 +247,7 @@ function DashboardPage() {
     setIsMining(false);
   };
 
-  const handleCompleteMission = (mission: DailyMission) => {
+  const handleCompleteMission = (mission: any) => {
     if (!user || user.completedMissionsToday?.includes(mission.id)) return;
     
     setClaimingId(mission.id);
@@ -324,6 +290,9 @@ function DashboardPage() {
                 <Logo size="sm" showText />
             </Link>
         </div>
+        <Link href="/" className="group flex items-center gap-3 px-4 py-3 rounded-2xl transition-all text-sm font-black uppercase italic text-accent hover:bg-accent/10 mb-4">
+           <ShoppingBag size={18} /> Retour Boutique
+        </Link>
         {navConfig.filter(link => link.roles.map(r => r.toLowerCase()).includes(user?.role?.toLowerCase() || "")).map(link => (
           <Link key={link.href} href={link.href} className={cn("group flex items-center gap-3 px-4 py-3 rounded-2xl transition-all text-sm font-bold", pathname === link.href ? 'bg-accent/10 text-accent' : 'text-slate-400 hover:bg-white/5 hover:text-white')}>
             <link.icon className={cn("h-4 w-4", pathname === link.href ? 'text-accent' : '')} />{link.label}
@@ -349,7 +318,7 @@ function DashboardPage() {
           </Sheet>
         <div className="flex-1 flex items-center justify-between">
             <div className="flex items-center gap-4">
-                <Link href="/">
+                <Link href="/" className="hover:scale-105 transition-transform">
                     <Logo size="sm" showText />
                 </Link>
             </div>
@@ -377,7 +346,7 @@ function DashboardPage() {
       </header>
 
       <main className="flex-1 p-4 md:p-8 space-y-12 pb-24 max-w-[1600px] mx-auto w-full">
-          <div className="flex flex-col md:flex-row items-center gap-8 mb-12 p-10 bg-white/[0.02] border border-white/5 rounded-[3rem] relative overflow-hidden group">
+          <div className="flex flex-col md:flex-row items-center gap-8 mb-12 p-10 bg-white/[0.02] border border-white/5 rounded-[3rem] relative overflow-hidden group shadow-2xl">
               <div className="absolute top-0 right-0 p-8 opacity-5"><Sparkles size={160} className="text-accent animate-pulse" /></div>
               <Avatar className="h-32 w-32 border-4 border-accent p-1.5 bg-background shadow-2xl transition-transform group-hover:scale-105 duration-500">
                   <AvatarImage src={user?.photoURL} className="rounded-full object-cover" />
@@ -424,7 +393,7 @@ function DashboardPage() {
                                       </svg>
                                       <div className="flex flex-col items-center gap-1 z-10">
                                           <Pickaxe size={48} className="text-accent animate-bounce" />
-                                          <div className="text-3xl font-black text-white italic tracking-tighter font-mono drop-shadow-[0_0_10px_rgba(56,189,248,0.8)]">{miningTimeLeft}</div>
+                                          <div className="text-3xl font-black text-white italic tracking-tighter font-mono drop-shadow-[0_0_15px_rgba(56,189,248,0.8)]">{miningTimeLeft}</div>
                                       </div>
                                   </div>
 
@@ -547,7 +516,7 @@ function DashboardPage() {
                                                     </div>
                                                 </div>
                                                 <div className="shrink-0">
-                                                    {isDone ? <CheckCircle className="text-green-500 h-4 w-4" /> : claimingMission === mission.id ? <Loader2 className="h-4 w-4 animate-spin text-primary" /> : <Badge className="bg-primary text-white text-[7px] font-black">+{mission.rewardPoints} PTS</Badge>}
+                                                    {isDone ? <CheckCircle size={16} className="text-green-500 h-4 w-4" /> : claimingMission === mission.id ? <Loader2 className="h-4 w-4 animate-spin text-primary" /> : <Badge className="bg-primary text-white text-[7px] font-black">+{mission.rewardPoints} PTS</Badge>}
                                                 </div>
                                             </div>
                                         );
