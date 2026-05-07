@@ -25,11 +25,13 @@ import {
     EyeOff, 
     ArrowRight,
     QrCode,
-    AlertCircle
+    AlertCircle,
+    ShoppingBag
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 type PaymentMethod = 'pi' | 'dkst' | 'mobile_money' | 'visa';
@@ -393,4 +395,3 @@ export default function CheckoutPage() {
         </div>
     );
 }
-
