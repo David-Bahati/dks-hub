@@ -130,7 +130,6 @@ function DashboardPage() {
   const pathname = usePathname();
   const router = useRouter();
   const { toast } = useToast();
-  const [loading, setLoading] = useState(true);
   
   // Mining States
   const [isMining, setIsMining] = useState(false);
@@ -394,7 +393,7 @@ function DashboardPage() {
                   <div className="relative z-10 space-y-8">
                       <div className="flex justify-between items-start">
                           <div className="space-y-1">
-                              <Badge className="bg-accent text-black font-black uppercase italic text-[8px] tracking-[0.3em] px-4 py-1 mb-2">Pool Communautaire 65%</Badge>
+                              <Badge className="bg-accent text-black font-black uppercase italic text-[9px] px-4 py-1 mb-2">Pool Communautaire 65%</Badge>
                               <h2 className="text-3xl font-black uppercase italic tracking-tighter">MINAGE <span className="text-accent">D'ÉLITE</span></h2>
                           </div>
                           <div className={cn("border p-3 rounded-2xl text-center transition-all duration-500", getRarityColor(user?.lastBlockRarity || 'common'))}>
@@ -413,7 +412,7 @@ function DashboardPage() {
                                       </svg>
                                       <div className="flex flex-col items-center gap-1 z-10">
                                           <Pickaxe size={48} className="text-accent animate-bounce" />
-                                          <div className="text-3xl font-black text-white italic tracking-tighter font-mono">{miningTimeLeft}</div>
+                                          <div className="text-3xl font-black text-white italic tracking-tighter font-mono drop-shadow-[0_0_10px_rgba(56,189,248,0.8)]">{miningTimeLeft}</div>
                                       </div>
                                   </div>
 
@@ -439,8 +438,8 @@ function DashboardPage() {
                                   </div>
                                   
                                   <div className="relative group">
-                                      <div className="absolute -inset-4 bg-accent/20 rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
-                                      <Button onClick={handleStartMining} disabled={isMining || poolStats.remaining <= 0} className="h-32 w-32 rounded-full bg-accent text-black font-black uppercase italic text-lg shadow-[0_0_50px_rgba(56,189,248,0.4)] hover:scale-110 active:scale-95 transition-all flex flex-col items-center justify-center p-0 group">
+                                      <div className="absolute -inset-6 bg-accent/30 rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-opacity animate-pulse" />
+                                      <Button onClick={handleStartMining} disabled={isMining || poolStats.remaining <= 0} className="h-32 w-32 rounded-full bg-accent text-black font-black uppercase italic text-lg shadow-[0_0_50px_rgba(56,189,248,0.6)] hover:scale-110 active:scale-95 transition-all flex flex-col items-center justify-center p-0 group border-4 border-white/20">
                                           {isMining ? <Loader2 className="animate-spin h-10 w-10" /> : <><Flame size={40} className="group-hover:animate-pulse" /><span className="text-[8px] mt-2">Lancer Cycle</span></>}
                                       </Button>
                                   </div>
