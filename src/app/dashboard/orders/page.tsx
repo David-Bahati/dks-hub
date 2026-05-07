@@ -352,7 +352,9 @@ export default function OrdersPage() {
                                 <p className="text-sm font-bold">Mode : <span className="uppercase">{selectedOrderForPDF.paymentMethod === 'PI_NETWORK' ? 'Crypto-monnaie (Pi)' : selectedOrderForPDF.paymentMethod?.replace('_', ' ')}</span></p>
                                 <p className="text-sm font-bold">Statut : <span className="uppercase text-green-600">{selectedOrderForPDF.status}</span></p>
                                 {selectedOrderForPDF.paymentMethod === 'PI_NETWORK' && (
-                                    <p className="text-xs font-medium text-orange-600 mt-2">Transaction GCV validée blockchain</p>
+                                    <p className="text-xs font-black text-orange-600 mt-2 flex items-center gap-2">
+                                        <QrCode size={12} /> Transaction GCV validée blockchain
+                                    </p>
                                 )}
                             </div>
                         </div>
@@ -402,17 +404,24 @@ export default function OrdersPage() {
                                 
                                 {/* DÉTAIL CONVERSION SELON MODE */}
                                 {selectedOrderForPDF.paymentMethod === 'PI_NETWORK' && (
-                                    <div className="bg-orange-50 p-4 rounded-xl flex justify-between items-center border border-orange-100">
-                                        <span className="text-[10px] font-black text-orange-800 uppercase">Valeur Crypto (GCV)</span>
-                                        <span className="text-sm font-black text-orange-800">{(selectedOrderForPDF.total / PI_GCV).toFixed(8)} π</span>
+                                    <div className="bg-orange-50 p-6 rounded-2xl flex flex-col gap-2 border border-orange-100">
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-[10px] font-black text-orange-800 uppercase">Valeur Pi (GCV)</span>
+                                            <Badge className="bg-orange-200 text-orange-800 border-none text-[8px] font-black">Consensus $314,159</Badge>
+                                        </div>
+                                        <span className="text-2xl font-black text-orange-800 italic">
+                                            {(selectedOrderForPDF.total / PI_GCV).toFixed(8)} π
+                                        </span>
                                     </div>
                                 )}
+
                                 {selectedOrderForPDF.paymentMethod === 'MOBILE_MONEY' && (
                                     <div className="bg-blue-50 p-4 rounded-xl flex justify-between items-center border border-blue-100">
                                         <span className="text-[10px] font-black text-blue-800 uppercase">Montant Francs Congolais</span>
                                         <span className="text-sm font-black text-blue-800">{(selectedOrderForPDF.cdfValue || selectedOrderForPDF.total * exchangeRate).toLocaleString()} CDF</span>
                                     </div>
                                 )}
+                                
                                 {selectedOrderForPDF.paymentMethod === 'DKST' && (
                                     <div className="bg-cyan-50 p-4 rounded-xl flex justify-between items-center border border-cyan-100">
                                         <span className="text-[10px] font-black text-cyan-800 uppercase">Débit Wallet DKST</span>
