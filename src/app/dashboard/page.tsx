@@ -42,7 +42,22 @@ import {
   Target,
   CheckCircle,
   BarChartHorizontal,
-  LayoutDashboard
+  LayoutDashboard,
+  Wallet,
+  Vote,
+  User as UserIcon,
+  Coins,
+  Scale,
+  Layout,
+  FlaskConical,
+  Hammer,
+  BookText,
+  PackagePlus,
+  Trash2,
+  FileText,
+  CreditCard,
+  ShieldCheck,
+  Share2
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -124,7 +139,6 @@ function DashboardPage() {
     const totalPower = (activeMiners?.reduce((acc, u) => acc + (u.miningPower || 1), 0) || 0);
     const luckMultiplier = Math.min(2, 1 + (count / 10));
     const minted = treasury?.totalMinted || 0;
-    // On s'assure que remaining n'est jamais bloquant s'il n'est pas encore chargé
     const remaining = Math.max(0, TOTAL_COMMUNITY_SUPPLY - minted);
     const depletedPct = (minted / TOTAL_COMMUNITY_SUPPLY) * 100;
     
@@ -151,7 +165,6 @@ function DashboardPage() {
         return;
     }
     const interval = setInterval(() => {
-        // Support pour Timestamp Firestore ou Date String
         const lastMining = user.lastMiningAt?.toDate ? user.lastMiningAt.toDate() : new Date(user.lastMiningAt);
         const nextMining = new Date(lastMining.getTime() + 24 * 60 * 60 * 1000);
         const now = new Date();
@@ -171,7 +184,6 @@ function DashboardPage() {
             const progress = (elapsed / (24 * 60 * 60 * 1000)) * 100;
             setMiningProgress(progress);
 
-            // Simulation visuelle de gain
             if (now.getTime() - lastMining.getTime() < 60000) {
                 setRealTimeGain(prev => prev + 0.00003);
             }
@@ -183,7 +195,6 @@ function DashboardPage() {
   const handleStartMining = () => {
     if (!user || miningTimeLeft) return;
     
-    // Feedback tactile si possible
     if (typeof navigator !== 'undefined' && navigator.vibrate) {
         navigator.vibrate(50);
     }
@@ -211,12 +222,10 @@ function DashboardPage() {
         updatedAt: serverTimestamp()
     };
 
-    // Mise à jour Non-bloquante du profil
     updateDoc(userRef, updateData).catch(async (err) => {
         errorEmitter.emit('permission-error', new FirestorePermissionError({ path: userRef.path, operation: 'update', requestResourceData: updateData }));
     });
 
-    // Mise à jour de la pool globale (Trésorerie)
     setDoc(treasuryDocRef, {
         totalMinted: increment(finalReward),
         updatedAt: serverTimestamp()
@@ -224,7 +233,6 @@ function DashboardPage() {
         errorEmitter.emit('permission-error', new FirestorePermissionError({ path: treasuryDocRef.path, operation: 'write', requestResourceData: { totalMinted: finalReward } }));
     });
 
-    // Enregistrement de la transaction de minage
     const txData = {
         userId: user.uid, 
         userName: user.name, 
@@ -270,7 +278,6 @@ function DashboardPage() {
   };
 
   const myMissions = useMemo(() => {
-    const userRole = user?.role?.toLowerCase() || 'customer';
     return DAILY_MISSIONS.filter(m => m.targetRole === 'all' || m.targetRole === (isStaff ? 'staff' : 'customer'));
   }, [user, isStaff]);
 
@@ -363,7 +370,7 @@ function DashboardPage() {
           </div>
 
           <div className="grid gap-6 grid-cols-1 lg:grid-cols-12">
-              <Card className="lg:col-span-5 bg-gradient-to-br from-accent/10 via-background to-black border-accent/20 rounded-[3rem] p-10 relative overflow-hidden group shadow-2xl">
+              <Card className="lg:col-span-5 bg-gradient-to-br from-accent/10 via-background to-black border-accent/20 rounded-[3rem] p-12 relative overflow-hidden group shadow-2xl">
                   {miningTimeLeft && (
                       <div className="absolute inset-0 pointer-events-none z-0">
                           <div className="absolute top-1/4 left-1/4 w-1 h-1 bg-accent rounded-full animate-ping opacity-20" />
