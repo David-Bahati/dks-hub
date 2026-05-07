@@ -39,20 +39,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         unsubscribeSnapshot = onSnapshot(userDocRef, (userDocSnap) => {
           if (userDocSnap.exists()) {
             const userData = userDocSnap.data();
+            // On fusionne les données Firebase Auth avec toutes les données Firestore
             setUser({
+              ...userData,
               uid: firebaseUser.uid,
-              email: firebaseUser.email || '',
+              email: firebaseUser.email || userData.email || '',
               name: userData.name || userData.displayName || userData.username || 'Utilisateur',
               role: userData.role || 'customer',
-              createdAt: userData.createdAt || null,
-              photoURL: userData.photoURL || null,
-              whatsapp: userData.whatsapp || userData.phoneNumber || '',
-              address: userData.address || '',
-              loyaltyLevel: userData.loyaltyLevel || 'Bronze',
-              language: userData.language || 'fr',
-              tokenBalance: userData.tokenBalance || 0,
-              pointsConverted: userData.pointsConverted || 0,
-            });
+              photoURL: userData.photoURL || firebaseUser.photoURL || null,
+            } as AppUser);
           } else {
             setUser({
               uid: firebaseUser.uid,
@@ -62,7 +57,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               photoURL: firebaseUser.photoURL || null,
               tokenBalance: 0,
               pointsConverted: 0,
-            });
+            } as AppUser);
           }
           setIsLoading(false);
         }, (error) => {
