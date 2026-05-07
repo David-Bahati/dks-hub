@@ -28,7 +28,12 @@ import {
     Trash2,
     Save,
     Camera,
-    Upload
+    Upload,
+    Copy,
+    Check,
+    Share2,
+    MessageCircle,
+    Gift
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -75,6 +80,7 @@ export default function SettingsPage() {
     const [photoURL, setPhotoURL] = useState("");
     const [language, setLanguage] = useState("fr");
     const [isSaving, setIsSaving] = useState(false);
+    const [hasCopiedRef, setHasCopiedRef] = useState(false);
 
     // Security States
     const [currentPassword, setCurrentPassword] = useState("");
@@ -163,6 +169,16 @@ export default function SettingsPage() {
         } catch (error) { toast({ title: "Erreur PIN", variant: "destructive" }); } finally { setIsUpdatingPin(false); }
     };
 
+    const copyReferralLink = () => {
+        if (!user?.referralCode) return;
+        const baseUrl = window.location.origin;
+        const link = `${baseUrl}/register?ref=${user.referralCode}`;
+        navigator.clipboard.writeText(link);
+        setHasCopiedRef(true);
+        toast({ title: "Lien copié !", description: "Invitez vos contacts à rejoindre l'élite." });
+        setTimeout(() => setHasCopiedRef(false), 2000);
+    };
+
     const handleAddAd = () => {
         const newAd: Ad = {
             id: Math.random().toString(36).substring(7),
@@ -228,43 +244,74 @@ export default function SettingsPage() {
 
                     <TabsContent value="profile" className="space-y-10 animate-in fade-in slide-in-from-bottom-4">
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-                            <Card className="glossy-card border-none rounded-[2.5rem] p-8 text-center space-y-6">
-                                <div className="relative inline-block mx-auto group">
-                                    <Avatar className="h-40 w-40 border-4 border-accent p-1.5 bg-background shadow-2xl transition-transform group-hover:scale-105 duration-500 overflow-hidden">
-                                        <AvatarImage src={photoURL} className="rounded-full object-cover h-full w-full" />
-                                        <AvatarFallback className="bg-primary/20 text-accent text-5xl font-black italic">{user?.name?.substring(0, 1)}</AvatarFallback>
-                                    </Avatar>
-                                    <button 
-                                        onClick={() => fileInputRef.current?.click()}
-                                        className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer border-4 border-accent/20 z-10"
-                                    >
-                                        <Camera size={32} className="text-white" />
-                                    </button>
-                                    <input 
-                                        type="file" 
-                                        ref={fileInputRef} 
-                                        className="hidden" 
-                                        accept="image/*" 
-                                        onChange={handleFileChange} 
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <h3 className="text-2xl font-black uppercase italic tracking-tighter truncate">{name}</h3>
-                                    <Button 
-                                        variant="outline" 
-                                        size="sm" 
-                                        onClick={() => fileInputRef.current?.click()}
-                                        className="h-9 px-4 rounded-xl border-white/10 hover:bg-accent/10 hover:text-accent font-black uppercase italic text-[9px] gap-2"
-                                    >
-                                        <Upload size={12} /> Changer la photo
-                                    </Button>
-                                </div>
-                                <div className="p-5 bg-white/5 rounded-2xl border border-white/5 text-left space-y-2">
-                                    <p className="text-[8px] font-black uppercase opacity-40">Détails Système</p>
-                                    <div className="flex items-center gap-3 text-[10px] font-bold uppercase"><Mail size={12} className="text-accent" /> {user?.email}</div>
-                                    <div className="flex items-center gap-3 text-[10px] font-bold uppercase"><Smartphone size={12} className="text-accent" /> {whatsapp}</div>
-                                </div>
-                            </Card>
+                            <div className="space-y-8">
+                                <Card className="glossy-card border-none rounded-[2.5rem] p-8 text-center space-y-6">
+                                    <div className="relative inline-block mx-auto group">
+                                        <Avatar className="h-40 w-40 border-4 border-accent p-1.5 bg-background shadow-2xl transition-transform group-hover:scale-105 duration-500 overflow-hidden">
+                                            <AvatarImage src={photoURL} className="rounded-full object-cover h-full w-full" />
+                                            <AvatarFallback className="bg-primary/20 text-accent text-5xl font-black italic">{user?.name?.substring(0, 1)}</AvatarFallback>
+                                        </Avatar>
+                                        <button 
+                                            onClick={() => fileInputRef.current?.click()}
+                                            className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer border-4 border-accent/20 z-10"
+                                        >
+                                            <Camera size={32} className="text-white" />
+                                        </button>
+                                        <input 
+                                            type="file" 
+                                            ref={fileInputRef} 
+                                            className="hidden" 
+                                            accept="image/*" 
+                                            onChange={handleFileChange} 
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <h3 className="text-2xl font-black uppercase italic tracking-tighter truncate">{name}</h3>
+                                        <Button 
+                                            variant="outline" 
+                                            size="sm" 
+                                            onClick={() => fileInputRef.current?.click()}
+                                            className="h-9 px-4 rounded-xl border-white/10 hover:bg-accent/10 hover:text-accent font-black uppercase italic text-[9px] gap-2"
+                                        >
+                                            <Upload size={12} /> Changer la photo
+                                        </Button>
+                                    </div>
+                                    <div className="p-5 bg-white/5 rounded-2xl border border-white/5 text-left space-y-2">
+                                        <p className="text-[8px] font-black uppercase opacity-40">Détails Système</p>
+                                        <div className="flex items-center gap-3 text-[10px] font-bold uppercase"><Mail size={12} className="text-accent" /> {user?.email}</div>
+                                        <div className="flex items-center gap-3 text-[10px] font-bold uppercase"><Smartphone size={12} className="text-accent" /> {whatsapp}</div>
+                                    </div>
+                                </Card>
+
+                                {/* REFERRAL LINK CARD */}
+                                <Card className="bg-primary/10 border-primary/20 rounded-[2.5rem] p-8 space-y-6 relative overflow-hidden">
+                                    <div className="absolute top-0 right-0 p-4 opacity-5"><Gift size={80} /></div>
+                                    <div className="relative z-10 space-y-4">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 rounded-xl bg-primary text-white flex items-center justify-center shadow-lg"><Share2 size={20}/></div>
+                                            <h4 className="text-sm font-black uppercase italic">Lien d'Invitation</h4>
+                                        </div>
+                                        <p className="text-[10px] text-white/60 leading-relaxed italic">
+                                            Partagez votre lien exclusif pour inviter de nouveaux membres et débloquer vos bonus DKS.
+                                        </p>
+                                        <div className="space-y-3">
+                                            <div className="p-3 bg-black/40 rounded-xl border border-white/5 overflow-hidden">
+                                                <p className="text-[9px] font-mono text-primary truncate mb-1">{typeof window !== 'undefined' ? `${window.location.origin}/register?ref=${user?.referralCode}` : '...'}</p>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <Button onClick={copyReferralLink} variant="outline" className="h-10 rounded-xl border-primary/20 text-primary font-black uppercase italic text-[9px] gap-2 hover:bg-primary hover:text-white">
+                                                    {hasCopiedRef ? <Check size={14}/> : <Copy size={14}/>} {hasCopiedRef ? "Copié" : "Copier"}
+                                                </Button>
+                                                <Button className="h-10 rounded-xl bg-green-500 text-white font-black uppercase italic text-[9px] gap-2" asChild>
+                                                    <a href={`https://wa.me/?text=Bonjour,%20rejoins%20le%20Hub%20Double%20King%20Shop%20via%20mon%20lien%20d'invitation%20pour%20profiter%20de%20remises%20exclusives%20:%20${typeof window !== 'undefined' ? `${window.location.origin}/register?ref=${user?.referralCode}` : ''}`} target="_blank" rel="noopener noreferrer">
+                                                        <MessageCircle size={14}/> WhatsApp
+                                                    </a>
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </Card>
+                            </div>
 
                             <div className="lg:col-span-2">
                                 <Card className="glossy-card border-none rounded-[2.5rem] p-10 space-y-8">
@@ -344,13 +391,18 @@ export default function SettingsPage() {
                                             {isPinActive ? "Modifier mon PIN (4 chiffres)" : "Définir mon PIN (4 chiffres)"}
                                         </Label>
                                         <div className="flex justify-center gap-4">
-                                            <Input 
-                                                type="password" 
-                                                maxLength={4} 
-                                                value={walletPin} 
-                                                onChange={(e) => setWalletPin(e.target.value.replace(/\D/g, ''))}
-                                                className="h-20 bg-background/50 border-white/10 rounded-[2rem] text-center text-5xl font-black tracking-[0.5em] focus:border-accent"
-                                            />
+                                            <div className="relative w-full max-w-[200px]">
+                                                <Input 
+                                                    type={showPin ? "text" : "password"} 
+                                                    maxLength={4} 
+                                                    value={walletPin} 
+                                                    onChange={(e) => setWalletPin(e.target.value.replace(/\D/g, ''))}
+                                                    className="h-20 bg-background/50 border-white/10 rounded-[2rem] text-center text-5xl font-black tracking-[0.5em] focus:border-accent"
+                                                />
+                                                <button onClick={() => setShowPin(!showPin)} className="absolute right-4 top-1/2 -translate-y-1/2 text-white/20 hover:text-accent transition-colors">
+                                                    {showPin ? <EyeOff size={20}/> : <Eye size={20}/>}
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
 
@@ -500,3 +552,4 @@ export default function SettingsPage() {
         </div>
     );
 }
+

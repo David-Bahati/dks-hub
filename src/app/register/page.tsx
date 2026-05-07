@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -25,6 +25,14 @@ export default function RegisterPage() {
   const { toast } = useToast();
 
   const { auth, firestore } = initializeFirebase();
+
+  // Capture automatique du parrain via l'URL
+  useEffect(() => {
+    const ref = searchParams.get('ref');
+    if (ref) {
+      setReferralCode(ref.toUpperCase());
+    }
+  }, [searchParams]);
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -203,7 +211,7 @@ export default function RegisterPage() {
                   <Gift className="absolute left-5 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within/input:text-accent transition-colors" size={18} />
                   <Input
                     type="text"
-                    placeholder="Code de parrainage (Optionnel)"
+                    placeholder="Code de parrainage"
                     className="h-14 pl-14 rounded-2xl bg-white/5 border-white/10 border-dashed focus:border-accent text-xs font-black uppercase tracking-widest transition-all"
                     value={referralCode}
                     onChange={(e) => setReferralCode(e.target.value)}
@@ -243,3 +251,4 @@ export default function RegisterPage() {
     </div>
   );
 }
+
