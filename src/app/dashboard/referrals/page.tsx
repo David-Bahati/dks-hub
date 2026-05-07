@@ -37,6 +37,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { Logo } from "@/components/ui/Logo";
+import { Input } from "@/components/ui/input";
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import { cn } from "@/lib/utils";
@@ -297,7 +298,7 @@ function AmbassadorProgramPage() {
                 </div>
             </main>
 
-            {/* MODÈLE DE CERTIFICAT CACHÉ (Inchangé) */}
+            {/* MODÈLE DE CERTIFICAT CACHÉ */}
             <div style={{ position: 'absolute', left: '-9999px', top: 0 }}>
                 <div ref={certRef} className="bg-white text-black p-0 w-[1123px] h-[794px] font-serif relative overflow-hidden flex items-center justify-center">
                     <div className="absolute inset-0 border-[40px] border-double border-[#1e293b]" />
@@ -317,7 +318,7 @@ function AmbassadorProgramPage() {
                             <p className="text-xl font-light italic text-gray-500 uppercase tracking-widest">Écosystème Technologique Hybride</p>
                         </div>
                         <div className="space-y-8 py-10 bg-yellow-50/30 rounded-[3rem] border border-yellow-100">
-                            <p className="text-lg font-medium text-gray-500">Nous certifions officiellement que</p>
+                            <p className="text-lg font-medium text-gray-400">Nous certifions officiellement que</p>
                             <h3 className="text-5xl font-black uppercase tracking-tight border-b-2 border-yellow-200 inline-block pb-2 px-14 italic">{user?.name}</h3>
                             <p className="text-lg font-medium text-gray-600 max-w-2xl mx-auto leading-relaxed italic px-10">Est reconnu comme **Partenaire Stratégique du Hub DKS** pour son implication exceptionnelle dans le rayonnement technologique de la province de l'Ituri.</p>
                         </div>
@@ -329,7 +330,7 @@ function AmbassadorProgramPage() {
                     </div>
                 </div>
             </div>
-        </div>
+        </main>
     );
 }
 
