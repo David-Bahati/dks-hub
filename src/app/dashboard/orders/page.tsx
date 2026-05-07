@@ -25,22 +25,32 @@ import {
   Coins,
   ShieldCheck,
   Globe,
-  Lock
+  Lock,
+  Banknote
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, where, doc, updateDoc, serverTimestamp, addDoc, getDoc } from 'firebase/firestore';
+import { collection, query, where, doc, updateDoc, serverTimestamp, addDoc, getDoc, increment } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardHeader, CardContent, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { 
+    Dialog, 
+    DialogContent, 
+    DialogHeader, 
+    DialogTitle, 
+    DialogFooter,
+    DialogDescription 
+} from '@/components/ui/dialog';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import { Logo } from '@/components/ui/Logo';
 import { PI_GCV } from '@/lib/constants';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function OrdersPage() {
   const { user, isLoading: authLoading } = useAuth();
@@ -50,6 +60,11 @@ export default function OrdersPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [exchangeRate, setExchangeRate] = useState(2500);
   
+  // Payment Dialog States
+  const [orderToPay, setOrderToPay] = useState<any | null>(null);
+  const [collectMethod, setCollectMethod] = useState("CASH");
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+
   // PDF Generation States
   const [selectedOrderForPDF, setSelectedOrderForPDF] = useState<any | null>(null);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
@@ -115,38 +130,64 @@ export default function OrdersPage() {
     });
   }, [rawOrders, search, statusFilter]);
 
-  const updateOrderStatus = async (orderId: string, newStatus: string, userId: string) => {
-    setUpdatingId(orderId);
+  const handleRegisterPayment = async () => {
+    if (!orderToPay) return;
+    setIsProcessingPayment(true);
+
     try {
-        await updateDoc(doc(db, "orders", orderId), {
-            status: newStatus,
+        const piTxId = collectMethod === 'PI_NETWORK' ? `PI-COLLECT-${Math.random().toString(36).substring(2, 10).toUpperCase()}` : null;
+
+        // 1. Update Order
+        await updateDoc(doc(db, "orders", orderToPay.id), {
+            status: 'payée',
+            paymentMethod: collectMethod,
+            piTxId: piTxId,
             updatedAt: serverTimestamp()
         });
 
+        // 2. Register as a Sale for Reports
+        await addDoc(collection(db, "sales"), {
+            userId: user?.uid,
+            customerName: orderToPay.customerName,
+            items: orderToPay.items,
+            totalAmount: orderToPay.total,
+            totalCDF: orderToPay.total * exchangeRate,
+            paymentMode: collectMethod,
+            piTxId: piTxId,
+            orderId: orderToPay.id,
+            createdAt: serverTimestamp()
+        });
+
+        // 3. Decrement Stock
+        await Promise.all(orderToPay.items.map((item: any) => {
+            const productRef = doc(db, "products", item.id || item.productId);
+            return updateDoc(productRef, {
+                stockQuantity: increment(-item.quantity)
+            });
+        }));
+
+        // 4. Notify User
         await addDoc(collection(db, "notifications"), {
-            userId: userId,
-            title: "Statut Commande Mis à Jour",
-            message: `Votre commande #${orderId.substring(0, 8)} est passée au statut : ${newStatus.toUpperCase()}.`,
-            type: 'info',
+            userId: orderToPay.userId,
+            title: "Paiement Reçu au Bureau",
+            message: `Votre commande #${orderToPay.id.substring(0, 8)} a été validée. Merci de votre confiance !`,
+            type: 'success',
             isRead: false,
             createdAt: serverTimestamp(),
             link: '/dashboard/orders'
         });
 
-        toast({
-            title: "Statut mis à jour",
-            description: `La commande est désormais : ${newStatus}`,
-        });
+        toast({ title: "Paiement Enregistré", description: "La commande est désormais clôturée." });
+        setOrderToPay(null);
     } catch (err) {
-        toast({ title: "Erreur", description: "Impossible de modifier le statut.", variant: "destructive" });
+        toast({ title: "Erreur", description: "Impossible d'enregistrer le paiement.", variant: "destructive" });
     } finally {
-        setUpdatingId(null);
+        setIsProcessingPayment(false);
     }
   };
 
   const handleDownloadInvoice = async (order: any) => {
     setSelectedOrderForPDF(order);
-    // On attend que le state soit mis à jour et le DOM rendu
     setTimeout(async () => {
         if (!invoiceRef.current) return;
         setIsGeneratingPDF(true);
@@ -289,12 +330,10 @@ export default function OrdersPage() {
                                             {isStaff && !["payée", "payé", "terminé", "completed", "cancelled", "annulé"].includes(order.status?.toLowerCase()) && (
                                                 <Button 
                                                     size="sm" 
-                                                    className="bg-green-500 hover:bg-green-600 text-white rounded-xl h-11 px-4 gap-2 font-black uppercase text-[9px]"
-                                                    onClick={() => updateOrderStatus(order.id, 'payée', order.userId)}
-                                                    disabled={updatingId === order.id}
+                                                    className="bg-green-500 hover:bg-green-600 text-white rounded-xl h-11 px-4 gap-2 font-black uppercase text-[9px] shadow-lg shadow-green-500/20"
+                                                    onClick={() => setOrderToPay(order)}
                                                 >
-                                                    {updatingId === order.id ? <Loader2 className="animate-spin h-3 w-3" /> : <Check size={14} />}
-                                                    Encaisser
+                                                    <Check size={14} /> Encaisser
                                                 </Button>
                                             )}
                                         </div>
@@ -315,7 +354,53 @@ export default function OrdersPage() {
             )}
         </main>
 
-        {/* FACTURE PDF CACHÉE (Générée lors du téléchargement) */}
+        {/* DIALOG D'ENCAISSEMENT */}
+        <Dialog open={!!orderToPay} onOpenChange={() => setOrderToPay(null)}>
+            <DialogContent className="bg-card border-white/10 text-foreground rounded-[2.5rem] sm:max-w-md">
+                <DialogHeader className="p-4 bg-accent/10 border-b border-white/5 text-center">
+                    <div className="w-16 h-16 rounded-2xl bg-accent text-black flex items-center justify-center mx-auto mb-4 shadow-xl"><Banknote size={32} /></div>
+                    <DialogTitle className="text-2xl font-black uppercase italic tracking-tighter">Enregistrer l'Argent</DialogTitle>
+                    <DialogDescription className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Validation manuelle de la commande</DialogDescription>
+                </DialogHeader>
+
+                <div className="p-8 space-y-8">
+                    <div className="text-center space-y-1">
+                        <p className="text-[10px] font-black uppercase text-muted-foreground opacity-40">Montant à percevoir</p>
+                        <h2 className="text-5xl font-black text-accent italic">${orderToPay?.total?.toFixed(2)}</h2>
+                        <p className="text-lg font-bold text-white/40">≈ {(orderToPay?.total * exchangeRate).toLocaleString()} CDF</p>
+                    </div>
+
+                    <div className="space-y-4">
+                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Mode de règlement physique</Label>
+                        <Select value={collectMethod} onValueChange={setCollectMethod}>
+                            <SelectTrigger className="h-14 bg-background/50 border-white/10 rounded-2xl text-[10px] font-black uppercase italic">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent className="bg-card border-white/10">
+                                <SelectItem value="CASH" className="font-bold uppercase text-[10px] text-green-400">Espèces / Cash</SelectItem>
+                                <SelectItem value="MOBILE_MONEY" className="font-bold uppercase text-[10px] text-blue-400">Mobile Money</SelectItem>
+                                <SelectItem value="PI_NETWORK" className="font-bold uppercase text-[10px] text-yellow-500">Crypto-monnaie (Pi)</SelectItem>
+                                <SelectItem value="VISA" className="font-bold uppercase text-[10px]">Carte Bancaire</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    <div className="p-5 bg-white/5 rounded-2xl border border-white/5 space-y-2">
+                        <p className="text-[8px] font-black uppercase text-muted-foreground">Client : {orderToPay?.customerName}</p>
+                        <p className="text-[8px] font-black uppercase text-muted-foreground">Articles : {orderToPay?.items?.length}</p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4 pt-4">
+                        <Button variant="ghost" onClick={() => setOrderToPay(null)} className="h-14 rounded-2xl font-black uppercase italic text-xs">Annuler</Button>
+                        <Button onClick={handleRegisterPayment} disabled={isProcessingPayment} className="h-14 bg-accent text-black font-black uppercase italic text-xs rounded-2xl shadow-xl shadow-accent/20">
+                            {isProcessingPayment ? <Loader2 className="animate-spin" /> : <><CheckCircle size={16} className="mr-2" /> Valider l'Encaissement</>}
+                        </Button>
+                    </div>
+                </div>
+            </DialogContent>
+        </Dialog>
+
+        {/* FACTURE PDF CACHÉE */}
         <div style={{ position: 'absolute', left: '-9999px', top: 0 }}>
             {selectedOrderForPDF && (
                 <div ref={invoiceRef} className="bg-white text-black p-16 w-[800px] font-sans">
@@ -419,7 +504,6 @@ export default function OrdersPage() {
                                     <span className="text-4xl font-black tracking-tighter">${selectedOrderForPDF.total?.toFixed(2)}</span>
                                 </div>
                                 
-                                {/* DÉTAIL CONVERSION SELON MODE */}
                                 {selectedOrderForPDF.paymentMethod === 'PI_NETWORK' && (
                                     <div className="bg-orange-50 p-6 rounded-2xl flex flex-col gap-3 border border-orange-100 animate-in zoom-in duration-500">
                                         <div className="flex justify-between items-center">
@@ -444,32 +528,12 @@ export default function OrdersPage() {
                                                 </p>
                                             </div>
                                         )}
-                                        
-                                        <p className="text-[8px] font-black text-orange-600 mt-1 flex items-center gap-2">
-                                            <ShieldCheck size={12} /> Transaction validée par le Hub DKS
-                                        </p>
                                     </div>
                                 )}
 
-                                {selectedOrderForPDF.paymentMethod === 'MOBILE_MONEY' && (
-                                    <div className="bg-blue-50 p-4 rounded-xl flex justify-between items-center border border-blue-100">
-                                        <span className="text-[10px] font-black text-blue-800 uppercase">Montant Francs Congolais</span>
-                                        <span className="text-sm font-black text-blue-800">{(selectedOrderForPDF.cdfValue || selectedOrderForPDF.total * exchangeRate).toLocaleString()} CDF</span>
-                                    </div>
-                                )}
-                                
-                                {selectedOrderForPDF.paymentMethod === 'DKST' && (
-                                    <div className="bg-cyan-50 p-4 rounded-xl flex justify-between items-center border border-cyan-100">
-                                        <span className="text-[10px] font-black text-cyan-800 uppercase">Débit Wallet DKST</span>
-                                        <span className="text-sm font-black text-cyan-800">{selectedOrderForPDF.total.toFixed(2)} DKST</span>
-                                    </div>
-                                )}
-                                
-                                {selectedOrderForPDF.paymentMethod !== 'MOBILE_MONEY' && (
-                                    <p className="text-right text-xs font-bold text-gray-400 uppercase">
-                                        Équivalent : {(selectedOrderForPDF.cdfValue || selectedOrderForPDF.total * exchangeRate).toLocaleString()} CDF
-                                    </p>
-                                )}
+                                <p className="text-right text-xs font-bold text-gray-400 uppercase">
+                                    Équivalent : {(selectedOrderForPDF.cdfValue || selectedOrderForPDF.total * exchangeRate).toLocaleString()} CDF
+                                </p>
                             </div>
                         </div>
                     </div>
