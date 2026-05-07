@@ -159,7 +159,7 @@ export default function SettingsPage() {
         setIsUpdatingPin(true);
         try {
             await updateDoc(doc(db, "users", user.uid), { walletPin, updatedAt: serverTimestamp() });
-            toast({ title: "Code PIN Wallet Mis à Jour", description: "Ce code sera requis pour chaque transfert." });
+            toast({ title: user?.walletPin ? "PIN Modifié" : "PIN Activé", description: "Votre signature de sécurité est désormais à jour." });
         } catch (error) { toast({ title: "Erreur PIN", variant: "destructive" }); } finally { setIsUpdatingPin(false); }
     };
 
@@ -201,6 +201,8 @@ export default function SettingsPage() {
     };
 
     const handleLogout = async () => { await signOut(auth); router.push('/login'); };
+
+    const isPinActive = !!user?.walletPin;
 
     return (
         <div className="min-h-screen w-full bg-background text-foreground pb-20">
@@ -321,11 +323,26 @@ export default function SettingsPage() {
                             <Card className="glossy-card border-none rounded-[3rem] p-12 space-y-8 relative overflow-hidden">
                                 <div className="absolute top-0 right-0 p-8 opacity-5"><KeyRound size={120} /></div>
                                 <div className="relative z-10 space-y-8">
-                                    <div className="flex items-center gap-4"><KeyRound className="text-accent" size={24} /><h2 className="text-2xl font-black uppercase italic tracking-tight">SIGNATURE <span className="text-accent">DKST</span></h2></div>
-                                    <p className="text-sm text-muted-foreground leading-relaxed italic">"Le code PIN Wallet est une couche de sécurité supplémentaire requise pour valider chaque transfert de jetons DKST."</p>
+                                    <div className="flex justify-between items-start">
+                                        <div className="flex items-center gap-4">
+                                            <KeyRound className="text-accent" size={24} />
+                                            <h2 className="text-2xl font-black uppercase italic tracking-tight">SIGNATURE <span className="text-accent">DKST</span></h2>
+                                        </div>
+                                        {isPinActive && (
+                                            <Badge className="bg-green-500/10 text-green-400 border-none px-4 py-1.5 uppercase font-black text-[9px] flex items-center gap-2 animate-in zoom-in">
+                                                <ShieldCheck size={12} /> Protection Active
+                                            </Badge>
+                                        )}
+                                    </div>
+
+                                    <p className="text-sm text-muted-foreground leading-relaxed italic">
+                                        "Le code PIN Wallet est une couche de sécurité supplémentaire requise pour valider chaque transfert de jetons DKST."
+                                    </p>
                                     
                                     <div className="space-y-4">
-                                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Définir mon PIN (4 chiffres)</Label>
+                                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">
+                                            {isPinActive ? "Modifier mon PIN (4 chiffres)" : "Définir mon PIN (4 chiffres)"}
+                                        </Label>
                                         <div className="flex justify-center gap-4">
                                             <Input 
                                                 type="password" 
@@ -337,8 +354,22 @@ export default function SettingsPage() {
                                         </div>
                                     </div>
 
-                                    <Button onClick={handleUpdateWalletPin} disabled={isUpdatingPin || walletPin.length !== 4} className="w-full h-16 bg-accent text-black font-black uppercase italic rounded-2xl shadow-xl shadow-accent/20">
-                                        {isUpdatingPin ? <Loader2 className="animate-spin" /> : <><ShieldCheck size={20}/> Activer la Protection PIN</>}
+                                    <Button 
+                                        onClick={handleUpdateWalletPin} 
+                                        disabled={isUpdatingPin || walletPin.length !== 4} 
+                                        className={cn(
+                                            "w-full h-16 font-black uppercase italic rounded-2xl shadow-xl transition-all",
+                                            isPinActive ? "bg-white text-black hover:bg-accent hover:text-black" : "bg-accent text-black shadow-accent/20"
+                                        )}
+                                    >
+                                        {isUpdatingPin ? (
+                                            <Loader2 className="animate-spin" />
+                                        ) : (
+                                            <>
+                                                {isPinActive ? <RefreshCw size={20} className="mr-2" /> : <ShieldCheck size={20} className="mr-2" />}
+                                                {isPinActive ? "Mettre à jour ma Signature PIN" : "Activer la Protection PIN"}
+                                            </>
+                                        )}
                                     </Button>
                                 </div>
                             </Card>
@@ -469,4 +500,3 @@ export default function SettingsPage() {
         </div>
     );
 }
-
