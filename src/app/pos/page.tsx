@@ -37,7 +37,8 @@ import {
   Zap,
   Globe,
   Lock,
-  ShieldCheck
+  ShieldCheck,
+  Receipt
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -198,6 +199,11 @@ function POS() {
     setCustomerName(order.customerName);
     setActiveOrderId(order.id);
     toast({ title: "Commande chargée", description: `Commande #${order.id.substring(0, 8)} de ${order.customerName}` });
+  };
+
+  const directCollect = (order: any) => {
+      loadOrderInPOS(order);
+      setShowConfirmation(true);
   };
 
   const removeFromCart = (id: string) => {
@@ -400,8 +406,8 @@ function POS() {
                             )}
                         </Button>
                     </SheetTrigger>
-                    <SheetContent className="bg-card/95 backdrop-blur-3xl border-white/10 w-full sm:max-w-md flex flex-col">
-                        <SheetHeader className="mb-6">
+                    <SheetContent className="bg-card/95 backdrop-blur-3xl border-white/10 w-full sm:max-w-md flex flex-col p-0">
+                        <SheetHeader className="p-8 bg-accent/10 border-b border-white/5">
                             <SheetTitle className="text-xl font-black uppercase italic flex items-center gap-3">
                                 <ShoppingBag className="text-accent" /> Commandes Web
                             </SheetTitle>
@@ -409,13 +415,13 @@ function POS() {
                               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={14} />
                               <Input 
                                 placeholder="Rechercher par nom ou #ID..." 
-                                className="h-10 pl-10 bg-white/5 border-white/10 rounded-xl text-xs"
+                                className="h-10 pl-10 bg-background/50 border-white/10 rounded-xl text-xs"
                                 value={orderSearch}
                                 onChange={(e) => setOrderSearch(e.target.value)}
                               />
                             </div>
                         </SheetHeader>
-                        <div className="flex-1 space-y-4 overflow-y-auto pr-2 custom-scrollbar">
+                        <div className="flex-1 space-y-4 overflow-y-auto p-6 custom-scrollbar">
                             {filteredPendingOrders.length === 0 ? (
                                 <div className="text-center py-20 opacity-20 italic">
                                     <ShoppingBag size={48} className="mx-auto mb-4" />
@@ -435,12 +441,21 @@ function POS() {
                                             <p className="text-[9px] text-muted-foreground uppercase font-black">Total</p>
                                             <p className="text-xl font-black text-white">${order.total?.toFixed(2)}</p>
                                         </div>
-                                        <Button 
-                                            className="bg-accent text-black font-black uppercase italic text-[10px] h-10 px-4 rounded-xl gap-2 shadow-lg"
-                                            onClick={() => loadOrderInPOS(order)}
-                                        >
-                                            <ExternalLink size={14} /> Charger
-                                        </Button>
+                                        <div className="flex gap-2">
+                                            <Button 
+                                                variant="outline"
+                                                className="border-white/10 text-white font-black uppercase italic text-[9px] h-10 px-3 rounded-xl gap-2 hover:bg-white/5"
+                                                onClick={() => loadOrderInPOS(order)}
+                                            >
+                                                <ExternalLink size={12} /> Charger
+                                            </Button>
+                                            <Button 
+                                                className="bg-accent text-black font-black uppercase italic text-[9px] h-10 px-4 rounded-xl gap-2 shadow-lg"
+                                                onClick={() => directCollect(order)}
+                                            >
+                                                <CheckCircle2 size={14} /> Encaisser
+                                            </Button>
+                                        </div>
                                     </div>
                                 </div>
                             ))}
@@ -454,13 +469,13 @@ function POS() {
                             <History size={24} />
                         </Button>
                     </SheetTrigger>
-                    <SheetContent className="bg-card/95 backdrop-blur-3xl border-white/10 w-full sm:max-w-md">
-                        <SheetHeader className="mb-6">
+                    <SheetContent className="bg-card/95 backdrop-blur-3xl border-white/10 w-full sm:max-w-md p-0">
+                        <SheetHeader className="p-8 bg-white/5 border-b border-white/5">
                             <SheetTitle className="text-xl font-black uppercase italic flex items-center gap-3">
                                 <Clock className="text-accent" /> Historique Ventes
                             </SheetTitle>
                         </SheetHeader>
-                        <div className="space-y-4 overflow-y-auto max-h-[85vh] pr-2 custom-scrollbar">
+                        <div className="p-6 space-y-4 overflow-y-auto max-h-[85vh] custom-scrollbar">
                             {recentSales.map(sale => (
                                 <div key={sale.id} className="p-4 rounded-2xl bg-white/5 border border-white/5 space-y-3 hover:border-accent/20 transition-all group">
                                     <div className="flex justify-between items-start">
@@ -842,4 +857,3 @@ function POS() {
 }
 
 export default withAuth(POS);
-

@@ -26,7 +26,8 @@ import {
   ShieldCheck,
   Globe,
   Lock,
-  Banknote
+  Banknote,
+  CheckCircle2
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useCollection, useMemoFirebase } from '@/firebase';
@@ -51,6 +52,7 @@ import { Logo } from '@/components/ui/Logo';
 import { PI_GCV } from '@/lib/constants';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { cn } from '@/lib/utils';
 
 export default function OrdersPage() {
   const { user, isLoading: authLoading } = useAuth();
@@ -97,7 +99,7 @@ export default function OrdersPage() {
     );
   }, [user?.uid, user?.role, authLoading]);
 
-  const { data: rawOrders, isLoading: collectionLoading, error } = useCollection(ordersQuery);
+  const { data: rawOrders, isLoading: collectionLoading } = useCollection(ordersQuery);
 
   const filteredOrders = useMemo(() => {
     if (!rawOrders) return [];
@@ -159,12 +161,14 @@ export default function OrdersPage() {
         });
 
         // 3. Decrement Stock
-        await Promise.all(orderToPay.items.map((item: any) => {
-            const productRef = doc(db, "products", item.id || item.productId);
-            return updateDoc(productRef, {
-                stockQuantity: increment(-item.quantity)
-            });
-        }));
+        if (orderToPay.items) {
+            await Promise.all(orderToPay.items.map((item: any) => {
+                const productRef = doc(db, "products", item.id || item.productId);
+                return updateDoc(productRef, {
+                    stockQuantity: increment(-item.quantity)
+                }).catch(e => console.warn("Stock update failed for", item.name, e));
+            }));
+        }
 
         // 4. Notify User
         await addDoc(collection(db, "notifications"), {
@@ -330,10 +334,10 @@ export default function OrdersPage() {
                                             {isStaff && !["payée", "payé", "terminé", "completed", "cancelled", "annulé"].includes(order.status?.toLowerCase()) && (
                                                 <Button 
                                                     size="sm" 
-                                                    className="bg-green-500 hover:bg-green-600 text-white rounded-xl h-11 px-4 gap-2 font-black uppercase text-[9px] shadow-lg shadow-green-500/20"
+                                                    className="bg-green-500 hover:bg-green-600 text-white rounded-xl h-11 px-4 gap-2 font-black uppercase text-[9px] shadow-xl shadow-green-500/20"
                                                     onClick={() => setOrderToPay(order)}
                                                 >
-                                                    <Check size={14} /> Encaisser
+                                                    <CheckCircle2 size={14} /> Encaisser
                                                 </Button>
                                             )}
                                         </div>
@@ -400,7 +404,7 @@ export default function OrdersPage() {
             </DialogContent>
         </Dialog>
 
-        {/* FACTURE PDF CACHÉE */}
+        {/* FACTURE PDF CACHÉE AVEC CACHET ET SIGNATURE AUTOMATIQUES */}
         <div style={{ position: 'absolute', left: '-9999px', top: 0 }}>
             {selectedOrderForPDF && (
                 <div ref={invoiceRef} className="bg-white text-black p-16 w-[800px] font-sans">
@@ -457,7 +461,7 @@ export default function OrdersPage() {
                                 <tr key={idx} className="border-b border-gray-100">
                                     <td className="p-4">
                                         <p className="font-bold uppercase italic">{item.name}</p>
-                                        <p className="text-[10px] text-gray-400 uppercase mt-1">
+                                        <p className="text-[9px] text-gray-400 uppercase mt-1">
                                             {selectedOrderForPDF.source ? "Garantie Service Hub Incluse" : "Garantie Hardware DKS incluse"}
                                         </p>
                                     </td>
@@ -572,4 +576,3 @@ export default function OrdersPage() {
     </div>
   );
 }
-
