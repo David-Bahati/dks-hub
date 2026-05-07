@@ -2,7 +2,7 @@
 "use client";
 
 import { Navbar } from "@/components/layout/Navbar";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Product, PaymentMode } from "@/lib/types";
 import { PI_GCV } from "@/lib/constants";
 import { 
@@ -38,7 +38,9 @@ import {
   Globe,
   Lock,
   ShieldCheck,
-  Receipt
+  Receipt,
+  Download,
+  X
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -63,6 +65,8 @@ import { collection, onSnapshot, doc, updateDoc, addDoc, serverTimestamp, increm
 import { useAuth } from "@/context/AuthContext";
 import withAuth from "@/components/auth/withAuth";
 import { Logo } from "@/components/ui/Logo";
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
 
 interface CartItem extends Product {
   quantity: number;
@@ -86,6 +90,7 @@ function POS() {
   const [pendingOrders, setPendingOrders] = useState<any[]>([]);
   const [exchangeRate, setExchangeRate] = useState(2500);
   const [activeOrderId, setActiveOrderId] = useState<string | null>(null);
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [lastTransaction, setLastTransaction] = useState<{
     id: string;
     items: any[];
@@ -98,6 +103,7 @@ function POS() {
     totalCDF: number;
   } | null>(null);
 
+  const receiptRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -352,29 +358,47 @@ function POS() {
     setShowReceipt(true);
   };
 
+  const handleDownloadReceiptPDF = async () => {
+      if (!receiptRef.current || !lastTransaction) return;
+      setIsGeneratingPDF(true);
+      try {
+          const canvas = await html2canvas(receiptRef.current, { scale: 3, useCORS: true, backgroundColor: "#ffffff" });
+          const imgData = canvas.toDataURL('image/png');
+          const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [80, 150] });
+          const imgWidth = 80;
+          const imgHeight = (canvas.height * imgWidth) / canvas.width;
+          pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+          pdf.save(`RECU_DKS_${lastTransaction.id.substring(0, 8).toUpperCase()}.pdf`);
+          toast({ title: "PDF Généré", description: "Le reçu a été téléchargé." });
+      } catch (error) {
+          toast({ title: "Erreur PDF", variant: "destructive" });
+      } finally {
+          setIsGeneratingPDF(false);
+      }
+  };
+
   const formatCurrency = (amount: number) => new Intl.NumberFormat('fr-FR').format(amount);
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <Navbar />
       
+      {/* Styles pour l'impression */}
       <style jsx global>{`
         @media print {
           body * {
             visibility: hidden;
           }
-          .receipt-to-print, .receipt-to-print * {
+          #printable-receipt-area, #printable-receipt-area * {
             visibility: visible;
           }
-          .receipt-to-print {
+          #printable-receipt-area {
             position: absolute;
             left: 0;
             top: 0;
             width: 100%;
             background: white !important;
             color: black !important;
-            padding: 10px !important;
-            box-shadow: none !important;
           }
           .no-print {
             display: none !important;
@@ -721,133 +745,145 @@ function POS() {
 
       {/* Receipt Dialog */}
       <Dialog open={showReceipt} onOpenChange={setShowReceipt}>
-        <DialogContent className="bg-white text-black p-0 overflow-hidden sm:max-w-[400px] rounded-3xl shadow-2xl border-none flex flex-col max-h-[95vh]">
-          <div className="flex-1 overflow-y-auto p-8 font-mono text-[10px] leading-tight receipt-to-print custom-scrollbar">
-            <div className="text-center mb-4 border-b-2 border-dashed border-gray-300 pb-4">
-              <div className="flex justify-center mb-2">
-                 <div className="bg-black text-white px-3 py-1 font-black text-lg italic tracking-tighter">DKS SHOP</div>
+        <DialogContent className="bg-white text-black p-0 overflow-hidden sm:max-w-[420px] rounded-[2rem] shadow-2xl border-none flex flex-col max-h-[95vh] relative">
+          {/* Bouton de fermeture (Nouvelle Vente) */}
+          <button 
+              onClick={() => setShowReceipt(false)} 
+              className="absolute top-4 right-4 z-50 w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-200 transition-colors no-print"
+          >
+              <X size={20} />
+          </button>
+
+          <div ref={receiptRef} id="printable-receipt-area" className="flex-1 overflow-y-auto p-8 font-mono text-[11px] leading-tight custom-scrollbar">
+            <div className="text-center mb-6 border-b-2 border-dashed border-gray-300 pb-6">
+              <div className="flex justify-center mb-3">
+                 <div className="bg-black text-white px-4 py-1.5 font-black text-xl italic tracking-tighter rounded-md">DKS SHOP</div>
               </div>
-              <p className="text-[9px] font-black uppercase tracking-widest opacity-60">Matériel Informatique Premium</p>
-              <div className="mt-2 space-y-0.5 text-[8px] font-bold uppercase">
-                <p>Immeuble Bahati, Boulevard de la Libération</p>
-                <p>Bunia, Ituri, RDC | Tél: +243 823 038 945</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60">Excellence Technologique</p>
+              <div className="mt-4 space-y-1 text-[9px] font-bold uppercase">
+                <p>Immeuble Bahati, Blvd Libération</p>
+                <p>Bunia, RDC | Tél: +243 823 038 945</p>
               </div>
 
-              <div className="mt-4 flex flex-col items-center gap-1">
-                <div className="p-1 border-2 border-black rounded-md bg-white">
-                    <QrCode size={60} />
+              <div className="mt-6 flex flex-col items-center gap-2">
+                <div className="p-2 border-2 border-black rounded-xl bg-white shadow-sm">
+                    <QrCode size={70} />
                 </div>
-                <p className="text-[7px] font-black uppercase tracking-widest opacity-40">Vérifier la Transaction</p>
+                <p className="text-[8px] font-black uppercase tracking-widest opacity-40">Vérifier l'authenticité</p>
               </div>
 
-              <div className="mt-4 p-1.5 bg-gray-100 rounded-md inline-block w-full text-center">
-                <p className="text-[8px] font-black">REÇU: #{lastTransaction?.id.toUpperCase().substring(0, 10)}</p>
-                <p className="text-[8px] font-black">CLIENT: {lastTransaction?.customerName.toUpperCase()}</p>
+              <div className="mt-6 p-2 bg-gray-100 rounded-xl inline-block w-full text-center">
+                <p className="text-[9px] font-black">REÇU: #{lastTransaction?.id.toUpperCase().substring(0, 10)}</p>
+                <p className="text-[9px] font-black">CLIENT: {lastTransaction?.customerName.toUpperCase()}</p>
               </div>
-              <p className="text-[7px] mt-1 opacity-40 font-black">{lastTransaction?.date}</p>
+              <p className="text-[8px] mt-2 opacity-40 font-black tracking-widest">{lastTransaction?.date}</p>
             </div>
             
-            <div className="space-y-2 mb-4">
-              <div className="flex justify-between font-black border-b border-gray-100 pb-1 mb-1 uppercase text-[9px]">
-                <span>Description</span>
+            <div className="space-y-3 mb-6">
+              <div className="flex justify-between font-black border-b-2 border-gray-100 pb-2 mb-2 uppercase text-[10px]">
+                <span>Désignation</span>
                 <span>Total</span>
               </div>
               {lastTransaction?.items.map((item, idx) => {
                 const unitPrice = item.price || item.sellingPrice || 0;
                 return (
                   <div key={idx} className="flex justify-between items-start">
-                    <div className="flex-1 pr-2">
-                      <div className="font-bold">{(item.name || "Produit").toUpperCase()}</div>
-                      <div className="text-[8px] opacity-60">
-                        {item.quantity}x @${unitPrice.toFixed(2)}
+                    <div className="flex-1 pr-4">
+                      <div className="font-bold text-[10px]">{(item.name || "Produit").toUpperCase()}</div>
+                      <div className="text-[9px] opacity-60 italic mt-0.5">
+                        {item.quantity}x @ ${unitPrice.toFixed(2)}
                       </div>
                     </div>
-                    <span className="font-bold">${(unitPrice * item.quantity).toFixed(2)}</span>
+                    <span className="font-bold text-[10px]">${(unitPrice * item.quantity).toFixed(2)}</span>
                   </div>
                 );
               })}
             </div>
 
-            <div className="border-t border-gray-100 pt-2 space-y-1">
-              <div className="flex justify-between font-bold text-[8px]">
+            <div className="border-t-2 border-gray-100 pt-4 space-y-2">
+              <div className="flex justify-between font-bold text-[9px]">
                 <span>SOUS-TOTAL (USD)</span>
                 <span>${lastTransaction?.total.toFixed(2)}</span>
               </div>
-              <div className="flex justify-between font-bold text-[8px] opacity-40">
-                <span>TAXE (0%)</span>
+              <div className="flex justify-between font-bold text-[9px] opacity-40">
+                <span>REMISE / TAXE</span>
                 <span>$0.00</span>
               </div>
-              <div className="flex justify-between text-base font-black border-t-2 border-dashed border-gray-300 pt-2 mt-1">
+              <div className="flex justify-between text-lg font-black border-t-2 border-dashed border-gray-300 pt-3 mt-2">
                 <span>TOTAL PAYÉ ($)</span>
                 <span>${lastTransaction?.total.toFixed(2)}</span>
               </div>
-              <div className="flex justify-between font-black opacity-60 text-[8px] mt-1">
-                <span>TOTAL PAYÉ (FC)</span>
+              <div className="flex justify-between font-black opacity-60 text-[10px] mt-1 border-b border-gray-100 pb-3">
+                <span>VALEUR EN CDF</span>
                 <span>{formatCurrency(lastTransaction?.totalCDF || 0)} FC</span>
               </div>
-              {lastTransaction?.mode === 'PI_NETWORK' && lastTransaction.cryptoType === 'pi' && (
-                <div className="mt-2 p-3 bg-gray-50 border border-gray-200 rounded-xl space-y-2">
-                  <div className="flex justify-between font-bold text-[8px]">
-                    <span className="flex items-center gap-1"><Globe size={10}/> VALEUR PI (π) GCV</span>
-                    <span>{(lastTransaction.total / PI_GCV).toFixed(8)} π</span>
+              
+              {lastTransaction?.mode === 'PI_NETWORK' && (
+                <div className="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-2xl space-y-3">
+                  <div className="flex justify-between font-black text-[10px]">
+                    <span className="flex items-center gap-1.5"><Globe size={12}/> CONVERSION PI (GCV)</span>
+                    <span className="text-blue-600">{(lastTransaction.total / PI_GCV).toFixed(8)} π</span>
                   </div>
                   {lastTransaction.piTxId && (
-                    <div className="pt-1 border-t border-gray-200">
-                      <p className="text-[7px] font-black uppercase text-gray-400 mb-1 flex items-center gap-1"><Lock size={8}/> Hachage Blockchain</p>
-                      <p className="text-[7px] font-mono break-all leading-tight opacity-70">{lastTransaction.piTxId}</p>
+                    <div className="pt-2 border-t border-gray-200">
+                      <p className="text-[8px] font-black uppercase text-gray-400 mb-1.5 flex items-center gap-1.5"><Lock size={10}/> HACHARAGE BLOCKCHAIN</p>
+                      <p className="text-[8px] font-mono break-all leading-tight opacity-70 bg-white p-2 rounded-lg border border-gray-100">{lastTransaction.piTxId}</p>
                     </div>
                   )}
                 </div>
               )}
-              <div className="flex justify-between mt-2 pt-2 border-t border-gray-100 italic font-black">
-                <span>RÈGLEMENT :</span>
-                <span>
+
+              <div className="flex justify-between mt-4 pt-3 border-t border-gray-100 italic font-black text-[10px]">
+                <span>MODE DE RÈGLEMENT :</span>
+                <span className="text-blue-700">
                     {lastTransaction?.mode === 'PI_NETWORK' 
-                        ? `Crypto-monnaie (${lastTransaction.cryptoType?.toUpperCase()})` 
+                        ? `CRYPTO (${lastTransaction.cryptoType?.toUpperCase()})` 
                         : lastTransaction?.mode.replace('_', ' ')}
                 </span>
               </div>
             </div>
 
             {/* CACHET AUTOMATIQUE POS (FORMAT TICKET) */}
-            <div className="mt-6 flex flex-col items-center gap-4 pt-4 border-t border-gray-100">
-              <div className="w-24 h-24 rounded-full border-2 border-blue-600 flex flex-col items-center justify-center p-1 rotate-[-10deg] opacity-70">
-                <p className="text-[5px] font-black text-blue-600 leading-none">DKS SHOP BUNIA</p>
-                <ShieldCheck size={20} className="text-blue-600 my-1" />
-                <p className="text-[5px] font-bold text-blue-600">OFFICIAL POS</p>
+            <div className="mt-8 flex flex-col items-center gap-4 pt-6 border-t-2 border-dashed border-gray-200">
+              <div className="w-28 h-28 rounded-full border-[3px] border-double border-blue-600 flex flex-col items-center justify-center p-1 rotate-[-12deg] opacity-80">
+                <p className="text-[6px] font-black text-blue-600 leading-none tracking-tighter">DOUBLE KING SHOP</p>
+                <ShieldCheck size={26} className="text-blue-600 my-1.5" />
+                <p className="text-[6px] font-bold text-blue-600 uppercase">CERTIFIED POS</p>
+                <p className="text-[7px] font-black text-blue-600 uppercase tracking-widest mt-1">BUNIA</p>
               </div>
               
-              <div className="text-center space-y-0.5">
-                  <p className="text-[8px] font-black uppercase italic text-blue-800">Expert Bahati Nyeke</p>
-                  <p className="text-[6px] font-bold text-gray-400 uppercase tracking-widest">Validateur Certifié</p>
+              <div className="text-center space-y-1">
+                  <p className="text-[9px] font-black uppercase italic text-blue-900">Expert Bahati Nyeke</p>
+                  <p className="text-[7px] font-bold text-gray-400 uppercase tracking-[0.3em]">Validateur de Caisse</p>
               </div>
 
-              <p className="text-[7px] font-black uppercase tracking-tighter opacity-40 italic border-y border-gray-100 py-1 w-full text-center">
-                Ni repris, ni échangés après sortie
+              <p className="text-[8px] font-black uppercase tracking-tighter opacity-40 italic border-y border-gray-100 py-1.5 w-full text-center">
+                Les marchandises ne sont ni reprises ni échangées
               </p>
             </div>
 
-            <div className="text-center pt-3">
-              <div className="bg-black text-white px-4 py-1.5 inline-block font-black uppercase italic tracking-widest text-[9px] mb-2">
-                 Merci de votre confiance
+            <div className="text-center pt-6">
+              <div className="bg-black text-white px-6 py-2 inline-block font-black uppercase italic tracking-[0.2em] text-[10px] mb-3 rounded-md">
+                 MERCI DE VOTRE CONFIANCE
               </div>
-              <p className="text-[7px] font-bold opacity-40 uppercase tracking-widest">À bientôt chez Double King Shop</p>
+              <p className="text-[8px] font-bold opacity-40 uppercase tracking-widest">À bientôt chez DKS HUB</p>
             </div>
           </div>
 
-          <div className="bg-gray-100 p-4 flex gap-3 no-print border-t border-gray-200">
+          <div className="bg-gray-50 p-6 flex gap-4 no-print border-t border-gray-200">
             <Button 
-                className="flex-1 gap-2 bg-black text-white hover:bg-black/90 rounded-xl font-black uppercase text-[10px] h-14" 
+                className="flex-1 gap-3 bg-black text-white hover:bg-black/90 rounded-2xl font-black uppercase italic text-[11px] h-16 shadow-xl" 
                 onClick={() => window.print()}
             >
-              <Printer size={18} /> Imprimer le Ticket
+              <Printer size={20} /> Imprimer Reçu
             </Button>
             <Button 
-                className="flex-1 gap-2 border-black text-black hover:bg-black/5 rounded-xl font-black uppercase text-[10px] h-14" 
+                className="flex-1 gap-3 border-gray-200 bg-white text-black hover:bg-gray-100 rounded-2xl font-black uppercase italic text-[11px] h-16 shadow-lg" 
                 variant="outline" 
-                onClick={() => setShowReceipt(false)}
+                onClick={handleDownloadReceiptPDF}
+                disabled={isGeneratingPDF}
             >
-              <ArrowLeft size={18} /> Nouvelle Vente
+              {isGeneratingPDF ? <Loader2 className="animate-spin w-5 h-5" /> : <><Download size={20} /> Télécharger PDF</>}
             </Button>
           </div>
         </DialogContent>
