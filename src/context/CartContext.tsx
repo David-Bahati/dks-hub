@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
@@ -5,7 +6,7 @@ import { Product } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { db } from '@/lib/firebase';
-import { doc, onSnapshot, setDoc } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, getDoc } from 'firebase/firestore';
 
 export interface CartItem extends Product {
   quantity: number;
@@ -26,81 +27,130 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 export const CartProvider = ({ children }: { children: ReactNode }) => {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const { user } = useAuth();
+  const { toast } = useToast();
 
+  // 1. Initial Load: Sync from Firestore (if logged in) or LocalStorage
   useEffect(() => {
+    let unsubscribe: (() => void) | null = null;
+
     if (user) {
       const cartRef = doc(db, 'carts', user.uid);
-      const unsubscribe = onSnapshot(cartRef, (doc) => {
-        if (doc.exists()) {
-          setCartItems(doc.data().items || []);
+      unsubscribe = onSnapshot(cartRef, (docSnap) => {
+        if (docSnap.exists()) {
+          setCartItems(docSnap.data().items || []);
         } else {
-          const localCart = localStorage.getItem('cart');
+          // If no cloud cart, check local storage and upload it
+          const localCart = localStorage.getItem('cart_dks');
           if (localCart) {
-            const parsedLocalCart = JSON.parse(localCart);
-            setCartItems(parsedLocalCart);
-            setDoc(cartRef, { items: parsedLocalCart });
+            const parsed = JSON.parse(localCart);
+            setCartItems(parsed);
+            setDoc(cartRef, { items: parsed, updatedAt: new Date().toISOString() });
           }
         }
       });
-      return () => unsubscribe();
     } else {
-      const savedCart = localStorage.getItem('cart');
+      const savedCart = localStorage.getItem('cart_dks');
       if (savedCart) {
-        setCartItems(JSON.parse(savedCart));
+        try {
+          setCartItems(JSON.parse(savedCart));
+        } catch (e) {
+          console.error("Error parsing local cart", e);
+        }
       }
     }
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, [user]);
 
-  useEffect(() => {
+  // 2. Persist changes to Cloud or LocalStorage
+  const persistCart = async (items: CartItem[]) => {
     if (user) {
       const cartRef = doc(db, 'carts', user.uid);
-      setDoc(cartRef, { items: cartItems });
+      setDoc(cartRef, { items, updatedAt: new Date().toISOString() }, { merge: true });
     } else {
-      localStorage.setItem('cart', JSON.stringify(cartItems));
+      localStorage.setItem('cart_dks', JSON.stringify(items));
     }
-  }, [cartItems, user]);
+  };
 
   const addToCart = (product: Product) => {
+    const normalizedProduct = {
+      ...product,
+      price: product.sellingPrice || product.price || 0,
+      imageUrl: product.imageUrl || product.image || 'https://picsum.photos/seed/dks/400/300'
+    };
+
     setCartItems(prevItems => {
       const existingItem = prevItems.find(item => item.id === product.id);
+      let newItems;
       
-      // Assurer la compatibilité des champs de prix
-      const normalizedProduct = {
-        ...product,
-        price: product.price || product.sellingPrice || 0,
-        imageUrl: product.imageUrl || product.image || '/placeholder.png'
-      };
-
       if (existingItem) {
-        return prevItems.map(item =>
+        // Check stock limit if info is available
+        if (product.stockQuantity && existingItem.quantity >= product.stockQuantity) {
+          toast({ 
+            title: "Stock Limité", 
+            description: `Nous n'avons que ${product.stockQuantity} unités de "${product.name}" en stock.`,
+            variant: "destructive"
+          });
+          return prevItems;
+        }
+
+        newItems = prevItems.map(item =>
           item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
         );
+      } else {
+        newItems = [...prevItems, { ...normalizedProduct, quantity: 1 }];
       }
-      return [...prevItems, { ...normalizedProduct, quantity: 1 }];
+
+      persistCart(newItems);
+      toast({
+        title: "Panier mis à jour",
+        description: `"${product.name}" ajouté au panier.`,
+      });
+      return newItems;
     });
   };
 
   const removeFromCart = (productId: string) => {
-    setCartItems(prevItems => prevItems.filter(item => item.id !== productId));
+    const item = cartItems.find(i => i.id === productId);
+    setCartItems(prevItems => {
+      const newItems = prevItems.filter(item => item.id !== productId);
+      persistCart(newItems);
+      return newItems;
+    });
+
+    if (item) {
+      toast({
+        title: "Article retiré",
+        description: `"${item.name}" a été supprimé du panier.`,
+        variant: "destructive"
+      });
+    }
   };
 
   const updateQuantity = (productId: string, quantity: number) => {
-    if (quantity <= 0) {
-      removeFromCart(productId);
-    } else {
-      setCartItems(prevItems =>
-        prevItems.map(item =>
+    setCartItems(prevItems => {
+      let newItems;
+      if (quantity <= 0) {
+        newItems = prevItems.filter(item => item.id !== productId);
+      } else {
+        newItems = prevItems.map(item =>
           item.id === productId ? { ...item, quantity } : item
-        )
-      );
-    }
+        );
+      }
+      persistCart(newItems);
+      return newItems;
+    });
   };
 
   const clearCart = () => {
     setCartItems([]);
     if (user) {
-        const cartRef = doc(db, 'carts', user.uid);
-        setDoc(cartRef, { items: [] });
+      const cartRef = doc(db, 'carts', user.uid);
+      setDoc(cartRef, { items: [], updatedAt: new Date().toISOString() });
+    } else {
+      localStorage.removeItem('cart_dks');
     }
   };
 
@@ -119,28 +169,5 @@ export const useCart = () => {
   if (context === undefined) {
     throw new Error('useCart must be used within a CartProvider');
   }
-
-  const { toast } = useToast();
-
-  const addToCartWithToast = (product: Product) => {
-    context.addToCart(product);
-    toast({
-      title: "Produit ajouté",
-      description: `"${product.name}" a été ajouté à votre panier.`,
-    });
-  };
-
-  const removeFromCartWithToast = (productId: string) => {
-    const item = context.cartItems.find(i => i.id === productId);
-    if (item) {
-        context.removeFromCart(productId);
-        toast({
-            title: "Produit retiré",
-            description: `"${item.name}" a été retiré de votre panier.`,
-            variant: "destructive"
-        });
-    }
-  };
-
-  return { ...context, addToCart: addToCartWithToast, removeFromCart: removeFromCartWithToast };
+  return context;
 };
