@@ -57,13 +57,16 @@ import {
   FileText,
   CreditCard,
   ShieldCheck,
-  Share2
+  Share2,
+  Banknote,
+  PlusCircle
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
+  CardContent
 } from "@/components/ui/card";
 import {
   Sheet,
@@ -369,6 +372,72 @@ function DashboardPage() {
               </div>
           </div>
 
+          {/* ACTIONS PRIORITAIRES STAFF */}
+          {isStaff && (
+              <section className="animate-in fade-in slide-in-from-top-4 duration-1000">
+                <div className="flex items-center gap-4 mb-6">
+                    <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center text-green-500 shadow-lg"><Zap size={20} /></div>
+                    <h3 className="text-xl font-black uppercase italic tracking-tight">Actions Prioritaires</h3>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <Link href="/pos" className="group">
+                        <Card className="bg-accent text-black border-none rounded-3xl p-6 h-full flex flex-col justify-between hover:scale-[1.02] transition-all shadow-xl shadow-accent/20 overflow-hidden relative">
+                            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-125 transition-transform"><ShoppingCart size={80} /></div>
+                            <div className="space-y-4 relative z-10">
+                                <Badge className="bg-black/20 text-black border-none font-black uppercase text-[8px] tracking-widest">Encaisser Client</Badge>
+                                <h4 className="text-2xl font-black uppercase italic leading-none">Terminal de<br/>Vente (POS)</h4>
+                            </div>
+                            <div className="mt-8 flex justify-between items-center relative z-10">
+                                <span className="text-[10px] font-black uppercase italic">Ouvrir la caisse</span>
+                                <div className="w-10 h-10 rounded-full bg-black/10 flex items-center justify-center"><ArrowRight size={20} /></div>
+                            </div>
+                        </Card>
+                    </Link>
+
+                    <Link href="/dashboard/orders" className="group">
+                        <Card className="bg-white/5 border-white/10 rounded-3xl p-6 h-full flex flex-col justify-between hover:bg-white/[0.08] transition-all">
+                            <div className="space-y-4">
+                                <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-accent"><ShoppingBag size={24} /></div>
+                                <h4 className="text-xl font-black uppercase italic leading-none text-white">Commandes<br/>Web</h4>
+                            </div>
+                            <div className="mt-8 flex justify-between items-center">
+                                <span className="text-[10px] font-black uppercase italic text-muted-foreground">Vérifier règlements</span>
+                                <ArrowRight size={20} className="text-accent" />
+                            </div>
+                        </Card>
+                    </Link>
+
+                    {(user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'seller') && (
+                        <Link href="/dashboard/products" className="group">
+                            <Card className="bg-white/5 border-white/10 rounded-3xl p-6 h-full flex flex-col justify-between hover:bg-white/[0.08] transition-all">
+                                <div className="space-y-4">
+                                    <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-primary"><PackagePlus size={24} /></div>
+                                    <h4 className="text-xl font-black uppercase italic leading-none text-white">Gestion de<br/>Stock IA</h4>
+                                </div>
+                                <div className="mt-8 flex justify-between items-center">
+                                    <span className="text-[10px] font-black uppercase italic text-muted-foreground">Nouveaux arrivages</span>
+                                    <ArrowRight size={20} className="text-primary" />
+                                </div>
+                            </Card>
+                        </Link>
+                    )}
+
+                    <Link href="/dashboard/maintenance/logs" className="group">
+                        <Card className="bg-white/5 border-white/10 rounded-3xl p-6 h-full flex flex-col justify-between hover:bg-white/[0.08] transition-all">
+                            <div className="space-y-4">
+                                <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-purple-400"><BookText size={24} /></div>
+                                <h4 className="text-xl font-black uppercase italic leading-none text-white">Journal du<br/>Laboratoire</h4>
+                            </div>
+                            <div className="mt-8 flex justify-between items-center">
+                                <span className="text-[10px] font-black uppercase italic text-muted-foreground">Passations SAV</span>
+                                <ArrowRight size={20} className="text-purple-400" />
+                            </div>
+                        </Card>
+                    </Link>
+                </div>
+              </section>
+          )}
+
           <div className="grid gap-6 grid-cols-1 lg:grid-cols-12">
               <Card className="lg:col-span-5 bg-gradient-to-br from-accent/10 via-background to-black border-accent/20 rounded-[3rem] p-12 relative overflow-hidden group shadow-2xl">
                   {miningTimeLeft && (
@@ -543,6 +612,7 @@ function DashboardPage() {
 
 const navConfig = [
   { href: "/", icon: Home, label: "Boutique Hardware", roles: ["Admin", "Seller", "Cashier", "customer"] },
+  { href: "/pos", icon: ShoppingCart, label: "Terminal de Vente (POS)", roles: ["Admin", "Seller", "Cashier"] },
   { href: "/dashboard", icon: LayoutDashboard, label: "Mon Dashboard", roles: ["Admin", "Seller", "Cashier", "customer"] },
   { href: "/dashboard/wallet", icon: Wallet, label: "Mon Wallet DKST", roles: ["Admin", "Seller", "Cashier", "customer"] },
   { href: "/dashboard/finance", icon: BarChartHorizontal, label: "Rapports Financiers", roles: ["Admin"] },
