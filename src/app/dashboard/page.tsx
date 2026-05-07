@@ -318,7 +318,11 @@ function DashboardPage() {
   const SidebarContent = () => (
     <div className="flex flex-col h-full">
       <nav className="flex-1 grid gap-1 p-6 overflow-y-auto custom-scrollbar">
-        <div className="mb-8 px-4"><Logo size="sm" showText /></div>
+        <div className="mb-8 px-4">
+            <Link href="/">
+                <Logo size="sm" showText />
+            </Link>
+        </div>
         {navConfig.filter(link => link.roles.map(r => r.toLowerCase()).includes(user?.role?.toLowerCase() || "")).map(link => (
           <Link key={link.href} href={link.href} className={cn("group flex items-center gap-3 px-4 py-3 rounded-2xl transition-all text-sm font-bold", pathname === link.href ? 'bg-accent/10 text-accent' : 'text-slate-400 hover:bg-white/5 hover:text-white')}>
             <link.icon className={cn("h-4 w-4", pathname === link.href ? 'text-accent' : '')} />{link.label}
@@ -344,9 +348,16 @@ function DashboardPage() {
           </Sheet>
         <div className="flex-1 flex items-center justify-between">
             <div className="flex items-center gap-4">
-                <Logo size="sm" showText />
+                <Link href="/">
+                    <Logo size="sm" showText />
+                </Link>
             </div>
             <div className="flex items-center gap-4">
+                <Link href="/" className="hidden sm:flex">
+                    <Button variant="outline" className="h-10 border-accent/20 text-accent hover:bg-accent hover:text-black gap-2 font-black uppercase italic text-[10px] rounded-xl px-4">
+                        <ShoppingBag size={14} /> Boutique
+                    </Button>
+                </Link>
                 <Link href="/dashboard/wallet"><Badge className="bg-accent/20 text-accent border-accent/20 h-10 px-4 rounded-xl gap-2 font-black italic cursor-pointer hover:bg-accent/30 transition-all"><Coins size={16} /> {user?.tokenBalance?.toFixed(2) || 0} DKST</Badge></Link>
                 <Separator orientation="vertical" className="h-8 bg-white/5 hidden sm:block" />
                 
@@ -554,7 +565,8 @@ function DashboardPage() {
 }
 
 const navConfig = [
-  { href: "/dashboard", icon: Home, label: "Aperçu", roles: ["Admin", "Seller", "Cashier", "customer"] },
+  { href: "/", icon: Home, label: "Boutique Hardware", roles: ["Admin", "Seller", "Cashier", "customer"] },
+  { href: "/dashboard", icon: LayoutDashboard, label: "Mon Dashboard", roles: ["Admin", "Seller", "Cashier", "customer"] },
   { href: "/dashboard/wallet", icon: Wallet, label: "Mon Wallet DKST", roles: ["Admin", "Seller", "Cashier", "customer"] },
   { href: "/dashboard/finance", icon: BarChartHorizontal, label: "Rapports Financiers", roles: ["Admin"] },
   { href: "/dashboard/governance", icon: Vote, label: "Gouvernance DAO", roles: ["Admin", "Seller", "Cashier", "customer"] },
