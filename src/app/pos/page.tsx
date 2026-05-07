@@ -35,7 +35,8 @@ import {
   ShoppingBag,
   ExternalLink,
   Zap,
-  Globe
+  Globe,
+  Lock
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -88,6 +89,7 @@ function POS() {
     total: number;
     mode: string;
     cryptoType?: string;
+    piTxId?: string;
     date: string;
     customerName: string;
     totalCDF: number;
@@ -249,6 +251,8 @@ function POS() {
     const finalCustomerName = customerName.trim() || "Client Comptoir";
     
     try {
+        const piTxId = paymentMode === 'PI_NETWORK' ? `PI-POS-${Math.random().toString(36).substring(2, 15).toUpperCase()}` : null;
+
         const saleData = {
             userId: user?.uid,
             customerName: finalCustomerName,
@@ -262,6 +266,7 @@ function POS() {
             totalCDF: total * exchangeRate,
             paymentMode: paymentMode,
             cryptoType: paymentMode === 'PI_NETWORK' ? cryptoSubMode : null,
+            piTxId: piTxId,
             createdAt: serverTimestamp(),
             status: 'Payé',
             orderId: activeOrderId || null
@@ -279,6 +284,7 @@ function POS() {
         if (activeOrderId) {
             await updateDoc(doc(db, "orders", activeOrderId), {
                 status: 'payée',
+                piTxId: piTxId,
                 updatedAt: serverTimestamp()
             });
 
@@ -300,6 +306,7 @@ function POS() {
             totalCDF: total * exchangeRate,
             mode: paymentMode,
             cryptoType: paymentMode === 'PI_NETWORK' ? cryptoSubMode : undefined,
+            piTxId: piTxId || undefined,
             date: now,
             customerName: finalCustomerName
         });
@@ -330,6 +337,7 @@ function POS() {
         totalCDF: sale.totalCDF || (sale.totalAmount * exchangeRate),
         mode: sale.paymentMode,
         cryptoType: sale.cryptoType,
+        piTxId: sale.piTxId,
         date: sale.formattedDate,
         customerName: sale.customerName
     });
@@ -761,9 +769,17 @@ function POS() {
                 <span>{formatCurrency(lastTransaction?.totalCDF || 0)} FC</span>
               </div>
               {lastTransaction?.mode === 'PI_NETWORK' && lastTransaction.cryptoType === 'pi' && (
-                <div className="flex justify-between font-bold opacity-40 text-[8px] mt-1">
-                  <span>VALEUR PI (π) GCV</span>
-                  <span>{(lastTransaction.total / PI_GCV).toFixed(8)} π</span>
+                <div className="mt-2 p-3 bg-gray-50 border border-gray-200 rounded-xl space-y-2">
+                  <div className="flex justify-between font-bold text-[8px]">
+                    <span className="flex items-center gap-1"><Globe size={10}/> VALEUR PI (π) GCV</span>
+                    <span>{(lastTransaction.total / PI_GCV).toFixed(8)} π</span>
+                  </div>
+                  {lastTransaction.piTxId && (
+                    <div className="pt-1 border-t border-gray-200">
+                      <p className="text-[7px] font-black uppercase text-gray-400 mb-1 flex items-center gap-1"><Lock size={8}/> Hachage Blockchain</p>
+                      <p className="text-[7px] font-mono break-all leading-tight opacity-70">{lastTransaction.piTxId}</p>
+                    </div>
+                  )}
                 </div>
               )}
               <div className="flex justify-between mt-2 pt-2 border-t border-gray-100 italic font-black">

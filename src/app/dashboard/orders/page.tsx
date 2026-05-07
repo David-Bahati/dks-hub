@@ -22,7 +22,10 @@ import {
   FileText,
   QrCode,
   Zap,
-  Coins
+  Coins,
+  ShieldCheck,
+  Globe,
+  Lock
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useCollection, useMemoFirebase } from '@/firebase';
@@ -351,11 +354,6 @@ export default function OrdersPage() {
                             <div className="space-y-1">
                                 <p className="text-sm font-bold">Mode : <span className="uppercase">{selectedOrderForPDF.paymentMethod === 'PI_NETWORK' ? 'Crypto-monnaie (Pi)' : selectedOrderForPDF.paymentMethod?.replace('_', ' ')}</span></p>
                                 <p className="text-sm font-bold">Statut : <span className="uppercase text-green-600">{selectedOrderForPDF.status}</span></p>
-                                {selectedOrderForPDF.paymentMethod === 'PI_NETWORK' && (
-                                    <p className="text-xs font-black text-orange-600 mt-2 flex items-center gap-2">
-                                        <QrCode size={12} /> Transaction GCV validée blockchain
-                                    </p>
-                                )}
                             </div>
                         </div>
                     </div>
@@ -404,14 +402,33 @@ export default function OrdersPage() {
                                 
                                 {/* DÉTAIL CONVERSION SELON MODE */}
                                 {selectedOrderForPDF.paymentMethod === 'PI_NETWORK' && (
-                                    <div className="bg-orange-50 p-6 rounded-2xl flex flex-col gap-2 border border-orange-100">
+                                    <div className="bg-orange-50 p-6 rounded-2xl flex flex-col gap-3 border border-orange-100 animate-in zoom-in duration-500">
                                         <div className="flex justify-between items-center">
-                                            <span className="text-[10px] font-black text-orange-800 uppercase">Valeur Pi (GCV)</span>
+                                            <div className="flex items-center gap-2">
+                                                <Globe className="text-orange-600" size={16} />
+                                                <span className="text-[10px] font-black text-orange-800 uppercase">Valeur Pi (GCV)</span>
+                                            </div>
                                             <Badge className="bg-orange-200 text-orange-800 border-none text-[8px] font-black">Consensus $314,159</Badge>
                                         </div>
-                                        <span className="text-2xl font-black text-orange-800 italic">
+                                        <span className="text-3xl font-black text-orange-800 italic">
                                             {(selectedOrderForPDF.total / PI_GCV).toFixed(8)} π
                                         </span>
+                                        
+                                        {selectedOrderForPDF.piTxId && (
+                                            <div className="pt-3 border-t border-orange-200 mt-1">
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <Lock size={10} className="text-orange-600" />
+                                                    <span className="text-[8px] font-black text-orange-400 uppercase tracking-widest">Hachage Blockchain</span>
+                                                </div>
+                                                <p className="text-[9px] font-mono font-bold text-orange-800 break-all bg-white/50 p-2 rounded-lg border border-orange-200/50">
+                                                    {selectedOrderForPDF.piTxId}
+                                                </p>
+                                            </div>
+                                        )}
+                                        
+                                        <p className="text-[8px] font-black text-orange-600 mt-1 flex items-center gap-2">
+                                            <ShieldCheck size={12} /> Transaction validée par le Hub DKS
+                                        </p>
                                     </div>
                                 )}
 

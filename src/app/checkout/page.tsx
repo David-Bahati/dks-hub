@@ -114,15 +114,18 @@ export default function CheckoutPage() {
         setIsProcessing(true);
         const isPiBrowser = typeof window !== 'undefined' && /PiBrowser/i.test(navigator.userAgent);
         
+        // Generate a simulated hash for the invoice
+        const mockTxId = `PI-HASH-${Math.random().toString(36).substring(2, 15).toUpperCase()}`;
+
         if (isPiBrowser && (window as any).Pi) {
             toast({ title: "Ouverture du Pi Wallet...", description: "Veuillez confirmer la transaction dans votre Pi Browser." });
-            setTimeout(() => executeOrder(), 3000);
+            setTimeout(() => executeOrder(mockTxId), 3000);
         } else {
             toast({ 
                 title: "Hors Pi Browser", 
                 description: "Le paiement Pi officiel nécessite le Pi Browser. Commande mise en attente." 
             });
-            executeOrder();
+            executeOrder(mockTxId);
         }
     };
 
@@ -136,7 +139,7 @@ export default function CheckoutPage() {
         }
     };
 
-    const executeOrder = () => {
+    const executeOrder = (piTxId?: string) => {
         setIsProcessing(true);
         
         const orderData = {
@@ -146,6 +149,7 @@ export default function CheckoutPage() {
             items: cartItems,
             total: totalPrice,
             piValue: totalPrice / PI_GCV,
+            piTxId: piTxId || null,
             cdfValue: totalPrice * exchangeRate,
             status: method === 'dkst' || method === 'visa' || method === 'mobile_money' ? "paid" : "pending_payment",
             paymentMethod: method === 'pi' ? 'PI_NETWORK' : method.toUpperCase(),
@@ -501,4 +505,3 @@ export default function CheckoutPage() {
         </div>
     );
 }
-
