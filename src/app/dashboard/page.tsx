@@ -456,7 +456,7 @@ function DashboardPage() {
                       <div className="absolute -bottom-12 -right-12 w-48 h-48 bg-primary/10 rounded-full blur-3xl" />
                       <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-8">
                           <div className="flex items-center gap-6">
-                              <div className="w-16 h-16 rounded-3xl bg-primary/20 flex items-center justify-center text-primary shadow-[0_0_20px_rgba(59,130,246,0.3)]"><TrendingUpIcon size={32} /></div>
+                              <div className="w-16 h-16 rounded-3xl bg-primary/20 flex items-center justify-center text-primary shadow-[0_0_20px_rgba(59,130,246,0.3)]"><TrendingUp size={32} /></div>
                               <div>
                                   <h3 className="text-2xl font-black uppercase italic tracking-tight text-white">Halving <span className="text-primary">Progress</span></h3>
                                   <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Niveau de Difficulté Actuel : {poolStats.halvingLevel + 1}</p>
