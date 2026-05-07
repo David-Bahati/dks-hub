@@ -27,7 +27,8 @@ import {
     QrCode,
     AlertCircle,
     ShoppingBag,
-    Banknote
+    Banknote,
+    Check
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
@@ -40,6 +41,13 @@ import { PI_GCV } from "@/lib/constants";
 
 type PaymentMethod = 'pi' | 'dkst' | 'mobile_money' | 'visa';
 
+const OPERATORS = [
+    { id: 'vodacom', name: 'Vodacom', color: 'border-red-600', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a6/Vodafone_icon.svg/1200px-Vodafone_icon.svg.png' },
+    { id: 'airtel', name: 'Airtel', color: 'border-red-500', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3a/Airtel_logo.svg/1200px-Airtel_logo.svg.png' },
+    { id: 'orange', name: 'Orange', color: 'border-orange-500', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c8/Orange_logo.svg/1200px-Orange_logo.svg.png' },
+    { id: 'africell', name: 'Africell', color: 'border-blue-600', logo: 'https://upload.wikimedia.org/wikipedia/en/thumb/f/f5/Africell_logo.svg/1200px-Africell_logo.svg.png' },
+];
+
 export default function CheckoutPage() {
     const { cartItems, totalPrice, clearCart } = useCart();
     const { user } = useAuth();
@@ -50,13 +58,16 @@ export default function CheckoutPage() {
     const [isProcessing, setIsProcessing] = useState(false);
     const [exchangeRate, setExchangeRate] = useState(2500);
     
+    // Mobile Money specific states
+    const [selectedOperator, setSelectedOperator] = useState<string | null>(null);
+    const [phoneNumber, setPhone] = useState("");
+
     // PIN Verification States for DKST
     const [isPinOpen, setIsPinOpen] = useState(false);
     const [pin, setPin] = useState("");
     const [showPin, setShowPin] = useState(false);
 
-    // Mobile Money / Visa specific states
-    const [phoneNumber, setPhone] = useState("");
+    // Visa specific states
     const [cardNumber, setCardNumber] = useState("");
 
     useEffect(() => {
@@ -72,6 +83,13 @@ export default function CheckoutPage() {
         };
         fetchConfig();
     }, []);
+
+    const handleOperatorSelect = (opId: string) => {
+        setSelectedOperator(opId);
+        if (!phoneNumber.startsWith("+243")) {
+            setPhone("+243");
+        }
+    };
 
     const validateOrder = () => {
         if (!user) {
@@ -153,6 +171,7 @@ export default function CheckoutPage() {
             cdfValue: totalPrice * exchangeRate,
             status: method === 'dkst' || method === 'visa' || method === 'mobile_money' ? "paid" : "pending_payment",
             paymentMethod: method === 'pi' ? 'PI_NETWORK' : method.toUpperCase(),
+            operator: selectedOperator,
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp()
         };
@@ -361,23 +380,53 @@ export default function CheckoutPage() {
                             </button>
                         </div>
 
-                        <Card className="glossy-card border-none rounded-[3rem] p-10 animate-in fade-in slide-in-from-bottom-4">
+                        <Card className="glossy-card border-none rounded-[3rem] p-10 animate-in fade-in slide-in-from-bottom-4 overflow-hidden">
                             {method === 'mobile_money' && (
-                                <div className="space-y-6">
-                                    <div className="p-6 bg-primary/5 rounded-2xl border border-primary/20 flex justify-between items-center mb-6">
+                                <div className="space-y-8">
+                                    <div className="p-6 bg-primary/5 rounded-2xl border border-primary/20 flex justify-between items-center">
                                         <span className="text-[10px] font-black uppercase text-primary tracking-widest">Montant à régler</span>
                                         <span className="text-xl font-black text-white">{(totalPrice * exchangeRate).toLocaleString()} CDF</span>
                                     </div>
-                                    <div className="space-y-2">
+
+                                    <div className="space-y-4">
+                                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Sélectionnez votre réseau</Label>
+                                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                            {OPERATORS.map((op) => (
+                                                <button
+                                                    key={op.id}
+                                                    onClick={() => handleOperatorSelect(op.id)}
+                                                    className={cn(
+                                                        "p-4 rounded-2xl border-2 bg-white/5 transition-all flex flex-col items-center gap-3 group relative",
+                                                        selectedOperator === op.id ? op.color : "border-white/5 opacity-60 hover:opacity-100"
+                                                    )}
+                                                >
+                                                    <div className="w-12 h-12 rounded-xl overflow-hidden bg-white flex items-center justify-center p-2 group-hover:scale-110 transition-transform">
+                                                        <img src={op.logo} alt={op.name} className="w-full h-full object-contain" />
+                                                    </div>
+                                                    <span className="text-[10px] font-black uppercase tracking-tighter">{op.name}</span>
+                                                    {selectedOperator === op.id && (
+                                                        <div className="absolute -top-2 -right-2 bg-green-500 text-white rounded-full p-1 shadow-lg">
+                                                            <Check size={10} />
+                                                        </div>
+                                                    )}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-3">
                                         <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Numéro de téléphone M-Money</Label>
                                         <Input 
                                             placeholder="+243..." 
                                             value={phoneNumber} 
                                             onChange={e => setPhone(e.target.value)} 
-                                            className="h-14 bg-background/50 border-white/10 rounded-2xl text-xl font-bold"
+                                            className="h-14 bg-background/50 border-white/10 rounded-2xl text-xl font-bold focus:border-primary"
                                         />
                                     </div>
-                                    <p className="text-[9px] text-muted-foreground italic uppercase">Une demande de confirmation sera envoyée sur votre téléphone.</p>
+                                    <p className="text-[9px] text-muted-foreground italic uppercase flex items-center gap-2">
+                                        <AlertCircle size={10} className="text-primary" />
+                                        Une demande de confirmation USSD sera envoyée sur votre téléphone.
+                                    </p>
                                 </div>
                             )}
 
@@ -453,10 +502,10 @@ export default function CheckoutPage() {
 
                             <Button 
                                 onClick={validateOrder} 
-                                disabled={isProcessing || isBalanceInsufficient}
+                                disabled={isProcessing || isBalanceInsufficient || (method === 'mobile_money' && (!phoneNumber || !selectedOperator))}
                                 className={cn(
                                     "w-full h-20 font-black uppercase italic rounded-2xl shadow-xl text-lg mt-10 gap-3 hover:scale-[1.02] transition-all",
-                                    isBalanceInsufficient ? "bg-white/5 text-white/20" : "bg-accent text-black shadow-accent/20"
+                                    (isBalanceInsufficient || (method === 'mobile_money' && (!phoneNumber || !selectedOperator))) ? "bg-white/5 text-white/20" : "bg-accent text-black shadow-accent/20"
                                 )}
                             >
                                 {isProcessing ? <Loader2 className="animate-spin" /> : <><CheckCircle2 size={24} /> Confirmer & Payer ${totalPrice.toFixed(2)}</>}
@@ -482,12 +531,12 @@ export default function CheckoutPage() {
                         <div className="space-y-4">
                             <Label className="text-[10px] font-black uppercase tracking-widest text-center block opacity-40">Entrez votre code secret à 4 chiffres</Label>
                             <div className="relative w-full max-w-[200px] mx-auto">
-                                <Input 
+                                <input 
                                     type={showPin ? "text" : "password"} 
                                     maxLength={4} 
                                     value={pin} 
                                     onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))} 
-                                    className="h-20 bg-background/50 border-white/10 rounded-2xl text-center text-5xl font-black tracking-[0.5em] focus:border-accent" 
+                                    className="h-20 w-full bg-background/50 border-white/10 rounded-2xl text-center text-5xl font-black tracking-[0.5em] focus:border-accent outline-none" 
                                     autoFocus 
                                 />
                                 <button onClick={() => setShowPin(!showPin)} className="absolute right-4 top-1/2 -translate-y-1/2 text-white/20 hover:text-accent transition-colors">
