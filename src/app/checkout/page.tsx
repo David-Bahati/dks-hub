@@ -9,7 +9,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useRouter } from 'next/navigation';
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase";
-import { collection, addDoc, serverTimestamp, doc, updateDoc, increment } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, doc, updateDoc, increment, getDoc } from "firebase/firestore";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { 
     Loader2, 
@@ -26,7 +26,8 @@ import {
     ArrowRight,
     QrCode,
     AlertCircle,
-    ShoppingBag
+    ShoppingBag,
+    Banknote
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
@@ -38,6 +39,8 @@ import { FirestorePermissionError } from '@/firebase/errors';
 
 type PaymentMethod = 'pi' | 'dkst' | 'mobile_money' | 'visa';
 
+const PI_GCV = 314159;
+
 export default function CheckoutPage() {
     const { cartItems, totalPrice, clearCart } = useCart();
     const { user } = useAuth();
@@ -46,6 +49,7 @@ export default function CheckoutPage() {
     
     const [method, setMethod] = useState<PaymentMethod>('pi');
     const [isProcessing, setIsProcessing] = useState(false);
+    const [exchangeRate, setExchangeRate] = useState(2500);
     
     // PIN Verification States for DKST
     const [isPinOpen, setIsPinOpen] = useState(false);
@@ -55,6 +59,20 @@ export default function CheckoutPage() {
     // Mobile Money / Visa specific states
     const [phoneNumber, setPhone] = useState("");
     const [cardNumber, setCardNumber] = useState("");
+
+    useEffect(() => {
+        const fetchConfig = async () => {
+            try {
+                const snap = await getDoc(doc(db, "system", "config"));
+                if (snap.exists()) {
+                    setExchangeRate(snap.data().exchangeRate || 2500);
+                }
+            } catch (e) {
+                console.error("Erreur config:", e);
+            }
+        };
+        fetchConfig();
+    }, []);
 
     const validateOrder = () => {
         if (!user) {
@@ -66,28 +84,25 @@ export default function CheckoutPage() {
         if (method === 'dkst') {
             const currentBalance = user.tokenBalance || 0;
             
-            // 1. Vérification du solde
             if (currentBalance < totalPrice) {
                 toast({ 
                     title: "Solde insuffisant", 
-                    description: `Il vous manque ${(totalPrice - currentBalance).toFixed(2)} DKST pour cette commande.`,
+                    description: `Il vous manque ${(totalPrice - currentBalance).toFixed(2)} DKST.`,
                     variant: "destructive" 
                 });
                 return;
             }
 
-            // 2. Vérification de la configuration du PIN
             if (!user.walletPin) {
                 toast({ 
                     title: "PIN non configuré", 
-                    description: "Veuillez définir un code PIN dans vos réglages pour valider les paiements DKST.",
+                    description: "Veuillez définir un code PIN dans vos réglages.",
                     variant: "destructive"
                 });
                 router.push('/dashboard/settings');
                 return;
             }
 
-            // 3. Si tout est OK, on demande le PIN
             setIsPinOpen(true);
         } else if (method === 'pi') {
             handlePiPayment();
@@ -102,12 +117,11 @@ export default function CheckoutPage() {
         
         if (isPiBrowser && (window as any).Pi) {
             toast({ title: "Ouverture du Pi Wallet...", description: "Veuillez confirmer la transaction dans votre Pi Browser." });
-            // Simulation du délai SDK
             setTimeout(() => executeOrder(), 3000);
         } else {
             toast({ 
                 title: "Hors Pi Browser", 
-                description: "Le paiement Pi officiel nécessite le Pi Browser. Commande mise en attente de scan au Hub." 
+                description: "Le paiement Pi officiel nécessite le Pi Browser. Commande mise en attente." 
             });
             executeOrder();
         }
@@ -140,10 +154,8 @@ export default function CheckoutPage() {
 
         const ordersRef = collection(db, "orders");
         
-        // Mutation non-bloquante pour la commande
         addDoc(ordersRef, orderData)
             .then((orderRef) => {
-                // Si DKST, on déduit le solde de manière non-bloquante
                 if (method === 'dkst' && user?.uid) {
                     const userRef = doc(db, "users", user.uid);
                     const txRef = collection(db, "tokenTransactions");
@@ -209,6 +221,38 @@ export default function CheckoutPage() {
 
     const isBalanceInsufficient = method === 'dkst' && (user?.tokenBalance || 0) < totalPrice;
 
+    const renderPriceContext = () => {
+        switch(method) {
+            case 'pi':
+                return (
+                    <div className="text-right">
+                        <p className="text-4xl font-black text-white italic tracking-tighter">${totalPrice.toFixed(2)}</p>
+                        <p className="text-[10px] font-black text-yellow-500 uppercase tracking-widest mt-1">≈ {(totalPrice / PI_GCV).toFixed(6)} π (GCV)</p>
+                    </div>
+                );
+            case 'mobile_money':
+                return (
+                    <div className="text-right">
+                        <p className="text-4xl font-black text-white italic tracking-tighter">${totalPrice.toFixed(2)}</p>
+                        <p className="text-[10px] font-black text-primary uppercase tracking-widest mt-1">≈ {(totalPrice * exchangeRate).toLocaleString()} CDF</p>
+                    </div>
+                );
+            case 'dkst':
+                return (
+                    <div className="text-right">
+                        <p className="text-4xl font-black text-white italic tracking-tighter">${totalPrice.toFixed(2)}</p>
+                        <p className="text-[10px] font-black text-accent uppercase tracking-widest mt-1">{totalPrice.toFixed(2)} DKST</p>
+                    </div>
+                );
+            default:
+                return (
+                    <div className="text-right">
+                        <p className="text-4xl font-black text-white italic tracking-tighter">${totalPrice.toFixed(2)}</p>
+                    </div>
+                );
+        }
+    };
+
     return (
         <div className="min-h-screen bg-background text-foreground pb-20">
             <Navbar />
@@ -219,7 +263,6 @@ export default function CheckoutPage() {
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-                    {/* RÉSUMÉ */}
                     <div className="lg:col-span-4 space-y-6">
                         <Card className="glossy-card border-none rounded-[2.5rem] p-8 space-y-6">
                             <CardHeader className="p-0 border-b border-white/5 pb-4">
@@ -237,8 +280,8 @@ export default function CheckoutPage() {
                                 ))}
                             </CardContent>
                             <div className="pt-6 border-t border-white/10 flex justify-between items-end">
-                                <span className="text-[10px] font-black uppercase text-white/40">Total à régler</span>
-                                <span className="text-4xl font-black text-white italic tracking-tighter">${totalPrice.toFixed(2)}</span>
+                                <span className="text-[10px] font-black uppercase text-white/40 mb-1">Total à régler</span>
+                                {renderPriceContext()}
                             </div>
                         </Card>
 
@@ -250,7 +293,6 @@ export default function CheckoutPage() {
                         </div>
                     </div>
 
-                    {/* MODES DE PAIEMENT */}
                     <div className="lg:col-span-8 space-y-8">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <button 
@@ -314,10 +356,13 @@ export default function CheckoutPage() {
                             </button>
                         </div>
 
-                        {/* FORMULAIRES DYNAMIQUES */}
                         <Card className="glossy-card border-none rounded-[3rem] p-10 animate-in fade-in slide-in-from-bottom-4">
                             {method === 'mobile_money' && (
                                 <div className="space-y-6">
+                                    <div className="p-6 bg-primary/5 rounded-2xl border border-primary/20 flex justify-between items-center mb-6">
+                                        <span className="text-[10px] font-black uppercase text-primary tracking-widest">Montant à régler</span>
+                                        <span className="text-xl font-black text-white">{(totalPrice * exchangeRate).toLocaleString()} CDF</span>
+                                    </div>
                                     <div className="space-y-2">
                                         <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Numéro de téléphone M-Money</Label>
                                         <Input 
@@ -360,6 +405,10 @@ export default function CheckoutPage() {
                             {method === 'pi' && (
                                 <div className="flex flex-col items-center gap-6 py-4">
                                     <QrCode size={120} className="text-white opacity-20" />
+                                    <div className="text-center space-y-2">
+                                        <p className="text-2xl font-black text-yellow-500 italic">{(totalPrice / PI_GCV).toFixed(6)} π</p>
+                                        <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Valeur GCV $314,159</p>
+                                    </div>
                                     <p className="text-sm text-white/70 italic text-center max-w-md">
                                         Si vous n'êtes pas dans le Pi Browser, vous pourrez scanner le code QR officiel au comptoir du Hub pour finaliser le transfert GCV.
                                     </p>
