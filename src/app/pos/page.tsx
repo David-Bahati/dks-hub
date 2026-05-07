@@ -36,7 +36,8 @@ import {
   ExternalLink,
   Zap,
   Globe,
-  Lock
+  Lock,
+  ShieldCheck
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -792,8 +793,15 @@ function POS() {
               </div>
             </div>
 
-            <div className="mt-4 text-center">
-              <p className="text-[8px] font-black uppercase tracking-tighter opacity-40 italic border-y border-gray-100 py-1">
+            <div className="mt-6 flex flex-col items-center gap-3">
+              <div className="w-full p-3 border border-gray-100 rounded-xl flex items-center justify-between">
+                <div className="flex flex-col">
+                  <p className="text-[6px] font-black uppercase text-gray-300">Cachet Numérique</p>
+                  <p className="text-[8px] font-black text-blue-600">CERTIFIED DKS HUB</p>
+                </div>
+                <ShieldCheck size={20} className="text-blue-600 opacity-20" />
+              </div>
+              <p className="text-[8px] font-black uppercase tracking-tighter opacity-40 italic border-y border-gray-100 py-1 w-full text-center">
                 Ni repris, ni échangés après sortie
               </p>
             </div>

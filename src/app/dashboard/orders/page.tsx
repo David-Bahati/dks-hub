@@ -384,7 +384,26 @@ export default function OrdersPage() {
                         </tbody>
                     </table>
 
-                    <div className="flex justify-end">
+                    <div className="flex justify-end gap-20">
+                        <div className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-gray-100 rounded-3xl min-w-[240px]">
+                            <div className="w-full border-b border-gray-100 mb-4 pb-1 text-center">
+                                <p className="text-[8px] font-black uppercase text-gray-300 tracking-[0.2em]">Cachet Officiel DKS Hub</p>
+                            </div>
+                            <div className="h-24 w-full flex items-center justify-center relative">
+                                <div className="absolute inset-0 border-2 border-blue-600/10 rounded-full flex items-center justify-center rotate-[-10deg]">
+                                    <div className="text-center">
+                                        <p className="text-[10px] font-black text-blue-600 uppercase leading-none">DOUBLE KING SHOP</p>
+                                        <p className="text-[8px] font-bold text-blue-600 uppercase tracking-tighter mt-1">CERTIFIED HUB BUNIA</p>
+                                    </div>
+                                </div>
+                                <ShieldCheck className="text-blue-600/20 absolute" size={64} />
+                            </div>
+                            <div className="mt-4 text-center">
+                                <p className="text-[8px] font-black text-gray-300 italic">Signature de la Direction</p>
+                                <div className="h-10 w-32 border-b border-gray-200 mx-auto mt-2" />
+                            </div>
+                        </div>
+
                         <div className="w-80 space-y-4">
                             <div className="flex justify-between text-sm font-bold text-gray-500">
                                 <span>SOUS-TOTAL</span>
