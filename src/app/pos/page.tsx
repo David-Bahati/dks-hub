@@ -4,7 +4,7 @@
 import { Navbar } from "@/components/layout/Navbar";
 import { useState, useEffect, useMemo } from "react";
 import { Product, PaymentMode } from "@/lib/types";
-import { PI_CONVERSION_RATE } from "@/lib/constants";
+import { PI_GCV } from "@/lib/constants";
 import { 
   Card, 
   CardContent, 
@@ -90,6 +90,7 @@ function POS() {
     cryptoType?: string;
     date: string;
     customerName: string;
+    totalCDF: number;
   } | null>(null);
 
   const { toast } = useToast();
@@ -296,6 +297,7 @@ function POS() {
             id: saleRef.id,
             items: [...cart],
             total: total,
+            totalCDF: total * exchangeRate,
             mode: paymentMode,
             cryptoType: paymentMode === 'PI_NETWORK' ? cryptoSubMode : undefined,
             date: now,
@@ -325,6 +327,7 @@ function POS() {
         id: sale.id,
         items: sale.items,
         total: sale.totalAmount,
+        totalCDF: sale.totalCDF || (sale.totalAmount * exchangeRate),
         mode: sale.paymentMode,
         cryptoType: sale.cryptoType,
         date: sale.formattedDate,
@@ -604,8 +607,7 @@ function POS() {
                 disabled={cart.length === 0 || isProcessing}
                 onClick={handleCheckout}
               >
-                {isProcessing ? <Loader2 className="animate-spin" /> : <CheckCircle2 />}
-                {activeOrderId ? "Encaisser Commande Web" : "Valider la Vente"}
+                {isProcessing ? <Loader2 className="animate-spin" /> : <><CheckCircle2 className="mr-2" size={20} /> {activeOrderId ? "Encaisser Commande Web" : "Valider la Vente"}</>}
               </Button>
             </CardFooter>
           </Card>
@@ -670,7 +672,7 @@ function POS() {
                     <p className="text-[10px] font-black uppercase tracking-widest text-white/60">Instructions Scan</p>
                     <p className="text-sm font-bold text-accent">
                       {cryptoSubMode === 'pi' 
-                        ? `Payer ${(total / PI_CONVERSION_RATE).toFixed(6)} π via Pi Browser` 
+                        ? `Payer ${(total / PI_GCV).toFixed(8)} π via Pi Browser` 
                         : `Transférer ${total.toFixed(2)} DKST via l'onglet Wallet`}
                     </p>
                   </div>
@@ -756,12 +758,12 @@ function POS() {
               </div>
               <div className="flex justify-between font-black opacity-60 text-[8px] mt-1">
                 <span>TOTAL PAYÉ (FC)</span>
-                <span>{formatCurrency((lastTransaction?.total || 0) * exchangeRate)} FC</span>
+                <span>{formatCurrency(lastTransaction?.totalCDF || 0)} FC</span>
               </div>
               {lastTransaction?.mode === 'PI_NETWORK' && lastTransaction.cryptoType === 'pi' && (
                 <div className="flex justify-between font-bold opacity-40 text-[8px] mt-1">
-                  <span>VALEUR PI (π)</span>
-                  <span>{(lastTransaction.total / PI_CONVERSION_RATE).toFixed(6)} π</span>
+                  <span>VALEUR PI (π) GCV</span>
+                  <span>{(lastTransaction.total / PI_GCV).toFixed(8)} π</span>
                 </div>
               )}
               <div className="flex justify-between mt-2 pt-2 border-t border-gray-100 italic font-black">

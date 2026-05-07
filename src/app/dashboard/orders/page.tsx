@@ -37,6 +37,7 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import { Logo } from '@/components/ui/Logo';
+import { PI_GCV } from '@/lib/constants';
 
 export default function OrdersPage() {
   const { user, isLoading: authLoading } = useAuth();
@@ -348,10 +349,10 @@ export default function OrdersPage() {
                         <div className="space-y-4">
                             <h3 className="text-[10px] font-black uppercase text-gray-400 border-b pb-2 tracking-widest">Paiement</h3>
                             <div className="space-y-1">
-                                <p className="text-sm font-bold">Mode : <span className="uppercase">{selectedOrderForPDF.paymentMethod === 'PI_NETWORK' ? 'Crypto-monnaie' : selectedOrderForPDF.paymentMethod?.replace('_', ' ')}</span></p>
+                                <p className="text-sm font-bold">Mode : <span className="uppercase">{selectedOrderForPDF.paymentMethod === 'PI_NETWORK' ? 'Crypto-monnaie (Pi)' : selectedOrderForPDF.paymentMethod?.replace('_', ' ')}</span></p>
                                 <p className="text-sm font-bold">Statut : <span className="uppercase text-green-600">{selectedOrderForPDF.status}</span></p>
-                                {selectedOrderForPDF.piValue && (
-                                    <p className="text-xs font-medium text-orange-600 mt-2">Transaction Crypto validée blockchain</p>
+                                {selectedOrderForPDF.paymentMethod === 'PI_NETWORK' && (
+                                    <p className="text-xs font-medium text-orange-600 mt-2">Transaction GCV validée blockchain</p>
                                 )}
                             </div>
                         </div>
@@ -393,21 +394,38 @@ export default function OrdersPage() {
                                 <span>TAXES (0%)</span>
                                 <span>$0.00</span>
                             </div>
-                            <div className="space-y-1">
+                            <div className="space-y-4">
                                 <div className="flex justify-between items-end">
                                     <span className="text-lg font-black uppercase italic">TOTAL À PAYER</span>
                                     <span className="text-4xl font-black tracking-tighter">${selectedOrderForPDF.total?.toFixed(2)}</span>
                                 </div>
-                                <p className="text-right text-sm font-bold text-gray-400 uppercase">
-                                    ≈ {(selectedOrderForPDF.total * exchangeRate).toLocaleString()} CDF
-                                </p>
+                                
+                                {/* DÉTAIL CONVERSION SELON MODE */}
+                                {selectedOrderForPDF.paymentMethod === 'PI_NETWORK' && (
+                                    <div className="bg-orange-50 p-4 rounded-xl flex justify-between items-center border border-orange-100">
+                                        <span className="text-[10px] font-black text-orange-800 uppercase">Valeur Crypto (GCV)</span>
+                                        <span className="text-sm font-black text-orange-800">{(selectedOrderForPDF.total / PI_GCV).toFixed(8)} π</span>
+                                    </div>
+                                )}
+                                {selectedOrderForPDF.paymentMethod === 'MOBILE_MONEY' && (
+                                    <div className="bg-blue-50 p-4 rounded-xl flex justify-between items-center border border-blue-100">
+                                        <span className="text-[10px] font-black text-blue-800 uppercase">Montant Francs Congolais</span>
+                                        <span className="text-sm font-black text-blue-800">{(selectedOrderForPDF.cdfValue || selectedOrderForPDF.total * exchangeRate).toLocaleString()} CDF</span>
+                                    </div>
+                                )}
+                                {selectedOrderForPDF.paymentMethod === 'DKST' && (
+                                    <div className="bg-cyan-50 p-4 rounded-xl flex justify-between items-center border border-cyan-100">
+                                        <span className="text-[10px] font-black text-cyan-800 uppercase">Débit Wallet DKST</span>
+                                        <span className="text-sm font-black text-cyan-800">{selectedOrderForPDF.total.toFixed(2)} DKST</span>
+                                    </div>
+                                )}
+                                
+                                {selectedOrderForPDF.paymentMethod !== 'MOBILE_MONEY' && (
+                                    <p className="text-right text-xs font-bold text-gray-400 uppercase">
+                                        Équivalent : {(selectedOrderForPDF.cdfValue || selectedOrderForPDF.total * exchangeRate).toLocaleString()} CDF
+                                    </p>
+                                )}
                             </div>
-                            {selectedOrderForPDF.piValue && (
-                                <div className="bg-orange-50 p-4 rounded-xl flex justify-between items-center border border-orange-100">
-                                    <span className="text-[10px] font-black text-orange-800 uppercase">Valeur Crypto (GCV)</span>
-                                    <span className="text-sm font-black text-orange-800">{selectedOrderForPDF.piValue.toFixed(8)} π</span>
-                                </div>
-                            )}
                         </div>
                     </div>
 

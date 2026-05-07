@@ -36,10 +36,9 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
+import { PI_GCV } from "@/lib/constants";
 
 type PaymentMethod = 'pi' | 'dkst' | 'mobile_money' | 'visa';
-
-const PI_GCV = 314159;
 
 export default function CheckoutPage() {
     const { cartItems, totalPrice, clearCart } = useCart();
@@ -146,8 +145,10 @@ export default function CheckoutPage() {
             customerEmail: user?.email,
             items: cartItems,
             total: totalPrice,
+            piValue: totalPrice / PI_GCV,
+            cdfValue: totalPrice * exchangeRate,
             status: method === 'dkst' || method === 'visa' || method === 'mobile_money' ? "paid" : "pending_payment",
-            paymentMethod: method.toUpperCase(),
+            paymentMethod: method === 'pi' ? 'PI_NETWORK' : method.toUpperCase(),
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp()
         };
@@ -500,3 +501,4 @@ export default function CheckoutPage() {
         </div>
     );
 }
+
