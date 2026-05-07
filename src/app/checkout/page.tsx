@@ -28,7 +28,9 @@ import {
     AlertCircle,
     ShoppingBag,
     Banknote,
-    Check
+    Check,
+    MapPin,
+    Info
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
@@ -39,7 +41,7 @@ import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { PI_GCV } from "@/lib/constants";
 
-type PaymentMethod = 'pi' | 'dkst' | 'mobile_money' | 'visa';
+type PaymentMethod = 'pi' | 'dkst' | 'mobile_money' | 'visa' | 'cash';
 
 const OPERATORS = [
     { id: 'vodacom', name: 'Vodacom', color: 'border-red-600', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a6/Vodafone_icon.svg/1200px-Vodafone_icon.svg.png' },
@@ -171,7 +173,7 @@ export default function CheckoutPage() {
             cdfValue: totalPrice * exchangeRate,
             status: method === 'dkst' || method === 'visa' || method === 'mobile_money' ? "paid" : "pending_payment",
             paymentMethod: method === 'pi' ? 'PI_NETWORK' : method.toUpperCase(),
-            operator: selectedOperator,
+            operator: selectedOperator || null,
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp()
         };
@@ -255,10 +257,13 @@ export default function CheckoutPage() {
                     </div>
                 );
             case 'mobile_money':
+            case 'cash':
                 return (
                     <div className="text-right">
                         <p className="text-4xl font-black text-white italic tracking-tighter">${totalPrice.toFixed(2)}</p>
-                        <p className="text-[10px] font-black text-primary uppercase tracking-widest mt-1">≈ {(totalPrice * exchangeRate).toLocaleString()} CDF</p>
+                        <p className={cn("text-[10px] font-black uppercase tracking-widest mt-1", method === 'cash' ? "text-green-500" : "text-primary")}>
+                            ≈ {(totalPrice * exchangeRate).toLocaleString()} CDF
+                        </p>
                     </div>
                 );
             case 'dkst':
@@ -318,7 +323,7 @@ export default function CheckoutPage() {
                     </div>
 
                     <div className="lg:col-span-8 space-y-8">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <button 
                                 onClick={() => setMethod('pi')}
                                 className={cn(
@@ -329,7 +334,7 @@ export default function CheckoutPage() {
                                 <Globe size={32} className={cn("transition-transform group-hover:scale-110", method === 'pi' ? "text-yellow-500" : "opacity-20")} />
                                 <div>
                                     <p className="font-black uppercase italic text-lg">Pi Network</p>
-                                    <p className="text-[10px] opacity-60 uppercase font-bold tracking-widest">Consensus GCV $314,159</p>
+                                    <p className="text-[10px] opacity-60 uppercase font-bold tracking-widest">Consensus GCV</p>
                                 </div>
                                 {method === 'pi' && <CheckCircle2 size={24} className="absolute top-6 right-6" />}
                             </button>
@@ -344,7 +349,7 @@ export default function CheckoutPage() {
                                 <Zap size={32} className={cn("transition-transform group-hover:scale-110", method === 'dkst' ? "text-accent" : "opacity-20")} />
                                 <div>
                                     <p className="font-black uppercase italic text-lg">Jeton DKST</p>
-                                    <p className="text-[10px] opacity-60 uppercase font-bold tracking-widest">Paiement par Wallet Interne</p>
+                                    <p className="text-[10px] opacity-60 uppercase font-bold tracking-widest">Wallet Interne</p>
                                 </div>
                                 {method === 'dkst' && <CheckCircle2 size={24} className="absolute top-6 right-6" />}
                             </button>
@@ -365,6 +370,21 @@ export default function CheckoutPage() {
                             </button>
 
                             <button 
+                                onClick={() => setMethod('cash')}
+                                className={cn(
+                                    "p-8 rounded-[2.5rem] border-2 transition-all flex flex-col items-start gap-4 text-left group relative overflow-hidden",
+                                    method === 'cash' ? "bg-green-500/10 border-green-500 text-green-500" : "bg-white/5 border-white/5 text-white/40 hover:bg-white/10"
+                                )}
+                            >
+                                <Banknote size={32} className={cn("transition-transform group-hover:scale-110", method === 'cash' ? "text-green-500" : "opacity-20")} />
+                                <div>
+                                    <p className="font-black uppercase italic text-lg">Cash / Espèces</p>
+                                    <p className="text-[10px] opacity-60 uppercase font-bold tracking-widest">Réglé au bureau</p>
+                                </div>
+                                {method === 'cash' && <CheckCircle2 size={24} className="absolute top-6 right-6" />}
+                            </button>
+
+                            <button 
                                 onClick={() => setMethod('visa')}
                                 className={cn(
                                     "p-8 rounded-[2.5rem] border-2 transition-all flex flex-col items-start gap-4 text-left group relative overflow-hidden",
@@ -374,7 +394,7 @@ export default function CheckoutPage() {
                                 <CreditCard size={32} className={cn("transition-transform group-hover:scale-110", method === 'visa' ? "text-white" : "opacity-20")} />
                                 <div>
                                     <p className="font-black uppercase italic text-lg">Carte Visa / MC</p>
-                                    <p className="text-[10px] opacity-60 uppercase font-bold tracking-widest">Transaction Bancaire Directe</p>
+                                    <p className="text-[10px] opacity-60 uppercase font-bold tracking-widest">Transaction Directe</p>
                                 </div>
                                 {method === 'visa' && <CheckCircle2 size={24} className="absolute top-6 right-6" />}
                             </button>
@@ -389,7 +409,6 @@ export default function CheckoutPage() {
                                     </div>
 
                                     <div className="space-y-4">
-                                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Sélectionnez votre réseau</Label>
                                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                                             {OPERATORS.map((op) => (
                                                 <button
@@ -404,11 +423,6 @@ export default function CheckoutPage() {
                                                         <img src={op.logo} alt={op.name} className="w-full h-full object-contain" />
                                                     </div>
                                                     <span className="text-[10px] font-black uppercase tracking-tighter">{op.name}</span>
-                                                    {selectedOperator === op.id && (
-                                                        <div className="absolute -top-2 -right-2 bg-green-500 text-white rounded-full p-1 shadow-lg">
-                                                            <Check size={10} />
-                                                        </div>
-                                                    )}
                                                 </button>
                                             ))}
                                         </div>
@@ -423,10 +437,31 @@ export default function CheckoutPage() {
                                             className="h-14 bg-background/50 border-white/10 rounded-2xl text-xl font-bold focus:border-primary"
                                         />
                                     </div>
-                                    <p className="text-[9px] text-muted-foreground italic uppercase flex items-center gap-2">
-                                        <AlertCircle size={10} className="text-primary" />
-                                        Une demande de confirmation USSD sera envoyée sur votre téléphone.
-                                    </p>
+                                </div>
+                            )}
+
+                            {method === 'cash' && (
+                                <div className="flex flex-col items-center text-center gap-8 py-4 animate-in zoom-in-95 duration-500">
+                                    <div className="w-24 h-24 rounded-full bg-green-500/10 flex items-center justify-center text-green-500 shadow-[0_0_40px_rgba(34,197,94,0.2)]">
+                                        <MapPin size={48} />
+                                    </div>
+                                    <div className="space-y-4">
+                                        <h3 className="text-2xl font-black uppercase italic tracking-tighter">Paiement <span className="text-green-500">au Bureau</span></h3>
+                                        <p className="text-sm text-white/60 leading-relaxed italic max-w-md">
+                                            Validez votre commande en ligne et présentez-vous à notre bureau physique de **Bunia (Immeuble Bahati)** pour effectuer le règlement en espèces.
+                                        </p>
+                                    </div>
+                                    <div className="p-6 bg-white/5 rounded-2xl border border-white/10 w-full max-w-sm flex justify-between items-center">
+                                        <span className="text-[10px] font-black uppercase opacity-40">Total à prévoir</span>
+                                        <div className="text-right">
+                                            <p className="text-xl font-black text-white italic">${totalPrice.toFixed(2)}</p>
+                                            <p className="text-[10px] font-bold text-green-500 uppercase">≈ {(totalPrice * exchangeRate).toLocaleString()} CDF</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-3 text-xs text-white/40 italic">
+                                        <Info size={14} className="text-green-500" />
+                                        Votre matériel sera réservé pendant 24h.
+                                    </div>
                                 </div>
                             )}
 
@@ -463,9 +498,6 @@ export default function CheckoutPage() {
                                         <p className="text-2xl font-black text-yellow-500 italic">{(totalPrice / PI_GCV).toFixed(6)} π</p>
                                         <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Valeur GCV $314,159</p>
                                     </div>
-                                    <p className="text-sm text-white/70 italic text-center max-w-md">
-                                        Si vous n'êtes pas dans le Pi Browser, vous pourrez scanner le code QR officiel au comptoir du Hub pour finaliser le transfert GCV.
-                                    </p>
                                 </div>
                             )}
 
@@ -474,28 +506,15 @@ export default function CheckoutPage() {
                                     <Lock size={40} className="text-accent animate-pulse" />
                                     <div className="space-y-2">
                                         <h4 className="text-xl font-black uppercase italic">Wallet interne DKS</h4>
-                                        <p className="text-sm text-white/60 italic leading-relaxed">
-                                            Le montant sera déduit de votre solde miné. Votre **Signature PIN** sera demandée à l'étape suivante.
+                                        <p className="text-sm text-white/60 italic">
+                                            Débit direct de votre solde miné. Signature PIN requise.
                                         </p>
                                     </div>
-                                    
-                                    <div className="w-full max-w-xs space-y-4">
-                                        <div className={cn(
-                                            "flex items-center justify-between p-4 rounded-2xl border transition-all",
-                                            isBalanceInsufficient ? "bg-red-500/10 border-red-500/30" : "bg-black/40 border-white/5"
-                                        )}>
-                                            <span className="text-[10px] font-black uppercase opacity-40">Votre Solde</span>
-                                            <span className={cn("text-lg font-black", isBalanceInsufficient ? "text-red-500" : "text-accent")}>
-                                                {user?.tokenBalance?.toFixed(2) || 0} DKST
-                                            </span>
-                                        </div>
-                                        
-                                        {isBalanceInsufficient && (
-                                            <div className="flex items-center gap-2 text-red-500 justify-center">
-                                                <AlertCircle size={14} />
-                                                <p className="text-[10px] font-black uppercase">Solde insuffisant pour cet achat</p>
-                                            </div>
-                                        )}
+                                    <div className="w-full max-w-xs p-4 rounded-2xl border border-white/5 bg-black/40 flex justify-between items-center">
+                                        <span className="text-[10px] font-black uppercase opacity-40">Solde</span>
+                                        <span className={cn("text-lg font-black", isBalanceInsufficient ? "text-red-500" : "text-accent")}>
+                                            {user?.tokenBalance?.toFixed(2) || 0} DKST
+                                        </span>
                                     </div>
                                 </div>
                             )}
@@ -508,7 +527,7 @@ export default function CheckoutPage() {
                                     (isBalanceInsufficient || (method === 'mobile_money' && (!phoneNumber || !selectedOperator))) ? "bg-white/5 text-white/20" : "bg-accent text-black shadow-accent/20"
                                 )}
                             >
-                                {isProcessing ? <Loader2 className="animate-spin" /> : <><CheckCircle2 size={24} /> Confirmer & Payer ${totalPrice.toFixed(2)}</>}
+                                {isProcessing ? <Loader2 className="animate-spin" /> : <><CheckCircle2 size={24} /> Confirmer & Valider ${totalPrice.toFixed(2)}</>}
                             </Button>
                         </Card>
                     </div>
