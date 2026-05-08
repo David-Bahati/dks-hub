@@ -56,7 +56,8 @@ import {
     ArrowDownRight,
     Repeat,
     IdCard,
-    PieChart as PieChartIcon
+    PieChart as PieChartIcon,
+    Gem
 } from "lucide-react";
 import { db } from '@/lib/firebase';
 import { collection, query, where, orderBy, updateDoc, doc, addDoc, serverTimestamp, increment, limit, getDocs } from 'firebase/firestore';
