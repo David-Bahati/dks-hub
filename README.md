@@ -11,9 +11,11 @@ DKS est un Hub Technologique Hybride alliant commerce de hardware luxe, formatio
 - **SAV & Labo** : Support technique en direct et gestion des stocks de maintenance.
 - **Héritage Digital** : Protocole de succession Web3 (Dead Man's Switch).
 - **DAO Governance** : Démocratie communautaire pour les choix stratégiques.
+- **Sécurité** : Système de cachet "Haute Sécurité" et signatures automatiques.
 
 ## 📖 Documentation
-Pour une compréhension approfondie de l'architecture, de l'économie et des rôles, consultez les [Spécifications Complètes du Projet](./docs/PROJECT_SPECIFICATIONS.md).
+- [Spécifications Complètes du Projet](./docs/PROJECT_SPECIFICATIONS.md)
+- [**Exposé Détaillé du Projet (Présentation)**](./docs/PROJET_EXPOSE_DETAILLE.md)
 
 ## 💻 Tech Stack
 - **Framework** : Next.js (App Router)
