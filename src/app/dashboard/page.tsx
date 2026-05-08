@@ -60,7 +60,8 @@ import {
   Share2,
   Banknote,
   PlusCircle,
-  Presentation
+  Presentation,
+  IdCard
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -368,7 +369,7 @@ function DashboardPage() {
                       <Badge className="bg-accent text-black font-black uppercase italic text-[8px] tracking-[0.3em] px-4 py-1">Membre {user?.loyaltyLevel || 'Bronze'}</Badge>
                       <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest opacity-40">Dernière activité: {user?.lastActivityAt?.toDate ? format(user.lastActivityAt.toDate(), "dd MMM HH:mm", { locale: fr }) : "Maintenant"}</span>
                   </div>
-                  <h1 className="text-4xl md:text-5xl font-black uppercase italic tracking-tighter">Bienvenue, <span className="text-accent">{user?.name?.split(' ')[0]}</span></h1>
+                  <h1 className="text-4xl md:text-5xl font-black uppercase italic tracking-tighter text-white leading-none">Bienvenue, <span className="text-accent">{user?.name?.split(' ')[0]}</span></h1>
                   <p className="text-sm text-white/60 font-medium italic">"Prêt à dominer l'économie technologique aujourd'hui ?"</p>
               </div>
           </div>
@@ -378,7 +379,7 @@ function DashboardPage() {
               <section className="animate-in fade-in slide-in-from-top-4 duration-1000">
                 <div className="flex items-center gap-4 mb-6">
                     <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center text-green-500 shadow-lg"><Zap size={20} /></div>
-                    <h3 className="text-xl font-black uppercase italic tracking-tight">Actions Prioritaires</h3>
+                    <h3 className="text-xl font-black uppercase italic tracking-tight text-white">Actions Prioritaires</h3>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                     <Link href="/pos" className="group">
@@ -452,7 +453,7 @@ function DashboardPage() {
                       <div className="flex justify-between items-start">
                           <div className="space-y-1">
                               <Badge className="bg-accent text-black font-black uppercase italic text-[9px] px-4 py-1 mb-2">Pool Communautaire 65%</Badge>
-                              <h2 className="text-3xl font-black uppercase italic tracking-tighter">MINAGE <span className="text-accent">D'ÉLITE</span></h2>
+                              <h2 className="text-3xl font-black uppercase italic tracking-tighter text-white">MINAGE <span className="text-accent">D'ÉLITE</span></h2>
                           </div>
                           <div className={cn("border p-3 rounded-2xl text-center transition-all duration-500", getRarityColor(user?.lastBlockRarity || 'common'))}>
                               <p className="text-[8px] font-black uppercase mb-1">Rareté</p>
@@ -563,7 +564,7 @@ function DashboardPage() {
                              <div className="space-y-4 relative z-10">
                                 <div className="flex items-center gap-3">
                                     <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-accent"><Building2 size={20} /></div>
-                                    <h4 className="text-sm font-black uppercase italic">Trésorerie Hub</h4>
+                                    <h4 className="text-sm font-black uppercase italic text-white">Trésorerie Hub</h4>
                                 </div>
                                 <div className="space-y-1">
                                     <p className="text-4xl font-black text-white italic">{treasury?.dkstBalance?.toLocaleString() || 0} <span className="text-xs opacity-40 not-italic">DKST</span></p>
@@ -647,3 +648,4 @@ const navConfig = [
 ];
 
 export default withAuth(DashboardPage);
+
