@@ -72,6 +72,13 @@ const SERVICE_PRICES: Record<string, number> = {
 function ServiceManagementPage() {
     const { user } = useAuth();
     const { toast } = useToast();
+    
+    // Hydration fix
+    const [isMounted, setIsMounted] = useState(false);
+    useEffect(() => {
+      setIsMounted(true);
+    }, []);
+
     const [search, setSearch] = useState("");
     const [statusFilter, setStatusFilter] = useState("all");
     const [staffMembers, setStaffMembers] = useState<any[]>([]);
@@ -247,6 +254,8 @@ function ServiceManagementPage() {
         return matchesSearch && matchesStatus && matchesUser;
     });
 
+    if (!isMounted) return null;
+
     return (
         <div className="min-h-screen bg-background text-foreground pb-24">
             <Navbar />
@@ -349,7 +358,7 @@ function ServiceManagementPage() {
                         ))
                     ) : (
                         <div className="py-32 text-center bg-white/5 rounded-[3rem] border border-dashed border-white/10 opacity-30 flex flex-col items-center gap-6">
-                            <GraduationCap size={80} strokeWidth={1} /><p className="text-xl font-black uppercase italic tracking-tighter">Aucun cursus actif</p>
+                            <GraduationCap size={80} strokeWidth={1} /><p className="textxl font-black uppercase italic tracking-tighter">Aucun cursus actif</p>
                         </div>
                     )}
                 </div>

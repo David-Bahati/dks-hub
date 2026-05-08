@@ -133,6 +133,12 @@ function UniversalWalletPage() {
     const { user } = useAuth();
     const { toast } = useToast();
     
+    // Hydration fix
+    const [isMounted, setIsMounted] = useState(false);
+    useEffect(() => {
+      setIsMounted(true);
+    }, []);
+
     // States for Modals
     const [isTransferSheetOpen, setIsTransferSheetOpen] = useState(false);
     const [isReceiveSheetOpen, setIsReceiveSheetOpen] = useState(false);
@@ -178,7 +184,7 @@ function UniversalWalletPage() {
     const { data: transactions } = useCollection(txQuery);
 
     const stats = useMemo(() => {
-        if (!user) return { stakingRewards: 0, apr: 5, totalWealthUSD: 0, balances: {}, pieData: [], daysInactive: 0 };
+        if (!user || !isMounted) return { stakingRewards: 0, apr: 5, totalWealthUSD: 0, balances: {}, pieData: [], daysInactive: 0 };
 
         let apr = 5;
         if (user.loyaltyLevel === 'Gold') apr = 12;
@@ -215,7 +221,7 @@ function UniversalWalletPage() {
         const daysInactive = differenceInDays(new Date(), lastActive);
 
         return { stakingRewards: rewards, apr, totalWealthUSD, balances, pieData, daysInactive };
-    }, [user]);
+    }, [user, isMounted]);
 
     const secureAction = (action: () => void) => {
         if (user?.isWalletLocked) {
@@ -403,6 +409,8 @@ function UniversalWalletPage() {
         }, 500);
         return () => clearTimeout(delayDebounce);
     }, [searchQuery, user?.uid]);
+
+    if (!isMounted) return null;
 
     return (
         <div className="min-h-screen bg-background text-foreground pb-24">

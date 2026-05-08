@@ -57,6 +57,13 @@ import { cn } from '@/lib/utils';
 export default function OrdersPage() {
   const { user, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
+  
+  // Hydration fix
+  const [isMounted, setIsMounted] = useState(false);
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -232,6 +239,8 @@ export default function OrdersPage() {
 
   const isLoading = authLoading || collectionLoading;
   const isStaff = user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'seller' || user?.role?.toLowerCase() === 'cashier';
+
+  if (!isMounted) return null;
 
   return (
     <div className="min-h-screen w-full bg-background text-foreground">
