@@ -26,19 +26,17 @@ import {
     Smartphone,
     Info,
     Search,
-    User as UserIcon,
+    User,
     CheckCircle2,
     X,
-    ArrowUpCircle,
-    ArrowDownCircle,
+    ArrowUp,
+    ArrowDown,
     ArrowUpRight,
     ArrowDownLeft,
     ShoppingBag,
-    Vault,
     Timer,
-    CircleDollarSign,
+    DollarSign,
     ArrowLeftRight,
-    LineChart as ChartIcon,
     Activity,
     Download,
     Medal,
@@ -53,10 +51,9 @@ import {
     Scale,
     Copy,
     Check,
-    ArrowDownRight,
     Repeat,
     IdCard,
-    PieChart as PieChartIcon,
+    PieChart as LucidePieChart,
     Gem,
     Flame
 } from "lucide-react";
@@ -92,7 +89,7 @@ import {
     YAxis, 
     Tooltip, 
     ResponsiveContainer,
-    PieChart,
+    PieChart as RechartsPieChart,
     Pie,
     Cell
 } from 'recharts';
@@ -103,7 +100,7 @@ import { differenceInDays } from "date-fns";
 import { fr } from "date-fns/locale";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-const GCV_VALUE = 314159; // Global Consensus Value in USD
+const GCV_VALUE = 314159; 
 
 const WEALTH_CHART_DATA = [
     { name: 'Jan', value: 1200 },
@@ -124,14 +121,12 @@ function UniversalWalletPage() {
       setIsMounted(true);
     }, []);
 
-    // States for Modals
     const [isTransferSheetOpen, setIsTransferSheetOpen] = useState(false);
     const [isReceiveSheetOpen, setIsReceiveSheetOpen] = useState(false);
     const [isSwapSheetOpen, setIsSwapSheetOpen] = useState(false);
     const [isCardDialogOpen, setIsCardDialogOpen] = useState(false);
     const [isPinVerificationOpen, setIsPinVerificationOpen] = useState(false);
     
-    // Logic States
     const [isProcessingAction, setIsProcessingAction] = useState(false);
     const [enteredPin, setEnteredPin] = useState("");
     const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
@@ -139,10 +134,7 @@ function UniversalWalletPage() {
     const [isEmergencyLockProcessing, setIsEmergencyLockProcessing] = useState(false);
     const [isHeartbeatProcessing, setIsHeartbeatProcessing] = useState(false);
 
-    // Staking States
     const [stakeAmount, setStakeAmount] = useState("");
-
-    // Transfer States
     const [searchQuery, setSearchQuery] = useState("");
     const [searchResults, setSearchResults] = useState<any[]>([]);
     const [isSearching, setIsSearching] = useState(false);
@@ -152,16 +144,13 @@ function UniversalWalletPage() {
     const [transferMemo, setTransferMemo] = useState("");
     const [hasCopiedId, setHasCopiedId] = useState(false);
 
-    // Swap States
     const [swapFrom, setSwapFrom] = useState('dkst');
     const [swapTo, setSwapTo] = useState('usdt');
     const [swapAmount, setSwapAmount] = useState("");
 
-    // Card/PDF Refs
     const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
     const cardRef = useRef<HTMLDivElement>(null);
 
-    // Fetch transactions for ledger
     const txQuery = useMemoFirebase(() => {
         if (!user?.uid) return null;
         return query(collection(db, "tokenTransactions"), where("userId", "==", user.uid), orderBy("createdAt", "desc"), limit(50));
@@ -171,7 +160,7 @@ function UniversalWalletPage() {
     const ASSETS = useMemo(() => [
         { id: 'dkst', symbol: 'DKST', name: 'DKS Utility Token', icon: <Flame className="text-accent" />, color: 'bg-accent/20', price: 1.00 },
         { id: 'pi', symbol: 'PI', name: 'Pi Network (GCV)', icon: <Globe className="text-yellow-500" />, color: 'bg-yellow-500/20', price: GCV_VALUE },
-        { id: 'usdt', symbol: 'USDT', name: 'Tether USD', icon: <CircleDollarSign className="text-green-500" />, color: 'bg-green-500/20', price: 1.00 },
+        { id: 'usdt', symbol: 'USDT', name: 'Tether USD', icon: <DollarSign className="text-green-500" />, color: 'bg-green-500/20', price: 1.00 },
         { id: 'lp', symbol: 'DKS-LP', name: 'Liquidity Provider', icon: <Activity className="text-purple-500" />, color: 'bg-purple-500/20', price: 15.50 }
     ], []);
 
@@ -253,52 +242,6 @@ function UniversalWalletPage() {
         } finally {
             setIsHeartbeatProcessing(false);
         }
-    };
-
-    const handleStake = async () => {
-        if (!user || !stakeAmount) return;
-        const amount = parseFloat(stakeAmount);
-        setIsProcessingAction(true);
-        try {
-            await updateDoc(doc(db, "users", user.uid), {
-                tokenBalance: increment(-amount),
-                stakedBalance: increment(amount),
-                stakingStartedAt: serverTimestamp(),
-                updatedAt: serverTimestamp()
-            });
-            await addDoc(collection(db, "tokenTransactions"), { userId: user.uid, userName: user.name, type: 'staking', tokenType: 'DKST', tokenAmount: amount, createdAt: serverTimestamp() });
-            toast({ title: "Staking Actif", description: `Vous générez maintenant ${stats.apr}% APR.` });
-            setStakeAmount("");
-        } catch (e) { toast({ title: "Erreur", variant: "destructive" }); } finally { setIsProcessingAction(false); }
-    };
-
-    const handleUnstake = async () => {
-        if (!user || (user.stakedBalance || 0) <= 0) return;
-        setIsProcessingAction(true);
-        try {
-            const rewards = stats.stakingRewards;
-            const capital = user.stakedBalance || 0;
-            const total = capital + rewards;
-
-            await updateDoc(doc(db, "users", user.uid), {
-                tokenBalance: increment(total),
-                stakedBalance: 0,
-                stakingStartedAt: null,
-                updatedAt: serverTimestamp()
-            });
-
-            await addDoc(collection(db, "tokenTransactions"), { 
-                userId: user.uid, 
-                userName: user.name, 
-                type: 'unstaking', 
-                tokenType: 'DKST', 
-                tokenAmount: total, 
-                memo: `Retrait Staking (Capital: ${capital.toFixed(2)} + Récompenses: ${rewards.toFixed(4)})`,
-                createdAt: serverTimestamp() 
-            });
-
-            toast({ title: "Capital & Intérêts Retirés", description: `${total.toFixed(4)} DKST ajoutés à votre solde.` });
-        } catch (e) { toast({ title: "Erreur", variant: "destructive" }); } finally { setIsProcessingAction(false); }
     };
 
     const handleTransferProcess = async () => {
@@ -515,16 +458,16 @@ function UniversalWalletPage() {
 
                             <TabsContent value="analytics" className="animate-in fade-in slide-in-from-bottom-4">
                                 <Card className="bg-white/[0.02] border-white/5 p-10 rounded-[3rem] flex flex-col items-center">
-                                    <h4 className="text-[10px] font-black uppercase tracking-widest opacity-40 mb-8 w-full flex items-center gap-2"><PieChartIcon size={14} className="text-accent" /> Répartition par Valeur</h4>
+                                    <h4 className="text-[10px] font-black uppercase tracking-widest opacity-40 mb-8 w-full flex items-center gap-2"><LucidePieChart size={14} className="text-accent" /> Répartition par Valeur</h4>
                                     <div className="h-[250px] w-full relative">
                                         <ResponsiveContainer width="100%" height="100%">
-                                            <PieChart>
+                                            <RechartsPieChart>
                                                 <Pie data={stats.pieData} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={5} dataKey="value">
                                                     {stats.pieData.map((entry, index) => (
                                                         <Cell key={`cell-${index}`} fill={entry.fill} stroke="none" />
                                                     ))}
                                                 </Pie>
-                                            </PieChart>
+                                            </RechartsPieChart>
                                         </ResponsiveContainer>
                                     </div>
                                 </Card>
@@ -640,7 +583,7 @@ function UniversalWalletPage() {
                                 </Select>
                                 <Input type="number" placeholder="0.00" value={swapAmount} onChange={(e) => setSwapAmount(e.target.value)} className="h-12 bg-transparent border-none text-2xl font-black text-white text-right" />
                             </div>
-                            <div className="flex justify-center -my-6 relative z-10"><Button size="icon" variant="outline" className="h-10 w-10 rounded-full bg-background border-white/10 text-accent hover:rotate-180 transition-transform duration-500 shadow-xl" onClick={() => { const tmp = swapFrom; setSwapFrom(swapTo); setSwapTo(tmp); }}><ArrowDownCircle size={20} /></Button></div>
+                            <div className="flex justify-center -my-6 relative z-10"><Button size="icon" variant="outline" className="h-10 w-10 rounded-full bg-background border-white/10 text-accent hover:rotate-180 transition-transform duration-500 shadow-xl" onClick={() => { const tmp = swapFrom; setSwapFrom(swapTo); setSwapTo(tmp); }}><ArrowDown size={20} /></Button></div>
                             <div className="p-6 bg-white/5 rounded-[2.5rem] border border-white/5 space-y-4">
                                 <Select value={swapTo} onValueChange={setSwapTo}>
                                     <SelectTrigger className="w-full h-12 bg-black/40 border-none rounded-xl font-black uppercase"><SelectValue /></SelectTrigger>
