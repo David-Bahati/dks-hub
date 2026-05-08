@@ -23,7 +23,8 @@ import {
     Flame,
     Gem,
     Cpu,
-    CheckCircle2
+    CheckCircle2,
+    TrendingUp
 } from "lucide-react";
 import Link from 'next/link';
 import { Badge } from "@/components/ui/badge";
@@ -107,6 +108,9 @@ function ProjectPresentationPage() {
 
                         <section className="space-y-8">
                             <h2 className="text-3xl font-black uppercase italic flex items-center gap-4"><Pickaxe className="text-orange-500" /> 2. Système de Minage (Proof of Activity)</h2>
+                            <p className="text-sm text-white/60 leading-relaxed">
+                                Le minage chez DKS repose sur l'engagement réel des membres. Chaque action dans le Hub (achat, formation, support) augmente la puissance de calcul (GH/s).
+                            </p>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                 <div className="p-8 bg-white/5 rounded-[2.5rem] border border-white/5 space-y-4">
                                     <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center"><Flame size={24} /></div>
@@ -128,6 +132,9 @@ function ProjectPresentationPage() {
 
                         <section className="space-y-8">
                             <h2 className="text-3xl font-black uppercase italic flex items-center gap-4"><ShoppingBag className="text-green-500" /> 3. Boutique Élite & POS</h2>
+                            <p className="text-sm text-white/60 leading-relaxed">
+                                Le cœur commercial du Hub propose le meilleur du Hardware mondial (NVIDIA, Intel, AMD, Starlink) avec une traçabilité totale des garanties.
+                            </p>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                 <Card className="bg-black/40 border-white/5 p-8 rounded-[2.5rem] space-y-6">
                                     <h4 className="text-xl font-black uppercase italic text-accent">Consensus Pi (GCV)</h4>
