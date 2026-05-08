@@ -53,7 +53,7 @@ import {
     Check,
     Repeat,
     IdCard,
-    PieChart as LucidePieChart,
+    PieChart as PieIcon,
     Diamond,
     Flame,
     ArrowDownCircle,
@@ -91,7 +91,7 @@ import {
     YAxis, 
     Tooltip, 
     ResponsiveContainer,
-    PieChart as RechartsPieChart,
+    PieChart,
     Pie,
     Cell
 } from 'recharts';
@@ -459,16 +459,16 @@ function UniversalWalletPage() {
 
                             <TabsContent value="analytics" className="animate-in fade-in slide-in-from-bottom-4">
                                 <Card className="bg-white/[0.02] border-white/5 p-10 rounded-[3rem] flex flex-col items-center">
-                                    <h4 className="text-[10px] font-black uppercase tracking-widest opacity-40 mb-8 w-full flex items-center gap-2"><LucidePieChart size={14} className="text-accent" /> Répartition par Valeur</h4>
+                                    <h4 className="text-[10px] font-black uppercase tracking-widest opacity-40 mb-8 w-full flex items-center gap-2"><PieIcon size={14} className="text-accent" /> Répartition par Valeur</h4>
                                     <div className="h-[250px] w-full relative">
                                         <ResponsiveContainer width="100%" height="100%">
-                                            <RechartsPieChart>
+                                            <PieChart>
                                                 <Pie data={stats.pieData} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={5} dataKey="value">
                                                     {stats.pieData.map((entry, index) => (
                                                         <Cell key={`cell-${index}`} fill={entry.fill} stroke="none" />
                                                     ))}
                                                 </Pie>
-                                            </RechartsPieChart>
+                                            </PieChart>
                                         </ResponsiveContainer>
                                     </div>
                                 </Card>
