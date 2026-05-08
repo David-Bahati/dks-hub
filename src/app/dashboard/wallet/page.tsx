@@ -57,7 +57,8 @@ import {
     Repeat,
     IdCard,
     PieChart as PieChartIcon,
-    Gem
+    Gem,
+    Flame
 } from "lucide-react";
 import { db } from '@/lib/firebase';
 import { collection, query, where, orderBy, updateDoc, doc, addDoc, serverTimestamp, increment, limit, getDocs } from 'firebase/firestore';
@@ -104,21 +105,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 const GCV_VALUE = 314159; // Global Consensus Value in USD
 
-const ASSETS = [
-    { id: 'dkst', symbol: 'DKST', name: 'DKS Utility Token', icon: <FlameIcon className="text-accent" />, color: 'bg-accent/20', price: 1.00 },
-    { id: 'pi', symbol: 'PI', name: 'Pi Network (GCV)', icon: <Globe className="text-yellow-500" />, color: 'bg-yellow-500/20', price: GCV_VALUE },
-    { id: 'usdt', symbol: 'USDT', name: 'Tether USD', icon: <CircleDollarSign className="text-green-500" />, color: 'bg-green-500/20', price: 1.00 },
-    { id: 'lp', symbol: 'DKS-LP', name: 'Liquidity Provider', icon: <Activity className="text-purple-500" />, color: 'bg-purple-500/20', price: 15.50 }
-];
-
-function FlameIcon({ className }: { className?: string }) {
-    return (
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-            <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.298 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>
-        </svg>
-    );
-}
-
 const WEALTH_CHART_DATA = [
     { name: 'Jan', value: 1200 },
     { name: 'Fév', value: 1800 },
@@ -133,7 +119,6 @@ function UniversalWalletPage() {
     const { user } = useAuth();
     const { toast } = useToast();
     
-    // Hydration fix
     const [isMounted, setIsMounted] = useState(false);
     useEffect(() => {
       setIsMounted(true);
@@ -183,8 +168,15 @@ function UniversalWalletPage() {
     }, [user?.uid]);
     const { data: transactions } = useCollection(txQuery);
 
+    const ASSETS = useMemo(() => [
+        { id: 'dkst', symbol: 'DKST', name: 'DKS Utility Token', icon: <Flame className="text-accent" />, color: 'bg-accent/20', price: 1.00 },
+        { id: 'pi', symbol: 'PI', name: 'Pi Network (GCV)', icon: <Globe className="text-yellow-500" />, color: 'bg-yellow-500/20', price: GCV_VALUE },
+        { id: 'usdt', symbol: 'USDT', name: 'Tether USD', icon: <CircleDollarSign className="text-green-500" />, color: 'bg-green-500/20', price: 1.00 },
+        { id: 'lp', symbol: 'DKS-LP', name: 'Liquidity Provider', icon: <Activity className="text-purple-500" />, color: 'bg-purple-500/20', price: 15.50 }
+    ], []);
+
     const stats = useMemo(() => {
-        if (!user || !isMounted) return { stakingRewards: 0, apr: 5, totalWealthUSD: 0, balances: {}, pieData: [], daysInactive: 0 };
+        if (!user || !isMounted) return { stakingRewards: 0, apr: 5, totalWealthUSD: 0, balances: { dkst: 0, pi: 0, usdt: 0, lp: 0 }, pieData: [], daysInactive: 0 };
 
         let apr = 5;
         if (user.loyaltyLevel === 'Gold') apr = 12;
