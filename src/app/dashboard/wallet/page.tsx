@@ -29,8 +29,8 @@ import {
     User as UserIcon,
     CheckCircle2,
     X,
-    CircleArrowUp,
-    CircleArrowDown,
+    ArrowUpCircle,
+    ArrowDownCircle,
     ArrowUpRight,
     ArrowDownLeft,
     ShoppingBag,
@@ -640,7 +640,7 @@ function UniversalWalletPage() {
                                 </Select>
                                 <Input type="number" placeholder="0.00" value={swapAmount} onChange={(e) => setSwapAmount(e.target.value)} className="h-12 bg-transparent border-none text-2xl font-black text-white text-right" />
                             </div>
-                            <div className="flex justify-center -my-6 relative z-10"><Button size="icon" variant="outline" className="h-10 w-10 rounded-full bg-background border-white/10 text-accent hover:rotate-180 transition-transform duration-500 shadow-xl" onClick={() => { const tmp = swapFrom; setSwapFrom(swapTo); setSwapTo(tmp); }}><CircleArrowDown size={20} /></Button></div>
+                            <div className="flex justify-center -my-6 relative z-10"><Button size="icon" variant="outline" className="h-10 w-10 rounded-full bg-background border-white/10 text-accent hover:rotate-180 transition-transform duration-500 shadow-xl" onClick={() => { const tmp = swapFrom; setSwapFrom(swapTo); setSwapTo(tmp); }}><ArrowDownCircle size={20} /></Button></div>
                             <div className="p-6 bg-white/5 rounded-[2.5rem] border border-white/5 space-y-4">
                                 <Select value={swapTo} onValueChange={setSwapTo}>
                                     <SelectTrigger className="w-full h-12 bg-black/40 border-none rounded-xl font-black uppercase"><SelectValue /></SelectTrigger>
