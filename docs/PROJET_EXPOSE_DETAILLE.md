@@ -3,46 +3,50 @@
 ## 1. Introduction
 Le **Double King Shop (DKS) Hub** est une plateforme technologique hybride révolutionnaire située à Bunia, Province de l'Ituri, en République Démocratique du Congo. Il fusionne trois secteurs critiques pour le développement régional : le commerce de hardware de luxe, l'éducation d'élite (IA & Blockchain) et le déploiement d'infrastructures numériques certifiées.
 
-## 2. L'Économie Hybride DKS
-Le système repose sur un modèle financier innovant à deux piliers :
+---
 
-### A. Consensus Pi Network (GCV)
-- **Standard de Valeur** : Utilisation du Global Consensus Value (1 π = $314,159).
-- **Application** : Monnaie de réserve pour l'acquisition de matériel hardware premium (NVIDIA, Starlink, etc.).
-- **Infrastructure** : Terminal POS intégré acceptant les paiements Pi avec validation instantanée.
+## 2. Le Système de Minage (Proof of Activity)
+Le Hub DKS récompense l'engagement de sa communauté via un protocole de minage gamifié et décentralisé au sein du Hub.
 
-### B. Jeton Utilitaire DKST
-- **Masse Monétaire** : 50 000 000 DKST (Fixée).
-- **Distribution (Halving)** : Système de réduction des récompenses tous les 8M de jetons pour garantir la rareté.
-- **Usage** : Paiement des services internes, frais de scolarité Academy, et récompenses de minage.
+### A. Cycles d'Extraction
+- **Fréquence** : Chaque membre peut lancer une session d'extraction toutes les **24 heures**.
+- **Mécanisme** : Le minage est basé sur le "Proof of Activity" (Preuve d'Activité). Plus un membre utilise les services du Hub (Boutique, Academy, SAV), plus sa puissance de minage (**GH/s**) augmente.
 
-## 3. Système de Minage (Proof of Activity)
-Le Hub DKS récompense l'engagement de sa communauté via un protocole de minage gamifié :
-- **Cycles de 24h** : Chaque membre peut lancer une session d'extraction quotidienne.
-- **Rareté des Blocs** : Le système génère des blocs avec des probabilités variables :
-  - **Commun** : Récompense standard (x1).
-  - **Rare** : Récompense doublée (x2) - 20% de chance.
-  - **Légendaire** : Récompense massive (x5) - 5% de chance.
-- **Puissance de Minage (GH/s)** : Augmente avec l'activité du membre et son niveau de loyauté (Bronze, Silver, Gold).
-- **Halving Protocol** : La difficulté augmente et les récompenses diminuent à mesure que la pool communautaire (65% du supply) se vide, assurant une déflation contrôlée.
+### B. Rareté des Blocs & Récompenses
+Le système de génération de blocs aléatoires introduit une dimension économique de rareté :
+- **Bloc Commun** : Récompense standard (x1).
+- **Bloc Rare** : Récompense doublée (**x2**) - Probabilité de 20%.
+- **Bloc Légendaire** : Récompense massive (**x5**) - Probabilité de 5%.
+*Note : Les membres possédant un grade de loyauté élevé (Gold/Silver) voient leur multiplicateur de chance augmenté par la Trésorerie.*
 
-## 4. Boutique Hardware & Terminal POS
-La boutique DKS est le cœur commercial de l'écosystème :
-- **Catalogue de Luxe** : Vente de cartes graphiques NVIDIA RTX série 40, processeurs Intel/AMD de dernière génération, et kits Starlink Business.
-- **Paiements Hybrides** :
-  - **Cash au Bureau** : Réservation en ligne et règlement physique à l'Immeuble Bahati.
-  - **Mobile Money** : Intégration directe des opérateurs RDC (Vodacom, Airtel, Orange, Africell).
-  - **Crypto-monnaies** : Utilisation native du Pi (GCV) et du DKST.
-- **Facturation Automatisée** : Chaque vente génère une facture ou un reçu PDF authentifié instantanément par le cachet numérique de sécurité DKS.
-
-## 5. Innovations en Sécurité et Design
-Pour garantir l'authenticité de l'écosystème, nous avons développé :
-- **Cachet "Haute Sécurité"** : Un sceau "Midnight Blue" avec micro-contour de sécurité (texte circulaire "CERTIFIED BY DOUBLE KING SHOP") imitant les documents bancaires.
-- **Signature "Expert"** : Tracé SVG fluide simulant une signature manuscrite authentique.
-- **Héritage Digital** : Transfert automatique des actifs vers un héritier après un seuil d'inactivité défini (Dead Man's Switch).
-
-## 6. Conclusion
-Le DKS Hub v3.0 représente l'avenir de l'entreprise technologique en Afrique. En combinant sécurité cryptographique, éducation de pointe et outils de gestion modernes, il offre une solution complète pour la prospérité numérique de la communauté de l'Ituri.
+### C. Protocole de Halving
+Pour garantir la déflation et la valeur à long terme du jeton **DKST**, les récompenses diminuent de moitié tous les **8 000 000 de jetons extraits** de la pool communautaire (65% du supply total).
 
 ---
-*Document produit par le DKS ShopManager Supreme - 2024.*
+
+## 3. La Boutique Hardware & Terminal POS
+Le cœur commercial du projet repose sur l'accessibilité au matériel de pointe.
+
+### A. Catalogue Hardware de Luxe
+- **Produits** : Cartes graphiques NVIDIA RTX (Série 40), processeurs Intel/AMD de dernière génération, serveurs de stockage, et kits Starlink Business.
+- **Garantie** : Chaque produit vendu est tracé dans le "Parc Hardware" de l'utilisateur pour un suivi SAV optimal.
+
+### B. Économie Hybride & Paiements
+Le système accepte nativement trois types de flux financiers :
+1. **Consensus Pi Network (GCV)** : Utilisation de la valeur mondiale de **1 π = $314,159** pour l'acquisition de matériel premium.
+2. **Mobile Money** : Intégration des opérateurs locaux (Vodacom, Airtel, Orange, Africell) avec conversion automatique en Francs Congolais (CDF).
+3. **Cash au Bureau** : Réservation en ligne et règlement physique sécurisé à l'Immeuble Bahati.
+
+### C. Terminal POS Intelligent
+Le terminal de vente (POS) permet aux vendeurs et caissiers d'encaisser les clients en temps réel, de gérer les stocks et de générer instantanément des reçus et factures PDF authentifiés.
+
+---
+
+## 4. Sécurité & Authentification
+Pour garantir l'intégrité des documents produits (Factures, Certificats), le système intègre :
+- **Cachet "Haute Sécurité"** : Un sceau numérique Bleu Nuit avec micro-contour de sécurité (texte circulaire "CERTIFIED BY DOUBLE KING SHOP").
+- **Signature "Expert"** : Un tracé SVG simulant une signature manuscrite authentique.
+- **Héritage Digital** : Un contrat intelligent de succession transmettant les actifs à un héritier après un délai d'inactivité défini (DMS).
+
+---
+*Document certifié par le DKS ShopManager Supreme - 2024.*
