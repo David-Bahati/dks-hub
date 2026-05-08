@@ -3,7 +3,7 @@
 
 import { useMemo, useState, useEffect, useRef } from 'react';
 import { Navbar } from "@/components/layout/Navbar";
-import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { 
     Coins, 
@@ -54,7 +54,7 @@ import {
     Repeat,
     IdCard,
     PieChart as LucidePieChart,
-    Gem,
+    Diamond,
     Flame,
     ArrowDownCircle,
     ArrowUpCircle
@@ -369,7 +369,7 @@ function UniversalWalletPage() {
 
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 mb-12">
                     <Card className="lg:col-span-8 bg-gradient-to-br from-accent/20 via-background to-black border-accent/20 rounded-[3.5rem] p-12 relative overflow-hidden group shadow-2xl">
-                        <div className="absolute top-0 right-0 p-12 opacity-5 scale-150 rotate-12"><Gem size={300} className="text-accent" /></div>
+                        <div className="absolute top-0 right-0 p-12 opacity-5 scale-150 rotate-12"><Diamond size={300} className="text-accent" /></div>
                         <div className="relative z-10 grid grid-cols-1 md:grid-cols-2 gap-12">
                             <div className="space-y-10">
                                 <div className="space-y-2">
