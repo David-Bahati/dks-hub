@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { 
     Coins, 
     ArrowLeft, 
+    ArrowRight,
     Loader2, 
     RefreshCw, 
     Globe, 
@@ -41,7 +42,6 @@ import {
     Activity,
     Download,
     Medal,
-    TrendingUp as TrendingUpIcon,
     Banknote,
     ShieldAlert,
     KeyRound,
@@ -63,7 +63,7 @@ import { db } from '@/lib/firebase';
 import { collection, query, where, orderBy, updateDoc, doc, addDoc, serverTimestamp, increment, limit, getDocs } from 'firebase/firestore';
 import withAuth from '@/components/auth/withAuth';
 import Link from 'next/link';
-import { useCollection, useMemoFirebase } from '@/firebase';
+import { useCollection, useDoc, useMemoFirebase } from '@/firebase';
 import { useAuth } from "@/context/AuthContext";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -111,7 +111,6 @@ const ASSETS = [
     { id: 'lp', symbol: 'DKS-LP', name: 'Liquidity Provider', icon: <Activity className="text-purple-500" />, color: 'bg-purple-500/20', price: 15.50 }
 ];
 
-// Helper Flame Icon since it was missing
 function FlameIcon({ className }: { className?: string }) {
     return (
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -641,7 +640,7 @@ function UniversalWalletPage() {
                                 </Select>
                                 <Input type="number" placeholder="0.00" value={swapAmount} onChange={(e) => setSwapAmount(e.target.value)} className="h-12 bg-transparent border-none text-2xl font-black text-white text-right" />
                             </div>
-                            <div className="flex justify-center -my-6 relative z-10"><Button size="icon" variant="outline" className="h-10 w-10 rounded-full" onClick={() => { const tmp = swapFrom; setSwapFrom(swapTo); setSwapTo(tmp); }}><Repeat size={20} /></Button></div>
+                            <div className="flex justify-center -my-6 relative z-10"><Button size="icon" variant="outline" className="h-10 w-10 rounded-full bg-background border-white/10 text-accent hover:rotate-180 transition-transform duration-500 shadow-xl" onClick={() => { const tmp = swapFrom; setSwapFrom(swapTo); setSwapTo(tmp); }}><CircleArrowDown size={20} /></Button></div>
                             <div className="p-6 bg-white/5 rounded-[2.5rem] border border-white/5 space-y-4">
                                 <Select value={swapTo} onValueChange={setSwapTo}>
                                     <SelectTrigger className="w-full h-12 bg-black/40 border-none rounded-xl font-black uppercase"><SelectValue /></SelectTrigger>
