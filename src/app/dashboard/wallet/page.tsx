@@ -31,6 +31,7 @@ import {
     X,
     TrendingDown,
     ArrowUpCircle,
+    ArrowDownCircle,
     ShoppingBag,
     Ticket,
     Vault,
@@ -772,7 +773,6 @@ function UniversalWalletPage() {
                 </div>
             </main>
 
-            {/* MODALS REMAIN THE SAME BUT WITH REFINED STYLING */}
             <Dialog open={isCardDialogOpen} onOpenChange={setIsCardDialogOpen}>
                 <DialogContent className="bg-card border-white/10 text-white rounded-[3rem] sm:max-w-2xl p-0 overflow-hidden">
                     <DialogHeader className="p-8 bg-accent/10 border-b border-white/5">
@@ -945,4 +945,3 @@ function UniversalWalletPage() {
 }
 
 export default withAuth(UniversalWalletPage);
-
