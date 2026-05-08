@@ -70,7 +70,8 @@ import {
     LayoutGrid,
     Repeat,
     IdCard,
-    ArrowLeftRight
+    ArrowLeftRight,
+    PieChart as PieChartIcon
 } from "lucide-react";
 import { db } from '@/lib/firebase';
 import { collection, query, where, orderBy, updateDoc, doc, addDoc, serverTimestamp, increment, limit, getDocs, Timestamp } from 'firebase/firestore';
@@ -106,12 +107,15 @@ import {
     YAxis, 
     CartesianGrid, 
     Tooltip, 
-    ResponsiveContainer 
+    ResponsiveContainer,
+    PieChart,
+    Pie,
+    Cell
 } from 'recharts';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import { Logo } from '@/components/ui/Logo';
-import { format } from "date-fns";
+import { format, differenceInDays } from "date-fns";
 import { fr } from "date-fns/locale";
 import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -124,6 +128,16 @@ const ASSETS = [
     { id: 'pi', symbol: 'PI', name: 'Pi Network (GCV)', icon: <Globe className="text-yellow-500" />, color: 'bg-yellow-500/20', price: GCV_VALUE },
     { id: 'usdt', symbol: 'USDT', name: 'Tether USD', icon: <CircleDollarSign className="text-green-500" />, color: 'bg-green-500/20', price: 1.00 },
     { id: 'lp', symbol: 'DKS-LP', name: 'Liquidity Provider', icon: <Activity className="text-purple-500" />, color: 'bg-purple-500/20', price: 15.50 }
+];
+
+const WEALTH_CHART_DATA = [
+    { name: 'Jan', value: 1200 },
+    { name: 'Fév', value: 1800 },
+    { name: 'Mar', value: 3200 },
+    { name: 'Avr', value: 2800 },
+    { name: 'Mai', value: 4500 },
+    { name: 'Juin', value: 6800 },
+    { name: 'Juil', value: 8500 },
 ];
 
 function UniversalWalletPage() {
@@ -143,6 +157,7 @@ function UniversalWalletPage() {
     const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
     const [showPin, setShowPin] = useState(false);
     const [isEmergencyLockProcessing, setIsEmergencyLockProcessing] = useState(false);
+    const [isHeartbeatProcessing, setIsHeartbeatProcessing] = useState(false);
 
     // Staking States
     const [stakeAmount, setStakeAmount] = useState("");
@@ -164,10 +179,7 @@ function UniversalWalletPage() {
 
     // Card/PDF Refs
     const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
-    const certRef = useRef<HTMLDivElement>(null);
     const cardRef = useRef<HTMLDivElement>(null);
-
-    const isStaff = user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'seller' || user?.role?.toLowerCase() === 'cashier';
 
     // Fetch transactions for ledger
     const txQuery = useMemoFirebase(() => {
@@ -177,7 +189,7 @@ function UniversalWalletPage() {
     const { data: transactions } = useCollection(txQuery);
 
     const stats = useMemo(() => {
-        if (!user) return { stakingRewards: 0, apr: 5, totalWealthUSD: 0, wealthHistory: [], balances: {} };
+        if (!user) return { stakingRewards: 0, apr: 5, totalWealthUSD: 0, balances: {}, pieData: [], daysInactive: 0 };
 
         let apr = 5;
         if (user.loyaltyLevel === 'Gold') apr = 12;
@@ -203,12 +215,22 @@ function UniversalWalletPage() {
             (balances.usdt * 1.0) + 
             (balances.lp * 15.50);
 
-        return { stakingRewards: rewards, apr, totalWealthUSD, balances };
+        const pieData = [
+            { name: 'DKST', value: balances.dkst * 1.0, fill: '#0ea5e9' },
+            { name: 'PI', value: balances.pi * GCV_VALUE, fill: '#eab308' },
+            { name: 'USDT', value: balances.usdt * 1.0, fill: '#22c55e' },
+            { name: 'LP', value: balances.lp * 15.50, fill: '#a855f7' }
+        ].filter(d => d.value > 0);
+
+        const lastActive = user.lastActivityAt?.toDate ? user.lastActivityAt.toDate() : new Date(user.lastActivityAt || user.createdAt);
+        const daysInactive = differenceInDays(new Date(), lastActive);
+
+        return { stakingRewards: rewards, apr, totalWealthUSD, balances, pieData, daysInactive };
     }, [user]);
 
     const secureAction = (action: () => void) => {
         if (user?.isWalletLocked) {
-            toast({ title: "Wallet Verrouillé", description: "Déverrouillez votre wallet pour continuer.", variant: "destructive" });
+            toast({ title: "Wallet Verrouillé", description: "Déverrouillez votre vault pour continuer.", variant: "destructive" });
             return;
         }
         if (!user?.walletPin) {
@@ -227,6 +249,22 @@ function UniversalWalletPage() {
         } else {
             toast({ title: "Code PIN Incorrect", variant: "destructive" });
             setEnteredPin("");
+        }
+    };
+
+    const sendHeartbeat = async () => {
+        if (!user) return;
+        setIsHeartbeatProcessing(true);
+        try {
+            await updateDoc(doc(db, "users", user.uid), {
+                lastActivityAt: serverTimestamp(),
+                updatedAt: serverTimestamp()
+            });
+            toast({ title: "Pulsation Détectée", description: "Votre présence a été notariée sur la blockchain." });
+        } catch (e) {
+            toast({ title: "Erreur Heartbeat", variant: "destructive" });
+        } finally {
+            setIsHeartbeatProcessing(false);
         }
     };
 
@@ -317,7 +355,6 @@ function UniversalWalletPage() {
 
         setIsProcessingAction(true);
         try {
-            // Simulation simple de prix
             const priceFrom = swapFrom === 'pi' ? GCV_VALUE : 1.0;
             const priceTo = swapTo === 'pi' ? GCV_VALUE : 1.0;
             const receivedAmount = (amount * priceFrom) / priceTo;
@@ -379,131 +416,252 @@ function UniversalWalletPage() {
     }, [searchQuery, user?.uid]);
 
     return (
-        <div className="min-h-screen bg-background text-foreground pb-20">
+        <div className="min-h-screen bg-background text-foreground pb-24">
             <Navbar />
-            <main className="max-w-7xl mx-auto px-4 py-12">
+            <main className="max-w-7xl mx-auto px-6 py-12">
                 <div className="flex flex-col md:flex-row justify-between items-start gap-8 mb-12">
                     <div className="flex items-start gap-5">
                         <Link href="/dashboard"><Button variant="outline" className="h-14 w-14 rounded-2xl border-white/10 p-0 transition-all hover:bg-accent/10 hover:text-accent"><ArrowLeft size={24} /></Button></Link>
                         <div>
                             <h1 className="text-4xl font-black uppercase italic tracking-tighter leading-none">Universal <span className="text-accent">Web3 Wallet</span></h1>
-                            <p className="text-muted-foreground text-[10px] uppercase font-black tracking-widest mt-2 opacity-40">Gouvernance décentralisée & Consensus Pi GCV $314,159</p>
+                            <p className="text-muted-foreground text-[10px] uppercase font-black tracking-widest mt-2 opacity-40">Gouvernance décentralisée • Consensus Pi GCV $314,159</p>
                         </div>
                     </div>
                     <div className="flex flex-wrap gap-3">
-                        <Button onClick={() => setIsCardDialogOpen(true)} variant="outline" className="h-14 px-6 rounded-2xl border-white/10 font-black uppercase italic gap-3 hover:bg-white/5"><IdCard size={20} /> Ma Carte Elite</Button>
+                        <Button onClick={() => setIsCardDialogOpen(true)} variant="outline" className="h-14 px-6 rounded-2xl border-white/10 font-black uppercase italic gap-3 hover:bg-white/5 shadow-xl"><IdCard size={20} /> Ma Carte Elite</Button>
+                        <Button onClick={() => setIsReceiveSheetOpen(true)} variant="outline" className="h-14 px-6 rounded-2xl border-white/10 font-black uppercase italic gap-3 hover:bg-white/5 shadow-xl"><ArrowDownLeft size={20} /> Recevoir</Button>
                         <Button onClick={() => setIsTransferSheetOpen(true)} className="bg-accent text-black h-14 px-8 rounded-2xl font-black uppercase italic gap-3 shadow-xl shadow-accent/20"><Send size={20} /> Transférer</Button>
-                        <Button onClick={() => setIsSwapSheetOpen(true)} variant="outline" className="h-14 px-8 rounded-2xl border-white/10 font-black uppercase italic gap-3 hover:bg-white/5"><ArrowLeftRight size={20} /> Swap</Button>
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-12">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 mb-12">
                     {/* PORTFOLIO OVERVIEW HERO */}
                     <Card className="lg:col-span-8 bg-gradient-to-br from-accent/20 via-background to-black border-accent/20 rounded-[3.5rem] p-12 relative overflow-hidden group shadow-2xl">
-                        <div className="absolute top-0 right-0 p-12 opacity-10 scale-150 rotate-12 group-hover:rotate-0 transition-transform duration-[3s]"><Gem size={300} className="text-accent" /></div>
-                        <div className="relative z-10 space-y-10">
-                            <div className="flex flex-wrap items-center gap-4">
-                                <Badge className="bg-accent text-black font-black uppercase italic text-[9px] px-4 py-1">Multi-Chain Hub Active</Badge>
-                                <Badge variant="outline" className="border-white/10 text-white/40 uppercase font-black text-[9px] tracking-widest">Global GCV Index: $314,159</Badge>
-                            </div>
-
-                            <div className="flex flex-col md:flex-row justify-between items-end gap-10">
+                        <div className="absolute top-0 right-0 p-12 opacity-5 scale-150 rotate-12"><Gem size={300} className="text-accent" /></div>
+                        <div className="relative z-10 grid grid-cols-1 md:grid-cols-2 gap-12">
+                            <div className="space-y-10">
                                 <div className="space-y-2">
                                     <p className="text-[10px] font-black uppercase text-accent tracking-[0.4em]">Valeur Nette du Portfolio (USD)</p>
-                                    <h2 className="text-6xl md:text-7xl font-black text-white italic tracking-tighter leading-none">
+                                    <h2 className="text-5xl md:text-7xl font-black text-white italic tracking-tighter leading-none">
                                         ${stats.totalWealthUSD.toLocaleString('fr-FR', { maximumFractionDigits: 0 })}
                                     </h2>
-                                    <p className="text-lg font-bold text-white/40 uppercase tracking-widest mt-4 flex items-center gap-2">
-                                        <TrendingUp className="text-green-400" size={20} /> +{(Math.random() * 5).toFixed(1)}% (24h)
+                                    <p className="text-lg font-bold text-green-400 uppercase tracking-widest mt-4 flex items-center gap-2">
+                                        <TrendingUp size={20} /> +{(Math.random() * 5).toFixed(1)}% (24h)
                                     </p>
                                 </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <Button onClick={() => setIsSwapSheetOpen(true)} variant="outline" className="h-14 rounded-2xl border-white/10 bg-white/5 uppercase font-black italic text-[10px] gap-2"><Repeat size={14}/> Swap</Button>
-                                    <Button variant="outline" className="h-14 rounded-2xl border-white/10 bg-white/5 uppercase font-black italic text-[10px] gap-2"><ArrowUpCircle size={14}/> Buy</Button>
+                                <div className="flex gap-4">
+                                    <Button onClick={() => setIsSwapSheetOpen(true)} className="h-14 px-8 rounded-2xl bg-white text-black font-black uppercase italic text-[10px] gap-2 shadow-xl hover:scale-105 transition-all"><ArrowLeftRight size={14}/> Swap instantané</Button>
                                 </div>
+                            </div>
+                            <div className="h-[240px] w-full hidden md:block">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <AreaChart data={WEALTH_CHART_DATA}>
+                                        <defs>
+                                            <linearGradient id="colorWealth" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="5%" stopColor="hsl(var(--accent))" stopOpacity={0.3}/>
+                                                <stop offset="95%" stopColor="hsl(var(--accent))" stopOpacity={0}/>
+                                            </linearGradient>
+                                        </defs>
+                                        <Area type="monotone" dataKey="value" stroke="hsl(var(--accent))" fillOpacity={1} fill="url(#colorWealth)" strokeWidth={3} />
+                                    </AreaChart>
+                                </ResponsiveContainer>
                             </div>
                         </div>
                     </Card>
 
-                    {/* QUICK SECURITY STATUS */}
-                    <Card className="lg:col-span-4 glossy-card border-none rounded-[3.5rem] p-10 flex flex-col justify-between">
-                         <div className="space-y-6">
-                            <div className="flex items-center gap-3">
-                                <div className="w-12 h-12 rounded-2xl bg-accent text-black flex items-center justify-center shadow-lg"><ShieldCheck size={24} /></div>
-                                <h4 className="text-xl font-black uppercase italic tracking-tight text-white">Security Vault</h4>
-                            </div>
-                            <div className="space-y-3">
-                                <div className="p-4 bg-white/5 rounded-2xl border border-white/5 flex justify-between items-center">
-                                    <span className="text-[10px] font-black uppercase opacity-40">Protection Phase</span>
-                                    <Badge className={cn("border-none text-[8px] font-black uppercase", user?.isWalletLocked ? "bg-red-500" : "bg-green-500")}>
-                                        {user?.isWalletLocked ? "Locked" : "Active"}
-                                    </Badge>
+                    {/* AMBASSADOR STATUS CARD */}
+                    <Card className="lg:col-span-4 bg-primary/10 border-primary/20 rounded-[3.5rem] p-10 flex flex-col justify-between relative overflow-hidden group shadow-2xl">
+                         <div className="absolute top-0 right-0 p-6 opacity-5"><Award size={120} className="text-primary" /></div>
+                         <div className="relative z-10 space-y-6">
+                            <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 rounded-2xl bg-primary text-white flex items-center justify-center shadow-lg shadow-primary/20">
+                                    {user?.loyaltyLevel === 'Gold' ? <Crown size={24} /> : user?.loyaltyLevel === 'Silver' ? <Star size={24} /> : <Medal size={24} />}
                                 </div>
-                                <div className="p-4 bg-white/5 rounded-2xl border border-white/5 flex justify-between items-center">
-                                    <span className="text-[10px] font-black uppercase opacity-40">PIN Authentication</span>
-                                    <Badge variant="outline" className="border-white/20 text-[8px] font-black uppercase">
-                                        {user?.walletPin ? "Verified" : "Setup Required"}
-                                    </Badge>
+                                <h4 className="text-xl font-black uppercase italic tracking-tight text-white">Reward Center</h4>
+                            </div>
+                            <div className="space-y-6">
+                                <div>
+                                    <div className="flex justify-between items-end mb-2">
+                                        <p className="text-[10px] font-black uppercase text-white/40">Ambassadeur {user?.loyaltyLevel || 'Bronze'}</p>
+                                        <span className="text-xs font-black text-primary italic">{user?.points || 0} PTS</span>
+                                    </div>
+                                    <Progress value={Math.min(100, ((user?.points || 0) / 1000) * 100)} className="h-2 bg-white/5" indicatorClassName="bg-primary shadow-[0_0_10px_rgba(59,130,246,0.5)]" />
+                                </div>
+                                <div className="p-5 bg-white/5 rounded-2xl border border-white/5 space-y-3">
+                                    <div className="flex justify-between items-center text-[10px] font-bold uppercase">
+                                        <span className="text-white/40">Remise Services Hub</span>
+                                        <span className="text-green-400">-{Math.min(25, (user?.referralCount || 0) * 5)}%</span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-[10px] font-bold uppercase">
+                                        <span className="text-white/40">Bonus Staking (VIP)</span>
+                                        <span className="text-accent">+{user?.loyaltyLevel === 'Gold' ? '7' : user?.loyaltyLevel === 'Silver' ? '3' : '0'}% APR</span>
+                                    </div>
                                 </div>
                             </div>
                          </div>
-                         <Button onClick={toggleEmergencyLock} disabled={isEmergencyLockProcessing} className={cn("w-full h-14 rounded-2xl font-black uppercase italic text-[10px] gap-3 mt-8 shadow-xl transition-all", user?.isWalletLocked ? "bg-red-500 text-white" : "bg-white text-black hover:bg-red-500 hover:text-white")}>
-                            {isEmergencyLockProcessing ? <Loader2 className="animate-spin h-4 w-4" /> : user?.isWalletLocked ? <><Lock size={16}/> Unlock Vault</> : <><ShieldAlert size={16}/> Emergency Lock</>}
-                         </Button>
+                         <Link href="/dashboard/referrals" className="mt-8">
+                            <Button variant="outline" className="w-full h-14 rounded-2xl border-primary/20 text-primary font-black uppercase italic text-[9px] gap-2 hover:bg-primary hover:text-white transition-all">Inviter de nouveaux membres <ArrowRight size={14}/></Button>
+                         </Link>
                     </Card>
                 </div>
 
-                <Tabs defaultValue="assets" className="space-y-10">
-                    <TabsList className="bg-white/5 border border-white/5 p-1.5 rounded-[2rem] h-16 w-full max-w-4xl mx-auto flex">
-                        <TabsTrigger value="assets" className="flex-1 rounded-[1.5rem] font-black uppercase italic text-[10px] data-[state=active]:bg-accent data-[state=active]:text-black transition-all">My Assets</TabsTrigger>
-                        <TabsTrigger value="vault" className="flex-1 rounded-[1.5rem] font-black uppercase italic text-[10px] data-[state=active]:bg-accent data-[state=active]:text-black transition-all">Staking Vault</TabsTrigger>
-                        <TabsTrigger value="history" className="flex-1 rounded-[1.5rem] font-black uppercase italic text-[10px] data-[state=active]:bg-accent data-[state=active]:text-black transition-all">Blockchain Ledger</TabsTrigger>
-                        <TabsTrigger value="heritage" className="flex-1 rounded-[1.5rem] font-black uppercase italic text-[10px] data-[state=active]:bg-accent data-[state=active]:text-black transition-all">Digital Heritage</TabsTrigger>
-                    </TabsList>
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+                    {/* LEFT COLUMN: ASSETS & STAKING */}
+                    <div className="lg:col-span-8 space-y-10">
+                        <Tabs defaultValue="assets" className="space-y-10">
+                            <TabsList className="bg-white/5 border border-white/5 p-1.5 rounded-[2rem] h-16 w-full flex">
+                                <TabsTrigger value="assets" className="flex-1 rounded-[1.5rem] font-black uppercase italic text-[10px] data-[state=active]:bg-accent data-[state=active]:text-black transition-all">Tous les actifs</TabsTrigger>
+                                <TabsTrigger value="analytics" className="flex-1 rounded-[1.5rem] font-black uppercase italic text-[10px] data-[state=active]:bg-accent data-[state=active]:text-black transition-all">Analytique Hub</TabsTrigger>
+                                <TabsTrigger value="history" className="flex-1 rounded-[1.5rem] font-black uppercase italic text-[10px] data-[state=active]:bg-accent data-[state=active]:text-black transition-all">Grand Livre Blockchain</TabsTrigger>
+                            </TabsList>
 
-                    <TabsContent value="assets" className="animate-in fade-in slide-in-from-bottom-4">
-                        <div className="grid grid-cols-1 gap-4">
-                            {ASSETS.map((asset) => {
-                                const balance = stats.balances[asset.id as keyof typeof stats.balances] || 0;
-                                const valueUSD = balance * asset.price;
-                                return (
-                                    <Card key={asset.id} className="bg-white/[0.02] border-white/5 hover:bg-white/[0.05] transition-all rounded-[2rem] group cursor-pointer overflow-hidden relative">
-                                        <CardContent className="p-6 flex items-center justify-between relative z-10">
-                                            <div className="flex items-center gap-6">
-                                                <div className={cn("w-16 h-16 rounded-2xl flex items-center justify-center shrink-0 shadow-lg group-hover:scale-110 transition-transform", asset.color)}>
-                                                    {asset.icon}
+                            <TabsContent value="assets" className="space-y-4 animate-in fade-in slide-in-from-bottom-4">
+                                {ASSETS.map((asset) => {
+                                    const balance = stats.balances[asset.id as keyof typeof stats.balances] || 0;
+                                    const valueUSD = balance * asset.price;
+                                    return (
+                                        <Card key={asset.id} className="bg-white/[0.02] border-white/5 hover:bg-white/[0.05] transition-all rounded-3xl group overflow-hidden relative shadow-lg">
+                                            <CardContent className="p-6 flex items-center justify-between relative z-10">
+                                                <div className="flex items-center gap-6">
+                                                    <div className={cn("w-16 h-16 rounded-2xl flex items-center justify-center shrink-0 shadow-lg group-hover:scale-110 transition-transform", asset.color)}>
+                                                        {asset.icon}
+                                                    </div>
+                                                    <div>
+                                                        <h4 className="text-xl font-black uppercase italic text-white leading-tight">{asset.symbol}</h4>
+                                                        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{asset.name}</p>
+                                                    </div>
                                                 </div>
-                                                <div>
-                                                    <h4 className="text-xl font-black uppercase italic text-white">{asset.symbol}</h4>
-                                                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{asset.name}</p>
+                                                <div className="flex items-center gap-12">
+                                                    <div className="text-right hidden md:block">
+                                                        <p className="text-[9px] font-black uppercase text-white/20 mb-1 tracking-widest">Prix Indexé</p>
+                                                        <p className="text-lg font-black text-white italic">${asset.price.toLocaleString('fr-FR')}</p>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <p className="text-3xl font-black text-white italic">{balance.toFixed(asset.id === 'pi' ? 6 : 2)}</p>
+                                                        <p className="text-[10px] font-bold text-accent uppercase">≈ ${valueUSD.toLocaleString('fr-FR', { maximumFractionDigits: 0 })}</p>
+                                                    </div>
+                                                    <Button onClick={() => setIsSwapSheetOpen(true)} variant="ghost" size="icon" className="h-12 w-12 rounded-xl text-white/10 hover:text-accent"><ArrowRight size={24}/></Button>
                                                 </div>
+                                            </CardContent>
+                                        </Card>
+                                    );
+                                })}
+                            </TabsContent>
+
+                            <TabsContent value="analytics" className="animate-in fade-in slide-in-from-bottom-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                    <Card className="bg-white/[0.02] border-white/5 p-10 rounded-[3rem] flex flex-col items-center">
+                                        <h4 className="text-[10px] font-black uppercase tracking-widest opacity-40 mb-8 w-full flex items-center gap-2"><PieChartIcon size={14} className="text-accent" /> Répartition par Valeur</h4>
+                                        <div className="h-[250px] w-full relative">
+                                            <ResponsiveContainer width="100%" height="100%">
+                                                <PieChart>
+                                                    <Pie data={stats.pieData} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={5} dataKey="value">
+                                                        {stats.pieData.map((entry, index) => (
+                                                            <Cell key={`cell-${index}`} fill={entry.fill} stroke="none" />
+                                                        ))}
+                                                    </Pie>
+                                                    <Tooltip contentStyle={{ backgroundColor: '#0f172a', border: 'none', borderRadius: '12px', fontSize: '10px' }} />
+                                                </PieChart>
+                                            </ResponsiveContainer>
+                                            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                                                <p className="text-[9px] font-black uppercase opacity-20">Wealth</p>
+                                                <p className="text-xl font-black italic">100%</p>
                                             </div>
-                                            <div className="flex items-center gap-12">
-                                                <div className="text-right hidden md:block">
-                                                    <p className="text-[10px] font-black uppercase text-muted-foreground mb-1">Index Price</p>
-                                                    <p className="text-lg font-black text-white italic">${asset.price.toLocaleString()}</p>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4 w-full mt-8">
+                                            {stats.pieData.map((d, i) => (
+                                                <div key={i} className="flex items-center gap-2">
+                                                    <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: d.fill }} />
+                                                    <span className="text-[9px] font-bold uppercase text-white/60">{d.name} : {((d.value / (stats.totalWealthUSD || 1)) * 100).toFixed(1)}%</span>
                                                 </div>
-                                                <div className="text-right">
-                                                    <p className="text-3xl font-black text-white italic">{balance.toFixed(asset.id === 'pi' ? 6 : 2)}</p>
-                                                    <p className="text-[10px] font-bold text-accent uppercase">≈ ${valueUSD.toLocaleString('fr-FR', { maximumFractionDigits: 0 })}</p>
-                                                </div>
-                                                <Button onClick={() => setIsSwapSheetOpen(true)} variant="ghost" size="icon" className="h-12 w-12 rounded-xl text-white/10 hover:text-accent"><ArrowRight size={24}/></Button>
-                                            </div>
-                                        </CardContent>
+                                            ))}
+                                        </div>
                                     </Card>
-                                );
-                            })}
-                        </div>
-                    </TabsContent>
 
-                    <TabsContent value="vault" className="space-y-10 animate-in fade-in slide-in-from-bottom-4">
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+                                    <Card className="bg-white/[0.02] border-white/5 p-10 rounded-[3rem] space-y-8">
+                                        <h4 className="text-[10px] font-black uppercase tracking-widest opacity-40 flex items-center gap-2"><TrendingUp size={14} className="text-primary" /> Performance Staking</h4>
+                                        <div className="space-y-6">
+                                            <div className="flex justify-between items-end border-b border-white/5 pb-4">
+                                                <p className="text-[10px] font-black uppercase text-white/40">Total Récompenses Générées</p>
+                                                <p className="text-2xl font-black text-green-400 italic">+{stats.stakingRewards.toFixed(4)} DKST</p>
+                                            </div>
+                                            <div className="flex justify-between items-end border-b border-white/5 pb-4">
+                                                <p className="text-[10px] font-black uppercase text-white/40">Projection Mensuelle (EST)</p>
+                                                <p className="text-xl font-black text-white italic">~{((user?.stakedBalance || 0) * (stats.apr/100) / 12).toFixed(2)} DKST</p>
+                                            </div>
+                                            <div className="p-6 bg-primary/10 rounded-[2rem] border border-primary/20 text-center">
+                                                <p className="text-[10px] font-black uppercase text-primary mb-2">Statut de Confiance Hub</p>
+                                                <Badge className="bg-primary text-white text-[9px] font-black uppercase px-4 h-7">Validateur Actif</Badge>
+                                            </div>
+                                        </div>
+                                    </Card>
+                                </div>
+                            </TabsContent>
+
+                            <TabsContent value="history" className="animate-in fade-in slide-in-from-bottom-4">
+                                <Card className="bg-white/[0.02] border-white/5 rounded-[3rem] overflow-hidden">
+                                     <div className="overflow-x-auto">
+                                        <table className="w-full text-left">
+                                            <thead>
+                                                <tr className="bg-white/5 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                                                    <th className="p-6">Tx Hash</th>
+                                                    <th className="p-6 text-center">Actif</th>
+                                                    <th className="p-6">Type / Flux</th>
+                                                    <th className="p-6 text-right">Montant</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-white/5 text-sm">
+                                                {transactions?.map((tx) => {
+                                                    const asset = ASSETS.find(a => a.symbol === tx.tokenType) || ASSETS[0];
+                                                    return (
+                                                        <tr key={tx.id} className="hover:bg-white/[0.02] transition-colors group">
+                                                            <td className="p-6 font-mono text-[9px] text-muted-foreground opacity-40 group-hover:opacity-100 transition-opacity">
+                                                                {tx.piTxId || tx.id.substring(0, 16).toUpperCase()}
+                                                            </td>
+                                                            <td className="p-6">
+                                                                <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center mx-auto shadow-md", asset.color)}>
+                                                                    {asset.icon}
+                                                                </div>
+                                                            </td>
+                                                            <td className="p-6">
+                                                                <div className="space-y-1">
+                                                                    <Badge className={cn(
+                                                                        "border-none uppercase text-[8px] font-black px-2.5",
+                                                                        ['mining', 'dividend', 'unstaking'].includes(tx.type) ? 'bg-green-500/10 text-green-400' : 'bg-blue-500/10 text-blue-400'
+                                                                    )}>{tx.type}</Badge>
+                                                                    <p className="text-[9px] text-white/40 font-bold uppercase truncate max-w-[150px]">{tx.memo || (tx.direction === 'sent' ? `À @${tx.recipientName}` : `De @${tx.senderName}`)}</p>
+                                                                </div>
+                                                            </td>
+                                                            <td className="p-6 text-right">
+                                                                <span className={cn(
+                                                                    "text-lg font-black italic",
+                                                                    tx.direction === 'sent' || tx.type === 'staking' ? 'text-white' : 'text-green-400'
+                                                                )}>
+                                                                    {tx.direction === 'sent' || tx.type === 'staking' ? '-' : '+'}{tx.tokenAmount.toFixed(4)}
+                                                                </span>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    {!transactions?.length && (
+                                        <div className="py-32 text-center opacity-20 italic text-xs uppercase font-black tracking-[0.4em]">Registre Vierge</div>
+                                    )}
+                                </Card>
+                            </TabsContent>
+                        </Tabs>
+
+                        {/* STAKING INTERFACE */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                             <Card className="glossy-card border-none rounded-[3rem] p-10 space-y-8">
-                                <div className="flex items-center gap-4"><Vault className="text-primary" size={24} /><h3 className="text-xl font-black uppercase italic tracking-tight text-white">DKS Staking Protocol</h3></div>
+                                <div className="flex items-center gap-4"><Vault className="text-primary" size={24} /><h3 className="text-xl font-black uppercase italic tracking-tight text-white">Staking Protocol</h3></div>
                                 <div className="space-y-6">
-                                    <div className="p-8 bg-primary/10 border border-primary/20 rounded-[2.5rem]">
+                                    <div className="p-8 bg-primary/10 border border-primary/20 rounded-[2.5rem] relative overflow-hidden">
+                                        <div className="absolute top-0 right-0 p-4 opacity-5"><Zap size={60} /></div>
                                         <div className="flex justify-between items-center mb-4"><span className="text-[10px] font-black uppercase text-primary tracking-widest">Yield APR</span><Badge className="bg-primary text-white font-black italic px-4 h-8">{stats.apr}% APR</Badge></div>
-                                        <p className="text-sm text-white/70 italic leading-relaxed">Verrouillez vos DKST pour sécuriser le Hub et générer des intérêts composés en temps réel.</p>
+                                        <p className="text-xs text-white/70 italic leading-relaxed">Verrouillez vos DKST pour sécuriser le réseau Hub et générer des intérêts composés.</p>
                                     </div>
                                     <div className="space-y-3">
                                         <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Stake Amount (DKST)</Label>
@@ -512,216 +670,138 @@ function UniversalWalletPage() {
                                             <Input type="number" placeholder="0.00" value={stakeAmount} onChange={(e) => setStakeAmount(e.target.value)} className="h-16 pl-12 bg-background/50 border-white/5 rounded-2xl text-2xl font-black text-white focus:border-primary" />
                                         </div>
                                     </div>
-                                    <Button onClick={() => secureAction(handleStake)} disabled={isProcessingAction || !stakeAmount} className="w-full h-16 bg-primary text-white font-black uppercase italic rounded-2xl shadow-xl shadow-primary/20 hover:scale-[1.02] transition-all">Lancer le Contrat Intelligent</Button>
+                                    <Button onClick={() => secureAction(handleStake)} disabled={isProcessingAction || !stakeAmount} className="w-full h-16 bg-primary text-white font-black uppercase italic rounded-2xl shadow-xl shadow-primary/20 hover:scale-[1.02] transition-all">Lancer le Staking</Button>
                                 </div>
                             </Card>
                             <Card className="bg-black/40 border border-white/5 rounded-[3rem] p-10 flex flex-col justify-between relative overflow-hidden">
                                 <div className="absolute top-0 right-0 p-8 opacity-5"><Activity size={150} className="text-primary" /></div>
                                 <div className="space-y-10 relative z-10">
-                                    <div className="flex justify-between items-start">
-                                        <div><h3 className="text-xl font-black uppercase italic text-white">Staking Portfolio</h3><p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest mt-1">Proof of Stake Hub</p></div>
-                                        <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-primary shadow-lg"><Timer size={24}/></div>
-                                    </div>
+                                    <div><h3 className="text-xl font-black uppercase italic text-white">Staking Portfolio</h3><p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest mt-1">Génération passive active</p></div>
                                     <div className="grid grid-cols-1 gap-8">
                                         <div><p className="text-[9px] font-black uppercase text-white/30 mb-2 tracking-[0.2em]">Capital Bloqué</p><p className="text-5xl font-black text-white italic tracking-tighter">{user?.stakedBalance?.toFixed(2) || 0} <span className="text-xs not-italic opacity-20 uppercase font-bold ml-1">DKST</span></p></div>
                                         <div>
-                                            <p className="text-[9px] font-black uppercase text-green-400/30 mb-2 tracking-[0.2em]">Intérêts Générés (Unclaimed)</p>
+                                            <p className="text-[9px] font-black uppercase text-green-400/30 mb-2 tracking-[0.2em]">Intérêts Accumulés</p>
                                             <div className="flex items-end gap-3">
                                                 <p className="text-5xl font-black text-green-400 italic tracking-tighter">+{stats.stakingRewards.toFixed(6)}</p>
-                                                <Badge variant="outline" className="mb-2 border-green-500/20 text-green-400 text-[8px] font-black uppercase animate-pulse">Live Tracking</Badge>
+                                                <Badge variant="outline" className="mb-2 border-green-500/20 text-green-400 text-[8px] font-black uppercase animate-pulse">Live Yield</Badge>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
-                                <Button onClick={() => secureAction(handleUnstake)} disabled={isProcessingAction || !user?.stakedBalance} variant="outline" className="w-full h-16 border-white/10 rounded-2xl font-black uppercase italic text-[10px] mt-10 hover:bg-white/5 transition-all">Clôturer et Retirer Capital + Rewards</Button>
+                                <Button onClick={() => secureAction(handleUnstake)} disabled={isProcessingAction || !user?.stakedBalance} variant="outline" className="w-full h-16 border-white/10 rounded-2xl font-black uppercase italic text-[10px] mt-10 hover:bg-white/5 transition-all">Récupérer Capital + Gains</Button>
                             </Card>
                         </div>
-                    </TabsContent>
+                    </div>
 
-                    <TabsContent value="history" className="animate-in fade-in slide-in-from-bottom-4">
-                        <Card className="glossy-card border-none rounded-[3rem] overflow-hidden">
-                             <div className="overflow-x-auto">
-                                <table className="w-full text-left">
-                                    <thead>
-                                        <tr className="bg-white/5 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                                            <th className="p-6">Hachage Transaction</th>
-                                            <th className="p-6 text-center">Actif</th>
-                                            <th className="p-6">Type</th>
-                                            <th className="p-6">Mémo / Flux</th>
-                                            <th className="p-6 text-right">Montant</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-white/5 text-sm">
-                                        {transactions?.map((tx) => {
-                                            const asset = ASSETS.find(a => a.symbol === tx.tokenType) || ASSETS[0];
-                                            return (
-                                                <tr key={tx.id} className="hover:bg-white/[0.02] transition-colors group">
-                                                    <td className="p-6 font-mono text-[10px] text-muted-foreground opacity-40 group-hover:opacity-100 transition-opacity">
-                                                        {tx.piTxId || tx.id.substring(0, 16).toUpperCase()}
-                                                    </td>
-                                                    <td className="p-6">
-                                                        <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center mx-auto shadow-md", asset.color)}>
-                                                            {asset.icon}
-                                                        </div>
-                                                    </td>
-                                                    <td className="p-6">
-                                                        <Badge className={cn(
-                                                            "border-none uppercase text-[8px] font-black px-2.5",
-                                                            ['mining', 'dividend', 'unstaking'].includes(tx.type) ? 'bg-green-500/10 text-green-400' : 'bg-blue-500/10 text-blue-400'
-                                                        )}>{tx.type}</Badge>
-                                                    </td>
-                                                    <td className="p-6">
-                                                        <span className="text-[10px] font-bold uppercase text-white/60 tracking-wider">
-                                                            {tx.memo || (tx.direction === 'sent' ? `Envoi vers @${tx.recipientName}` : `Réception de @${tx.senderName}`)}
-                                                        </span>
-                                                    </td>
-                                                    <td className="p-6 text-right">
-                                                        <span className={cn(
-                                                            "text-lg font-black italic",
-                                                            tx.direction === 'sent' || tx.type === 'staking' ? 'text-white' : 'text-green-400'
-                                                        )}>
-                                                            {tx.direction === 'sent' || tx.type === 'staking' ? '-' : '+'}{tx.tokenAmount.toFixed(4)}
-                                                        </span>
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
-                            </div>
-                            {!transactions?.length && (
-                                <div className="py-32 text-center opacity-20 italic text-xs uppercase font-black tracking-[0.4em]">Registre Blockchain Vierge</div>
-                            )}
+                    {/* RIGHT COLUMN: SECURITY & HERITAGE */}
+                    <div className="lg:col-span-4 space-y-10">
+                        {/* DIGITAL HERITAGE STATUS */}
+                        <Card className="bg-gradient-to-br from-red-500/20 to-background border-red-500/20 rounded-[3rem] p-10 space-y-8 relative overflow-hidden group shadow-2xl">
+                             <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:scale-110 transition-transform duration-1000"><HeartPulse size={120} className="text-red-500" /></div>
+                             <div className="relative z-10 space-y-8">
+                                <div className="flex items-center gap-4">
+                                    <div className="w-12 h-12 rounded-2xl bg-red-500 text-white flex items-center justify-center shadow-lg shadow-red-500/20"><Scale size={24} /></div>
+                                    <h4 className="text-xl font-black uppercase italic tracking-tight text-white">Digital Heritage</h4>
+                                </div>
+                                
+                                <div className="space-y-6">
+                                    <div className="p-6 bg-black/40 rounded-[2rem] border border-white/5 space-y-4">
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-[10px] font-black uppercase text-white/40">Inactivité Notariale</span>
+                                            <span className="text-xs font-black text-white italic">{stats.daysInactive} Jours</span>
+                                        </div>
+                                        <Progress value={(stats.daysInactive / (user?.heritageThresholdDays || 90)) * 100} className="h-1.5 bg-white/5" indicatorClassName="bg-red-500" />
+                                        <div className="flex justify-between text-[8px] font-black uppercase text-red-400/60">
+                                            <span>Actif</span>
+                                            <span>Succession à {user?.heritageThresholdDays || 90}j</span>
+                                        </div>
+                                    </div>
+
+                                    {user?.beneficiaryId ? (
+                                        <div className="p-5 bg-white/5 rounded-2xl border border-white/5 flex items-center gap-4">
+                                            <div className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center text-red-400"><UserCheck size={20} /></div>
+                                            <div>
+                                                <p className="text-[8px] font-black uppercase text-white/40">Héritier Désigné</p>
+                                                <p className="text-sm font-black uppercase italic text-white truncate">{user?.beneficiaryName}</p>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <Link href="/dashboard/settings" className="block">
+                                            <Button variant="outline" className="w-full h-12 rounded-xl border-red-500/20 text-red-400 font-black uppercase italic text-[9px] gap-2 hover:bg-red-500 hover:text-white transition-all">Configurer un héritier</Button>
+                                        </Link>
+                                    )}
+
+                                    <Button 
+                                        onClick={sendHeartbeat} 
+                                        disabled={isHeartbeatProcessing}
+                                        className="w-full h-14 bg-red-500 text-white font-black uppercase italic rounded-2xl gap-3 shadow-xl shadow-red-500/20"
+                                    >
+                                        {isHeartbeatProcessing ? <Loader2 className="animate-spin h-5 w-5" /> : <><HeartPulse size={18} /> Signaler mon activité</>}
+                                    </Button>
+                                </div>
+                             </div>
                         </Card>
-                    </TabsContent>
-                </Tabs>
-            </main>
 
-            {/* SWAP SHEET */}
-            <Sheet open={isSwapSheetOpen} onOpenChange={setIsSwapSheetOpen}>
-                <SheetContent side="right" className="bg-card/95 backdrop-blur-3xl border-white/10 w-full sm:max-w-md flex flex-col p-0">
-                    <SheetHeader className="p-10 bg-accent/10 border-b border-white/5">
-                        <div className="flex items-center gap-5">
-                            <div className="w-16 h-16 rounded-2xl bg-accent/20 flex items-center justify-center text-accent shadow-xl shadow-accent/10"><ArrowLeftRight size={32} /></div>
-                            <div><SheetTitle className="text-3xl font-black uppercase italic tracking-tighter">Insta-Swap</SheetTitle><p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Liquidité instantanée Hub DKS</p></div>
-                        </div>
-                    </SheetHeader>
-                    <div className="flex-1 p-10 space-y-10 overflow-y-auto">
-                        <div className="space-y-6">
-                            <div className="p-6 bg-white/5 rounded-[2.5rem] border border-white/5 space-y-4">
-                                <div className="flex justify-between items-center">
-                                    <Label className="text-[10px] font-black uppercase opacity-40">Vendre</Label>
-                                    <span className="text-[9px] font-bold text-accent uppercase">Solde: {stats.balances[swapFrom as keyof typeof stats.balances]?.toFixed(4)}</span>
-                                </div>
+                        {/* SECURITY VAULT STATUS */}
+                        <Card className="glossy-card border-none rounded-[3.5rem] p-10 flex flex-col justify-between shadow-2xl">
+                             <div className="space-y-6">
                                 <div className="flex items-center gap-4">
-                                    <Select value={swapFrom} onValueChange={setSwapFrom}>
-                                        <SelectTrigger className="w-[120px] h-12 bg-black/40 border-none rounded-xl font-black uppercase text-[10px]">
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent className="bg-card border-white/10">
-                                            <SelectItem value="dkst">DKST</SelectItem>
-                                            <SelectItem value="pi">PI</SelectItem>
-                                            <SelectItem value="usdt">USDT</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                    <Input type="number" placeholder="0.00" value={swapAmount} onChange={(e) => setSwapAmount(e.target.value)} className="flex-1 h-12 bg-transparent border-none text-2xl font-black text-white p-0 text-right focus-visible:ring-0" />
+                                    <div className="w-12 h-12 rounded-2xl bg-accent text-black flex items-center justify-center shadow-lg"><ShieldCheck size={24} /></div>
+                                    <h4 className="text-xl font-black uppercase italic tracking-tight text-white">Security Vault</h4>
                                 </div>
-                            </div>
-
-                            <div className="flex justify-center -my-6 relative z-10">
-                                <Button size="icon" variant="outline" className="h-10 w-10 rounded-full bg-background border-white/10 text-accent hover:rotate-180 transition-transform duration-500 shadow-xl" onClick={() => { const tmp = swapFrom; setSwapFrom(swapTo); setSwapTo(tmp); }}>
-                                    <ArrowDownCircle size={20} />
-                                </Button>
-                            </div>
-
-                            <div className="p-6 bg-white/5 rounded-[2.5rem] border border-white/5 space-y-4">
-                                <div className="flex justify-between items-center">
-                                    <Label className="text-[10px] font-black uppercase opacity-40">Recevoir (Estimation)</Label>
-                                    <span className="text-[9px] font-bold text-accent uppercase">Index GCV Actif</span>
-                                </div>
-                                <div className="flex items-center gap-4">
-                                    <Select value={swapTo} onValueChange={setSwapTo}>
-                                        <SelectTrigger className="w-[120px] h-12 bg-black/40 border-none rounded-xl font-black uppercase text-[10px]">
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent className="bg-card border-white/10">
-                                            <SelectItem value="dkst">DKST</SelectItem>
-                                            <SelectItem value="pi">PI</SelectItem>
-                                            <SelectItem value="usdt">USDT</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                    <div className="flex-1 text-2xl font-black text-accent text-right">
-                                        {swapAmount ? ((parseFloat(swapAmount) * (swapFrom === 'pi' ? GCV_VALUE : 1)) / (swapTo === 'pi' ? GCV_VALUE : 1)).toFixed(6) : "0.00"}
+                                <div className="space-y-3">
+                                    <div className="p-4 bg-white/5 rounded-2xl border border-white/5 flex justify-between items-center">
+                                        <span className="text-[10px] font-black uppercase opacity-40">Status Global</span>
+                                        <Badge className={cn("border-none text-[8px] font-black uppercase px-3", user?.isWalletLocked ? "bg-red-500" : "bg-green-500")}>
+                                            {user?.isWalletLocked ? "VAULT LOCKED" : "SECURED & ACTIVE"}
+                                        </Badge>
+                                    </div>
+                                    <div className="p-4 bg-white/5 rounded-2xl border border-white/5 flex justify-between items-center">
+                                        <span className="text-[10px] font-black uppercase opacity-40">Auth Factor</span>
+                                        <Badge variant="outline" className="border-white/20 text-[8px] font-black uppercase px-3">
+                                            {user?.walletPin ? "PIN VERIFIED" : "SETUP REQ."}
+                                        </Badge>
                                     </div>
                                 </div>
-                            </div>
-                        </div>
-
-                        <div className="p-6 bg-accent/5 rounded-2xl border border-accent/20 space-y-3">
-                            <div className="flex justify-between text-[9px] font-black uppercase opacity-60"><span>Frais de réseau Hub</span><span>0.00 %</span></div>
-                            <div className="flex justify-between text-[9px] font-black uppercase text-accent"><span>Impact Prix</span><span>&lt; 0.01%</span></div>
-                        </div>
-
-                        <Button onClick={() => secureAction(handleSwapProcess)} disabled={isProcessingAction || !swapAmount} className="w-full h-20 bg-accent text-black font-black uppercase italic rounded-[2rem] shadow-2xl text-xl gap-4">
-                            {isProcessingAction ? <Loader2 className="animate-spin" /> : <><Repeat size={24} /> Swap instantané</>}
-                        </Button>
+                             </div>
+                             <Button onClick={toggleEmergencyLock} disabled={isEmergencyLockProcessing} className={cn("w-full h-14 rounded-2xl font-black uppercase italic text-[10px] gap-3 mt-10 shadow-xl transition-all", user?.isWalletLocked ? "bg-red-500 text-white" : "bg-white text-black hover:bg-red-500 hover:text-white")}>
+                                {isEmergencyLockProcessing ? <Loader2 className="animate-spin h-4 w-4" /> : user?.isWalletLocked ? <><Lock size={16}/> Unlock Vault</> : <><ShieldAlert size={16}/> Emergency Lock</>}
+                             </Button>
+                        </Card>
                     </div>
-                </SheetContent>
-            </Sheet>
+                </div>
+            </main>
 
-            {/* MEMBERSHIP CARD DIALOG */}
+            {/* MODALS REMAIN THE SAME BUT WITH REFINED STYLING */}
             <Dialog open={isCardDialogOpen} onOpenChange={setIsCardDialogOpen}>
                 <DialogContent className="bg-card border-white/10 text-white rounded-[3rem] sm:max-w-2xl p-0 overflow-hidden">
                     <DialogHeader className="p-8 bg-accent/10 border-b border-white/5">
                         <DialogTitle className="text-3xl font-black uppercase italic tracking-tighter">Ma Carte <span className="text-accent">Elite DKS</span></DialogTitle>
                         <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60 mt-1">Identité numérique et accès privilège au Hub</p>
                     </DialogHeader>
-                    
                     <div className="p-12 flex flex-col items-center justify-center gap-12 bg-black/40">
-                        {/* DIGITAL CARD DESIGN */}
                         <div ref={cardRef} className="w-[450px] h-[260px] bg-gradient-to-br from-[#1e293b] via-[#0f172a] to-black rounded-3xl p-8 relative overflow-hidden shadow-2xl font-sans border-2 border-white/10 group">
                             <div className="absolute inset-0 bg-[url('https://picsum.photos/seed/tech/800/600')] opacity-5 mix-blend-overlay" />
                             <div className="absolute -top-12 -right-12 w-48 h-48 bg-accent/10 rounded-full blur-[80px]" />
-                            
                             <div className="relative z-10 h-full flex flex-col justify-between">
                                 <div className="flex justify-between items-start">
-                                    <div className="space-y-1">
-                                        <Logo size="sm" showText />
-                                        <Badge className="bg-accent/20 text-accent border-none text-[7px] font-black uppercase tracking-[0.4em] px-2 py-0.5">Elite Member</Badge>
-                                    </div>
+                                    <div className="space-y-1"><Logo size="sm" showText /><Badge className="bg-accent/20 text-accent border-none text-[7px] font-black uppercase tracking-[0.4em] px-2 py-0.5">Elite Member</Badge></div>
                                     <div className="w-16 h-16 bg-white p-1 rounded-xl shadow-lg"><QrCode size={54} className="text-black" /></div>
                                 </div>
-
                                 <div className="space-y-4">
-                                    <div className="space-y-1">
-                                        <p className="text-[8px] font-black uppercase text-white/40 tracking-widest">Titulaire du compte</p>
-                                        <h3 className="text-2xl font-black uppercase italic tracking-tight text-white leading-none truncate">{user?.name}</h3>
-                                    </div>
+                                    <div className="space-y-1"><p className="text-[8px] font-black uppercase text-white/40 tracking-widest">Titulaire du compte</p><h3 className="text-2xl font-black uppercase italic tracking-tight text-white leading-none truncate">{user?.name}</h3></div>
                                     <div className="flex justify-between items-end">
-                                        <div className="space-y-1">
-                                            <p className="text-[8px] font-black uppercase text-white/40 tracking-widest">Membre ID</p>
-                                            <p className="text-xs font-mono font-bold text-accent">DKS-{user?.uid?.substring(0, 12).toUpperCase()}</p>
-                                        </div>
-                                        <div className="text-right">
-                                            <p className="text-[8px] font-black uppercase text-white/40 tracking-widest">Grade</p>
-                                            <p className="text-sm font-black uppercase italic text-white">{user?.loyaltyLevel?.toUpperCase() || 'BRONZE'}</p>
-                                        </div>
+                                        <div className="space-y-1"><p className="text-[8px] font-black uppercase text-white/40 tracking-widest">Membre ID</p><p className="text-xs font-mono font-bold text-accent">DKS-{user?.uid?.substring(0, 12).toUpperCase()}</p></div>
+                                        <div className="text-right"><p className="text-[8px] font-black uppercase text-white/40 tracking-widest">Grade</p><p className="text-sm font-black uppercase italic text-white">{user?.loyaltyLevel?.toUpperCase() || 'BRONZE'}</p></div>
                                     </div>
                                 </div>
                             </div>
-                            
-                            {/* CACHET SÉCURITÉ FILIGRANE */}
                             <div className="absolute bottom-6 right-6 opacity-5 rotate-[-15deg] group-hover:rotate-0 transition-transform duration-700 pointer-events-none">
                                 <div className="w-20 h-20 rounded-full border-4 border-double border-white flex items-center justify-center"><ShieldCheck size={40} className="text-white"/></div>
                             </div>
                         </div>
-
                         <div className="w-full flex gap-4">
-                            <Button 
-                                onClick={handleDownloadMembershipCard} 
-                                disabled={isGeneratingPDF}
-                                className="flex-1 h-16 bg-accent text-black font-black uppercase italic rounded-2xl gap-3 shadow-xl shadow-accent/20 text-sm"
-                            >
+                            <Button onClick={handleDownloadMembershipCard} disabled={isGeneratingPDF} className="flex-1 h-16 bg-accent text-black font-black uppercase italic rounded-2xl gap-3 shadow-xl shadow-accent/20 text-sm">
                                 {isGeneratingPDF ? <Loader2 className="animate-spin" /> : <><Download size={20} /> Télécharger ma carte PDF</>}
                             </Button>
                             <Button variant="outline" onClick={() => setIsCardDialogOpen(false)} className="h-16 rounded-2xl border-white/10 px-8 font-black uppercase italic text-xs">Fermer</Button>
@@ -730,7 +810,6 @@ function UniversalWalletPage() {
                 </DialogContent>
             </Dialog>
 
-            {/* PIN VERIFICATION DIALOG */}
             <Dialog open={isPinVerificationOpen} onOpenChange={setIsPinVerificationOpen}>
                 <DialogContent className="bg-card border-white/10 text-foreground rounded-[2.5rem] sm:max-w-md overflow-hidden">
                     <DialogHeader className="p-8 bg-accent/10 border-b border-white/5">
@@ -760,7 +839,43 @@ function UniversalWalletPage() {
                 </DialogContent>
             </Dialog>
 
-            {/* RECEIVE SHEET */}
+            <Sheet open={isSwapSheetOpen} onOpenChange={setIsSwapSheetOpen}>
+                <SheetContent side="right" className="bg-card/95 backdrop-blur-3xl border-white/10 w-full sm:max-w-md flex flex-col p-0">
+                    <SheetHeader className="p-10 bg-accent/10 border-b border-white/5">
+                        <div className="flex items-center gap-5">
+                            <div className="w-16 h-16 rounded-2xl bg-accent/20 flex items-center justify-center text-accent shadow-xl shadow-accent/10"><ArrowLeftRight size={32} /></div>
+                            <div><SheetTitle className="text-3xl font-black uppercase italic tracking-tighter">Insta-Swap</SheetTitle><p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Liquidité instantanée Hub DKS</p></div>
+                        </div>
+                    </SheetHeader>
+                    <div className="flex-1 p-10 space-y-10 overflow-y-auto">
+                        <div className="space-y-6">
+                            <div className="p-6 bg-white/5 rounded-[2.5rem] border border-white/5 space-y-4">
+                                <div className="flex justify-between items-center"><Label className="text-[10px] font-black uppercase opacity-40">Vendre</Label><span className="text-[9px] font-bold text-accent uppercase">Solde: {stats.balances[swapFrom as keyof typeof stats.balances]?.toFixed(4)}</span></div>
+                                <div className="flex items-center gap-4">
+                                    <Select value={swapFrom} onValueChange={setSwapFrom}>
+                                        <SelectTrigger className="w-[120px] h-12 bg-black/40 border-none rounded-xl font-black uppercase text-[10px]"><SelectValue /></SelectTrigger>
+                                        <SelectContent className="bg-card border-white/10"><SelectItem value="dkst">DKST</SelectItem><SelectItem value="pi">PI</SelectItem><SelectItem value="usdt">USDT</SelectItem></SelectContent>
+                                    </Select>
+                                    <Input type="number" placeholder="0.00" value={swapAmount} onChange={(e) => setSwapAmount(e.target.value)} className="flex-1 h-12 bg-transparent border-none text-2xl font-black text-white p-0 text-right focus-visible:ring-0" />
+                                </div>
+                            </div>
+                            <div className="flex justify-center -my-6 relative z-10"><Button size="icon" variant="outline" className="h-10 w-10 rounded-full bg-background border-white/10 text-accent hover:rotate-180 transition-transform duration-500 shadow-xl" onClick={() => { const tmp = swapFrom; setSwapFrom(swapTo); setSwapTo(tmp); }}><ArrowDownCircle size={20} /></Button></div>
+                            <div className="p-6 bg-white/5 rounded-[2.5rem] border border-white/5 space-y-4">
+                                <div className="flex justify-between items-center"><Label className="text-[10px] font-black uppercase opacity-40">Recevoir (EST)</Label><span className="text-[9px] font-bold text-accent uppercase">Index GCV Actif</span></div>
+                                <div className="flex items-center gap-4">
+                                    <Select value={swapTo} onValueChange={setSwapTo}>
+                                        <SelectTrigger className="w-[120px] h-12 bg-black/40 border-none rounded-xl font-black uppercase text-[10px]"><SelectValue /></SelectTrigger>
+                                        <SelectContent className="bg-card border-white/10"><SelectItem value="dkst">DKST</SelectItem><SelectItem value="pi">PI</SelectItem><SelectItem value="usdt">USDT</SelectItem></SelectContent>
+                                    </Select>
+                                    <div className="flex-1 text-2xl font-black text-accent text-right">{swapAmount ? ((parseFloat(swapAmount) * (swapFrom === 'pi' ? GCV_VALUE : 1)) / (swapTo === 'pi' ? GCV_VALUE : 1)).toFixed(6) : "0.00"}</div>
+                                </div>
+                            </div>
+                        </div>
+                        <Button onClick={() => secureAction(handleSwapProcess)} disabled={isProcessingAction || !swapAmount} className="w-full h-20 bg-accent text-black font-black uppercase italic rounded-[2rem] shadow-2xl text-xl gap-4">{isProcessingAction ? <Loader2 className="animate-spin" /> : <><Repeat size={24} /> Swap instantané</>}</Button>
+                    </div>
+                </SheetContent>
+            </Sheet>
+
             <Sheet open={isReceiveSheetOpen} onOpenChange={setIsReceiveSheetOpen}>
                 <SheetContent side="right" className="bg-card/95 backdrop-blur-3xl border-white/10 w-full sm:max-w-md flex flex-col p-0">
                     <SheetHeader className="p-10 bg-accent/10 border-b border-white/5">
@@ -770,39 +885,15 @@ function UniversalWalletPage() {
                         </div>
                     </SheetHeader>
                     <div className="flex-1 p-10 flex flex-col items-center justify-center gap-10">
-                        <div className="relative group">
-                            <div className="absolute inset-0 bg-accent/20 blur-[40px] rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
-                            <div className="relative bg-white p-8 rounded-[3rem] shadow-2xl">
-                                <QrCode size={200} className="text-black" />
-                            </div>
-                        </div>
-                        
+                        <div className="relative group"><div className="absolute inset-0 bg-accent/20 blur-[40px] rounded-full opacity-0 group-hover:opacity-100 transition-opacity" /><div className="relative bg-white p-8 rounded-[3rem] shadow-2xl"><QrCode size={200} className="text-black" /></div></div>
                         <div className="w-full space-y-6">
-                            <div className="space-y-2">
-                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-40 ml-1">Mon ID Unique</Label>
-                                <div className="flex gap-2">
-                                    <Input readOnly value={user?.uid || ""} className="h-14 bg-white/5 border-white/10 rounded-2xl font-mono text-[10px] text-accent tracking-wider text-center" />
-                                    <Button onClick={() => { navigator.clipboard.writeText(user?.uid || ""); setHasCopiedId(true); setTimeout(() => setHasCopiedId(false), 2000); }} variant="outline" className="h-14 w-14 rounded-2xl border-white/10 hover:bg-accent/10 hover:text-accent p-0 transition-all">
-                                        {hasCopiedId ? <Check size={20}/> : <Copy size={20}/>}
-                                    </Button>
-                                </div>
-                            </div>
-                            
-                            <Card className="bg-accent/5 border-accent/20 p-6 rounded-[2rem] space-y-3">
-                                <div className="flex items-center gap-2 text-accent">
-                                    <Info size={14} />
-                                    <p className="text-[10px] font-black uppercase tracking-widest">Note de transfert</p>
-                                </div>
-                                <p className="text-[11px] text-white/60 italic leading-relaxed">
-                                    Partagez cet ID ou ce code QR pour recevoir des jetons de l'écosystème. Les transactions sont instantanées au sein du Hub.
-                                </p>
-                            </Card>
+                            <div className="space-y-2"><Label className="text-[10px] font-black uppercase opacity-40 ml-1">Mon ID Unique</Label><div className="flex gap-2"><Input readOnly value={user?.uid || ""} className="h-14 bg-white/5 border-white/10 rounded-2xl font-mono text-[10px] text-accent tracking-wider text-center" /><Button onClick={() => { navigator.clipboard.writeText(user?.uid || ""); setHasCopiedId(true); setTimeout(() => setHasCopiedId(false), 2000); }} variant="outline" className="h-14 w-14 rounded-2xl border-white/10 hover:bg-accent/10 hover:text-accent p-0 transition-all">{hasCopiedId ? <Check size={20}/> : <Copy size={20}/>}</Button></div></div>
+                            <Card className="bg-accent/5 border-accent/20 p-6 rounded-[2rem] space-y-3"><div className="flex items-center gap-2 text-accent"><Info size={14} /><p className="text-[10px] font-black uppercase tracking-widest">Note de transfert</p></div><p className="text-[11px] text-white/60 italic leading-relaxed">Partagez cet ID ou ce code QR pour recevoir des jetons de l'écosystème. Les transactions sont instantanées au sein du Hub.</p></Card>
                         </div>
                     </div>
                 </SheetContent>
             </Sheet>
 
-            {/* TRANSFER SHEET */}
             <Sheet open={isTransferSheetOpen} onOpenChange={setIsTransferSheetOpen}>
                 <SheetContent side="right" className="bg-card/95 backdrop-blur-3xl border-white/10 w-full sm:max-w-md flex flex-col p-0">
                     <SheetHeader className="p-10 bg-accent/10 border-b border-white/5">
@@ -829,37 +920,19 @@ function UniversalWalletPage() {
                             </div>
                         ) : (
                             <form onSubmit={(e) => { e.preventDefault(); secureAction(handleTransferProcess); }} className="space-y-10">
-                                <div className="p-6 bg-accent/5 border border-accent/20 rounded-[2.5rem] flex items-center justify-between">
-                                    <div className="flex items-center gap-5">
-                                        <div className="w-14 h-14 rounded-2xl bg-accent text-black flex items-center justify-center font-black text-xl italic shadow-lg shadow-accent/20">{(selectedRecipient.name || selectedRecipient.displayName)?.substring(0, 1)}</div>
-                                        <div><p className="text-[9px] font-black text-accent uppercase tracking-widest">Envoi vers</p><p className="text-lg font-black uppercase italic text-white mt-1">{selectedRecipient.name || selectedRecipient.displayName}</p></div>
-                                    </div>
-                                    <button onClick={() => setSelectedRecipient(null)} className="text-white/20 hover:text-white"><X size={20}/></button>
-                                </div>
+                                <div className="p-6 bg-accent/5 border border-accent/20 rounded-[2.5rem] flex items-center justify-between"><div className="flex items-center gap-5"><div className="w-14 h-14 rounded-2xl bg-accent text-black flex items-center justify-center font-black text-xl italic shadow-lg shadow-accent/20">{(selectedRecipient.name || selectedRecipient.displayName)?.substring(0, 1)}</div><div><p className="text-[9px] font-black text-accent uppercase tracking-widest">Envoi vers</p><p className="text-lg font-black uppercase italic text-white mt-1">{selectedRecipient.name || selectedRecipient.displayName}</p></div></div><button onClick={() => setSelectedRecipient(null)} className="text-white/20 hover:text-white"><X size={20}/></button></div>
                                 <div className="space-y-8">
                                     <div className="space-y-3">
                                         <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Choisir l'actif</Label>
                                         <Select value={selectedToken} onValueChange={setSelectedToken}>
-                                            <SelectTrigger className="h-14 bg-background/50 border-white/10 rounded-2xl">
-                                                <SelectValue />
-                                            </SelectTrigger>
+                                            <SelectTrigger className="h-14 bg-background/50 border-white/10 rounded-2xl"><SelectValue /></SelectTrigger>
                                             <SelectContent className="bg-card border-white/10">
-                                                {ASSETS.map(a => (
-                                                    <SelectItem key={a.id} value={a.id} className="font-bold uppercase text-[10px]">
-                                                        <div className="flex items-center gap-2">{a.symbol} ({stats.balances[a.id as keyof typeof stats.balances]?.toFixed(2)})</div>
-                                                    </SelectItem>
-                                                ))}
+                                                {ASSETS.map(a => (<SelectItem key={a.id} value={a.id} className="font-bold uppercase text-[10px]"><div className="flex items-center gap-2">{a.symbol} ({stats.balances[a.id as keyof typeof stats.balances]?.toFixed(2)})</div></SelectItem>))}
                                             </SelectContent>
                                         </Select>
                                     </div>
-                                    <div className="space-y-3">
-                                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Montant</Label>
-                                        <div className="relative"><Coins className="absolute left-6 top-1/2 -translate-y-1/2 text-accent" size={24} /><Input type="number" step="0.0001" value={transferAmount} onChange={(e) => setTransferAmount(e.target.value)} className="h-20 pl-16 bg-background/50 border-white/10 rounded-[2rem] text-4xl font-black text-accent" required /></div>
-                                    </div>
-                                    <div className="space-y-3">
-                                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Mémo</Label>
-                                        <Input value={transferMemo} onChange={(e) => setTransferMemo(e.target.value)} placeholder="Objet du transfert..." className="h-14 bg-background/50 border-white/10 rounded-2xl italic text-sm" />
-                                    </div>
+                                    <div className="space-y-3"><Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Montant</Label><div className="relative"><Coins className="absolute left-6 top-1/2 -translate-y-1/2 text-accent" size={24} /><Input type="number" step="0.0001" value={transferAmount} onChange={(e) => setTransferAmount(e.target.value)} className="h-20 pl-16 bg-background/50 border-white/10 rounded-[2rem] text-4xl font-black text-accent" required /></div></div>
+                                    <div className="space-y-3"><Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Mémo</Label><Input value={transferMemo} onChange={(e) => setTransferMemo(e.target.value)} placeholder="Objet du transfert..." className="h-14 bg-background/50 border-white/10 rounded-2xl italic text-sm" /></div>
                                 </div>
                                 <Button type="submit" disabled={isProcessingAction || !transferAmount} className="w-full h-20 bg-accent text-black font-black uppercase italic rounded-[2rem] shadow-2xl text-xl gap-4">{isProcessingAction ? <Loader2 className="animate-spin" /> : <><Send size={24} /> Valider le Transfert</>}</Button>
                             </form>
