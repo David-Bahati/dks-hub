@@ -15,6 +15,9 @@ export type AppUser = {
   referralCount?: number;
   points?: number;
   tokenBalance?: number;
+  piBalance?: number; // New: Pi balance
+  usdtBalance?: number; // New: USDT balance
+  lpBalance?: number; // New: Liquidity Provider tokens
   pointsConverted?: number;
   piWalletAddress?: string;
   stakedBalance?: number;
@@ -46,7 +49,8 @@ export type TokenTransaction = {
   id: string;
   userId: string;
   userName?: string;
-  type: 'mint' | 'burn' | 'transfer' | 'mining' | 'staking' | 'unstaking' | 'exchange' | 'heritage' | 'dividend';
+  tokenType: 'DKST' | 'PI' | 'USDT' | 'LP'; // Added token type
+  type: 'mint' | 'burn' | 'transfer' | 'mining' | 'staking' | 'unstaking' | 'exchange' | 'heritage' | 'dividend' | 'swap';
   pointsAmount?: number;
   tokenAmount: number;
   piTxId?: string;
