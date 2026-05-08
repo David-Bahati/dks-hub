@@ -59,7 +59,8 @@ import {
   ShieldCheck,
   Share2,
   Banknote,
-  PlusCircle
+  PlusCircle,
+  Presentation
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -408,14 +409,14 @@ function DashboardPage() {
                     </Link>
 
                     {(user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'seller') && (
-                        <Link href="/dashboard/products" className="group">
+                        <Link href="/dashboard/presentation" className="group">
                             <Card className="bg-white/5 border-white/10 rounded-3xl p-6 h-full flex flex-col justify-between hover:bg-white/[0.08] transition-all">
                                 <div className="space-y-4">
-                                    <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-primary"><PackagePlus size={24} /></div>
-                                    <h4 className="text-xl font-black uppercase italic leading-none text-white">Gestion de<br/>Stock IA</h4>
+                                    <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-primary"><Presentation size={24} /></div>
+                                    <h4 className="text-xl font-black uppercase italic leading-none text-white">Présentation<br/>Officielle</h4>
                                 </div>
                                 <div className="mt-8 flex justify-between items-center">
-                                    <span className="text-[10px] font-black uppercase italic text-muted-foreground">Nouveaux arrivages</span>
+                                    <span className="text-[10px] font-black uppercase italic text-muted-foreground">Support Expert PDF</span>
                                     <ArrowRight size={20} className="text-primary" />
                                 </div>
                             </Card>
@@ -616,6 +617,7 @@ const navConfig = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Mon Dashboard", roles: ["Admin", "Seller", "Cashier", "customer"] },
   { href: "/dashboard/wallet", icon: Wallet, label: "Mon Wallet DKST", roles: ["Admin", "Seller", "Cashier", "customer"] },
   { href: "/dashboard/finance", icon: BarChartHorizontal, label: "Rapports Financiers", roles: ["Admin"] },
+  { href: "/dashboard/presentation", icon: Presentation, label: "Présentation Projet", roles: ["Admin"] },
   { href: "/dashboard/governance", icon: Vote, label: "Gouvernance DAO", roles: ["Admin", "Seller", "Cashier", "customer"] },
   { href: "/dashboard/profile/expert", icon: UserIcon, label: "Mon Profil Expert", roles: ["Admin", "Seller", "Cashier"] },
   { href: "/dashboard/tokens", icon: Coins, label: "Économie Hub", roles: ["Admin", "Seller", "Cashier"] },
