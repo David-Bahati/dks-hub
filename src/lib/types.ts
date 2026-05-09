@@ -42,6 +42,18 @@ export type AppUser = {
   kycSubmittedAt?: any;
   kycVerifiedAt?: any;
   kycRejectionReason?: string;
+  // KYB Fields
+  kybStatus?: 'none' | 'pending' | 'verified' | 'rejected';
+  businessName?: string;
+  businessType?: string;
+  businessRegistrationNumber?: string;
+  businessTaxId?: string;
+  businessLicenseImage?: string;
+  businessAddress?: string;
+  businessWebsite?: string;
+  kybSubmittedAt?: any;
+  kybVerifiedAt?: any;
+  kybRejectionReason?: string;
 };
 
 export type Treasury = {

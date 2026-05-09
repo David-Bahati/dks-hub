@@ -67,7 +67,8 @@ import {
   Network,
   Briefcase,
   UserCheck,
-  ShieldAlert
+  ShieldAlert,
+  Building
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -341,19 +342,30 @@ function DashboardPage() {
                 </Link>
             </div>
             <div className="flex items-center gap-4">
-                {/* KYC STATUS BADGE */}
+                {/* KYC/KYB STATUS BADGE */}
                 {user && (
-                    <Link href="/dashboard/kyc">
-                        <Badge className={cn(
-                            "h-10 px-4 rounded-xl gap-2 font-black italic cursor-pointer transition-all",
-                            user.kycStatus === 'verified' ? "bg-green-500/20 text-green-400 border-green-500/20" : 
-                            user.kycStatus === 'pending' ? "bg-orange-500/20 text-orange-400 border-orange-500/20" :
-                            "bg-white/5 text-muted-foreground border-white/10"
-                        )}>
-                            {user.kycStatus === 'verified' ? <ShieldCheck size={16} /> : <ShieldAlert size={16} />}
-                            {user.kycStatus === 'verified' ? 'Identité Vérifiée' : 'Vérifier Identité'}
-                        </Badge>
-                    </Link>
+                    <div className="flex gap-2">
+                        <Link href="/dashboard/kyc">
+                            <Badge className={cn(
+                                "h-10 px-4 rounded-xl gap-2 font-black italic cursor-pointer transition-all",
+                                user.kycStatus === 'verified' ? "bg-green-500/20 text-green-400 border-green-500/20" : 
+                                user.kycStatus === 'pending' ? "bg-orange-500/20 text-orange-400 border-orange-500/20" :
+                                "bg-white/5 text-muted-foreground border-white/10"
+                            )}>
+                                <UserIcon size={16} /> KYC
+                            </Badge>
+                        </Link>
+                        <Link href="/dashboard/kyb">
+                            <Badge className={cn(
+                                "h-10 px-4 rounded-xl gap-2 font-black italic cursor-pointer transition-all",
+                                user.kybStatus === 'verified' ? "bg-primary/20 text-primary border-primary/20" : 
+                                user.kybStatus === 'pending' ? "bg-blue-500/20 text-blue-400 border-blue-500/20" :
+                                "bg-white/5 text-muted-foreground border-white/10"
+                            )}>
+                                <Building size={16} /> KYB
+                            </Badge>
+                        </Link>
+                    </div>
                 )}
 
                 <Link href="/" className="hidden sm:flex">
@@ -493,20 +505,18 @@ function DashboardPage() {
                         </Card>
                     </Link>
 
-                    {(user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'seller') && (
-                        <Link href="/dashboard/presentation" className="group">
-                            <Card className="bg-white/5 border-white/10 rounded-3xl p-6 h-full flex flex-col justify-between hover:bg-white/[0.08] transition-all">
-                                <div className="space-y-4">
-                                    <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-primary"><Presentation size={24} /></div>
-                                    <h4 className="text-xl font-black uppercase italic leading-none text-white">Présentation<br/>Officielle</h4>
-                                </div>
-                                <div className="mt-8 flex justify-between items-center">
-                                    <span className="text-[10px] font-black uppercase italic text-muted-foreground">Support Expert PDF</span>
-                                    <ArrowRight size={20} className="text-primary" />
-                                </div>
-                            </Card>
-                        </Link>
-                    )}
+                    <Link href="/dashboard/kyb-management" className="group">
+                        <Card className="bg-white/5 border-white/10 rounded-3xl p-6 h-full flex flex-col justify-between hover:bg-white/[0.08] transition-all">
+                            <div className="space-y-4">
+                                <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-primary"><Building2 size={24} /></div>
+                                <h4 className="text-xl font-black uppercase italic leading-none text-white">Validateur<br/>KYB</h4>
+                            </div>
+                            <div className="mt-8 flex justify-between items-center">
+                                <span className="text-[10px] font-black uppercase italic text-muted-foreground">Vérifier Business</span>
+                                <ArrowRight size={20} className="text-primary" />
+                            </div>
+                        </Card>
+                    </Link>
 
                     <Link href="/dashboard/maintenance/logs" className="group">
                         <Card className="bg-white/5 border-white/10 rounded-3xl p-6 h-full flex flex-col justify-between hover:bg-white/[0.08] transition-all">
@@ -701,6 +711,7 @@ const navConfig = [
   { href: "/pos", icon: ShoppingCart, label: "Terminal de Vente (POS)", roles: ["Admin", "Seller", "Cashier"] },
   { href: "/dashboard", icon: LayoutDashboard, label: "Mon Dashboard", roles: ["Admin", "Seller", "Cashier", "customer"] },
   { href: "/dashboard/kyc", icon: ShieldCheck, label: "Vérification KYC", roles: ["Admin", "Seller", "Cashier", "customer"] },
+  { href: "/dashboard/kyb", icon: Building2, label: "Certification Business (KYB)", roles: ["Admin", "Seller", "Cashier", "customer"] },
   { href: "/dashboard/wallet", icon: Wallet, label: "Mon Wallet DKST", roles: ["Admin", "Seller", "Cashier", "customer"] },
   { href: "/dashboard/finance", icon: BarChartHorizontal, label: "Rapports Financiers", roles: ["Admin"] },
   { href: "/dashboard/presentation", icon: Presentation, label: "Présentation Projet", roles: ["Admin"] },
