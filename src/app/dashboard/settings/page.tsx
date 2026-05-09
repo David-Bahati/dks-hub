@@ -89,6 +89,7 @@ export default function SettingsPage() {
     // Wallet PIN States
     const [walletPin, setWalletPin] = useState("");
     const [isUpdatingPin, setIsUpdatingPin] = useState(false);
+    const [showPin, setShowPin] = useState(false);
     
     // System States
     const [exchangeRate, setExchangeRate] = useState("2500");
@@ -283,7 +284,6 @@ export default function SettingsPage() {
                                     </div>
                                 </Card>
 
-                                {/* REFERRAL LINK CARD */}
                                 <Card className="bg-primary/10 border-primary/20 rounded-[2.5rem] p-8 space-y-6 relative overflow-hidden">
                                     <div className="absolute top-0 right-0 p-4 opacity-5"><Gift size={80} /></div>
                                     <div className="relative z-10 space-y-4">
@@ -326,8 +326,8 @@ export default function SettingsPage() {
                                             <Input value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} className="h-14 bg-background/50 border-white/5 rounded-2xl" />
                                         </div>
                                         <div className="md:col-span-2 space-y-4">
-                                            <Label className="text-[10px] font-black uppercase opacity-60 ml-1">URL de Photo de Profil (ou via sélecteur à gauche)</Label>
-                                            <Input value={photoURL} onChange={(e) => setPhotoURL(e.target.value)} placeholder="data:image/... ou https://..." className="h-14 bg-background/50 border-white/5 rounded-2xl font-mono text-[9px] opacity-60" />
+                                            <Label className="text-[10px] font-black uppercase opacity-60 ml-1">URL de Photo de Profil</Label>
+                                            <Input value={photoURL} onChange={(e) => setPhotoURL(e.target.value)} placeholder="https://..." className="h-14 bg-background/50 border-white/5 rounded-2xl font-mono text-[9px] opacity-60" />
                                         </div>
                                         <div className="md:col-span-2 space-y-4">
                                             <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Adresse à Bunia</Label>
