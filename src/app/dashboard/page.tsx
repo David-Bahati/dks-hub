@@ -60,7 +60,12 @@ import {
   Share2,
   Banknote,
   PlusCircle,
-  Presentation
+  Presentation,
+  Rocket,
+  Globe,
+  Cpu,
+  Network,
+  Briefcase
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -372,6 +377,69 @@ function DashboardPage() {
                   <p className="text-sm text-white/60 font-medium italic">"Prêt à dominer l'économie technologique aujourd'hui ?"</p>
               </div>
           </div>
+
+          {/* DKS EXPANSION MODULES */}
+          <section className="animate-in fade-in slide-in-from-top-4 duration-1000">
+            <div className="flex items-center gap-4 mb-6">
+                <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-accent shadow-lg"><Rocket size={20} /></div>
+                <h3 className="text-xl font-black uppercase italic tracking-tight text-white">DKS Expansion</h3>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <Link href="/dashboard/work" className="group">
+                    <Card className="bg-primary text-white border-none rounded-3xl p-6 h-full flex flex-col justify-between hover:scale-[1.02] transition-all shadow-xl shadow-primary/20 overflow-hidden relative">
+                        <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-125 transition-transform"><Briefcase size={80} /></div>
+                        <div className="space-y-4 relative z-10">
+                            <Badge className="bg-white/20 text-white border-none font-black uppercase text-[8px] tracking-widest">Gagnez des DKST</Badge>
+                            <h4 className="text-2xl font-black uppercase italic leading-none">DKS Work<br/>Missions</h4>
+                        </div>
+                        <div className="mt-8 flex justify-between items-center relative z-10">
+                            <span className="text-[10px] font-black uppercase italic">Voir les tâches</span>
+                            <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center"><ArrowRight size={20} /></div>
+                        </div>
+                    </Card>
+                </Link>
+
+                <Link href="/dashboard/pay" className="group">
+                    <Card className="bg-accent text-black border-none rounded-3xl p-6 h-full flex flex-col justify-between hover:scale-[1.02] transition-all shadow-xl shadow-accent/20 overflow-hidden relative">
+                        <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-125 transition-transform"><Coins size={80} /></div>
+                        <div className="space-y-4 relative z-10">
+                            <Badge className="bg-black/20 text-black border-none font-black uppercase text-[8px] tracking-widest">Portail Marchand</Badge>
+                            <h4 className="text-2xl font-black uppercase italic leading-none">DKS Pay<br/>SDK</h4>
+                        </div>
+                        <div className="mt-8 flex justify-between items-center relative z-10">
+                            <span className="text-[10px] font-black uppercase italic">Encaisser partout</span>
+                            <div className="w-10 h-10 rounded-full bg-black/10 flex items-center justify-center"><ArrowRight size={20} /></div>
+                        </div>
+                    </Card>
+                </Link>
+
+                <Link href="/dashboard/nodes" className="group">
+                    <Card className="bg-white/5 border-white/10 rounded-3xl p-6 h-full flex flex-col justify-between hover:bg-white/[0.08] transition-all">
+                        <div className="space-y-4">
+                            <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-accent"><Network size={24} /></div>
+                            <h4 className="text-xl font-black uppercase italic leading-none text-white">DKS Nodes<br/>Hosting</h4>
+                        </div>
+                        <div className="mt-8 flex justify-between items-center">
+                            <span className="text-[10px] font-black uppercase italic text-muted-foreground">Booster Minage</span>
+                            <ArrowRight size={20} className="text-accent" />
+                        </div>
+                    </Card>
+                </Link>
+
+                <Link href="/dashboard/p2p" className="group">
+                    <Card className="bg-white/5 border-white/10 rounded-3xl p-6 h-full flex flex-col justify-between hover:bg-white/[0.08] transition-all">
+                        <div className="space-y-4">
+                            <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-primary"><RefreshCw size={24} /></div>
+                            <h4 className="text-xl font-black uppercase italic leading-none text-white">Marketplace<br/>P2P</h4>
+                        </div>
+                        <div className="mt-8 flex justify-between items-center">
+                            <span className="text-[10px] font-black uppercase italic text-muted-foreground">Vente membre</span>
+                            <ArrowRight size={20} className="text-primary" />
+                        </div>
+                    </Card>
+                </Link>
+            </div>
+          </section>
 
           {/* ACTIONS PRIORITAIRES STAFF */}
           {isStaff && (

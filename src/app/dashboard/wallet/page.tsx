@@ -1,8 +1,9 @@
+
 "use client";
 
 import { useMemo, useState, useEffect, useRef } from 'react';
 import { Navbar } from "@/components/layout/Navbar";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { 
     Coins, 
@@ -64,7 +65,9 @@ import {
     UserCheck,
     Scale,
     Copy,
-    Check
+    Check,
+    ChevronDown,
+    PieChart as LucidePieChart
 } from "lucide-react";
 import { db } from '@/lib/firebase';
 import { collection, query, where, orderBy, updateDoc, doc, addDoc, serverTimestamp, increment, limit, getDocs, Timestamp } from 'firebase/firestore';
@@ -92,6 +95,13 @@ import {
     DialogFooter,
     DialogDescription 
 } from "@/components/ui/dialog";
+import { 
+    Select, 
+    SelectContent, 
+    SelectItem, 
+    SelectTrigger, 
+    SelectValue 
+} from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
     AreaChart, 
@@ -121,12 +131,12 @@ const SHOP_PERKS = [
 function UniversalWalletPage() {
     const { user } = useAuth();
     const { toast } = useToast();
+    const [isMounted, setIsMounted] = useState(false);
     const [isMinting, setIsMinting] = useState(false);
     const [isSyncing, setIsSyncing] = useState(false);
     const [isTransferSheetOpen, setIsTransferSheetOpen] = useState(false);
     const [isReceiveSheetOpen, setIsReceiveSheetOpen] = useState(false);
     const [isProcessingAction, setIsProcessingAction] = useState(false);
-    const [tempPiAddress, setTempPiAddress] = useState("");
     
     // Security States
     const [isPinVerificationOpen, setIsPinVerificationOpen] = useState(false);
@@ -156,6 +166,10 @@ function UniversalWalletPage() {
     const [isGeneratingCert, setIsGeneratingCert] = useState(false);
     const certRef = useRef<HTMLDivElement>(null);
 
+    useEffect(() => {
+        setIsMounted(true);
+    }, []);
+
     const isStaff = user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'seller' || user?.role?.toLowerCase() === 'cashier';
 
     const logsQuery = useMemoFirebase(() => {
@@ -175,11 +189,6 @@ function UniversalWalletPage() {
         return query(collection(db, "tokenTransactions"), where("userId", "==", user.uid), orderBy("createdAt", "asc"));
     }, [user?.uid]);
     const { data: transactions } = useCollection(txQuery);
-
-    const topWealthQuery = useMemoFirebase(() => {
-        return query(collection(db, "users"), orderBy("tokenBalance", "desc"), limit(10));
-    }, []);
-    const { data: topWealthyUsers } = useCollection(topWealthQuery);
 
     const stats = useMemo(() => {
         if (!user) return { totalPoints: 0, redeemableTokens: 0, progress: 0, availablePoints: 0, stakingRewards: 0, income: 0, expense: 0, apr: 5, gcvUSD: 0, totalTokens: 0, wealthHistory: [], nextDividend: 0 };
@@ -442,6 +451,8 @@ function UniversalWalletPage() {
         return () => clearTimeout(delayDebounce);
     }, [searchQuery, user?.uid]);
 
+    if (!isMounted) return null;
+
     return (
         <div className="min-h-screen bg-background text-foreground pb-20">
             <Navbar />
@@ -506,6 +517,12 @@ function UniversalWalletPage() {
                                     <HeartPulse size={14} className={user?.beneficiaryId ? "text-green-400" : "text-white/20"} />
                                     <span className="text-[9px] font-bold uppercase">Héritage Activé</span>
                                     {user?.beneficiaryId ? <CheckCircle2 size={12} className="ml-auto text-green-400" /> : <ShieldX size={12} className="ml-auto text-red-400" />}
+                                </div>
+                                <div className="p-4 bg-white/5 rounded-2xl border border-white/5 flex justify-between items-center">
+                                    <span className="text-[10px] font-black uppercase opacity-40">Statut Protection</span>
+                                    <Badge className={cn("border-none text-[8px] font-black uppercase", user?.isWalletLocked ? "bg-red-500" : "bg-green-500")}>
+                                        {user?.isWalletLocked ? "Verrouillé" : "Actif"}
+                                    </Badge>
                                 </div>
                             </div>
                          </div>
@@ -698,13 +715,13 @@ function UniversalWalletPage() {
 
             {/* PIN VERIFICATION DIALOG */}
             <Dialog open={isPinVerificationOpen} onOpenChange={setIsPinVerificationOpen}>
-                <DialogContent className="bg-card border-white/10 text-foreground rounded-[2.5rem] sm:max-w-md overflow-hidden">
+                <DialogContent className="bg-card border-white/10 text-foreground rounded-[2.5rem] sm:max-w-md overflow-hidden p-0">
                     <DialogHeader className="p-8 bg-accent/10 border-b border-white/5">
                         <div className="flex flex-col items-center gap-6">
                             <div className="w-20 h-20 rounded-[2.5rem] bg-accent/20 flex items-center justify-center text-accent shadow-xl shadow-accent/10"><Lock size={40} className="animate-pulse" /></div>
                             <div className="text-center">
                                 <DialogTitle className="text-2xl font-black uppercase italic tracking-tighter">Signature Élite</DialogTitle>
-                                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60 mt-1">Autorisation requise pour transaction</p>
+                                <DialogDescription className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60 mt-1">Autorisation requise pour transaction</DialogDescription>
                             </div>
                         </div>
                     </DialogHeader>
@@ -753,16 +770,6 @@ function UniversalWalletPage() {
                                     </Button>
                                 </div>
                             </div>
-                            
-                            <Card className="bg-accent/5 border-accent/20 p-6 rounded-[2rem] space-y-3">
-                                <div className="flex items-center gap-2 text-accent">
-                                    <Info size={14} />
-                                    <p className="text-[10px] font-black uppercase tracking-widest">Note de transfert</p>
-                                </div>
-                                <p className="text-[11px] text-white/60 italic leading-relaxed">
-                                    Partagez cet ID ou ce code QR pour recevoir des jetons **DKST** d'un autre membre de l'élite. Les transactions sont instantanées et sans frais au sein du Hub.
-                                </p>
-                            </Card>
                         </div>
                     </div>
                 </SheetContent>
