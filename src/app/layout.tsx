@@ -7,7 +7,6 @@ import { AuthProvider } from "@/context/AuthContext";
 import { Toaster } from "@/components/ui/toaster";
 import { FirebaseClientProvider } from "@/firebase";
 import { AiAssistant } from "@/components/chat/AiAssistant";
-import Script from "next/script";
 
 const fontSans = FontSans({
   subsets: ["latin"],
@@ -15,20 +14,14 @@ const fontSans = FontSans({
 });
 
 export const metadata: Metadata = {
-  title: "DKS ShopManager - Votre boutique informatique premium",
-  description: "La qualité informatique au coeur de l'Ituri. Paiements en Pi Network (GCV), Mobile Money et Cash.",
-  manifest: "/manifest.json",
+  title: "DKS Hub - ShopManager Supreme",
+  description: "Le premier Hub Technologique Hybride de l'Ituri. Hardware de luxe, formation d'élite et infrastructures certifiées.",
   appleWebApp: {
     capable: true,
-    statusBarStyle: "default",
-    title: "DKS Shop",
+    statusBarStyle: "black-translucent",
+    title: "DKS Hub",
   },
-  other: {
-    "mobile-web-app-capable": "yes",
-    "application-name": "DKS Shop",
-    "apple-mobile-web-app-title": "DKS Shop",
-    "msapplication-starturl": "/",
-  }
+  applicationName: "DKS Hub",
 };
 
 export const viewport: Viewport = {
@@ -47,7 +40,6 @@ export default function RootLayout({
   return (
     <html lang="fr" suppressHydrationWarning>
       <head>
-        {/* Chargement conditionnel du SDK Pi pour éviter le timeout hors Pi Browser */}
         <script dangerouslySetInnerHTML={{ __html: `
           (function() {
             var isPiBrowser = /PiBrowser/i.test(navigator.userAgent);
@@ -65,8 +57,6 @@ export default function RootLayout({
                 }
               };
               document.head.appendChild(s);
-            } else {
-              console.log("[Pi SDK] Hors Pi Browser : Initialisation ignorée pour éviter le timeout.");
             }
           })();
         ` }} />
