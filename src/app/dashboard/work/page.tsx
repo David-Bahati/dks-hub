@@ -26,6 +26,7 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { Progress } from "@/components/ui/progress";
 
 const MOCK_MISSIONS = [
     { id: '1', title: 'Réparation Serveur PME', company: 'RawBank Bunia', reward: 50, category: 'Hardware', deadline: '24h', location: 'Boulevard de la Libération', difficulty: 'Expert' },
@@ -119,8 +120,8 @@ function DKSWorkPage() {
                             <div className="relative z-10 space-y-4">
                                 <h3 className="text-xl font-black uppercase italic tracking-tight text-white leading-none">Votre Indice <br /><span className="text-primary">d'Employabilité</span></h3>
                                 <div className="space-y-2">
-                                    <div className="flex justify-between text-[10px] font-black uppercase text-white/40">
-                                        <span>Confiance Hub</span>
+                                    <div className="flex justify-between items-end">
+                                        <span className="text-[10px] font-black uppercase text-white/40">Confiance Hub</span>
                                         <span className="text-primary">85%</span>
                                     </div>
                                     <Progress value={85} className="h-2 bg-white/5" indicatorClassName="bg-primary" />
@@ -132,7 +133,7 @@ function DKSWorkPage() {
                         </Card>
                         
                         <div className="p-8 bg-white/5 rounded-[2.5rem] border border-white/5 space-y-4">
-                            <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground flex items-center gap-2"><Check size={12} /> Conditions</h4>
+                            <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground flex items-center gap-2"><CheckCircle2 size={12} /> Conditions</h4>
                             <ul className="space-y-2 text-[9px] font-bold uppercase text-white/60 list-disc pl-4">
                                 <li>Certification Academy obligatoire</li>
                                 <li>Paiement via Escrow DKS</li>
