@@ -18,7 +18,8 @@ import {
     Share2,
     ArrowRight,
     Info,
-    CheckCircle2
+    CheckCircle2,
+    DollarSign
 } from "lucide-react";
 import withAuth from '@/components/auth/withAuth';
 import Link from 'next/link';
@@ -52,7 +53,7 @@ function DKSPayPage() {
             <Navbar />
             <main className="max-w-4xl mx-auto px-6 py-12">
                 <div className="flex items-center gap-4 mb-12">
-                    <Link href="/dashboard"><Button variant="outline" className="h-14 w-14 rounded-2xl border-white/10 p-0"><ArrowLeft size={24} /></Button></Link>
+                    <Link href="/dashboard"><Button variant="outline" className="h-14 w-14 rounded-2xl border-white/10 p-0 hover:bg-accent/10 hover:text-accent"><ArrowLeft size={24} /></Button></Link>
                     <div>
                         <h1 className="text-4xl font-black uppercase italic tracking-tighter">DKS <span className="text-accent">Pay</span></h1>
                         <p className="text-muted-foreground text-xs uppercase font-black opacity-40 mt-1">Terminal de paiement universel pour marchands de l'Ituri</p>
