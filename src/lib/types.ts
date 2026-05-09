@@ -15,6 +15,8 @@ export type AppUser = {
   referralCount?: number;
   points?: number;
   tokenBalance?: number;
+  piBalance?: number;
+  usdBalance?: number;
   pointsConverted?: number;
   piWalletAddress?: string;
   stakedBalance?: number;

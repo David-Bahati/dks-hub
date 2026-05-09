@@ -3,7 +3,7 @@
 
 import { useMemo, useState, useEffect, useRef } from 'react';
 import { Navbar } from "@/components/layout/Navbar";
-import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { 
     Coins, 
@@ -71,10 +71,10 @@ import {
     PieChart as LucidePieChart
 } from "lucide-react";
 import { db } from '@/lib/firebase';
-import { collection, query, where, orderBy, updateDoc, doc, addDoc, serverTimestamp, increment, limit, getDocs, Timestamp } from 'firebase/firestore';
+import { collection, query, where, orderBy, updateDoc, doc, addDoc, serverTimestamp, increment, limit, getDocs } from 'firebase/firestore';
 import withAuth from '@/components/auth/withAuth';
 import Link from 'next/link';
-import { useCollection, useDoc, useMemoFirebase } from '@/firebase';
+import { useCollection, useMemoFirebase } from '@/firebase';
 import { useAuth } from "@/context/AuthContext";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -94,7 +94,6 @@ import {
     DialogContent, 
     DialogHeader, 
     DialogTitle, 
-    DialogFooter,
     DialogDescription 
 } from "@/components/ui/dialog";
 import { 
@@ -114,9 +113,6 @@ import {
     Tooltip, 
     ResponsiveContainer 
 } from 'recharts';
-import html2canvas from 'html2canvas';
-import { jsPDF } from 'jspdf';
-import { Logo } from '@/components/ui/Logo';
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { Slider } from "@/components/ui/slider";
@@ -135,7 +131,6 @@ function UniversalWalletPage() {
     const { toast } = useToast();
     const [isMounted, setIsMounted] = useState(false);
     const [isMinting, setIsMinting] = useState(false);
-    const [isSyncing, setIsSyncing] = useState(false);
     const [isTransferSheetOpen, setIsTransferSheetOpen] = useState(false);
     const [isReceiveSheetOpen, setIsReceiveSheetOpen] = useState(false);
     const [isSwapSheetOpen, setIsSwapSheetOpen] = useState(false);
@@ -170,10 +165,6 @@ function UniversalWalletPage() {
     const [heritageRecipient, setHeritageRecipient] = useState<any>(null);
     const [heritageThreshold, setHeritageThreshold] = useState("90");
 
-    // Certificate States
-    const [isGeneratingCert, setIsGeneratingCert] = useState(false);
-    const certRef = useRef<HTMLDivElement>(null);
-
     useEffect(() => {
         setIsMounted(true);
     }, []);
@@ -199,7 +190,7 @@ function UniversalWalletPage() {
     const { data: transactions } = useCollection(txQuery);
 
     const stats = useMemo(() => {
-        if (!user) return { totalPoints: 0, redeemableTokens: 0, progress: 0, availablePoints: 0, stakingRewards: 0, income: 0, expense: 0, apr: 5, gcvUSD: 0, totalTokens: 0, wealthHistory: [], nextDividend: 0 };
+        if (!user) return { totalPoints: 0, redeemableTokens: 0, progress: 0, availablePoints: 0, stakingRewards: 0, apr: 5, gcvUSD: 0, totalTokens: 0, wealthHistory: [], nextDividend: 0 };
 
         let total = 0;
         if (isStaff) {
@@ -235,7 +226,7 @@ function UniversalWalletPage() {
             wealthHistory.push({ name: date, balance: runningTotal, wealth: runningTotal * GCV_VALUE });
         });
 
-        const totalTokens = (user.tokenBalance || 0) + (user.stakedBalance || 0) + rewards;
+        const totalTokens = (user.tokenBalance || 0) + (user.stakedBalance || 0) + rewards + (user.piBalance || 0);
         const gcvUSD = totalTokens * GCV_VALUE;
         const nextDividend = totalTokens * 0.005;
 
@@ -435,12 +426,12 @@ function UniversalWalletPage() {
 
         setIsProcessingAction(true);
         try {
-            // Simulation Swap : 1 DKST = 1 Pi (Consensus Hub)
-            const fee = amount * 0.01; // 1% de frais Hub
+            const fee = amount * 0.01; 
             const finalAmount = amount - fee;
 
             await updateDoc(doc(db, "users", user.uid), {
                 tokenBalance: increment(-amount),
+                piBalance: increment(finalAmount),
                 updatedAt: serverTimestamp()
             });
 
@@ -525,14 +516,11 @@ function UniversalWalletPage() {
 
                             <div className="flex flex-col md:flex-row justify-between items-end gap-10">
                                 <div className="space-y-2">
+                                    <p className="text-[10px] font-black uppercase text-white/40 tracking-[0.4em]">Fortune Consolidée (USD)</p>
                                     <h2 className="text-6xl md:text-8xl font-black text-white italic tracking-tighter leading-none">
-                                        {stats.totalTokens.toFixed(2)} <span className="text-2xl text-yellow-500 ml-2">DKST</span>
+                                        ${stats.gcvUSD.toLocaleString('fr-FR', { maximumFractionDigits: 0 })}
                                     </h2>
-                                    <p className="text-lg font-bold text-white/40 uppercase tracking-widest">Actifs de l'Élite • Fortune Numérique</p>
-                                </div>
-                                <div className="bg-black/60 backdrop-blur-3xl p-8 rounded-[2.5rem] border border-yellow-500/30 text-right min-w-[280px]">
-                                    <p className="text-[10px] font-black uppercase text-yellow-500 mb-2 tracking-[0.4em]">Valeur Estimée (USD)</p>
-                                    <p className="text-4xl font-black text-white italic tracking-tighter">${stats.gcvUSD.toLocaleString('fr-FR', { maximumFractionDigits: 0 })}</p>
+                                    <p className="text-lg font-bold text-yellow-500 uppercase tracking-widest">≈ {stats.totalTokens.toFixed(4)} Actifs Totaux</p>
                                 </div>
                             </div>
                         </div>
@@ -555,12 +543,6 @@ function UniversalWalletPage() {
                                     <span className="text-[9px] font-bold uppercase">Héritage Activé</span>
                                     {user?.beneficiaryId ? <CheckCircle2 size={12} className="ml-auto text-green-400" /> : <ShieldX size={12} className="ml-auto text-red-400" />}
                                 </div>
-                                <div className="p-4 bg-white/5 rounded-2xl border border-white/5 flex justify-between items-center">
-                                    <span className="text-[10px] font-black uppercase opacity-40">Statut Protection</span>
-                                    <Badge className={cn("border-none text-[8px] font-black uppercase", user?.isWalletLocked ? "bg-red-500" : "bg-green-500")}>
-                                        {user?.isWalletLocked ? "Locked" : "Active"}
-                                    </Badge>
-                                </div>
                             </div>
                          </div>
                          <Button onClick={toggleEmergencyLock} disabled={isEmergencyLockProcessing} variant={user?.isWalletLocked ? "default" : "outline"} className={cn("w-full h-14 rounded-2xl font-black uppercase italic text-[10px] gap-3 mt-6", user?.isWalletLocked ? "bg-red-500" : "border-red-500/20 text-red-400 hover:bg-red-500")}>
@@ -569,11 +551,68 @@ function UniversalWalletPage() {
                     </Card>
                 </div>
 
+                {/* SECTION DES JETONS DÉTAILLÉS */}
+                <section className="mb-12 space-y-6">
+                    <div className="flex items-center gap-3 px-4">
+                        <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-accent"><LucidePieChart size={20}/></div>
+                        <h3 className="text-xl font-black uppercase italic tracking-tight">Mes Réserves <span className="text-accent">d'Élite</span></h3>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        {/* DKST Balance */}
+                        <Card className="bg-white/5 border-white/5 rounded-[2.5rem] p-8 hover:bg-white/[0.08] transition-all relative overflow-hidden group">
+                            <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:scale-110 transition-transform"><Coins size={80} /></div>
+                            <div className="relative z-10 space-y-4">
+                                <Badge className="bg-accent/20 text-accent border-none font-black text-[8px] uppercase tracking-widest px-3">Jeton Interne</Badge>
+                                <div>
+                                    <p className="text-3xl font-black text-white italic">{(user?.tokenBalance || 0).toFixed(2)}</p>
+                                    <p className="text-[10px] font-black uppercase text-accent tracking-widest mt-1">DKST Utility</p>
+                                </div>
+                                <div className="pt-4 border-t border-white/5">
+                                    <p className="text-[8px] font-bold text-white/40 uppercase">Valeur DKS Hub</p>
+                                    <p className="text-xs font-black text-white/60">${((user?.tokenBalance || 0) * GCV_VALUE).toLocaleString()}</p>
+                                </div>
+                            </div>
+                        </Card>
+
+                        {/* Pi Balance */}
+                        <Card className="bg-white/5 border-white/5 rounded-[2.5rem] p-8 hover:bg-white/[0.08] transition-all relative overflow-hidden group">
+                            <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:scale-110 transition-transform"><Globe size={80} className="text-yellow-500" /></div>
+                            <div className="relative z-10 space-y-4">
+                                <Badge className="bg-yellow-500/20 text-yellow-500 border-none font-black text-[8px] uppercase tracking-widest px-3">Pi Network</Badge>
+                                <div>
+                                    <p className="text-3xl font-black text-white italic">{(user?.piBalance || 0).toFixed(6)}</p>
+                                    <p className="text-[10px] font-black uppercase text-yellow-500 tracking-widest mt-1">π Consensus</p>
+                                </div>
+                                <div className="pt-4 border-t border-white/5">
+                                    <p className="text-[8px] font-bold text-white/40 uppercase">Valeur GCV</p>
+                                    <p className="text-xs font-black text-white/60">${((user?.piBalance || 0) * GCV_VALUE).toLocaleString()}</p>
+                                </div>
+                            </div>
+                        </Card>
+
+                        {/* USD Balance */}
+                        <Card className="bg-white/5 border-white/5 rounded-[2.5rem] p-8 hover:bg-white/[0.08] transition-all relative overflow-hidden group">
+                            <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:scale-110 transition-transform"><CircleDollarSign size={80} className="text-green-500" /></div>
+                            <div className="relative z-10 space-y-4">
+                                <Badge className="bg-green-500/20 text-green-500 border-none font-black text-[8px] uppercase tracking-widest px-3">Réserve Fiat</Badge>
+                                <div>
+                                    <p className="text-3xl font-black text-white italic">${(user?.usdBalance || 0).toFixed(2)}</p>
+                                    <p className="text-[10px] font-black uppercase text-green-500 tracking-widest mt-1">USD Cash</p>
+                                </div>
+                                <div className="pt-4 border-t border-white/5">
+                                    <p className="text-[8px] font-bold text-white/40 uppercase">Stabilité Hub</p>
+                                    <p className="text-xs font-black text-white/60">Garantie par DKS</p>
+                                </div>
+                            </div>
+                        </Card>
+                    </div>
+                </section>
+
                 <Tabs defaultValue="overview" className="space-y-10">
                     <TabsList className="bg-white/5 border border-white/5 p-1.5 rounded-[1.5rem] h-16 w-full max-w-2xl mx-auto flex">
-                        <TabsTrigger value="overview" className="flex-1 rounded-xl font-black uppercase italic text-[10px] data-[state=active]:bg-accent data-[state=active]:text-black transition-all">Portefeuille</TabsTrigger>
+                        <TabsTrigger value="overview" className="flex-1 rounded-xl font-black uppercase italic text-[10px] data-[state=active]:bg-accent data-[state=active]:text-black transition-all">Historique</TabsTrigger>
                         <TabsTrigger value="vault" className="flex-1 rounded-xl font-black uppercase italic text-[10px] data-[state=active]:bg-accent data-[state=active]:text-black transition-all">DKS Vault</TabsTrigger>
-                        <TabsTrigger value="simulator" className="flex-1 rounded-xl font-black uppercase italic text-[10px] data-[state=active]:bg-accent data-[state=active]:text-black transition-all">Simulateur ROI</TabsTrigger>
+                        <TabsTrigger value="simulator" className="flex-1 rounded-xl font-black uppercase italic text-[10px] data-[state=active]:bg-accent data-[state=active]:text-black transition-all">ROI Simulator</TabsTrigger>
                         <TabsTrigger value="heritage" className="flex-1 rounded-xl font-black uppercase italic text-[10px] data-[state=active]:bg-accent data-[state=active]:text-black transition-all">Héritage</TabsTrigger>
                     </TabsList>
 
@@ -818,7 +857,6 @@ function UniversalWalletPage() {
                                         <SelectContent className="bg-card border-white/10">
                                             <SelectItem value="pi">Pi Network</SelectItem>
                                             <SelectItem value="dkst">DKST</SelectItem>
-                                            <SelectItem value="usd">USD (Fiat)</SelectItem>
                                         </SelectContent>
                                     </Select>
                                     <div className="flex-1 text-2xl font-black text-accent text-right">

@@ -36,7 +36,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (firebaseUser) {
         const userDocRef = doc(firestore, 'users', firebaseUser.uid);
         
-        // Listener en temps réel pour capturer TOUTES les métadonnées (minage, solde, etc.)
         unsubscribeSnapshot = onSnapshot(userDocRef, (userDocSnap) => {
           if (userDocSnap.exists()) {
             const userData = userDocSnap.data();
@@ -47,15 +46,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               name: userData.name || userData.displayName || userData.username || 'Membre DKS',
               role: userData.role || 'customer',
               photoURL: userData.photoURL || firebaseUser.photoURL || null,
-              // S'assurer que les champs de minage sont présents même si c'est la première fois
               tokenBalance: userData.tokenBalance ?? 0,
+              piBalance: userData.piBalance ?? 0,
+              usdBalance: userData.usdBalance ?? 0,
               miningPower: userData.miningPower ?? 1.0,
               points: userData.points ?? 0,
               pointsConverted: userData.pointsConverted ?? 0,
               completedMissionsToday: userData.completedMissionsToday ?? [],
             } as AppUser);
           } else {
-            // Profil minimal si le document n'existe pas encore
             setUser({
               uid: firebaseUser.uid,
               email: firebaseUser.email || '',
@@ -63,6 +62,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               role: 'customer',
               photoURL: firebaseUser.photoURL || null,
               tokenBalance: 0,
+              piBalance: 0,
+              usdBalance: 0,
               miningPower: 1.0,
               points: 0,
               pointsConverted: 0,
