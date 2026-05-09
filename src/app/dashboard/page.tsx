@@ -65,7 +65,9 @@ import {
   Globe,
   Cpu,
   Network,
-  Briefcase
+  Briefcase,
+  UserCheck,
+  ShieldAlert
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -339,6 +341,21 @@ function DashboardPage() {
                 </Link>
             </div>
             <div className="flex items-center gap-4">
+                {/* KYC STATUS BADGE */}
+                {user && (
+                    <Link href="/dashboard/kyc">
+                        <Badge className={cn(
+                            "h-10 px-4 rounded-xl gap-2 font-black italic cursor-pointer transition-all",
+                            user.kycStatus === 'verified' ? "bg-green-500/20 text-green-400 border-green-500/20" : 
+                            user.kycStatus === 'pending' ? "bg-orange-500/20 text-orange-400 border-orange-500/20" :
+                            "bg-white/5 text-muted-foreground border-white/10"
+                        )}>
+                            {user.kycStatus === 'verified' ? <ShieldCheck size={16} /> : <ShieldAlert size={16} />}
+                            {user.kycStatus === 'verified' ? 'Identité Vérifiée' : 'Vérifier Identité'}
+                        </Badge>
+                    </Link>
+                )}
+
                 <Link href="/" className="hidden sm:flex">
                     <Button variant="outline" className="h-10 border-accent/20 text-accent hover:bg-accent hover:text-black gap-2 font-black uppercase italic text-[10px] rounded-xl px-4">
                         <ShoppingBag size={14} /> Boutique
@@ -463,14 +480,14 @@ function DashboardPage() {
                         </Card>
                     </Link>
 
-                    <Link href="/dashboard/orders" className="group">
+                    <Link href="/dashboard/kyc-management" className="group">
                         <Card className="bg-white/5 border-white/10 rounded-3xl p-6 h-full flex flex-col justify-between hover:bg-white/[0.08] transition-all">
                             <div className="space-y-4">
-                                <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-accent"><ShoppingBag size={24} /></div>
-                                <h4 className="text-xl font-black uppercase italic leading-none text-white">Commandes<br/>Web</h4>
+                                <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-accent"><ShieldCheck size={24} /></div>
+                                <h4 className="text-xl font-black uppercase italic leading-none text-white">Validateur<br/>KYC</h4>
                             </div>
                             <div className="mt-8 flex justify-between items-center">
-                                <span className="text-[10px] font-black uppercase italic text-muted-foreground">Vérifier règlements</span>
+                                <span className="text-[10px] font-black uppercase italic text-muted-foreground">Vérifier dossiers</span>
                                 <ArrowRight size={20} className="text-accent" />
                             </div>
                         </Card>
@@ -683,6 +700,7 @@ const navConfig = [
   { href: "/", icon: Home, label: "Boutique Hardware", roles: ["Admin", "Seller", "Cashier", "customer"] },
   { href: "/pos", icon: ShoppingCart, label: "Terminal de Vente (POS)", roles: ["Admin", "Seller", "Cashier"] },
   { href: "/dashboard", icon: LayoutDashboard, label: "Mon Dashboard", roles: ["Admin", "Seller", "Cashier", "customer"] },
+  { href: "/dashboard/kyc", icon: ShieldCheck, label: "Vérification KYC", roles: ["Admin", "Seller", "Cashier", "customer"] },
   { href: "/dashboard/wallet", icon: Wallet, label: "Mon Wallet DKST", roles: ["Admin", "Seller", "Cashier", "customer"] },
   { href: "/dashboard/finance", icon: BarChartHorizontal, label: "Rapports Financiers", roles: ["Admin"] },
   { href: "/dashboard/presentation", icon: Presentation, label: "Présentation Projet", roles: ["Admin"] },

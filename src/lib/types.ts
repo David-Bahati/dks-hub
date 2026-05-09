@@ -33,6 +33,15 @@ export type AppUser = {
   beneficiaryId?: string;
   beneficiaryName?: string;
   heritageThresholdDays?: number;
+  // KYC Fields
+  kycStatus?: 'none' | 'pending' | 'verified' | 'rejected';
+  kycDocumentType?: string;
+  kycDocumentNumber?: string;
+  kycDocumentImage?: string;
+  kycSelfieImage?: string;
+  kycSubmittedAt?: any;
+  kycVerifiedAt?: any;
+  kycRejectionReason?: string;
 };
 
 export type Treasury = {
