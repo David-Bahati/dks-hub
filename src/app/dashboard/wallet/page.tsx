@@ -67,6 +67,7 @@ import {
     Copy,
     Check,
     ChevronDown,
+    ArrowDownUp,
     PieChart as LucidePieChart
 } from "lucide-react";
 import { db } from '@/lib/firebase';
@@ -86,6 +87,7 @@ import {
     SheetContent, 
     SheetHeader, 
     SheetTitle,
+    SheetFooter,
 } from "@/components/ui/sheet";
 import { 
     Dialog, 
@@ -136,6 +138,7 @@ function UniversalWalletPage() {
     const [isSyncing, setIsSyncing] = useState(false);
     const [isTransferSheetOpen, setIsTransferSheetOpen] = useState(false);
     const [isReceiveSheetOpen, setIsReceiveSheetOpen] = useState(false);
+    const [isSwapSheetOpen, setIsSwapSheetOpen] = useState(false);
     const [isProcessingAction, setIsProcessingAction] = useState(false);
     
     // Security States
@@ -144,6 +147,11 @@ function UniversalWalletPage() {
     const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
     const [showPin, setShowPin] = useState(false);
     const [isEmergencyLockProcessing, setIsEmergencyLockProcessing] = useState(false);
+
+    // Swap States
+    const [swapFrom, setSwapFrom] = useState("dkst");
+    const [swapTo, setSwapTo] = useState("pi");
+    const [swapAmount, setSwapAmount] = useState("");
 
     // Staking States
     const [stakeAmount, setStakeAmount] = useState("");
@@ -417,6 +425,44 @@ function UniversalWalletPage() {
         }
     };
 
+    const handleSwapProcess = async () => {
+        if (!user || !swapAmount) return;
+        const amount = parseFloat(swapAmount);
+        if (amount > (user.tokenBalance || 0)) {
+            toast({ title: "Solde insuffisant", variant: "destructive" });
+            return;
+        }
+
+        setIsProcessingAction(true);
+        try {
+            // Simulation Swap : 1 DKST = 1 Pi (Consensus Hub)
+            const fee = amount * 0.01; // 1% de frais Hub
+            const finalAmount = amount - fee;
+
+            await updateDoc(doc(db, "users", user.uid), {
+                tokenBalance: increment(-amount),
+                updatedAt: serverTimestamp()
+            });
+
+            await addDoc(collection(db, "tokenTransactions"), {
+                userId: user.uid,
+                userName: user.name,
+                type: 'exchange',
+                tokenAmount: amount,
+                memo: `Swap: ${swapFrom.toUpperCase()} vers ${swapTo.toUpperCase()}`,
+                createdAt: serverTimestamp()
+            });
+
+            toast({ title: "Swap Effectué", description: `${finalAmount.toFixed(4)} ${swapTo.toUpperCase()} crédités sur votre réserve.` });
+            setIsSwapSheetOpen(false);
+            setSwapAmount("");
+        } catch (e) {
+            toast({ title: "Erreur Swap", variant: "destructive" });
+        } finally {
+            setIsProcessingAction(false);
+        }
+    };
+
     const copyWalletId = () => {
         if (user?.uid) {
             navigator.clipboard.writeText(user.uid);
@@ -465,14 +511,16 @@ function UniversalWalletPage() {
                             <p className="text-muted-foreground text-xs uppercase font-black opacity-40 mt-1">Gestionnaire d'actifs numériques & GCV Pi Terminal</p>
                         </div>
                     </div>
-                    <div className="flex gap-3">
-                        {stats.gcvUSD >= 1000000 && (
-                            <Button onClick={handleDownloadFortuneCert} disabled={isGeneratingCert} className="bg-yellow-500 text-black h-14 px-6 rounded-2xl font-black uppercase italic gap-3 shadow-xl shadow-yellow-500/20">
-                                {isGeneratingCert ? <Loader2 className="animate-spin" /> : <Medal size={20} />} Certificat Millionnaire
-                            </Button>
-                        )}
-                        <Button onClick={() => setIsReceiveSheetOpen(true)} variant="outline" className="h-14 px-8 rounded-2xl border-white/10 font-black uppercase italic gap-3 hover:bg-white/5"><ArrowDownLeft size={20} /> Recevoir</Button>
-                        <Button onClick={() => setIsTransferSheetOpen(true)} className="bg-accent text-black h-14 px-8 rounded-2xl font-black uppercase italic gap-3 shadow-xl shadow-accent/20"><Send size={20} /> Transférer</Button>
+                    <div className="flex flex-wrap gap-3">
+                        <Button onClick={() => setIsSwapSheetOpen(true)} variant="outline" className="h-14 px-8 rounded-2xl border-accent/20 text-accent font-black uppercase italic gap-3 hover:bg-accent hover:text-black transition-all">
+                           <ArrowDownUp size={20} /> Swap
+                        </Button>
+                        <Button onClick={() => setIsReceiveSheetOpen(true)} variant="outline" className="h-14 px-8 rounded-2xl border-white/10 font-black uppercase italic gap-3 hover:bg-white/5">
+                           <ArrowDownLeft size={20} /> Recevoir
+                        </Button>
+                        <Button onClick={() => setIsTransferSheetOpen(true)} className="bg-accent text-black h-14 px-8 rounded-2xl font-black uppercase italic gap-3 shadow-xl shadow-accent/20">
+                           <Send size={20} /> Transférer
+                        </Button>
                     </div>
                 </div>
 
@@ -521,7 +569,7 @@ function UniversalWalletPage() {
                                 <div className="p-4 bg-white/5 rounded-2xl border border-white/5 flex justify-between items-center">
                                     <span className="text-[10px] font-black uppercase opacity-40">Statut Protection</span>
                                     <Badge className={cn("border-none text-[8px] font-black uppercase", user?.isWalletLocked ? "bg-red-500" : "bg-green-500")}>
-                                        {user?.isWalletLocked ? "Verrouillé" : "Actif"}
+                                        {user?.isWalletLocked ? "Locked" : "Active"}
                                     </Badge>
                                 </div>
                             </div>
@@ -730,7 +778,7 @@ function UniversalWalletPage() {
                             <Label className="text-[10px] font-black uppercase tracking-widest text-center block opacity-40">Entrez votre code secret à 4 chiffres</Label>
                             <div className="flex justify-center gap-4">
                                 <div className="relative w-full max-w-[200px]">
-                                    <Input type={showPin ? "text" : "password"} maxLength={4} value={enteredPin} onChange={(e) => setEnteredPin(e.target.value)} className="h-20 bg-background/50 border-white/10 rounded-2xl text-center text-5xl font-black tracking-[0.5em] focus:border-accent" autoFocus />
+                                    <Input type={showPin ? "text" : "password"} maxLength={4} value={enteredPin} onChange={(e) => setEnteredPin(e.target.value.replace(/\D/g, ''))} className="h-20 bg-background/50 border-white/10 rounded-2xl text-center text-5xl font-black tracking-[0.5em] focus:border-accent" autoFocus />
                                     <button onClick={() => setShowPin(!showPin)} className="absolute right-4 top-1/2 -translate-y-1/2 text-white/20 hover:text-accent transition-colors">{showPin ? <EyeOff size={20}/> : <Eye size={20}/>}</button>
                                 </div>
                             </div>
@@ -742,6 +790,67 @@ function UniversalWalletPage() {
                     </div>
                 </DialogContent>
             </Dialog>
+
+            {/* SWAP SHEET */}
+            <Sheet open={isSwapSheetOpen} onOpenChange={setIsSwapSheetOpen}>
+                <SheetContent side="right" className="bg-card/95 backdrop-blur-3xl border-white/10 w-full sm:max-w-md flex flex-col p-0">
+                    <SheetHeader className="p-10 bg-accent/10 border-b border-white/5">
+                        <div className="flex items-center gap-5">
+                            <div className="w-16 h-16 rounded-2xl bg-accent/20 flex items-center justify-center text-accent shadow-xl shadow-accent/10"><ArrowDownUp size={32} /></div>
+                            <div><SheetTitle className="text-3xl font-black uppercase italic tracking-tighter">Instant Swap</SheetTitle><p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Échange Décentralisé Hub</p></div>
+                        </div>
+                    </SheetHeader>
+                    <div className="flex-1 p-10 space-y-10 overflow-y-auto">
+                        <div className="space-y-8">
+                            <div className="p-6 bg-white/5 border border-white/5 rounded-[2rem] space-y-4">
+                                <Label className="text-[10px] font-black uppercase opacity-40">Vendre</Label>
+                                <div className="flex items-center gap-4">
+                                    <Select value={swapFrom} onValueChange={setSwapFrom}>
+                                        <SelectTrigger className="w-[120px] h-12 bg-black/40 border-none rounded-xl font-black uppercase text-[10px]"><SelectValue /></SelectTrigger>
+                                        <SelectContent className="bg-card border-white/10">
+                                            <SelectItem value="dkst">DKST</SelectItem>
+                                            <SelectItem value="pi">Pi Network</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    <Input type="number" value={swapAmount} onChange={(e) => setSwapAmount(e.target.value)} placeholder="0.00" className="flex-1 h-12 bg-transparent border-none text-2xl font-black text-right focus-visible:ring-0" />
+                                </div>
+                                <p className="text-[9px] text-muted-foreground uppercase font-bold">Solde: {user?.tokenBalance?.toFixed(2)} {swapFrom.toUpperCase()}</p>
+                            </div>
+
+                            <div className="flex justify-center -my-10 relative z-10">
+                                <Button size="icon" variant="outline" onClick={() => { const f = swapFrom; setSwapFrom(swapTo); setSwapTo(f); }} className="h-12 w-12 rounded-xl bg-background border-white/10 hover:text-accent transition-all rotate-180"><ArrowDownUp size={20}/></Button>
+                            </div>
+
+                            <div className="p-6 bg-accent/5 border border-accent/20 rounded-[2rem] space-y-4">
+                                <Label className="text-[10px] font-black uppercase opacity-40">Recevoir (Estimé)</Label>
+                                <div className="flex items-center gap-4">
+                                    <Select value={swapTo} onValueChange={setSwapTo}>
+                                        <SelectTrigger className="w-[120px] h-12 bg-black/40 border-none rounded-xl font-black uppercase text-[10px]"><SelectValue /></SelectTrigger>
+                                        <SelectContent className="bg-card border-white/10">
+                                            <SelectItem value="pi">Pi Network</SelectItem>
+                                            <SelectItem value="dkst">DKST</SelectItem>
+                                            <SelectItem value="usd">USD (Fiat)</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    <div className="flex-1 text-2xl font-black text-accent text-right">
+                                        {swapAmount ? (parseFloat(swapAmount) * 0.99).toFixed(4) : "0.00"}
+                                    </div>
+                                </div>
+                                <p className="text-[9px] text-accent/60 uppercase font-bold">1 {swapFrom.toUpperCase()} ≈ 1.00 {swapTo.toUpperCase()}</p>
+                            </div>
+                        </div>
+
+                        <div className="space-y-4 p-5 bg-white/5 rounded-2xl border border-white/5">
+                            <div className="flex justify-between text-[9px] font-bold uppercase"><span className="opacity-40">Frais Hub (1%)</span><span>{(parseFloat(swapAmount || "0") * 0.01).toFixed(4)} {swapFrom.toUpperCase()}</span></div>
+                            <div className="flex justify-between text-[9px] font-bold uppercase"><span className="opacity-40">Temps estimé</span><span className="text-green-400">Instantané</span></div>
+                        </div>
+
+                        <Button onClick={() => secureAction(handleSwapProcess)} disabled={isProcessingAction || !swapAmount} className="w-full h-20 bg-accent text-black font-black uppercase italic rounded-[2rem] shadow-2xl text-xl gap-4">
+                            {isProcessingAction ? <Loader2 className="animate-spin" /> : <><ArrowDownUp size={24} /> Valider l'Échange</>}
+                        </Button>
+                    </div>
+                </SheetContent>
+            </Sheet>
 
             {/* RECEIVE SHEET */}
             <Sheet open={isReceiveSheetOpen} onOpenChange={setIsReceiveSheetOpen}>
