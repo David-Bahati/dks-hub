@@ -364,7 +364,7 @@ function DashboardPage() {
       <main className="flex-1 p-4 md:p-8 space-y-12 pb-24 max-w-[1600px] mx-auto w-full">
           <div className="flex flex-col md:flex-row items-center gap-8 mb-12 p-10 bg-white/[0.02] border border-white/5 rounded-[3rem] relative overflow-hidden group shadow-2xl">
               <div className="absolute top-0 right-0 p-8 opacity-5"><Sparkles size={160} className="text-accent animate-pulse" /></div>
-              <Avatar className="h-32 w-32 border-4 border-accent p-1.5 bg-background shadow-2xl transition-transform group-hover:scale-105 duration-500">
+              <Avatar className="h-32 w-32 border-4 border-accent p-1.5 bg-background shadow-2xl transition-transform group-hover:scale-105 duration-500 overflow-hidden">
                   <AvatarImage src={user?.photoURL} className="rounded-full object-cover" />
                   <AvatarFallback className="bg-primary/20 text-accent text-4xl font-black italic">{user?.name?.substring(0, 1)}</AvatarFallback>
               </Avatar>

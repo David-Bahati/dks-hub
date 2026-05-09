@@ -93,7 +93,7 @@ import {
     Dialog, 
     DialogContent, 
     DialogHeader, 
-    DialogTitle,
+    DialogTitle, 
     DialogFooter,
     DialogDescription 
 } from "@/components/ui/dialog";
@@ -470,17 +470,6 @@ function UniversalWalletPage() {
             toast({ title: "ID Copié", description: "Votre adresse de wallet est prête à être partagée." });
             setTimeout(() => setHasCopiedId(false), 2000);
         }
-    };
-
-    const handleDownloadFortuneCert = async () => {
-        if (!certRef.current) return;
-        setIsGeneratingCert(true);
-        try {
-            const canvas = await html2canvas(certRef.current, { scale: 2, useCORS: true });
-            const pdf = new jsPDF({ orientation: 'landscape', unit: 'px', format: [canvas.width / 2, canvas.height / 2] });
-            pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, canvas.width / 2, canvas.height / 2);
-            pdf.save(`FORTUNE_DKS_${user?.name}.pdf`);
-        } catch (e) { toast({ title: "Erreur PDF", variant: "destructive" }); } finally { setIsGeneratingCert(false); }
     };
 
     useEffect(() => {
@@ -934,19 +923,6 @@ function UniversalWalletPage() {
                     </div>
                 </SheetContent>
             </Sheet>
-
-            {/* MODÈLE DE CERTIFICAT DE FORTUNE CACHÉ */}
-            <div style={{ position: 'absolute', left: '-9999px', top: 0 }}>
-                <div ref={certRef} className="bg-white text-black p-0 w-[1123px] h-[794px] font-serif relative overflow-hidden flex items-center justify-center">
-                    <div className="absolute inset-0 border-[40px] border-double border-[#1e293b]" />
-                    <div className="absolute inset-10 border-4 border-yellow-500/20" />
-                    <div className="relative z-10 text-center w-full px-40 space-y-12">
-                        <div className="flex flex-col items-center gap-6"><Logo size="lg" /><div className="space-y-1"><h2 className="text-sm font-bold tracking-[0.4em] uppercase text-yellow-600">Double King Foundation</h2><p className="text-[10px] font-medium uppercase tracking-[0.2em] opacity-40">Bunia, RDC</p></div></div>
-                        <div className="space-y-4"><Badge className="bg-yellow-100 text-yellow-800 border-yellow-200 font-black uppercase italic tracking-[0.3em] px-6 py-2">Millionnaire GCV Consensus</Badge><h1 className="text-6xl font-black uppercase italic tracking-tighter text-[#1e293b]">CERTIFICAT DE FORTUNE</h1></div>
-                        <div className="space-y-8 py-10 bg-yellow-50/30 rounded-[3rem] border border-yellow-100"><h3 className="text-5xl font-black uppercase tracking-tight border-b-2 border-yellow-200 inline-block pb-2 px-14 italic">{user?.name}</h3><p className="text-lg font-medium text-gray-600 max-w-2xl mx-auto leading-relaxed italic px-10">Pour avoir atteint une valorisation théorique de :</p><h4 className="text-4xl font-black text-yellow-600 tracking-tighter">$ {stats.gcvUSD.toLocaleString('fr-FR', { maximumFractionDigits: 0 })} USD</h4></div>
-                    </div>
-                </div>
-            </div>
         </div>
     );
 }
