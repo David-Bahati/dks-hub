@@ -11,7 +11,7 @@ interface LogoProps {
 
 /**
  * Logo Double King Shop (DKS) - Design Premium "Elite Hub"
- * Un monogramme symétrique formant une couronne technologique.
+ * Un monogramme symétrique formant une couronne technologique dans un hexagone.
  */
 export function Logo({ className, size = "md", showText = false }: LogoProps) {
   const sizeClasses = {
@@ -56,7 +56,7 @@ export function Logo({ className, size = "md", showText = false }: LogoProps) {
             strokeWidth="0.5"
           />
 
-          {/* Monogramme "Double King" symétrique (Deux K formant une couronne) */}
+          {/* Monogramme "Double King" symétrique (Deux K affrontés formant une couronne) */}
           <path
             d="M35 35V85L50 60L35 35ZM85 35V85L70 60L85 35Z"
             fill="white"
