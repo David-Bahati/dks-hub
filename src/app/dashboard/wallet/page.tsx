@@ -6,7 +6,6 @@ import { Navbar } from "@/components/layout/Navbar";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { 
-    Coins, 
     ArrowLeft, 
     Loader2, 
     RefreshCw, 
@@ -18,62 +17,33 @@ import {
     QrCode,
     Zap,
     TrendingUp,
-    Wallet,
-    Award,
-    Star,
-    Crown,
-    Gift,
-    Smartphone,
-    Info,
-    Search,
-    User as UserIcon,
-    CheckCircle2,
-    X,
-    TrendingDown,
-    ArrowUpCircle,
-    ShoppingBag,
-    Ticket,
     Vault,
     Timer,
     CircleDollarSign,
-    Filter,
+    Search,
+    User as UserIcon,
+    X,
     ArrowDownLeft,
-    ArrowUpRight,
-    GraduationCap,
-    Wrench,
-    Flame,
-    Calculator,
-    Gem,
-    Sparkles,
-    ArrowRight,
-    LineChart as ChartIcon,
-    Activity,
-    Download,
-    FileBadge,
-    Medal,
-    Banknote,
-    BarChart3,
-    ShieldAlert,
-    KeyRound,
-    Eye,
-    EyeOff,
-    Fingerprint,
-    AlertTriangle,
-    ShieldX,
-    HeartPulse,
-    UserCheck,
-    Scale,
-    Copy,
-    Check,
-    ChevronDown,
     ArrowDownUp,
-    PieChart as LucidePieChart,
     PlusCircle,
     Database,
     Network,
-    Terminal,
-    Link as LinkIcon,
-    Clock
+    Clock,
+    Eye,
+    EyeOff,
+    Fingerprint,
+    ShieldAlert,
+    ShieldX,
+    Info,
+    Gift,
+    Check,
+    Copy,
+    ChevronDown,
+    Activity,
+    Calculator,
+    Medal,
+    Sparkles,
+    Flame
 } from "lucide-react";
 import { db } from '@/lib/firebase';
 import { collection, query, where, orderBy, limit, addDoc, serverTimestamp, doc, updateDoc, increment, getDocs, Timestamp } from 'firebase/firestore';
@@ -119,6 +89,20 @@ import {
 } from 'recharts';
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
+
+/**
+ * LOGO OFFICIEL DU JETON DKST
+ * Design hexagonal néon symbolisant l'élite technologique de Bunia.
+ */
+const DKSTIcon = ({ size = 20, className = "" }: { size?: number; className?: string }) => (
+  <div className={cn("relative flex items-center justify-center", className)} style={{ width: size, height: size }}>
+    <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full drop-shadow-[0_0_8px_rgba(56,189,248,0.6)]">
+      <path d="M50 5L93.3 30V70L50 95L6.7 70V30L50 5Z" fill="black" stroke="currentColor" strokeWidth="4" />
+      <path d="M35 35V65M35 50H55L65 35V65" stroke="currentColor" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="50" cy="50" r="40" stroke="currentColor" strokeWidth="1" strokeDasharray="4 4" className="opacity-20 animate-spin-slow" />
+    </svg>
+  </div>
+);
 
 const POINTS_PER_TOKEN = 100;
 const GCV_VALUE = 314159; 
@@ -169,7 +153,6 @@ function UniversalWalletPage() {
     const [searchResults, setSearchResults] = useState<any[]>([]);
     const [isSearching, setIsSearching] = useState(false);
     const [receiveAsset, setReceiveAsset] = useState('dkst');
-    const [pointsToConvert, setPointsToConvert] = useState("");
     const [enteredPin, setEnteredPin] = useState("");
     const [showPin, setShowPin] = useState(false);
     const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
@@ -250,9 +233,9 @@ function UniversalWalletPage() {
 
     const ASSETS = useMemo(() => {
         const list = [
-            { id: 'dkst', name: 'DKST Utility', balance: user?.tokenBalance || 0, icon: <Coins className="text-accent" />, network: 'dks', price: GCV_VALUE, bg: 'bg-accent/10' },
-            { id: 'pi', name: 'Pi Network', balance: user?.piBalance || 0, icon: <Globe className="text-yellow-500" />, network: 'pi', price: GCV_VALUE, bg: 'bg-yellow-500/10' },
-            { id: 'usd', name: 'US Dollar', balance: user?.usdBalance || 0, icon: <CircleDollarSign className="text-green-500" />, network: 'dks', price: 1, bg: 'bg-green-500/10' }
+            { id: 'dkst', name: 'DKST Utility', balance: user?.tokenBalance || 0, icon: <DKSTIcon size={24} className="text-accent" />, network: 'dks', price: GCV_VALUE, bg: 'bg-accent/10' },
+            { id: 'pi', name: 'Pi Network', balance: user?.piBalance || 0, icon: <Globe className="text-yellow-500" size={24} />, network: 'pi', price: GCV_VALUE, bg: 'bg-yellow-500/10' },
+            { id: 'usd', name: 'US Dollar', balance: user?.usdBalance || 0, icon: <CircleDollarSign className="text-green-500" size={24} />, network: 'dks', price: 1, bg: 'bg-green-500/10' }
         ];
         if (networkFilter === 'all') return list;
         return list.filter(a => a.network === networkFilter);
@@ -541,7 +524,7 @@ function UniversalWalletPage() {
 
                     <TabsContent value="overview" className="space-y-10 animate-in fade-in slide-in-from-bottom-4">
                         <Card className="glossy-card border-none rounded-[3rem] p-10 relative overflow-hidden">
-                            <div className="absolute top-0 right-0 p-6 opacity-5"><ChartIcon size={120} /></div>
+                            <div className="absolute top-0 right-0 p-6 opacity-5"><Activity size={120} /></div>
                             <div className="flex justify-between items-center mb-10 relative z-10">
                                 <div><h3 className="text-2xl font-black uppercase italic leading-none">Wealth <span className="text-accent">Evolution</span></h3><p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mt-1">Historique de valeur du portefeuille</p></div>
                                 <Activity size={24} className="text-accent opacity-30" />
@@ -580,7 +563,7 @@ function UniversalWalletPage() {
                                 </div>
                             </Card>
                             <Card className="bg-gradient-to-br from-primary/20 to-background border-primary/20 rounded-[3rem] p-10 flex flex-col justify-between overflow-hidden relative group">
-                                <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:scale-110 transition-transform duration-1000"><Award size={100}/></div>
+                                <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:scale-110 transition-transform duration-1000"><Medal size={100}/></div>
                                 <div className="relative z-10">
                                     <div className="flex items-center gap-4 mb-4"><Star className="text-primary" size={24} /><h4 className="text-lg font-black uppercase italic">Elite Status</h4></div>
                                     <p className="text-xs text-white/60 italic leading-relaxed">"Votre loyauté de grade {user?.loyaltyLevel} vous octroie un multiplicateur de dividende hebdomadaire sur votre solde global."</p>
@@ -696,7 +679,7 @@ function UniversalWalletPage() {
                                     <Button onClick={toggleEmergencyLock} disabled={isEmergencyLockProcessing} className={cn("w-full h-20 rounded-3xl font-black uppercase italic text-xs gap-3 shadow-2xl transition-all hover:scale-105", user?.isWalletLocked ? "bg-white text-black" : "bg-red-500 text-white shadow-red-500/20")}>
                                         {isEmergencyLockProcessing ? <Loader2 className="animate-spin" /> : user?.isWalletLocked ? <><Lock size={20} /> Déverrouiller le Wallet</> : <><ShieldX size={20} /> Verrouiller Tout Immédiatement</>}
                                     </Button>
-                                    <div className="flex items-center justify-center gap-2 text-[9px] font-black uppercase text-red-400/40 tracking-[0.2em] italic"><AlertTriangle size={10} /> Action irréversible sans identifiants d'origine</div>
+                                    <div className="flex items-center justify-center gap-2 text-[9px] font-black uppercase text-red-400/40 tracking-[0.2em] italic"><ShieldAlert size={10} /> Action irréversible sans identifiants d'origine</div>
                                 </div>
                             </Card>
                         </div>
@@ -717,8 +700,8 @@ function UniversalWalletPage() {
                             <Label className="text-[10px] font-black uppercase tracking-widest opacity-40 ml-1">Sélecteur de Jeton</Label>
                             <div className="grid grid-cols-3 gap-2">
                                 {['dkst', 'pi', 'usd'].map(a => (
-                                    <button key={a} onClick={() => setReceiveAsset(a)} className={cn("h-12 rounded-xl border transition-all text-[10px] font-black uppercase", receiveAsset === a ? "bg-accent border-accent text-black" : "bg-white/5 border-white/5 text-white/40")}>
-                                        {a}
+                                    <button key={a} onClick={() => setReceiveAsset(a)} className={cn("h-12 rounded-xl border transition-all text-[10px] font-black uppercase flex items-center justify-center gap-2", receiveAsset === a ? "bg-accent border-accent text-black" : "bg-white/5 border-white/5 text-white/40")}>
+                                        {a === 'dkst' && <DKSTIcon size={12} />} {a}
                                     </button>
                                 ))}
                             </div>
@@ -787,7 +770,7 @@ function UniversalWalletPage() {
                                 <div className="space-y-8">
                                     <div className="space-y-3">
                                         <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Montant (DKST)</Label>
-                                        <div className="relative"><Coins className="absolute left-6 top-1/2 -translate-y-1/2 text-accent" size={24} /><Input type="number" step="0.01" value={transferAmount} onChange={(e) => setTransferAmount(e.target.value)} className="h-24 pl-18 bg-background/50 border-white/10 rounded-[2.5rem] text-4xl font-black text-accent" required /></div>
+                                        <div className="relative"><DKSTIcon className="absolute left-6 top-1/2 -translate-y-1/2 text-accent" size={24} /><Input type="number" step="0.01" value={transferAmount} onChange={(e) => setTransferAmount(e.target.value)} className="h-24 pl-18 bg-background/50 border-white/10 rounded-[2.5rem] text-4xl font-black text-accent" required /></div>
                                         <p className="text-[9px] font-bold text-white/20 uppercase text-right mr-4 italic">Frais réseau : 0.1 DKST</p>
                                     </div>
                                     <div className="space-y-3">
@@ -954,7 +937,7 @@ function UniversalWalletPage() {
             {/* SUCCESS FEEDBACK DIALOG */}
             <Dialog open={isSuccessDialogOpen} onOpenChange={setIsSuccessDialogOpen}>
                 <DialogContent className="bg-card border-white/10 text-foreground rounded-[2.5rem] sm:max-w-md p-10 flex flex-col items-center text-center space-y-6">
-                    <div className="w-24 h-24 rounded-full bg-green-500/10 flex items-center justify-center text-green-400 shadow-[0_0_50px_rgba(34,197,94,0.2)] animate-in zoom-in-50 duration-500"><CheckCircle2 size={56} /></div>
+                    <div className="w-24 h-24 rounded-full bg-green-500/10 flex items-center justify-center text-green-400 shadow-[0_0_50px_rgba(34,197,94,0.2)] animate-in zoom-in-50 duration-500"><ShieldCheck size={56} /></div>
                     <div className="space-y-2">
                         <h2 className="text-3xl font-black uppercase italic tracking-tighter">Action Validée</h2>
                         <p className="text-sm text-white/60 italic">Le protocole DKS a confirmé la réussite de l'opération avec succès.</p>
@@ -967,4 +950,3 @@ function UniversalWalletPage() {
 }
 
 export default withAuth(UniversalWalletPage);
-
