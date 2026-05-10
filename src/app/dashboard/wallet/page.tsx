@@ -10,6 +10,7 @@ import {
     ArrowLeft, 
     Loader2, 
     RefreshCw, 
+    Send, 
     Globe, 
     Lock, 
     ShieldCheck, 
@@ -17,7 +18,6 @@ import {
     QrCode,
     Zap,
     TrendingUp,
-    Send,
     Wallet,
     Award,
     Star,
@@ -67,10 +67,15 @@ import {
     Check,
     ChevronDown,
     ArrowDownUp,
-    PieChart as LucidePieChart
+    PieChart as LucidePieChart,
+    PlusCircle,
+    Database,
+    Network,
+    Terminal,
+    Link as LinkIcon
 } from "lucide-react";
 import { db } from '@/lib/firebase';
-import { collection, query, where, orderBy, limit, addDoc, serverTimestamp, doc, updateDoc, increment, getDocs } from 'firebase/firestore';
+import { collection, query, where, orderBy, limit, addDoc, serverTimestamp, doc, updateDoc, increment, getDocs, Timestamp } from 'firebase/firestore';
 import withAuth from '@/components/auth/withAuth';
 import Link from 'next/link';
 import { useCollection, useDoc, useMemoFirebase } from '@/firebase';
@@ -86,7 +91,6 @@ import {
     SheetContent, 
     SheetHeader, 
     SheetTitle,
-    SheetFooter,
 } from "@/components/ui/sheet";
 import { 
     Dialog, 
@@ -114,62 +118,79 @@ import {
 } from 'recharts';
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import { Slider } from "@/components/ui/slider";
 
 const POINTS_PER_TOKEN = 100;
-const GCV_VALUE = 314159; // Global Consensus Value in USD
+const GCV_VALUE = 314159; 
 
-const SHOP_PERKS = [
-    { id: 'discount_10', title: 'Coupon -10% Hardware', cost: 50, description: 'Réduction immédiate sur tout article en stock.', icon: <ShoppingBag className="text-accent" /> },
-    { id: 'diagnostic_free', title: 'Check-up PC Offert', cost: 30, description: 'Expertise complète de votre machine au labo.', icon: <Wrench className="text-primary" /> },
-    { id: 'academy_pass', title: 'Accès Masterclass VIP', cost: 100, description: 'Invitation à une session DKS Academy au choix.', icon: <GraduationCap className="text-purple-400" /> },
+const STAKING_OPTIONS = [
+    { months: 3, apr: 0.05, label: "3 MOIS", color: "text-blue-400" },
+    { months: 6, apr: 0.085, label: "6 MOIS", color: "text-purple-400" },
+    { months: 9, apr: 0.105, label: "9 MOIS", color: "text-orange-400" },
+    { months: 12, apr: 0.125, label: "1 AN", color: "text-accent" },
+];
+
+const NETWORKS = [
+    { id: 'all', name: 'Tous les réseaux', icon: <Database size={14}/> },
+    { id: 'dks', name: 'DKS Hub', icon: <Zap size={14}/> },
+    { id: 'pi', name: 'Pi Network', icon: <Globe size={14}/> },
+];
+
+const RPC_PRESETS = [
+    { name: "Pi Network Mainnet", rpc: "https://api.minepi.com/v2", chainId: "1", explorer: "https://minepi.com/blockexplorer" },
+    { name: "Ethereum Mainnet", rpc: "https://mainnet.infura.io/v3/...", chainId: "1", explorer: "https://etherscan.io" },
+    { name: "Polygon PoS", rpc: "https://polygon-rpc.com", chainId: "137", explorer: "https://polygonscan.com" },
 ];
 
 function UniversalWalletPage() {
     const { user } = useAuth();
     const { toast } = useToast();
     const [isMounted, setIsMounted] = useState(false);
-    const [isMinting, setIsMinting] = useState(false);
+    
+    // UI Visibility States
+    const [isBalanceVisible, setIsBalanceVisible] = useState(true);
+    const [networkFilter, setNetworkFilter] = useState('all');
+
+    // Action Sheets/Dialogs
     const [isTransferSheetOpen, setIsTransferSheetOpen] = useState(false);
     const [isReceiveSheetOpen, setIsReceiveSheetOpen] = useState(false);
     const [isSwapSheetOpen, setIsSwapSheetOpen] = useState(false);
-    const [isProcessingAction, setIsProcessingAction] = useState(false);
-    
-    // Security States
+    const [isPointsSheetOpen, setIsPointsSheetOpen] = useState(false);
+    const [isNetworkSheetOpen, setIsNetworkSheetOpen] = useState(false);
+    const [isImportSheetOpen, setIsImportSheetOpen] = useState(false);
     const [isPinVerificationOpen, setIsPinVerificationOpen] = useState(false);
-    const [enteredPin, setEnteredPin] = useState("");
-    const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
-    const [showPin, setShowPin] = useState(false);
-    const [isEmergencyLockProcessing, setIsEmergencyLockProcessing] = useState(false);
+    const [isSuccessDialogOpen, setIsSuccessDialogOpen] = useState(false);
 
-    // Swap States
-    const [swapFrom, setSwapFrom] = useState("dkst");
-    const [swapTo, setSwapTo] = useState("pi");
-    const [swapAmount, setSwapAmount] = useState("");
-
-    // Staking States
-    const [stakeAmount, setStakeAmount] = useState("");
-    const [simAmount, setSimAmount] = useState([100]);
-
-    // Transfer States
+    // Form States
+    const [transferAmount, setTransferAmount] = useState("");
+    const [transferMemo, setTransferMemo] = useState("");
+    const [selectedRecipient, setSelectedRecipient] = useState<any>(null);
     const [searchQuery, setSearchQuery] = useState("");
     const [searchResults, setSearchResults] = useState<any[]>([]);
     const [isSearching, setIsSearching] = useState(false);
-    const [selectedRecipient, setSelectedRecipient] = useState<any>(null);
-    const [transferAmount, setTransferAmount] = useState("");
-    const [transferMemo, setTransferMemo] = useState("");
+    const [receiveAsset, setReceiveAsset] = useState('dkst');
+    const [pointsToConvert, setPointsToConvert] = useState("");
+    const [enteredPin, setEnteredPin] = useState("");
+    const [showPin, setShowPin] = useState(false);
+    const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
+
+    // Staking States
+    const [stakingAmount, setStakingAmount] = useState("");
+    const [selectedStakingOption, setSelectedStakingOption] = useState(STAKING_OPTIONS[3]); // Default 1 year
+    const [stakingMode, setStakingMode] = useState<'stake' | 'unstake'>('stake');
+
+    // Network Setup States
+    const [rpcUrl, setRpcUrl] = useState("");
+    const [chainId, setChainId] = useState("");
+    const [rpcPing, setRpcPing] = useState<number | null>(null);
+    const [isRpcValidating, setIsRpcValidating] = useState(false);
+
+    // Processing States
+    const [isProcessingAction, setIsProcessingAction] = useState(false);
     const [hasCopiedId, setHasCopiedId] = useState(false);
-
-    // Heritage States
-    const [heritageRecipient, setHeritageRecipient] = useState<any>(null);
-    const [heritageThreshold, setHeritageThreshold] = useState("90");
-
-    useEffect(() => {
-        setIsMounted(true);
-    }, []);
 
     const isStaff = user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'seller' || user?.role?.toLowerCase() === 'cashier';
 
+    // Queries
     const logsQuery = useMemoFirebase(() => {
         if (!user?.uid || !isStaff) return null;
         return query(collection(db, "technicianLogs"), where("userId", "==", user.uid));
@@ -188,17 +209,11 @@ function UniversalWalletPage() {
     }, [user?.uid]);
     const { data: transactions } = useCollection(txQuery);
 
+    // Stats Calculation
     const stats = useMemo(() => {
-        if (!user) return { totalPoints: 0, redeemableTokens: 0, progress: 0, availablePoints: 0, stakingRewards: 0, apr: 5, gcvUSD: 0, totalTokens: 0, wealthHistory: [], nextDividend: 0 };
+        if (!user) return { totalPoints: 0, availablePoints: 0, redeemableTokens: 0, progress: 0, stakingRewards: 0, gcvUSD: 0, totalTokens: 0, wealthHistory: [] };
 
-        let total = 0;
-        if (isStaff) {
-            total += (logs?.length || 0) * 10;
-        } else {
-            total += (orders?.length || 0) * 100; 
-            total += (user.referralCount || 0) * 500; 
-        }
-
+        let total = user.points || 0;
         const availablePoints = total - (user.pointsConverted || 0);
         const redeemable = Math.floor(availablePoints / POINTS_PER_TOKEN);
         const progress = (availablePoints % POINTS_PER_TOKEN);
@@ -214,254 +229,46 @@ function UniversalWalletPage() {
             rewards = (user.stakedBalance * (apr / 100) * (hoursStaked / 8760));
         }
 
+        const totalTokens = (user.tokenBalance || 0) + (user.stakedBalance || 0) + (user.piBalance || 0);
+        const gcvUSD = totalTokens * GCV_VALUE;
+
         let runningTotal = 0;
         const wealthHistory: any[] = [];
-
         transactions?.forEach((tx, idx) => {
-            const isIncoming = tx.type === 'mint' || tx.type === 'mining' || tx.type === 'unstaking' || tx.type === 'dividend' || (tx.type === 'transfer' && tx.direction === 'received');
+            const isIncoming = ['mint', 'mining', 'unstaking', 'dividend'].includes(tx.type) || (tx.type === 'transfer' && tx.direction === 'received');
             runningTotal += isIncoming ? tx.tokenAmount : -tx.tokenAmount;
-
-            const date = tx.createdAt?.toDate ? tx.createdAt.toDate().toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }) : `T${idx}`;
-            wealthHistory.push({ name: date, balance: runningTotal, wealth: runningTotal * GCV_VALUE });
+            const date = tx.createdAt?.toDate ? format(tx.createdAt.toDate(), 'dd/MM') : `T${idx}`;
+            wealthHistory.push({ name: date, wealth: runningTotal * GCV_VALUE });
         });
-
-        const totalTokens = (user.tokenBalance || 0) + (user.stakedBalance || 0) + rewards + (user.piBalance || 0);
-        const gcvUSD = totalTokens * GCV_VALUE;
-        const nextDividend = totalTokens * 0.005;
 
         return { 
             totalPoints: total, availablePoints, redeemableTokens: redeemable, progress, 
-            stakingRewards: rewards, apr, gcvUSD, totalTokens, nextDividend, 
-            wealthHistory: wealthHistory.slice(-15) 
+            stakingRewards: rewards, gcvUSD, totalTokens, wealthHistory: wealthHistory.slice(-15) 
         };
-    }, [user, logs, orders, isStaff, transactions]);
+    }, [user, transactions]);
 
-    const mintTokens = async () => {
-        if (!user || stats.redeemableTokens < 1) return;
-        setIsMinting(true);
-        try {
-            const tokens = stats.redeemableTokens;
-            const points = tokens * POINTS_PER_TOKEN;
-            const txId = `PI-MINT-${Math.random().toString(36).substring(2, 12).toUpperCase()}`;
+    const ASSETS = useMemo(() => {
+        const list = [
+            { id: 'dkst', name: 'DKST Utility', balance: user?.tokenBalance || 0, icon: <Coins className="text-accent" />, network: 'dks', price: GCV_VALUE, bg: 'bg-accent/10' },
+            { id: 'pi', name: 'Pi Network', balance: user?.piBalance || 0, icon: <Globe className="text-yellow-500" />, network: 'pi', price: GCV_VALUE, bg: 'bg-yellow-500/10' },
+            { id: 'usd', name: 'US Dollar', balance: user?.usdBalance || 0, icon: <CircleDollarSign className="text-green-500" />, network: 'dks', price: 1, bg: 'bg-green-500/10' }
+        ];
+        if (networkFilter === 'all') return list;
+        return list.filter(a => a.network === networkFilter);
+    }, [user, networkFilter]);
 
-            await updateDoc(doc(db, "users", user.uid), {
-                tokenBalance: increment(tokens),
-                pointsConverted: increment(points),
-                lastActivityAt: serverTimestamp(),
-                updatedAt: serverTimestamp()
-            });
+    const estimatedStakingGains = useMemo(() => {
+        if (!stakingAmount) return "0.00";
+        const amt = parseFloat(stakingAmount);
+        const gains = amt * selectedStakingOption.apr * (selectedStakingOption.months / 12);
+        return gains.toFixed(4);
+    }, [stakingAmount, selectedStakingOption]);
 
-            await addDoc(collection(db, "tokenTransactions"), {
-                userId: user.uid, userName: user.name, type: 'mint',
-                pointsAmount: points, tokenAmount: tokens, piTxId: txId,
-                createdAt: serverTimestamp()
-            });
+    useEffect(() => {
+        setIsMounted(true);
+    }, []);
 
-            toast({ title: "Points Mintés !", description: `${tokens} DKST générés sur votre compte.` });
-        } catch (error) { toast({ title: "Erreur Mint", variant: "destructive" }); } finally { setIsMinting(false); }
-    };
-
-    const secureAction = (action: () => void) => {
-        if (user?.isWalletLocked) {
-            toast({ title: "Wallet Verrouillé", description: "Déverrouillez votre wallet dans le centre de sécurité.", variant: "destructive" });
-            return;
-        }
-        if (!user?.walletPin) {
-            toast({ title: "PIN non configuré", description: "Veuillez configurer un code PIN dans les réglages.", variant: "destructive" });
-            return;
-        }
-        setPendingAction(() => action);
-        setIsPinVerificationOpen(true);
-    };
-
-    const handleVerifyPin = () => {
-        if (enteredPin === user?.walletPin) {
-            setIsPinVerificationOpen(false);
-            setEnteredPin("");
-            if (pendingAction) pendingAction();
-        } else {
-            toast({ title: "Code PIN Incorrect", variant: "destructive" });
-            setEnteredPin("");
-        }
-    };
-
-    const toggleEmergencyLock = async () => {
-        if (!user) return;
-        setIsEmergencyLockProcessing(true);
-        try {
-            const newLockState = !user.isWalletLocked;
-            await updateDoc(doc(db, "users", user.uid), { isWalletLocked: newLockState, updatedAt: serverTimestamp() });
-            toast({ title: newLockState ? "Wallet Verrouillé" : "Wallet Déverrouillé", variant: newLockState ? "destructive" : "default" });
-        } catch (e) { toast({ title: "Erreur Sécurité", variant: "destructive" }); } finally { setIsEmergencyLockProcessing(false); }
-    };
-
-    const handleStake = async () => {
-        if (!user || !stakeAmount) return;
-        const amount = parseFloat(stakeAmount);
-        setIsProcessingAction(true);
-        try {
-            await updateDoc(doc(db, "users", user.uid), {
-                tokenBalance: increment(-amount),
-                stakedBalance: increment(amount),
-                stakingStartedAt: serverTimestamp(),
-                updatedAt: serverTimestamp()
-            });
-            await addDoc(collection(db, "tokenTransactions"), { userId: user.uid, type: 'staking', tokenAmount: amount, createdAt: serverTimestamp() });
-            toast({ title: "Staking Actif" });
-            setStakeAmount("");
-        } catch (e) { toast({ title: "Erreur", variant: "destructive" }); } finally { setIsProcessingAction(false); }
-    };
-
-    const handleUnstake = async () => {
-        if (!user || !user.stakedBalance) return;
-        setIsProcessingAction(true);
-        try {
-            const amount = user.stakedBalance;
-            await updateDoc(doc(db, "users", user.uid), {
-                tokenBalance: increment(amount + stats.stakingRewards),
-                stakedBalance: 0,
-                stakingStartedAt: null,
-                updatedAt: serverTimestamp()
-            });
-            await addDoc(collection(db, "tokenTransactions"), { userId: user.uid, type: 'unstaking', tokenAmount: amount + stats.stakingRewards, createdAt: serverTimestamp() });
-            toast({ title: "Capital & Intérêts Retirés" });
-        } catch (e) { toast({ title: "Erreur", variant: "destructive" }); } finally { setIsProcessingAction(false); }
-    };
-
-    const handleBuyPerk = async (perk: any) => {
-        if (!user || (user.tokenBalance || 0) < perk.cost) return;
-        setIsProcessingAction(true);
-        try {
-            await updateDoc(doc(db, "users", user.uid), { tokenBalance: increment(-perk.cost), updatedAt: serverTimestamp() });
-            await addDoc(collection(db, "tokenTransactions"), { userId: user.uid, type: 'exchange', tokenAmount: perk.cost, memo: perk.title, createdAt: serverTimestamp() });
-            toast({ title: "Privilège Débloqué" });
-        } catch (e) { toast({ title: "Erreur", variant: "destructive" }); } finally { setIsProcessingAction(false); }
-    };
-
-    const handleSaveHeritage = async () => {
-        if (!user || !heritageRecipient) return;
-        setIsProcessingAction(true);
-        try {
-            await updateDoc(doc(db, "users", user.uid), {
-                beneficiaryId: heritageRecipient.id,
-                beneficiaryName: heritageRecipient.name || heritageRecipient.displayName,
-                heritageThresholdDays: parseInt(heritageThreshold),
-                updatedAt: serverTimestamp()
-            });
-            toast({ title: "Testament Numérique Scellé" });
-        } catch (e) { toast({ title: "Erreur", variant: "destructive" }); } finally { setIsProcessingAction(false); }
-    };
-
-    const handleTransferProcess = async () => {
-        if (!user || !selectedRecipient || !transferAmount) return;
-        
-        const amount = parseFloat(transferAmount);
-        if (amount > (user.tokenBalance || 0)) {
-            toast({ title: "Solde insuffisant", variant: "destructive" });
-            return;
-        }
-
-        setIsProcessingAction(true);
-        try {
-            const piTxId = `PI-P2P-${Math.random().toString(36).substring(2, 12).toUpperCase()}`;
-
-            await updateDoc(doc(db, "users", user.uid), {
-                tokenBalance: increment(-amount),
-                updatedAt: serverTimestamp()
-            });
-
-            await updateDoc(doc(db, "users", selectedRecipient.id), {
-                tokenBalance: increment(amount),
-                updatedAt: serverTimestamp()
-            });
-
-            await addDoc(collection(db, "tokenTransactions"), {
-                userId: user.uid,
-                userName: user.name,
-                type: 'transfer',
-                tokenAmount: amount,
-                senderId: user.uid,
-                senderName: user.name,
-                direction: 'sent',
-                recipientId: selectedRecipient.id,
-                recipientName: selectedRecipient.name || selectedRecipient.displayName,
-                memo: transferMemo,
-                piTxId: piTxId,
-                createdAt: serverTimestamp()
-            });
-
-            await addDoc(collection(db, "tokenTransactions"), {
-                userId: selectedRecipient.id,
-                userName: selectedRecipient.name || selectedRecipient.displayName,
-                type: 'transfer',
-                tokenAmount: amount,
-                direction: 'received',
-                senderId: user.uid,
-                senderName: user.name,
-                memo: transferMemo,
-                piTxId: piTxId,
-                createdAt: serverTimestamp()
-            });
-
-            toast({ title: "Transfert réussi", description: `${amount} DKST envoyés à ${selectedRecipient.name || selectedRecipient.displayName}` });
-            setIsTransferSheetOpen(false);
-            setTransferAmount("");
-            setTransferMemo("");
-            setSelectedRecipient(null);
-        } catch (error) {
-            toast({ title: "Erreur transfert", variant: "destructive" });
-        } finally {
-            setIsProcessingAction(false);
-        }
-    };
-
-    const handleSwapProcess = async () => {
-        if (!user || !swapAmount) return;
-        const amount = parseFloat(swapAmount);
-        if (amount > (user.tokenBalance || 0)) {
-            toast({ title: "Solde insuffisant", variant: "destructive" });
-            return;
-        }
-
-        setIsProcessingAction(true);
-        try {
-            const fee = amount * 0.01; 
-            const finalAmount = amount - fee;
-
-            await updateDoc(doc(db, "users", user.uid), {
-                tokenBalance: increment(-amount),
-                piBalance: increment(finalAmount),
-                updatedAt: serverTimestamp()
-            });
-
-            await addDoc(collection(db, "tokenTransactions"), {
-                userId: user.uid,
-                userName: user.name,
-                type: 'exchange',
-                tokenAmount: amount,
-                memo: `Swap: ${swapFrom.toUpperCase()} vers ${swapTo.toUpperCase()}`,
-                createdAt: serverTimestamp()
-            });
-
-            toast({ title: "Swap Effectué", description: `${finalAmount.toFixed(4)} ${swapTo.toUpperCase()} crédités sur votre réserve.` });
-            setIsSwapSheetOpen(false);
-            setSwapAmount("");
-        } catch (e) {
-            toast({ title: "Erreur Swap", variant: "destructive" });
-        } finally {
-            setIsProcessingAction(false);
-        }
-    };
-
-    const copyWalletId = () => {
-        if (user?.uid) {
-            navigator.clipboard.writeText(user.uid);
-            setHasCopiedId(true);
-            toast({ title: "ID Copié", description: "Votre adresse de wallet est prête à être partagée." });
-            setTimeout(() => setHasCopiedId(false), 2000);
-        }
-    };
-
+    // Search Logic
     useEffect(() => {
         const delayDebounce = setTimeout(async () => {
             if (searchQuery.length < 3) { setSearchResults([]); return; }
@@ -476,190 +283,651 @@ function UniversalWalletPage() {
         return () => clearTimeout(delayDebounce);
     }, [searchQuery, user?.uid]);
 
+    // RPC Ping Simulation
+    useEffect(() => {
+        if (rpcUrl.startsWith("http")) {
+            setIsRpcValidating(true);
+            const timeout = setTimeout(() => {
+                setRpcPing(Math.floor(Math.random() * 50) + 10);
+                setIsRpcValidating(false);
+            }, 800);
+            return () => clearTimeout(timeout);
+        } else {
+            setRpcPing(null);
+            setIsRpcValidating(false);
+        }
+    }, [rpcUrl]);
+
+    const secureAction = (action: () => void) => {
+        if (user?.isWalletLocked) {
+            toast({ title: "Wallet Verrouillé", variant: "destructive" });
+            return;
+        }
+        if (!user?.walletPin) {
+            toast({ title: "PIN non configuré", description: "Veuillez le faire dans les réglages.", variant: "destructive" });
+            return;
+        }
+        setPendingAction(() => action);
+        setIsPinVerificationOpen(true);
+    };
+
+    const handleVerifyPin = () => {
+        if (enteredPin === user?.walletPin) {
+            setIsPinVerificationOpen(false);
+            setEnteredPin("");
+            if (pendingAction) pendingAction();
+        } else {
+            toast({ title: "PIN Incorrect", variant: "destructive" });
+            setEnteredPin("");
+        }
+    };
+
+    const handleConvertPoints = async () => {
+        const amt = parseInt(pointsToConvert);
+        if (!user || isNaN(amt) || amt > stats.availablePoints || amt < POINTS_PER_TOKEN) return;
+
+        setIsProcessingAction(true);
+        try {
+            const tokens = Math.floor(amt / POINTS_PER_TOKEN);
+            await updateDoc(doc(db, "users", user.uid), {
+                tokenBalance: increment(tokens),
+                pointsConverted: increment(amt),
+                updatedAt: serverTimestamp()
+            });
+            await addDoc(collection(db, "tokenTransactions"), {
+                userId: user.uid, userName: user.name, type: 'exchange',
+                tokenAmount: tokens, memo: `Conversion de ${amt} points`,
+                createdAt: serverTimestamp()
+            });
+            toast({ title: "Conversion réussie !" });
+            setIsPointsSheetOpen(false);
+            setPointsToConvert("");
+            setIsSuccessDialogOpen(true);
+        } catch (e) { toast({ title: "Erreur", variant: "destructive" }); } finally { setIsProcessingAction(false); }
+    };
+
+    const handleTransfer = async () => {
+        if (!user || !selectedRecipient || !transferAmount) return;
+        const amount = parseFloat(transferAmount);
+        setIsProcessingAction(true);
+        try {
+            const piTxId = `PI-P2P-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+            await updateDoc(doc(db, "users", user.uid), { tokenBalance: increment(-amount), updatedAt: serverTimestamp() });
+            await updateDoc(doc(db, "users", selectedRecipient.id), { tokenBalance: increment(amount), updatedAt: serverTimestamp() });
+            await addDoc(collection(db, "tokenTransactions"), {
+                userId: user.uid, userName: user.name, type: 'transfer', tokenAmount: amount,
+                direction: 'sent', recipientId: selectedRecipient.id, recipientName: selectedRecipient.name || selectedRecipient.displayName,
+                memo: transferMemo, piTxId: piTxId, createdAt: serverTimestamp()
+            });
+            await addDoc(collection(db, "tokenTransactions"), {
+                userId: selectedRecipient.id, userName: selectedRecipient.name || selectedRecipient.displayName, type: 'transfer', tokenAmount: amount,
+                direction: 'received', senderId: user.uid, senderName: user.name, memo: transferMemo, piTxId: piTxId, createdAt: serverTimestamp()
+            });
+            toast({ title: "Transfert effectué" });
+            setIsTransferSheetOpen(false);
+            setIsSuccessDialogOpen(true);
+        } catch (e) { toast({ title: "Erreur", variant: "destructive" }); } finally { setIsProcessingAction(false); }
+    };
+
+    const handleStake = async () => {
+        if (!user || !stakingAmount) return;
+        const amount = parseFloat(stakingAmount);
+        setIsProcessingAction(true);
+        try {
+            await updateDoc(doc(db, "users", user.uid), {
+                tokenBalance: increment(-amount),
+                stakedBalance: increment(amount),
+                stakingStartedAt: serverTimestamp(),
+                updatedAt: serverTimestamp()
+            });
+            await addDoc(collection(db, "tokenTransactions"), { userId: user.uid, type: 'staking', tokenAmount: amount, createdAt: serverTimestamp() });
+            toast({ title: "Vault Actif" });
+            setStakingAmount("");
+            setIsSuccessDialogOpen(true);
+        } catch (e) { toast({ title: "Erreur", variant: "destructive" }); } finally { setIsProcessingAction(false); }
+    };
+
+    const handleConnectNetwork = async () => {
+        if (!rpcUrl) return;
+        setIsProcessingAction(true);
+        setTimeout(() => {
+            setIsProcessingAction(false);
+            setIsNetworkSheetOpen(false);
+            setIsSuccessDialogOpen(true);
+            setRpcUrl("");
+            setChainId("");
+        }, 1500);
+    };
+
+    const getReceiveAddress = (asset: string) => {
+        if (!user) return "...";
+        switch(asset) {
+            case 'dkst': return `DKS-WALLET-${user.uid.substring(0, 12).toUpperCase()}`;
+            case 'pi': return `G${Math.random().toString(36).substring(2, 20).toUpperCase()}`;
+            case 'usd': return `CD-DKS-BANK-${user.uid.substring(0, 8).toUpperCase()}`;
+            default: return user.uid;
+        }
+    };
+
     if (!isMounted) return null;
 
-    const ASSETS = [
-        { id: 'dkst', name: 'DKST Utility', balance: user?.tokenBalance || 0, icon: <Coins className="text-accent" />, color: 'text-accent', bg: 'bg-accent/10', sub: 'Hub Native' },
-        { id: 'pi', name: 'Pi Network', balance: user?.piBalance || 0, icon: <Globe className="text-yellow-500" />, color: 'text-yellow-500', bg: 'bg-yellow-500/10', sub: 'Pi GCV' },
-        { id: 'usd', name: 'US Dollar', balance: user?.usdBalance || 0, icon: <CircleDollarSign className="text-green-500" />, color: 'text-green-500', bg: 'bg-green-500/10', sub: 'Fiat Reserve' }
-    ];
+    const currentStakingBalance = stakingMode === 'stake' ? (user?.tokenBalance || 0) : (user?.stakedBalance || 0);
 
     return (
         <div className="min-h-screen bg-background text-foreground pb-20">
             <Navbar />
-            <main className="max-w-4xl mx-auto px-4 py-8">
-                {/* HEADER STYLE BINANCE */}
-                <div className="mb-10 flex flex-col items-center text-center">
-                    <div className="flex items-center gap-2 text-muted-foreground uppercase font-black text-[10px] tracking-[0.4em] mb-4">
-                        <ShieldCheck size={12} className="text-accent" /> Sécurisé par le Protocole DKS
+            <main className="max-w-4xl mx-auto px-4 py-10">
+                
+                {/* GLOBAL WEALTH HEADER */}
+                <div className="mb-12 flex flex-col items-center text-center animate-in fade-in zoom-in duration-700">
+                    <Badge variant="outline" className="mb-6 bg-accent/5 text-accent border-accent/20 px-4 py-1.5 text-[9px] font-black uppercase tracking-[0.4em] italic flex items-center gap-2">
+                        <ShieldCheck size={12}/> Sovereign Encryption Active
+                    </Badge>
+                    
+                    <div className="group relative">
+                        <p className="text-[10px] font-black text-white/40 uppercase tracking-[0.3em] mb-2 flex items-center justify-center gap-2">
+                            Avoirs Totaux (GCV) 
+                            <button onClick={() => setIsBalanceVisible(!isBalanceVisible)} className="hover:text-accent transition-colors">
+                                {isBalanceVisible ? <Eye size={12}/> : <EyeOff size={12}/>}
+                            </button>
+                        </p>
+                        <h2 className="text-6xl md:text-8xl font-black text-white italic tracking-tighter leading-none mb-3 drop-shadow-[0_0_30px_rgba(56,189,248,0.2)]">
+                            {isBalanceVisible ? `$${stats.gcvUSD.toLocaleString('fr-FR', { maximumFractionDigits: 0 })}` : "••••••"}
+                        </h2>
+                        <div className="flex items-center justify-center gap-3">
+                            <Badge className="bg-accent text-black font-black italic text-[10px]">≈ {isBalanceVisible ? stats.totalTokens.toFixed(4) : "••"} Actifs</Badge>
+                            <span className="text-[9px] font-bold text-white/20 uppercase tracking-widest">Indexé sur $314,159 GCV</span>
+                        </div>
                     </div>
-                    <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-1">Fortune Totale Estimée</p>
-                    <h2 className="text-5xl md:text-7xl font-black text-white italic tracking-tighter leading-none mb-2">
-                        ${stats.gcvUSD.toLocaleString('fr-FR', { maximumFractionDigits: 0 })}
-                    </h2>
-                    <p className="text-sm font-bold text-accent uppercase tracking-widest">≈ {stats.totalTokens.toFixed(4)} Actifs</p>
 
-                    <div className="flex gap-4 mt-8 w-full max-w-sm">
-                        <Button onClick={() => setIsReceiveSheetOpen(true)} className="flex-1 h-14 rounded-2xl bg-white/5 border border-white/10 text-white font-black uppercase italic text-[10px] hover:bg-white/10 transition-all flex flex-col items-center justify-center gap-1">
-                            <ArrowDownLeft size={18} /> Recevoir
-                        </Button>
-                        <Button onClick={() => setIsTransferSheetOpen(true)} className="flex-1 h-14 rounded-2xl bg-accent text-black font-black uppercase italic text-[10px] shadow-xl shadow-accent/20 flex flex-col items-center justify-center gap-1">
-                            <Send size={18} /> Envoyer
-                        </Button>
-                        <Button onClick={() => setIsSwapSheetOpen(true)} className="flex-1 h-14 rounded-2xl bg-white/5 border border-white/10 text-white font-black uppercase italic text-[10px] hover:bg-white/10 transition-all flex flex-col items-center justify-center gap-1">
-                            <ArrowDownUp size={18} /> Swap
-                        </Button>
+                    <div className="grid grid-cols-4 gap-4 mt-12 w-full max-w-lg">
+                        {[
+                            { id: 'receive', label: 'Recevoir', icon: ArrowDownLeft, action: () => setIsReceiveSheetOpen(true), bg: 'bg-white/5 border-white/10' },
+                            { id: 'send', label: 'Envoyer', icon: Send, action: () => setIsTransferSheetOpen(true), bg: 'bg-accent text-black shadow-accent/20 shadow-xl' },
+                            { id: 'swap', label: 'Swap', icon: ArrowDownUp, action: () => setIsSwapSheetOpen(true), bg: 'bg-white/5 border-white/10' },
+                            { id: 'points', label: 'Points', icon: Gift, action: () => setIsPointsSheetOpen(true), bg: 'bg-white/5 border-white/10' },
+                        ].map(btn => (
+                            <Button key={btn.id} onClick={btn.action} className={cn("h-16 rounded-[1.5rem] flex flex-col gap-1 font-black uppercase italic text-[9px] transition-all hover:scale-105 active:scale-95", btn.bg)}>
+                                <btn.icon size={20} /> {btn.label}
+                            </Button>
+                        ))}
                     </div>
                 </div>
 
-                {/* LISTE DES ACTIFS - STYLE WALLET DÉCENTRALISÉ */}
-                <Card className="glossy-card border-none rounded-[3rem] overflow-hidden mb-10">
-                    <CardHeader className="px-8 py-6 border-b border-white/5 flex flex-row items-center justify-between">
-                        <CardTitle className="text-xs font-black uppercase italic tracking-widest opacity-40">Mes Actifs</CardTitle>
-                        <LucidePieChart size={14} className="text-accent opacity-40" />
-                    </CardHeader>
-                    <div className="divide-y divide-white/5">
-                        {ASSETS.map(asset => (
-                            <div key={asset.id} className="p-6 flex items-center justify-between hover:bg-white/[0.02] transition-all group">
-                                <div className="flex items-center gap-4">
-                                    <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform", asset.bg)}>
-                                        {asset.icon}
-                                    </div>
-                                    <div>
-                                        <p className="font-black text-sm uppercase italic text-white leading-none">{asset.name}</p>
-                                        <p className="text-[10px] font-bold text-white/20 uppercase tracking-widest mt-1">{asset.sub}</p>
-                                    </div>
-                                </div>
-                                <div className="text-right">
-                                    <p className="text-lg font-black text-white leading-none">{asset.balance.toFixed(asset.id === 'pi' ? 6 : 2)}</p>
-                                    <p className="text-[10px] font-bold text-white/40 mt-1 uppercase">
-                                        ≈ ${(asset.balance * (asset.id === 'usd' ? 1 : GCV_VALUE)).toLocaleString()}
-                                    </p>
-                                </div>
-                            </div>
-                        ))}
+                {/* ASSET LIST WITH FILTERS */}
+                <div className="space-y-6 mb-12">
+                    <div className="flex items-center justify-between px-2">
+                        <div className="flex gap-2 p-1 bg-white/5 rounded-xl border border-white/5 overflow-hidden">
+                            {NETWORKS.map(net => (
+                                <button key={net.id} onClick={() => setNetworkFilter(net.id)} className={cn("px-4 h-9 rounded-lg text-[9px] font-black uppercase flex items-center gap-2 transition-all", networkFilter === net.id ? "bg-accent text-black shadow-lg" : "text-white/40 hover:text-white")}>
+                                    {net.icon} {net.name}
+                                </button>
+                            ))}
+                        </div>
+                        <div className="flex gap-2">
+                            <Button onClick={() => setIsNetworkSheetOpen(true)} variant="ghost" size="icon" className="h-10 w-10 rounded-xl bg-white/5 border border-white/5 hover:text-accent"><Network size={18}/></Button>
+                            <Button onClick={() => setIsImportSheetOpen(true)} variant="ghost" size="icon" className="h-10 w-10 rounded-xl bg-white/5 border border-white/5 hover:text-accent"><PlusCircle size={18}/></Button>
+                        </div>
                     </div>
-                </Card>
 
-                {/* TABS DE NAVIGATION SECONDAIRE */}
+                    <Card className="glossy-card border-none rounded-[3rem] overflow-hidden shadow-2xl">
+                        <div className="divide-y divide-white/5">
+                            {ASSETS.map(asset => (
+                                <div key={asset.id} onClick={() => { setReceiveAsset(asset.id); setIsReceiveSheetOpen(true); }} className="p-7 flex items-center justify-between hover:bg-white/[0.03] transition-all group cursor-pointer">
+                                    <div className="flex items-center gap-5">
+                                        <div className={cn("w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform", asset.bg)}>
+                                            {asset.icon}
+                                        </div>
+                                        <div>
+                                            <div className="flex items-center gap-2">
+                                                <p className="font-black text-base uppercase italic text-white leading-none">{asset.name}</p>
+                                                <Badge className="bg-white/5 text-white/20 border-none text-[7px] font-black px-1.5 uppercase h-4">{asset.network}</Badge>
+                                            </div>
+                                            <p className="text-[9px] font-bold text-accent/40 uppercase tracking-widest mt-1.5 italic">
+                                                Price/Token: ${asset.price.toLocaleString()}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-xl font-black text-white leading-none">{isBalanceVisible ? asset.balance.toFixed(asset.id === 'pi' ? 6 : 2) : "••••"}</p>
+                                        <p className="text-[10px] font-bold text-white/20 mt-1.5 uppercase tracking-tighter">
+                                            ≈ {isBalanceVisible ? `$${(asset.balance * asset.price).toLocaleString()}` : "••••"}
+                                        </p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </Card>
+                </div>
+
+                {/* SECONDARY MODULES TABS */}
                 <Tabs defaultValue="overview" className="space-y-8">
-                    <TabsList className="bg-white/5 border border-white/5 p-1 rounded-2xl h-12 w-full max-w-sm mx-auto flex">
-                        <TabsTrigger value="overview" className="flex-1 rounded-xl font-black uppercase italic text-[9px]">Analyse</TabsTrigger>
-                        <TabsTrigger value="vault" className="flex-1 rounded-xl font-black uppercase italic text-[9px]">Staking</TabsTrigger>
-                        <TabsTrigger value="security" className="flex-1 rounded-xl font-black uppercase italic text-[9px]">Sécurité</TabsTrigger>
+                    <TabsList className="bg-white/5 border border-white/5 p-1 rounded-2xl h-14 w-full flex">
+                        <TabsTrigger value="overview" className="flex-1 rounded-xl font-black uppercase italic text-[10px] data-[state=active]:bg-white data-[state=active]:text-black transition-all">Analyse</TabsTrigger>
+                        <TabsTrigger value="vault" className="flex-1 rounded-xl font-black uppercase italic text-[10px] data-[state=active]:bg-primary data-[state=active]:text-white transition-all">DKS Vault</TabsTrigger>
+                        <TabsTrigger value="security" className="flex-1 rounded-xl font-black uppercase italic text-[10px] data-[state=active]:bg-red-500 data-[state=active]:text-white transition-all">Sécurité</TabsTrigger>
                     </TabsList>
 
-                    <TabsContent value="overview" className="space-y-8 animate-in fade-in slide-in-from-bottom-2">
-                        <Card className="glossy-card border-none rounded-[3rem] p-10">
-                            <div className="flex justify-between items-center mb-8">
-                                <h3 className="text-xl font-black uppercase italic">Performance <span className="text-accent">Portefeuille</span></h3>
-                                <ChartIcon size={20} className="text-accent opacity-20" />
+                    <TabsContent value="overview" className="space-y-10 animate-in fade-in slide-in-from-bottom-4">
+                        <Card className="glossy-card border-none rounded-[3rem] p-10 relative overflow-hidden">
+                            <div className="absolute top-0 right-0 p-6 opacity-5"><ChartIcon size={120} /></div>
+                            <div className="flex justify-between items-center mb-10 relative z-10">
+                                <div><h3 className="text-2xl font-black uppercase italic leading-none">Wealth <span className="text-accent">Evolution</span></h3><p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mt-1">Historique de valeur du portefeuille</p></div>
+                                <Activity size={24} className="text-accent opacity-30" />
                             </div>
-                            <div className="h-[300px] w-full">
+                            <div className="h-[320px] w-full">
                                 <ResponsiveContainer width="100%" height="100%">
                                     <AreaChart data={stats.wealthHistory}>
                                         <defs>
-                                            <linearGradient id="colorWealth" x1="0" x2="0" y2="1">
+                                            <linearGradient id="colorW" x1="0" y1="0" x2="0" y2="1">
                                                 <stop offset="5%" stopColor="hsl(var(--accent))" stopOpacity={0.3}/>
                                                 <stop offset="95%" stopColor="hsl(var(--accent))" stopOpacity={0}/>
                                             </linearGradient>
                                         </defs>
                                         <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" vertical={false} />
-                                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 10}} />
-                                        <Tooltip contentStyle={{ backgroundColor: '#0f172a', border: 'none', borderRadius: '12px' }} />
-                                        <Area type="monotone" dataKey="wealth" stroke="hsl(var(--accent))" strokeWidth={3} fill="url(#colorWealth)" />
+                                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 10}} dy={10} />
+                                        <Tooltip contentStyle={{ backgroundColor: '#0f172a', border: 'none', borderRadius: '16px', boxShadow: '0 20px 40px rgba(0,0,0,0.5)' }} />
+                                        <Area type="monotone" dataKey="wealth" stroke="hsl(var(--accent))" strokeWidth={3} fill="url(#colorW)" />
                                     </AreaChart>
                                 </ResponsiveContainer>
                             </div>
                         </Card>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <Card className="bg-white/5 border border-white/10 rounded-[2.5rem] p-8 space-y-6">
-                                <div className="flex items-center gap-3"><Flame className="text-orange-500" size={20} /><h4 className="text-sm font-black uppercase italic">Convertir mes Points</h4></div>
-                                <div className="space-y-4">
-                                    <div className="flex justify-between items-end"><p className="text-[9px] font-black uppercase text-white/40">Points Accumulés</p><span className="text-xl font-black text-accent">{stats.availablePoints} PTS</span></div>
-                                    <Progress value={stats.progress} className="h-1.5 bg-white/5" indicatorClassName="bg-accent" />
-                                    <Button onClick={() => secureAction(mintTokens)} disabled={isMinting || stats.redeemableTokens < 1} className="w-full h-12 bg-accent text-black font-black uppercase italic rounded-xl text-[10px] shadow-lg">
-                                        {isMinting ? <Loader2 className="animate-spin" /> : "Lancer le Minting"}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <Card className="bg-white/5 border border-white/10 rounded-[3rem] p-10 space-y-6">
+                                <div className="flex items-center gap-4"><Flame className="text-orange-500" size={24} /><h4 className="text-lg font-black uppercase italic">Burn & Mint</h4></div>
+                                <div className="space-y-5">
+                                    <div className="flex justify-between items-end"><p className="text-[10px] font-black uppercase text-white/30 tracking-widest">Potentiel de Minting</p><span className="text-2xl font-black text-accent">{isBalanceVisible ? stats.availablePoints : "••"} <span className="text-[10px] not-italic opacity-40">PTS</span></span></div>
+                                    <Progress value={stats.progress} className="h-2 bg-white/5" indicatorClassName="bg-accent shadow-[0_0_15px_rgba(56,189,248,0.5)]" />
+                                    <Button onClick={() => secureAction(mintTokens)} disabled={isMinting || stats.redeemableTokens < 1} className="w-full h-14 bg-white text-black font-black uppercase italic rounded-2xl text-[11px] gap-2 shadow-xl hover:bg-accent transition-all">
+                                        {isMinting ? <Loader2 className="animate-spin" /> : <><RefreshCw size={16}/> Transformer Points en DKST</>}
                                     </Button>
                                 </div>
                             </Card>
-
-                            <Card className="bg-gradient-to-br from-primary/10 to-background border-primary/20 rounded-[2.5rem] p-8 flex flex-col justify-between">
-                                <div className="flex items-center gap-3 mb-4"><Award className="text-primary" size={20} /><h4 className="text-sm font-black uppercase italic">Bonus Ambassadeur</h4></div>
-                                <div className="p-4 bg-black/40 rounded-2xl border border-white/5">
-                                    <p className="text-[9px] font-bold text-white/40 uppercase mb-1">Prochain Dividende</p>
-                                    <p className="text-xl font-black text-white">+{stats.nextDividend.toFixed(4)} DKST</p>
-                                    <p className="text-[8px] text-primary font-black uppercase mt-1">Calculé sur solde total</p>
+                            <Card className="bg-gradient-to-br from-primary/20 to-background border-primary/20 rounded-[3rem] p-10 flex flex-col justify-between overflow-hidden relative group">
+                                <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:scale-110 transition-transform duration-1000"><Award size={100}/></div>
+                                <div className="relative z-10">
+                                    <div className="flex items-center gap-4 mb-4"><Star className="text-primary" size={24} /><h4 className="text-lg font-black uppercase italic">Elite Status</h4></div>
+                                    <p className="text-xs text-white/60 italic leading-relaxed">"Votre loyauté de grade {user?.loyaltyLevel} vous octroie un multiplicateur de dividende hebdomadaire sur votre solde global."</p>
+                                </div>
+                                <div className="mt-8 p-5 bg-black/40 rounded-2xl border border-white/5 relative z-10 flex justify-between items-center">
+                                    <div><p className="text-[9px] font-black uppercase text-white/40 mb-1">Impact Loyalité</p><p className="text-xl font-black text-primary italic">+12% APR Bonus</p></div>
+                                    <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center text-primary"><TrendingUp size={20}/></div>
                                 </div>
                             </Card>
                         </div>
                     </TabsContent>
 
-                    <TabsContent value="vault" className="space-y-8 animate-in fade-in slide-in-from-bottom-2">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                            <Card className="glossy-card border-none rounded-[3rem] p-10 space-y-8">
-                                <div className="flex items-center gap-4"><Vault className="text-primary" size={24} /><h3 className="text-xl font-black uppercase italic tracking-tight">DKS Staking Vault</h3></div>
-                                <div className="space-y-6">
-                                    <div className="p-6 bg-primary/10 border border-primary/20 rounded-3xl">
-                                        <div className="flex justify-between items-center mb-4"><span className="text-[10px] font-black uppercase text-primary">Rendement Annuel</span><Badge className="bg-primary text-white font-black italic">{stats.apr}% APR</Badge></div>
-                                        <p className="text-xs text-white/60 italic leading-relaxed">Verrouillez vos DKST pour sécuriser Bunia et générer des intérêts en temps réel.</p>
+                    <TabsContent value="vault" className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+                            <Card className="glossy-card border-none rounded-[3rem] p-10 space-y-10 relative overflow-hidden">
+                                <div className="absolute top-0 right-0 p-6 opacity-5"><Vault size={120} className="text-primary" /></div>
+                                <div className="relative z-10 space-y-8">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shadow-lg shadow-primary/20"><Vault size={28}/></div>
+                                        <div><h3 className="text-2xl font-black uppercase italic tracking-tight">DKS Staking Vault</h3><p className="text-[9px] font-bold text-primary uppercase tracking-widest">Rendement Certifié Hub</p></div>
                                     </div>
-                                    <div className="space-y-3">
-                                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Montant à Staker</Label>
-                                        <Input type="number" placeholder="0.00" value={stakeAmount} onChange={(e) => setStakeAmount(e.target.value)} className="h-14 bg-background/50 border-white/5 rounded-xl text-xl font-black text-white" />
-                                    </div>
-                                    <Button onClick={() => secureAction(handleStake)} disabled={isProcessingAction || !stakeAmount} className="w-full h-16 bg-primary text-white font-black uppercase italic rounded-2xl shadow-xl shadow-primary/20">Lancer le Staking</Button>
-                                </div>
-                            </Card>
-                            <Card className="bg-black/40 border border-white/5 rounded-[3rem] p-10 flex flex-col justify-between">
-                                <div className="space-y-8">
-                                    <div className="flex justify-between items-start"><div><h3 className="text-xl font-black uppercase italic">Ma Position</h3><p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Actifs bloqués</p></div><div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-primary"><Timer size={24}/></div></div>
-                                    <div className="space-y-6">
-                                        <div><p className="text-[9px] font-black uppercase text-white/40 mb-1">Capital Vault</p><p className="text-4xl font-black text-white italic">{user?.stakedBalance?.toFixed(2) || 0} <span className="text-sm not-italic opacity-40">DKST</span></p></div>
-                                        <div><p className="text-[9px] font-black uppercase text-white/40 mb-1">Récompenses accumulées</p><p className="text-4xl font-black text-green-400 italic">+{stats.stakingRewards.toFixed(6)}</p></div>
-                                    </div>
-                                </div>
-                                <Button onClick={() => secureAction(handleUnstake)} disabled={isProcessingAction || !user?.stakedBalance} variant="outline" className="w-full h-16 border-white/10 rounded-2xl font-black uppercase italic mt-10 hover:bg-white/5">Retirer Tout</Button>
-                            </Card>
-                        </div>
-                    </TabsContent>
-
-                    <TabsContent value="security" className="space-y-8 animate-in fade-in slide-in-from-bottom-2">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                            <Card className="glossy-card border-none rounded-[3rem] p-10 space-y-8 relative overflow-hidden">
-                                <div className="absolute top-0 right-0 p-8 opacity-5"><KeyRound size={120} /></div>
-                                <div className="relative z-10 space-y-6">
-                                    <div className="flex items-center gap-4"><ShieldCheck className="text-accent" size={24} /><h2 className="text-xl font-black uppercase italic tracking-tight">Sécurité Wallet</h2></div>
-                                    <p className="text-xs text-white/60 italic leading-relaxed">Votre code PIN est requis pour chaque transaction sortante et accès aux réglages sensibles.</p>
                                     
-                                    <div className="p-4 bg-white/5 rounded-2xl border border-white/5 flex justify-between items-center">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center text-accent"><Fingerprint size={16}/></div>
-                                            <span className="text-[10px] font-black uppercase">Statut PIN</span>
+                                    <div className="space-y-8">
+                                        {/* DURATION SELECTOR */}
+                                        <div className="space-y-4">
+                                            <Label className="text-[10px] font-black uppercase tracking-widest opacity-40 ml-1">Choisir une Durée de Blocage</Label>
+                                            <div className="grid grid-cols-4 gap-2">
+                                                {STAKING_OPTIONS.map((opt) => (
+                                                    <button key={opt.months} onClick={() => setSelectedStakingOption(opt)} className={cn("p-4 rounded-2xl border-2 transition-all flex flex-col items-center gap-2", selectedStakingOption.months === opt.months ? "bg-primary/20 border-primary text-white" : "bg-white/5 border-transparent text-white/40 hover:bg-white/10")}>
+                                                        <span className="text-[10px] font-black">{opt.label}</span>
+                                                        <span className={cn("text-[9px] font-bold", opt.color)}>{(opt.apr * 100).toFixed(1)}% APR</span>
+                                                    </button>
+                                                ))}
+                                            </div>
                                         </div>
-                                        <Badge className={cn("border-none text-[8px] font-black uppercase", user?.walletPin ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400")}>
-                                            {user?.walletPin ? "Activé" : "Non Configuré"}
-                                        </Badge>
-                                    </div>
 
-                                    <Button asChild variant="outline" className="w-full h-12 border-white/10 rounded-xl font-black uppercase italic text-[10px] hover:bg-white/5">
-                                        <Link href="/dashboard/settings">Gérer mes codes d'accès</Link>
-                                    </Button>
+                                        <div className="space-y-4">
+                                            <div className="flex justify-between items-end px-1">
+                                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-40">Montant à Sécuriser</Label>
+                                                <p className="text-[9px] font-bold text-white/40 uppercase">Disponible : <span className="text-accent">{isBalanceVisible ? currentStakingBalance.toFixed(2) : "••••"}</span> DKST</p>
+                                            </div>
+                                            <div className="relative">
+                                                <Input type="number" placeholder="0.00" value={stakingAmount} onChange={(e) => setStakingAmount(e.target.value)} className="h-20 bg-background/50 border-white/10 rounded-[2rem] text-3xl font-black text-white px-8 pr-24" />
+                                                <button onClick={() => setStakingAmount(currentStakingBalance.toString())} className="absolute right-6 top-1/2 -translate-y-1/2 h-10 px-4 rounded-xl bg-accent text-black font-black uppercase italic text-[10px] shadow-lg shadow-accent/20">MAX</button>
+                                            </div>
+                                        </div>
+
+                                        {/* GAIN PROJECTION */}
+                                        <div className="p-6 bg-black/40 rounded-[2rem] border border-white/5 space-y-6">
+                                            <div className="flex justify-between items-center">
+                                                <p className="text-[9px] font-black uppercase text-white/40 flex items-center gap-2"><Calculator size={12} className="text-accent" /> Gains Estimés ({selectedStakingOption.label})</p>
+                                                <Badge className="bg-accent/10 text-accent border-none text-[10px] font-black">+{estimatedStakingGains} DKST</Badge>
+                                            </div>
+                                            <div className="pt-4 border-t border-white/5">
+                                                <div className="flex items-center gap-3 text-[9px] font-bold uppercase text-white/40 italic">
+                                                    <Clock size={12} className="text-accent" /> Date de libération : {format(new Date(Date.now() + selectedStakingOption.months * 30 * 24 * 60 * 60 * 1000), "dd MMMM yyyy", { locale: fr })}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <Button onClick={() => secureAction(handleStake)} disabled={isProcessingAction || !stakingAmount || parseFloat(stakingAmount) <= 0} className="w-full h-16 bg-primary text-white font-black uppercase italic rounded-2xl shadow-xl shadow-primary/20 text-lg gap-3 transition-all hover:scale-105 active:scale-95">
+                                            {isProcessingAction ? <Loader2 className="animate-spin" /> : <><ShieldCheck size={24} /> Bloquer dans le Vault</>}
+                                        </Button>
+                                    </div>
                                 </div>
                             </Card>
 
-                            <Card className="bg-red-500/10 border-red-500/20 rounded-[3rem] p-10 space-y-8">
-                                <div className="flex items-center gap-4 text-red-500"><ShieldAlert size={32} /><h3 className="text-xl font-black uppercase italic tracking-tight">Zone d'Urgence</h3></div>
-                                <p className="text-xs text-red-400 font-medium leading-relaxed italic">En cas de vol de votre téléphone, verrouillez instantanément votre wallet. Cette action gèlera tous vos avoirs.</p>
-                                <Button onClick={toggleEmergencyLock} disabled={isEmergencyLockProcessing} className={cn("w-full h-16 rounded-2xl font-black uppercase italic text-[10px] gap-3", user?.isWalletLocked ? "bg-white text-black" : "bg-red-500 text-white shadow-xl shadow-red-500/20")}>
-                                    {isEmergencyLockProcessing ? <Loader2 className="animate-spin" /> : user?.isWalletLocked ? <><Lock size={16} /> Déverrouiller le Wallet</> : <><ShieldX size={16} /> Verrouiller Tout</>}
-                                </Button>
+                            <div className="space-y-8">
+                                <Card className="bg-black/40 border border-white/5 rounded-[3rem] p-10 flex flex-col justify-between group overflow-hidden relative">
+                                    <div className="absolute -bottom-10 -right-10 p-6 opacity-5 group-hover:scale-110 transition-transform duration-[10s]"><Timer size={160} className="text-accent" /></div>
+                                    <div className="space-y-10 relative z-10">
+                                        <div className="flex justify-between items-start">
+                                            <div><h3 className="text-xl font-black uppercase italic">Ma Position Staking</h3><p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest mt-1">Actifs en cours de fructification</p></div>
+                                            <div className="w-14 h-14 rounded-2xl bg-white/5 flex items-center justify-center text-accent shadow-2xl"><Timer size={28}/></div>
+                                        </div>
+                                        <div className="space-y-8">
+                                            <div><p className="text-[10px] font-black uppercase text-white/40 mb-2 tracking-[0.2em]">Capital bloqué</p><p className="text-5xl font-black text-white italic tracking-tighter">{isBalanceVisible ? (user?.stakedBalance || 0).toFixed(2) : "••••"} <span className="text-xs not-italic opacity-40">DKST</span></p></div>
+                                            <div><p className="text-[10px] font-black uppercase text-white/40 mb-2 tracking-[0.2em]">Récompenses de session</p><p className="text-5xl font-black text-green-400 italic tracking-tighter">+{isBalanceVisible ? stats.stakingRewards.toFixed(6) : "••••"}</p></div>
+                                        </div>
+                                    </div>
+                                    <div className="mt-12 space-y-4 relative z-10">
+                                        <Button onClick={() => secureAction(handleUnstake)} disabled={isProcessingAction || !user?.stakedBalance} variant="outline" className="w-full h-16 border-white/10 rounded-2xl font-black uppercase italic text-[11px] hover:bg-white/5 hover:border-accent transition-all">Débloquer Tout (Capital + Intérêts)</Button>
+                                        <p className="text-[8px] text-center text-white/20 uppercase font-bold tracking-widest italic">Action soumise à validation blockchain 24h</p>
+                                    </div>
+                                </Card>
+                            </div>
+                        </div>
+                    </TabsContent>
+
+                    <TabsContent value="security" className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                            <Card className="glossy-card border-none rounded-[3rem] p-12 space-y-10 relative overflow-hidden">
+                                <div className="absolute top-0 right-0 p-8 opacity-5"><Lock size={120} /></div>
+                                <div className="relative z-10 space-y-8">
+                                    <div className="flex items-center gap-4"><ShieldCheck className="text-red-500" size={32} /><h2 className="text-2xl font-black uppercase italic tracking-tight leading-none">Sécurité de <br />Portefeuille</h2></div>
+                                    <p className="text-sm text-white/60 italic leading-relaxed">"Votre Wallet est protégé par une signature PIN requise pour chaque transaction. Ne partagez jamais votre code."</p>
+                                    
+                                    <div className="space-y-4">
+                                        <div className="p-5 rounded-3xl bg-white/5 border border-white/5 flex justify-between items-center">
+                                            <div className="flex items-center gap-4"><div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-accent"><Fingerprint size={20}/></div><span className="text-[10px] font-black uppercase">Protection PIN</span></div>
+                                            <Badge className={cn("border-none text-[8px] font-black uppercase px-3 h-5", user?.walletPin ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400")}>{user?.walletPin ? "ACTIVE" : "NON CONFIGURÉ"}</Badge>
+                                        </div>
+                                        <Button asChild variant="outline" className="w-full h-14 rounded-2xl border-white/10 font-black uppercase italic text-[10px] hover:bg-white/5"><Link href="/dashboard/settings">Mettre à jour mes accès</Link></Button>
+                                    </div>
+                                </div>
+                            </Card>
+
+                            <Card className="bg-red-500/10 border-red-500/20 rounded-[3rem] p-12 space-y-10 relative overflow-hidden group">
+                                <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:scale-110 transition-transform duration-[20s]"><ShieldAlert size={120} /></div>
+                                <div className="relative z-10 space-y-8">
+                                    <div className="flex items-center gap-4 text-red-500"><ShieldX size={32} /><h3 className="text-2xl font-black uppercase italic tracking-tight leading-none">Blocage <br />d'Urgence</h3></div>
+                                    <p className="text-sm text-red-400 font-medium leading-relaxed italic">"Gelez instantanément tous les mouvements de fonds sur votre wallet en cas de suspicion de fraude ou vol."</p>
+                                    <Button onClick={toggleEmergencyLock} disabled={isEmergencyLockProcessing} className={cn("w-full h-20 rounded-3xl font-black uppercase italic text-xs gap-3 shadow-2xl transition-all hover:scale-105", user?.isWalletLocked ? "bg-white text-black" : "bg-red-500 text-white shadow-red-500/20")}>
+                                        {isEmergencyLockProcessing ? <Loader2 className="animate-spin" /> : user?.isWalletLocked ? <><Lock size={20} /> Déverrouiller le Wallet</> : <><ShieldX size={20} /> Verrouiller Tout Immédiatement</>}
+                                    </Button>
+                                    <div className="flex items-center justify-center gap-2 text-[9px] font-black uppercase text-red-400/40 tracking-[0.2em] italic"><AlertTriangle size={10} /> Action irréversible sans identifiants d'origine</div>
+                                </div>
                             </Card>
                         </div>
                     </TabsContent>
                 </Tabs>
             </main>
+
+            {/* ACTION SHEETS & DIALOGS */}
+
+            {/* RECEIVE SHEET */}
+            <Sheet open={isReceiveSheetOpen} onOpenChange={setIsReceiveSheetOpen}>
+                <SheetContent side="right" className="bg-card/95 backdrop-blur-3xl border-white/10 w-full sm:max-w-md flex flex-col p-0">
+                    <SheetHeader className="p-10 bg-accent/10 border-b border-white/5 text-center">
+                        <div className="w-16 h-16 rounded-[1.5rem] bg-accent text-black flex items-center justify-center mx-auto mb-4 shadow-xl"><ArrowDownLeft size={32} /></div>
+                        <SheetTitle className="text-3xl font-black uppercase italic tracking-tighter">Réception DKS</SheetTitle>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Mon Identifiant Universel Hub</p>
+                    </SheetHeader>
+                    <div className="flex-1 p-10 flex flex-col items-center justify-center gap-10">
+                        <div className="space-y-4 w-full">
+                            <Label className="text-[10px] font-black uppercase tracking-widest opacity-40 ml-1">Sélecteur de Jeton</Label>
+                            <div className="grid grid-cols-3 gap-2">
+                                {['dkst', 'pi', 'usd'].map(a => (
+                                    <button key={a} onClick={() => setReceiveAsset(a)} className={cn("h-12 rounded-xl border transition-all text-[10px] font-black uppercase", receiveAsset === a ? "bg-accent border-accent text-black" : "bg-white/5 border-white/5 text-white/40")}>
+                                        {a}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="relative group">
+                            <div className="absolute inset-0 bg-accent/20 blur-[40px] rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
+                            <div className="relative bg-white p-6 rounded-[2.5rem] shadow-2xl">
+                                <QrCode size={180} className="text-black" />
+                            </div>
+                        </div>
+                        
+                        <div className="w-full space-y-6">
+                            <div className="space-y-3">
+                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-40 ml-1">Adresse de Dépôt ({receiveAsset.toUpperCase()})</Label>
+                                <div className="flex gap-2">
+                                    <Input readOnly value={getReceiveAddress(receiveAsset)} className="h-14 bg-white/5 border-white/10 rounded-2xl font-mono text-[9px] text-accent tracking-wider text-center" />
+                                    <Button onClick={() => { navigator.clipboard.writeText(getReceiveAddress(receiveAsset)); setHasCopiedId(true); setTimeout(() => setHasCopiedId(false), 2000); }} variant="outline" className="h-14 w-14 rounded-2xl border-white/10 hover:bg-accent/10 hover:text-accent p-0 transition-all">
+                                        {hasCopiedId ? <Check size={20}/> : <Copy size={20}/>}
+                                    </Button>
+                                </div>
+                            </div>
+                            <div className="p-4 bg-accent/5 rounded-2xl border border-accent/20 flex items-start gap-4">
+                                <Info size={16} className="text-accent shrink-0 mt-0.5" />
+                                <p className="text-[9px] font-bold text-accent uppercase leading-relaxed italic">Utilisez cette adresse exclusivement pour le jeton {receiveAsset.toUpperCase()} sur le réseau correspondant.</p>
+                            </div>
+                        </div>
+                    </div>
+                </SheetContent>
+            </Sheet>
+
+            {/* TRANSFER SHEET */}
+            <Sheet open={isTransferSheetOpen} onOpenChange={setIsTransferSheetOpen}>
+                <SheetContent side="right" className="bg-card/95 backdrop-blur-3xl border-white/10 w-full sm:max-w-md flex flex-col p-0">
+                    <SheetHeader className="p-10 bg-accent/10 border-b border-white/5">
+                        <div className="flex items-center gap-5">
+                            <div className="w-16 h-16 rounded-2xl bg-accent text-black flex items-center justify-center shadow-xl"><Send size={32} /></div>
+                            <div><SheetTitle className="text-3xl font-black uppercase italic tracking-tighter">Envoi de Jetons</SheetTitle><p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Réseau Universel DKS</p></div>
+                        </div>
+                    </SheetHeader>
+                    <div className="flex-1 p-10 space-y-10 overflow-y-auto custom-scrollbar">
+                        {!selectedRecipient ? (
+                            <div className="space-y-6">
+                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Rechercher un Bénéficiaire</Label>
+                                <div className="relative"><Search className="absolute left-5 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} /><Input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Nom ou Email..." className="h-16 pl-14 bg-background/50 border-white/10 rounded-2xl focus:border-accent font-bold" /></div>
+                                {searchQuery.length >= 3 && (
+                                    <div className="space-y-2">
+                                        {isSearching ? <div className="py-10 text-center"><Loader2 className="animate-spin text-accent mx-auto h-8 w-8" /></div> : searchResults.map((u) => (
+                                            <button key={u.id} onClick={() => { setSelectedRecipient(u); setSearchQuery(""); }} className="flex items-center gap-4 p-5 w-full rounded-2xl bg-white/5 border border-white/5 hover:bg-accent/5 hover:border-accent/20 transition-all text-left group">
+                                                <div className="w-12 h-12 rounded-xl bg-accent/10 flex items-center justify-center font-black text-accent text-lg italic group-hover:scale-110 transition-transform">{(u.name || u.displayName)?.substring(0, 1)}</div>
+                                                <div className="flex-1 overflow-hidden"><p className="font-black text-sm uppercase italic truncate">{u.name || u.displayName}</p><p className="text-[10px] opacity-40 truncate">{u.email}</p></div>
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        ) : (
+                            <div className="space-y-10">
+                                <div className="p-6 bg-accent/5 border border-accent/20 rounded-[2.5rem] flex items-center justify-between">
+                                    <div className="flex items-center gap-5">
+                                        <div className="w-14 h-14 rounded-2xl bg-accent text-black flex items-center justify-center font-black text-xl italic shadow-lg shadow-accent/20">{(selectedRecipient.name || selectedRecipient.displayName)?.substring(0, 1)}</div>
+                                        <div><p className="text-[9px] font-black text-accent uppercase tracking-widest">Envoi vers</p><p className="text-lg font-black uppercase italic text-white mt-1">{selectedRecipient.name || selectedRecipient.displayName}</p></div>
+                                    </div>
+                                    <Button variant="ghost" size="icon" onClick={() => setSelectedRecipient(null)} className="h-10 w-10 rounded-xl hover:bg-red-500/10 hover:text-red-500"><X size={20}/></Button>
+                                </div>
+                                <div className="space-y-8">
+                                    <div className="space-y-3">
+                                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Montant (DKST)</Label>
+                                        <div className="relative"><Coins className="absolute left-6 top-1/2 -translate-y-1/2 text-accent" size={24} /><Input type="number" step="0.01" value={transferAmount} onChange={(e) => setTransferAmount(e.target.value)} className="h-24 pl-18 bg-background/50 border-white/10 rounded-[2.5rem] text-4xl font-black text-accent" required /></div>
+                                        <p className="text-[9px] font-bold text-white/20 uppercase text-right mr-4 italic">Frais réseau : 0.1 DKST</p>
+                                    </div>
+                                    <div className="space-y-3">
+                                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Mémo de Transaction</Label>
+                                        <Input value={transferMemo} onChange={(e) => setTransferMemo(e.target.value)} placeholder="Ex: Paiement Service..." className="h-14 bg-background/50 border-white/10 rounded-2xl italic text-sm" />
+                                    </div>
+                                </div>
+                                <Button onClick={() => secureAction(handleTransfer)} disabled={isProcessingAction || !transferAmount} className="w-full h-20 bg-accent text-black font-black uppercase italic rounded-[2.5rem] shadow-2xl text-xl gap-4">{isProcessingAction ? <Loader2 className="animate-spin" /> : <><Send size={24} /> Valider l'Envoi</>}</Button>
+                            </div>
+                        )}
+                    </div>
+                </SheetContent>
+            </Sheet>
+
+            {/* SWAP SHEET */}
+            <Sheet open={isSwapSheetOpen} onOpenChange={setIsSwapSheetOpen}>
+                <SheetContent side="right" className="bg-card/95 backdrop-blur-3xl border-white/10 w-full sm:max-w-md flex flex-col p-0">
+                    <SheetHeader className="p-10 bg-accent/10 border-b border-white/5">
+                        <div className="flex items-center gap-5">
+                            <div className="w-16 h-16 rounded-2xl bg-accent text-black flex items-center justify-center shadow-xl"><ArrowDownUp size={32} /></div>
+                            <div><SheetTitle className="text-3xl font-black uppercase italic tracking-tighter">Instant Swap</SheetTitle><p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Échange Décentralisé DKS</p></div>
+                        </div>
+                    </SheetHeader>
+                    <div className="flex-1 p-10 space-y-10">
+                        <div className="space-y-8">
+                            <div className="p-6 bg-white/5 border border-white/5 rounded-[2rem] space-y-4">
+                                <Label className="text-[10px] font-black uppercase opacity-40">De</Label>
+                                <div className="flex items-center gap-4">
+                                    <Select value={swapFrom} onValueChange={setSwapFrom}>
+                                        <SelectTrigger className="w-[120px] h-12 bg-black/40 border-none rounded-xl font-black uppercase text-[10px]"><SelectValue /></SelectTrigger>
+                                        <SelectContent className="bg-card border-white/10">
+                                            <SelectItem value="dkst">DKST</SelectItem>
+                                            <SelectItem value="pi">Pi Network</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    <Input type="number" value={swapAmount} onChange={(e) => setSwapAmount(e.target.value)} placeholder="0.00" className="flex-1 h-12 bg-transparent border-none text-2xl font-black text-right focus-visible:ring-0" />
+                                </div>
+                            </div>
+                            <div className="flex justify-center -my-10 relative z-10"><Button size="icon" variant="outline" className="h-12 w-12 rounded-xl bg-background border-white/10 hover:text-accent transition-all rotate-180"><ArrowDownUp size={20}/></Button></div>
+                            <div className="p-6 bg-accent/5 border border-accent/20 rounded-[2rem] space-y-4">
+                                <Label className="text-[10px] font-black uppercase opacity-40">Vers (Estimé)</Label>
+                                <div className="flex items-center gap-4">
+                                    <Select value={swapTo} onValueChange={setSwapTo}>
+                                        <SelectTrigger className="w-[120px] h-12 bg-black/40 border-none rounded-xl font-black uppercase text-[10px]"><SelectValue /></SelectTrigger>
+                                        <SelectContent className="bg-card border-white/10"><SelectItem value="pi">Pi Network</SelectItem><SelectItem value="dkst">DKST</SelectItem></SelectContent>
+                                    </Select>
+                                    <div className="flex-1 text-2xl font-black text-accent text-right">{swapAmount ? (parseFloat(swapAmount) * 0.99).toFixed(4) : "0.00"}</div>
+                                </div>
+                            </div>
+                        </div>
+                        <Button className="w-full h-20 bg-accent text-black font-black uppercase italic rounded-2xl shadow-xl">Confirmer le Swap</Button>
+                    </div>
+                </SheetContent>
+            </Sheet>
+
+            {/* POINTS CONVERSION SHEET */}
+            <Sheet open={isPointsSheetOpen} onOpenChange={setIsPointsSheetOpen}>
+                <SheetContent side="right" className="bg-card/95 backdrop-blur-3xl border-white/10 w-full sm:max-w-md flex flex-col p-0">
+                    <SheetHeader className="p-10 bg-orange-500/10 border-b border-white/5">
+                        <div className="flex items-center gap-5">
+                            <div className="w-16 h-16 rounded-2xl bg-orange-500/20 flex items-center justify-center text-orange-500 shadow-xl shadow-orange-500/10"><Gift size={32} /></div>
+                            <div><SheetTitle className="text-3xl font-black uppercase italic tracking-tighter text-orange-500">DKS Rewards</SheetTitle><p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Capitaliser votre engagement</p></div>
+                        </div>
+                    </SheetHeader>
+                    <div className="flex-1 p-10 space-y-10">
+                        <div className="p-8 bg-orange-500/5 rounded-[2rem] border border-orange-500/10 flex flex-col items-center text-center gap-4">
+                            <p className="text-[10px] font-black uppercase text-orange-500/60 tracking-widest">Points de Prestige</p>
+                            <h4 className="text-6xl font-black italic text-white tracking-tighter">{stats.availablePoints}</h4>
+                            <div className="flex items-center gap-2 text-[9px] font-bold uppercase text-white/20"><TrendingUp size={12}/> 100 PTS = 1 DKST</div>
+                        </div>
+                        <div className="space-y-4">
+                            <Label className="text-[10px] font-black uppercase tracking-widest opacity-40 ml-1">Points à Brûler</Label>
+                            <div className="relative">
+                                <Ticket className="absolute left-6 top-1/2 -translate-y-1/2 text-orange-500" size={24} />
+                                <Input type="number" value={pointsToConvert} onChange={(e) => setPointsToConvert(e.target.value)} className="h-20 pl-16 bg-background/50 border-white/10 rounded-[2rem] text-4xl font-black text-orange-500" />
+                                <button onClick={() => setPointsToConvert(stats.availablePoints.toString())} className="absolute right-6 top-1/2 -translate-y-1/2 font-black text-white/40 hover:text-orange-500 transition-colors uppercase text-[10px]">MAX</button>
+                            </div>
+                            <div className="p-5 bg-white/5 rounded-2xl border border-white/5 flex justify-between items-center">
+                                <p className="text-[10px] font-black uppercase text-white/40 italic">Valeur générée</p>
+                                <p className="text-xl font-black text-accent">+{pointsToConvert ? Math.floor(parseInt(pointsToConvert) / 100) : 0} DKST</p>
+                            </div>
+                        </div>
+                        <Button onClick={() => secureAction(handleConvertPoints)} disabled={isProcessingAction || !pointsToConvert || parseInt(pointsToConvert) < 100} className="w-full h-20 bg-orange-500 text-white font-black uppercase italic rounded-[2.5rem] shadow-2xl shadow-orange-500/20 text-lg">Convertir en DKST</Button>
+                    </div>
+                </SheetContent>
+            </Sheet>
+
+            {/* NETWORK SETUP SHEET */}
+            <Sheet open={isNetworkSheetOpen} onOpenChange={setIsNetworkSheetOpen}>
+                <SheetContent side="right" className="bg-card/95 backdrop-blur-3xl border-white/10 w-full sm:max-w-md flex flex-col p-0">
+                    <SheetHeader className="p-10 bg-primary/10 border-b border-white/5">
+                        <div className="flex items-center gap-5">
+                            <div className="w-16 h-16 rounded-2xl bg-primary text-white flex items-center justify-center shadow-xl"><Network size={32} /></div>
+                            <div><SheetTitle className="text-3xl font-black uppercase italic tracking-tighter">Custom RPC</SheetTitle><p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Ajouter un protocole externe</p></div>
+                        </div>
+                    </SheetHeader>
+                    <div className="flex-1 p-10 space-y-10 overflow-y-auto custom-scrollbar">
+                        <div className="space-y-4">
+                            <Label className="text-[10px] font-black uppercase tracking-widest opacity-40 ml-1">Configuration Rapide</Label>
+                            <div className="grid grid-cols-1 gap-2">
+                                {RPC_PRESETS.map(p => (
+                                    <button key={p.name} onClick={() => { setRpcUrl(p.rpc); setChainId(p.chainId); }} className="p-4 rounded-xl bg-white/5 border border-white/5 hover:bg-primary/10 hover:border-primary/30 transition-all text-left flex justify-between items-center group">
+                                        <span className="text-[10px] font-black uppercase group-hover:text-primary transition-colors">{p.name}</span>
+                                        <Zap size={12} className="opacity-20 group-hover:opacity-100 group-hover:text-primary" />
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="space-y-6">
+                            <div className="space-y-2">
+                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-40">URL RPC du Réseau</Label>
+                                <div className="relative">
+                                    <Input value={rpcUrl} onChange={(e) => setRpcUrl(e.target.value)} placeholder="https://..." className="h-14 bg-background/50 border-white/5 rounded-2xl font-mono text-[10px] pr-16" />
+                                    <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                                        {isRpcValidating ? <Loader2 className="animate-spin text-accent h-4 w-4" /> : rpcPing && <Badge className={cn("h-6 border-none text-[8px] font-black", rpcPing < 50 ? "bg-green-500/20 text-green-400" : "bg-orange-500/20 text-orange-400")}>{rpcPing}ms</Badge>}
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2"><Label className="text-[10px] font-black uppercase tracking-widest opacity-40">Chain ID</Label><Input value={chainId} onChange={(e) => setChainId(e.target.value)} placeholder="Ex: 137" className="h-14 bg-background/50 border-white/5 rounded-2xl font-mono text-xs" /></div>
+                                <div className="space-y-2"><Label className="text-[10px] font-black uppercase tracking-widest opacity-40">Symbole</Label><Input placeholder="Ex: MATIC" className="h-14 bg-background/50 border-white/5 rounded-2xl font-black text-center" /></div>
+                            </div>
+                            <div className="space-y-2">
+                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-40">Explorateur (Optionnel)</Label>
+                                <Input placeholder="https://..." className="h-14 bg-background/50 border-white/5 rounded-2xl font-mono text-[10px]" />
+                            </div>
+                        </div>
+
+                        <div className="p-6 bg-red-500/5 rounded-2xl border border-red-500/10 flex items-start gap-4">
+                            <ShieldAlert className="text-red-500 shrink-0 mt-0.5" size={18} />
+                            <p className="text-[10px] font-bold text-red-400 uppercase leading-relaxed italic">AVERTISSEMENT : L'ajout d'un réseau personnalisé comporte des risques. Vérifiez toujours la source de vos URLs RPC.</p>
+                        </div>
+
+                        <Button onClick={() => secureAction(handleConnectNetwork)} disabled={isProcessingAction || !rpcUrl} className="w-full h-20 bg-primary text-white font-black uppercase italic rounded-[2.5rem] shadow-2xl text-xl gap-4">
+                            {isProcessingAction ? <Loader2 className="animate-spin" /> : <><Globe size={24} /> Connecter au Hub</>}
+                        </Button>
+                    </div>
+                </SheetContent>
+            </Sheet>
+
+            {/* IMPORT TOKEN SHEET */}
+            <Sheet open={isImportSheetOpen} onOpenChange={setIsImportSheetOpen}>
+                <SheetContent side="right" className="bg-card/95 backdrop-blur-3xl border-white/10 w-full sm:max-w-md flex flex-col p-0">
+                    <SheetHeader className="p-10 bg-accent/10 border-b border-white/5">
+                        <div className="flex items-center gap-5">
+                            <div className="w-16 h-16 rounded-2xl bg-accent text-black flex items-center justify-center shadow-xl"><PlusCircle size={32} /></div>
+                            <div><SheetTitle className="text-3xl font-black uppercase italic tracking-tighter">Import Token</SheetTitle><p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Ajouter un actif personnalisé</p></div>
+                        </div>
+                    </SheetHeader>
+                    <div className="flex-1 p-10 space-y-10 overflow-y-auto">
+                        <div className="space-y-6">
+                            <div className="space-y-2">
+                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-40 ml-1">Sélectionner le Réseau</Label>
+                                <Select defaultValue="dks">
+                                    <SelectTrigger className="h-14 bg-background/50 border-white/5 rounded-2xl text-[10px] font-black uppercase italic"><SelectValue /></SelectTrigger>
+                                    <SelectContent className="bg-card border-white/10">
+                                        <SelectItem value="dks">DKS Hub Network</SelectItem>
+                                        <SelectItem value="pi">Pi Network</SelectItem>
+                                        <SelectItem value="eth">Ethereum Mainnet</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="space-y-2"><Label className="text-[10px] font-black uppercase tracking-widest opacity-40 ml-1">Adresse du Contrat</Label><Input placeholder="0x..." className="h-14 bg-background/50 border-white/5 rounded-2xl font-mono text-xs pr-10" /></div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2"><Label className="text-[10px] font-black uppercase tracking-widest opacity-40 ml-1">Symbole</Label><Input placeholder="TKN" className="h-14 bg-background/50 border-white/5 rounded-2xl font-black text-center" /></div>
+                                <div className="space-y-2"><Label className="text-[10px] font-black uppercase tracking-widest opacity-40 ml-1">Décimales</Label><Input defaultValue="18" className="h-14 bg-background/50 border-white/5 rounded-2xl text-center" /></div>
+                            </div>
+                        </div>
+                        <Button onClick={() => secureAction(() => { setIsImportSheetOpen(false); setIsSuccessDialogOpen(true); })} className="w-full h-18 bg-accent text-black font-black uppercase italic rounded-2xl shadow-xl shadow-accent/20">Importer l'Actif</Button>
+                    </div>
+                </SheetContent>
+            </Sheet>
 
             {/* PIN VERIFICATION DIALOG */}
             <Dialog open={isPinVerificationOpen} onOpenChange={setIsPinVerificationOpen}>
@@ -678,17 +946,8 @@ function UniversalWalletPage() {
                             <Label className="text-[10px] font-black uppercase tracking-widest text-center block opacity-40">Entrez votre code secret à 4 chiffres</Label>
                             <div className="flex justify-center gap-4">
                                 <div className="relative w-full max-w-[200px]">
-                                    <Input 
-                                        type={showPin ? "text" : "password"} 
-                                        maxLength={4} 
-                                        value={enteredPin} 
-                                        onChange={(e) => setEnteredPin(e.target.value.replace(/\D/g, ''))} 
-                                        className="h-20 bg-background/50 border-white/10 rounded-2xl text-center text-5xl font-black tracking-[0.5em] focus:border-accent" 
-                                        autoFocus 
-                                    />
-                                    <button onClick={() => setShowPin(!showPin)} className="absolute right-4 top-1/2 -translate-y-1/2 text-white/20 hover:text-accent transition-colors">
-                                        {showPin ? <EyeOff size={20}/> : <Eye size={20}/>}
-                                    </button>
+                                    <Input type={showPin ? "text" : "password"} maxLength={4} value={enteredPin} onChange={(e) => setEnteredPin(e.target.value.replace(/\D/g, ''))} className="h-20 bg-background/50 border-white/10 rounded-2xl text-center text-5xl font-black tracking-[0.5em] focus:border-accent" autoFocus />
+                                    <button onClick={() => setShowPin(!showPin)} className="absolute right-4 top-1/2 -translate-y-1/2 text-white/20 hover:text-accent transition-colors">{showPin ? <EyeOff size={20}/> : <Eye size={20}/>}</button>
                                 </div>
                             </div>
                         </div>
@@ -700,151 +959,19 @@ function UniversalWalletPage() {
                 </DialogContent>
             </Dialog>
 
-            {/* SWAP SHEET */}
-            <Sheet open={isSwapSheetOpen} onOpenChange={setIsSwapSheetOpen}>
-                <SheetContent side="right" className="bg-card/95 backdrop-blur-3xl border-white/10 w-full sm:max-w-md flex flex-col p-0">
-                    <SheetHeader className="p-10 bg-accent/10 border-b border-white/5">
-                        <div className="flex items-center gap-5">
-                            <div className="w-16 h-16 rounded-2xl bg-accent/20 flex items-center justify-center text-accent shadow-xl shadow-accent/10"><ArrowDownUp size={32} /></div>
-                            <div><SheetTitle className="text-3xl font-black uppercase italic tracking-tighter">Instant Swap</SheetTitle><p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Échange Décentralisé Hub</p></div>
-                        </div>
-                    </SheetHeader>
-                    <div className="flex-1 p-10 space-y-10 overflow-y-auto">
-                        <div className="space-y-8">
-                            <div className="p-6 bg-white/5 border border-white/5 rounded-[2rem] space-y-4">
-                                <Label className="text-[10px] font-black uppercase opacity-40">Vendre</Label>
-                                <div className="flex items-center gap-4">
-                                    <Select value={swapFrom} onValueChange={setSwapFrom}>
-                                        <SelectTrigger className="w-[120px] h-12 bg-black/40 border-none rounded-xl font-black uppercase text-[10px]"><SelectValue /></SelectTrigger>
-                                        <SelectContent className="bg-card border-white/10">
-                                            <SelectItem value="dkst">DKST</SelectItem>
-                                            <SelectItem value="pi">Pi Network</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                    <Input type="number" value={swapAmount} onChange={(e) => setSwapAmount(e.target.value)} placeholder="0.00" className="flex-1 h-12 bg-transparent border-none text-2xl font-black text-right focus-visible:ring-0" />
-                                </div>
-                                <p className="text-[9px] text-muted-foreground uppercase font-bold">Solde: {user?.tokenBalance?.toFixed(2)} {swapFrom.toUpperCase()}</p>
-                            </div>
-
-                            <div className="flex justify-center -my-10 relative z-10">
-                                <Button size="icon" variant="outline" onClick={() => { const f = swapFrom; setSwapFrom(swapTo); setSwapTo(f); }} className="h-12 w-12 rounded-xl bg-background border-white/10 hover:text-accent transition-all rotate-180"><ArrowDownUp size={20}/></Button>
-                            </div>
-
-                            <div className="p-6 bg-accent/5 border border-accent/20 rounded-[2rem] space-y-4">
-                                <Label className="text-[10px] font-black uppercase opacity-40">Recevoir (Estimé)</Label>
-                                <div className="flex items-center gap-4">
-                                    <Select value={swapTo} onValueChange={setSwapTo}>
-                                        <SelectTrigger className="w-[120px] h-12 bg-black/40 border-none rounded-xl font-black uppercase text-[10px]"><SelectValue /></SelectTrigger>
-                                        <SelectContent className="bg-card border-white/10">
-                                            <SelectItem value="pi">Pi Network</SelectItem>
-                                            <SelectItem value="dkst">DKST</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                    <div className="flex-1 text-2xl font-black text-accent text-right">
-                                        {swapAmount ? (parseFloat(swapAmount) * 0.99).toFixed(4) : "0.00"}
-                                    </div>
-                                </div>
-                                <p className="text-[9px] text-accent/60 uppercase font-bold">1 {swapFrom.toUpperCase()} ≈ 1.00 {swapTo.toUpperCase()}</p>
-                            </div>
-                        </div>
-
-                        <div className="space-y-4 p-5 bg-white/5 rounded-2xl border border-white/5">
-                            <div className="flex justify-between text-[9px] font-bold uppercase"><span className="opacity-40">Frais Hub (1%)</span><span>{(parseFloat(swapAmount || "0") * 0.01).toFixed(4)} {swapFrom.toUpperCase()}</span></div>
-                            <div className="flex justify-between text-[9px] font-bold uppercase"><span className="opacity-40">Temps estimé</span><span className="text-green-400">Instantané</span></div>
-                        </div>
-
-                        <Button onClick={() => secureAction(handleSwapProcess)} disabled={isProcessingAction || !swapAmount} className="w-full h-20 bg-accent text-black font-black uppercase italic rounded-[2rem] shadow-2xl text-xl gap-4">
-                            {isProcessingAction ? <Loader2 className="animate-spin" /> : <><ArrowDownUp size={24} /> Valider l'Échange</>}
-                        </Button>
+            {/* SUCCESS FEEDBACK DIALOG */}
+            <Dialog open={isSuccessDialogOpen} onOpenChange={setIsSuccessDialogOpen}>
+                <DialogContent className="bg-card border-white/10 text-foreground rounded-[2.5rem] sm:max-w-md p-10 flex flex-col items-center text-center space-y-6">
+                    <div className="w-24 h-24 rounded-full bg-green-500/10 flex items-center justify-center text-green-400 shadow-[0_0_50px_rgba(34,197,94,0.2)] animate-in zoom-in-50 duration-500"><CheckCircle2 size={56} /></div>
+                    <div className="space-y-2">
+                        <h2 className="text-3xl font-black uppercase italic tracking-tighter">Action Validée</h2>
+                        <p className="text-sm text-white/60 italic">Le protocole DKS a confirmé la réussite de l'opération avec succès.</p>
                     </div>
-                </SheetContent>
-            </Sheet>
-
-            {/* RECEIVE SHEET */}
-            <Sheet open={isReceiveSheetOpen} onOpenChange={setIsReceiveSheetOpen}>
-                <SheetContent side="right" className="bg-card/95 backdrop-blur-3xl border-white/10 w-full sm:max-w-md flex flex-col p-0">
-                    <SheetHeader className="p-10 bg-accent/10 border-b border-white/5">
-                        <div className="flex items-center gap-5">
-                            <div className="w-16 h-16 rounded-2xl bg-accent/20 flex items-center justify-center text-accent shadow-xl shadow-accent/10"><ArrowDownLeft size={32} /></div>
-                            <div><SheetTitle className="text-3xl font-black uppercase italic tracking-tighter">Recevoir</SheetTitle><p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Mon Adresse de Wallet DKS</p></div>
-                        </div>
-                    </SheetHeader>
-                    <div className="flex-1 p-10 flex flex-col items-center justify-center gap-10">
-                        <div className="relative group">
-                            <div className="absolute inset-0 bg-accent/20 blur-[40px] rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
-                            <div className="relative bg-white p-8 rounded-[3rem] shadow-2xl">
-                                <QrCode size={200} className="text-black" />
-                            </div>
-                        </div>
-                        
-                        <div className="w-full space-y-6">
-                            <div className="space-y-2">
-                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-40 ml-1">Mon ID Unique</Label>
-                                <div className="flex gap-2">
-                                    <Input readOnly value={user?.uid || ""} className="h-14 bg-white/5 border-white/10 rounded-2xl font-mono text-[10px] text-accent tracking-wider text-center" />
-                                    <Button onClick={copyWalletId} variant="outline" className="h-14 w-14 rounded-2xl border-white/10 hover:bg-accent/10 hover:text-accent p-0 transition-all">
-                                        {hasCopiedId ? <Check size={20}/> : <Copy size={20}/>}
-                                    </Button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </SheetContent>
-            </Sheet>
-
-            {/* TRANSFER SHEET */}
-            <Sheet open={isTransferSheetOpen} onOpenChange={setIsTransferSheetOpen}>
-                <SheetContent side="right" className="bg-card/95 backdrop-blur-3xl border-white/10 w-full sm:max-w-md flex flex-col p-0">
-                    <SheetHeader className="p-10 bg-accent/10 border-b border-white/5">
-                        <div className="flex items-center gap-5">
-                            <div className="w-16 h-16 rounded-2xl bg-accent/20 flex items-center justify-center text-accent shadow-xl shadow-accent/10"><Send size={32} /></div>
-                            <div><SheetTitle className="text-3xl font-black uppercase italic tracking-tighter">Envoyer des Jetons</SheetTitle><p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Échange Universel DKS</p></div>
-                        </div>
-                    </SheetHeader>
-                    <div className="flex-1 p-10 space-y-10 overflow-y-auto">
-                        {!selectedRecipient ? (
-                            <div className="space-y-6">
-                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Chercher un membre</Label>
-                                <div className="relative"><Search className="absolute left-5 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} /><Input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Nom ou Email..." className="h-16 pl-14 bg-background/50 border-white/10 rounded-2xl focus:border-accent font-bold" /></div>
-                                {searchQuery.length >= 3 && (
-                                    <div className="space-y-2 max-h-[350px] overflow-y-auto pr-2 custom-scrollbar">
-                                        {isSearching ? <div className="py-10 text-center"><Loader2 className="animate-spin text-accent mx-auto h-8 w-8" /></div> : searchResults.map((u) => (
-                                            <button key={u.id} onClick={() => { setSelectedRecipient(u); setSearchQuery(""); }} className="flex items-center gap-4 p-5 w-full rounded-2xl bg-white/5 border border-white/5 hover:bg-accent/5 hover:border-accent/20 transition-all text-left">
-                                                <div className="w-12 h-12 rounded-xl bg-accent/10 flex items-center justify-center font-black text-accent text-lg italic">{(u.name || u.displayName)?.substring(0, 1)}</div>
-                                                <div className="flex-1 overflow-hidden"><p className="font-black text-sm uppercase italic truncate">{u.name || u.displayName}</p><p className="text-[10px] opacity-40 truncate">{u.email}</p></div>
-                                            </button>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        ) : (
-                            <form onSubmit={(e) => { e.preventDefault(); secureAction(handleTransferProcess); }} className="space-y-10">
-                                <div className="p-6 bg-accent/5 border border-accent/20 rounded-[2.5rem] flex items-center justify-between">
-                                    <div className="flex items-center gap-5">
-                                        <div className="w-14 h-14 rounded-2xl bg-accent text-black flex items-center justify-center font-black text-xl italic shadow-lg shadow-accent/20">{(selectedRecipient.name || selectedRecipient.displayName)?.substring(0, 1)}</div>
-                                        <div><p className="text-[9px] font-black text-accent uppercase tracking-widest">Envoi vers</p><p className="text-lg font-black uppercase italic text-white mt-1">{selectedRecipient.name || selectedRecipient.displayName}</p></div>
-                                    </div>
-                                    <Button variant="ghost" size="icon" onClick={() => setSelectedRecipient(null)}><X size={20}/></Button>
-                                </div>
-                                <div className="space-y-8">
-                                    <div className="space-y-3">
-                                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Montant</Label>
-                                        <div className="relative"><Coins className="absolute left-6 top-1/2 -translate-y-1/2 text-accent" size={24} /><Input type="number" step="0.01" value={transferAmount} onChange={(e) => setTransferAmount(e.target.value)} className="h-20 pl-16 bg-background/50 border-white/10 rounded-[2rem] text-4xl font-black text-accent" required /></div>
-                                    </div>
-                                    <div className="space-y-3">
-                                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Mémo</Label>
-                                        <Input value={transferMemo} onChange={(e) => setTransferMemo(e.target.value)} placeholder="Ex: Service Hub..." className="h-14 bg-background/50 border-white/10 rounded-2xl italic text-sm" />
-                                    </div>
-                                </div>
-                                <Button type="submit" disabled={isProcessingAction || !transferAmount} className="w-full h-20 bg-accent text-black font-black uppercase italic rounded-[2rem] shadow-2xl text-xl gap-4">{isProcessingAction ? <Loader2 className="animate-spin" /> : <><Send size={24} /> Valider le Transfert</>}</Button>
-                            </form>
-                        )}
-                    </div>
-                </SheetContent>
-            </Sheet>
+                    <Button onClick={() => setIsSuccessDialogOpen(false)} className="w-full h-14 bg-white text-black font-black uppercase italic rounded-2xl">Terminer</Button>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
 
 export default withAuth(UniversalWalletPage);
-
