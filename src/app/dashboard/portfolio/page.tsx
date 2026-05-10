@@ -30,6 +30,7 @@ import { Project } from '@/lib/types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
 
 const projectSchema = z.object({
   title: z.string().min(5, "Le titre est trop court"),
