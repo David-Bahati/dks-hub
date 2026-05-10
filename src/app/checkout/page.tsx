@@ -15,7 +15,6 @@ import {
     Loader2, 
     CreditCard, 
     Smartphone, 
-    Coins, 
     Zap, 
     Globe, 
     CheckCircle2, 
@@ -25,12 +24,11 @@ import {
     EyeOff, 
     ArrowRight,
     QrCode,
-    AlertCircle,
     ShoppingBag,
     Banknote,
-    Check,
     MapPin,
-    Info
+    Info,
+    Coins
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
@@ -40,6 +38,19 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { PI_GCV } from "@/lib/constants";
+
+/**
+ * LOGO OFFICIEL DU JETON DKST
+ */
+const DKSTIcon = ({ size = 20, className = "" }: { size?: number; className?: string }) => (
+  <div className={cn("relative flex items-center justify-center", className)} style={{ width: size, height: size }}>
+    <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full drop-shadow-[0_0_8px_rgba(56,189,248,0.6)]">
+      <path d="M50 5L93.3 30V70L50 95L6.7 70V30L50 5Z" fill="black" stroke="currentColor" strokeWidth="4" />
+      <path d="M35 35V65M35 50H55L65 35V65" stroke="currentColor" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="50" cy="50" r="40" stroke="currentColor" strokeWidth="1" strokeDasharray="4 4" className="opacity-20 animate-spin-slow" />
+    </svg>
+  </div>
+);
 
 type PaymentMethod = 'pi' | 'dkst' | 'mobile_money' | 'visa' | 'cash';
 
@@ -106,7 +117,7 @@ export default function CheckoutPage() {
             if (currentBalance < totalPrice) {
                 toast({ 
                     title: "Solde insuffisant", 
-                    description: `Il vous manque ${(totalPrice - currentBalance).toFixed(2)} DKST.`,
+                    description: `Il vous manque ${(totalPrice - currentBalance).toFixed(2)} DKST dans votre wallet.`,
                     variant: "destructive" 
                 });
                 return;
@@ -114,8 +125,8 @@ export default function CheckoutPage() {
 
             if (!user.walletPin) {
                 toast({ 
-                    title: "PIN non configuré", 
-                    description: "Veuillez définir un code PIN dans vos réglages.",
+                    title: "Protection PIN requise", 
+                    description: "Veuillez configurer votre code PIN de sécurité dans vos réglages avant d'utiliser vos DKST.",
                     variant: "destructive"
                 });
                 router.push('/dashboard/settings');
@@ -154,7 +165,7 @@ export default function CheckoutPage() {
             setIsPinOpen(false);
             executeOrder();
         } else {
-            toast({ title: "Code PIN incorrect", variant: "destructive" });
+            toast({ title: "Signature invalide", description: "Code PIN incorrect.", variant: "destructive" });
             setPin("");
         }
     };
@@ -171,7 +182,7 @@ export default function CheckoutPage() {
             piValue: totalPrice / PI_GCV,
             piTxId: piTxId || null,
             cdfValue: totalPrice * exchangeRate,
-            status: method === 'dkst' || method === 'visa' || method === 'mobile_money' ? "paid" : "pending_payment",
+            status: method === 'dkst' || method === 'visa' || method === 'mobile_money' ? "payée" : "pending_payment",
             paymentMethod: method === 'pi' ? 'PI_NETWORK' : method.toUpperCase(),
             operator: selectedOperator || null,
             createdAt: serverTimestamp(),
@@ -218,8 +229,8 @@ export default function CheckoutPage() {
                 }
 
                 toast({ 
-                    title: "Commande confirmée !", 
-                    description: "Votre reçu est disponible dans votre dashboard." 
+                    title: "Succès Élite", 
+                    description: "Votre commande a été validée et enregistrée." 
                 });
                 
                 clearCart();
@@ -244,8 +255,6 @@ export default function CheckoutPage() {
             </div>
         );
     }
-
-    const isBalanceInsufficient = method === 'dkst' && (user?.tokenBalance || 0) < totalPrice;
 
     const renderPriceContext = () => {
         switch(method) {
@@ -304,7 +313,7 @@ export default function CheckoutPage() {
                                             <p className="font-bold truncate uppercase italic text-[11px]">{item.name}</p>
                                             <p className="text-[10px] text-white/40">Quantité: {item.quantity}</p>
                                         </div>
-                                        <span className="font-black text-accent">${((item.price || 0) * item.quantity).toFixed(2)}</span>
+                                        <span className="font-black text-accent">${((item.sellingPrice || item.price || 0) * item.quantity).toFixed(2)}</span>
                                     </div>
                                 ))}
                             </CardContent>
@@ -346,7 +355,7 @@ export default function CheckoutPage() {
                                     method === 'dkst' ? "bg-accent/10 border-accent text-accent" : "bg-white/5 border-white/5 text-white/40 hover:bg-white/10"
                                 )}
                             >
-                                <Zap size={32} className={cn("transition-transform group-hover:scale-110", method === 'dkst' ? "text-accent" : "opacity-20")} />
+                                <DKSTIcon size={32} className={cn("transition-transform group-hover:scale-110", method === 'dkst' ? "text-accent" : "opacity-20")} />
                                 <div>
                                     <p className="font-black uppercase italic text-lg">Jeton DKST</p>
                                     <p className="text-[10px] opacity-60 uppercase font-bold tracking-widest">Wallet Interne</p>
@@ -505,14 +514,14 @@ export default function CheckoutPage() {
                                 <div className="p-8 bg-accent/5 rounded-[2.5rem] border border-accent/20 flex flex-col items-center gap-6 text-center">
                                     <Lock size={40} className="text-accent animate-pulse" />
                                     <div className="space-y-2">
-                                        <h4 className="text-xl font-black uppercase italic">Wallet interne DKS</h4>
+                                        <h4 className="text-xl font-black uppercase italic">Signature Cryptographique DKS</h4>
                                         <p className="text-sm text-white/60 italic">
-                                            Débit direct de votre solde miné. Signature PIN requise.
+                                            L'achat sera débité directement de votre solde miné.
                                         </p>
                                     </div>
                                     <div className="w-full max-w-xs p-4 rounded-2xl border border-white/5 bg-black/40 flex justify-between items-center">
-                                        <span className="text-[10px] font-black uppercase opacity-40">Solde</span>
-                                        <span className={cn("text-lg font-black", isBalanceInsufficient ? "text-red-500" : "text-accent")}>
+                                        <span className="text-[10px] font-black uppercase opacity-40">Votre Solde</span>
+                                        <span className={cn("text-lg font-black", (user?.tokenBalance || 0) < totalPrice ? "text-red-500" : "text-accent")}>
                                             {user?.tokenBalance?.toFixed(2) || 0} DKST
                                         </span>
                                     </div>
@@ -521,10 +530,10 @@ export default function CheckoutPage() {
 
                             <Button 
                                 onClick={validateOrder} 
-                                disabled={isProcessing || isBalanceInsufficient || (method === 'mobile_money' && (!phoneNumber || !selectedOperator))}
+                                disabled={isProcessing || (method === 'mobile_money' && (!phoneNumber || !selectedOperator))}
                                 className={cn(
                                     "w-full h-20 font-black uppercase italic rounded-2xl shadow-xl text-lg mt-10 gap-3 hover:scale-[1.02] transition-all",
-                                    (isBalanceInsufficient || (method === 'mobile_money' && (!phoneNumber || !selectedOperator))) ? "bg-white/5 text-white/20" : "bg-accent text-black shadow-accent/20"
+                                    (method === 'mobile_money' && (!phoneNumber || !selectedOperator)) ? "bg-white/5 text-white/20" : "bg-accent text-black shadow-accent/20"
                                 )}
                             >
                                 {isProcessing ? <Loader2 className="animate-spin" /> : <><CheckCircle2 size={24} /> Confirmer & Valider ${totalPrice.toFixed(2)}</>}
