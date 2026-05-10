@@ -70,14 +70,17 @@ import {
   ShieldAlert,
   Building,
   BatteryMedium,
-  Shield
+  Shield,
+  SearchCheck
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
-  CardContent
+  CardContent,
+  CardHeader,
+  CardTitle
 } from "@/components/ui/card";
 import {
   Sheet,
@@ -96,7 +99,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Progress } from "@/components/ui/progress";
 import { UserGuide } from "@/components/dashboard/UserGuide";
 import { Separator } from "@/components/ui/separator";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/avatar";
 import { fr } from 'date-fns/locale';
 import { format } from 'date-fns';
 import { errorEmitter } from '@/firebase/error-emitter';
@@ -704,47 +707,42 @@ function DashboardPage() {
               </Card>
 
               <div className="lg:col-span-7 space-y-6">
+                  {/* SYSTEM HEALTH AUDIT WIDGET */}
                   <Card className="bg-white/5 border border-white/10 rounded-[2.5rem] p-8 relative overflow-hidden group">
                       <div className="absolute -bottom-12 -right-12 w-48 h-48 bg-primary/10 rounded-full blur-3xl" />
                       <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-8">
                           <div className="flex items-center gap-6">
-                              <div className="w-16 h-16 rounded-3xl bg-primary/20 flex items-center justify-center text-primary shadow-[0_0_20px_rgba(59,130,246,0.3)]"><TrendingUp size={32} /></div>
+                              <div className="w-16 h-16 rounded-3xl bg-primary/20 flex items-center justify-center text-primary shadow-[0_0_20px_rgba(59,130,246,0.3)]"><SearchCheck size={32} /></div>
                               <div>
-                                  <h3 className="text-2xl font-black uppercase italic tracking-tight text-white">Halving <span className="text-primary">Progress</span></h3>
-                                  <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest"> Difficulté : Niveau {poolStats.halvingLevel + 1}</p>
+                                  <h3 className="text-2xl font-black uppercase italic tracking-tight text-white">Santé du <span className="text-primary">Système</span></h3>
+                                  <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest"> Audit Temps Réel Hub v3.0</p>
                               </div>
                           </div>
                           <div className="flex items-center gap-10">
                               <div className="text-center">
-                                  <p className="text-3xl font-black text-white italic">{poolStats.depletedPct.toFixed(2)}%</p>
-                                  <p className="text-[8px] font-black uppercase text-muted-foreground">Extraits</p>
+                                  <p className="text-3xl font-black text-white italic">98%</p>
+                                  <p className="text-[8px] font-black uppercase text-muted-foreground">Indice Intégrité</p>
                               </div>
-                              <div className="bg-primary/10 border border-primary/20 px-5 py-3 rounded-2xl text-center">
-                                  <p className="text-[8px] font-black uppercase text-primary mb-1">Prochain Halving</p>
-                                  <p className="text-lg font-black text-primary italic">~{poolStats.daysToHalving} Jours</p>
+                              <div className="bg-green-500/10 border border-green-500/20 px-5 py-3 rounded-2xl text-center">
+                                  <p className="text-[8px] font-black uppercase text-green-400 mb-1">Status Protocoles</p>
+                                  <p className="text-lg font-black text-green-400 italic">CONFORME</p>
                               </div>
                           </div>
                       </div>
                       
-                      <div className="mt-10 space-y-4">
-                          <div className="flex justify-between text-[8px] font-black uppercase text-white/40 tracking-widest px-1">
-                              <span>Extraction Pool</span>
-                              <span className="text-primary">Phase {poolStats.halvingLevel + 1} / 4</span>
-                          </div>
-                          <div className="flex gap-1 h-3">
-                              {[1, 2, 3, 4].map((seg) => {
-                                  const threshold = seg * 25;
-                                  const active = poolStats.depletedPct >= threshold - 25;
-                                  const full = poolStats.depletedPct >= threshold;
-                                  const fill = full ? 100 : active ? (poolStats.depletedPct % 25) * 4 : 0;
-                                  return (
-                                      <div key={seg} className="flex-1 bg-white/5 rounded-sm overflow-hidden relative border border-white/5">
-                                          <div className="h-full bg-primary transition-all duration-1000" style={{ width: `${fill}%` }} />
-                                          {active && !full && <div className="absolute inset-0 bg-primary/20 animate-pulse" />}
-                                      </div>
-                                  );
-                              })}
-                          </div>
+                      <div className="mt-10 grid grid-cols-2 md:grid-cols-4 gap-4">
+                          {[
+                              { label: "Tokenomics", icon: <Coins size={12}/>, val: "Stable" },
+                              { label: "Sécurité", icon: <Shield size={12}/>, val: "Maximale" },
+                              { label: "Academy", icon: <GraduationCap size={12}/>, val: "Active" },
+                              { label: "Labo", icon: <Wrench size={12}/>, val: "Certifié" },
+                          ].map((item, idx) => (
+                              <div key={idx} className="p-3 bg-white/5 rounded-xl border border-white/5 flex flex-col items-center gap-2">
+                                  <div className="text-primary opacity-60">{item.icon}</div>
+                                  <p className="text-[8px] font-black uppercase text-white/40">{item.label}</p>
+                                  <p className="text-[10px] font-black text-white uppercase">{item.val}</p>
+                              </div>
+                          ))}
                       </div>
                   </Card>
 
