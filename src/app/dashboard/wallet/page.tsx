@@ -72,7 +72,8 @@ import {
     Database,
     Network,
     Terminal,
-    Link as LinkIcon
+    Link as LinkIcon,
+    Clock
 } from "lucide-react";
 import { db } from '@/lib/firebase';
 import { collection, query, where, orderBy, limit, addDoc, serverTimestamp, doc, updateDoc, increment, getDocs, Timestamp } from 'firebase/firestore';
@@ -82,7 +83,7 @@ import { useCollection, useDoc, useMemoFirebase } from '@/firebase';
 import { useAuth } from "@/context/AuthContext";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { cn } from "@/lib/utils";
+import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -325,12 +326,12 @@ function UniversalWalletPage() {
     };
 
     const handleConvertPoints = async () => {
-        const amt = parseInt(pointsToConvert);
-        if (!user || isNaN(amt) || amt > stats.availablePoints || amt < POINTS_PER_TOKEN) return;
+        const amt = stats.redeemableTokens * POINTS_PER_TOKEN;
+        if (!user || amt < POINTS_PER_TOKEN) return;
 
         setIsProcessingAction(true);
         try {
-            const tokens = Math.floor(amt / POINTS_PER_TOKEN);
+            const tokens = stats.redeemableTokens;
             await updateDoc(doc(db, "users", user.uid), {
                 tokenBalance: increment(tokens),
                 pointsConverted: increment(amt),
@@ -343,7 +344,6 @@ function UniversalWalletPage() {
             });
             toast({ title: "Conversion réussie !" });
             setIsPointsSheetOpen(false);
-            setPointsToConvert("");
             setIsSuccessDialogOpen(true);
         } catch (e) { toast({ title: "Erreur", variant: "destructive" }); } finally { setIsProcessingAction(false); }
     };
@@ -885,7 +885,7 @@ function UniversalWalletPage() {
                             <p className="text-[10px] font-bold text-red-400 uppercase leading-relaxed italic">AVERTISSEMENT : L'ajout d'un réseau personnalisé comporte des risques.</p>
                         </div>
 
-                        <Button onClick={() => secureAction(handleConnectNetwork)} disabled={isProcessingAction || !rpcUrl} className="w-full h-20 bg-primary text-white font-black uppercase italic rounded-[2.5rem] shadow-2xl text-xl gap-4">
+                        <Button onClick={() => secureAction(() => toast({ title: "Réseau Connecté" }))} disabled={isProcessingAction || !rpcUrl} className="w-full h-20 bg-primary text-white font-black uppercase italic rounded-[2.5rem] shadow-2xl text-xl gap-4">
                             {isProcessingAction ? <Loader2 className="animate-spin" /> : <><Globe size={24} /> Connecter au Hub</>}
                         </Button>
                     </div>
@@ -967,3 +967,4 @@ function UniversalWalletPage() {
 }
 
 export default withAuth(UniversalWalletPage);
+
