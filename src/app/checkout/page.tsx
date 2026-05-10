@@ -237,7 +237,8 @@ export default function CheckoutPage() {
                 });
                 
                 clearCart();
-                router.push('/dashboard/orders');
+                // REDIRECTION VERS LA PAGE DE SUCCÈS
+                router.push(`/checkout/success?id=${orderRef.id}`);
             })
             .catch(async (error) => {
                 setIsProcessing(false);
