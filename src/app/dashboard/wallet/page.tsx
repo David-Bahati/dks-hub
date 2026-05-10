@@ -47,7 +47,8 @@ import {
     Star,
     Key,
     RotateCw,
-    Shield
+    Shield,
+    CheckCircle2
 } from "lucide-react";
 import { db } from '@/lib/firebase';
 import { collection, query, where, orderBy, limit, addDoc, serverTimestamp, doc, updateDoc, increment, getDocs, setDoc } from 'firebase/firestore';
@@ -123,12 +124,6 @@ const NETWORKS = [
     { id: 'pi', name: 'Pi Network', icon: <Globe size={14}/> },
 ];
 
-const RPC_PRESETS = [
-    { name: "Pi Network Mainnet", rpc: "https://api.minepi.com/v2", chainId: "1", explorer: "https://minepi.com/blockexplorer" },
-    { name: "Ethereum Mainnet", rpc: "https://mainnet.infura.io/v3/...", chainId: "1", explorer: "https://etherscan.io" },
-    { name: "Polygon PoS", rpc: "https://polygon-rpc.com", chainId: "137", explorer: "https://polygonscan.com" },
-];
-
 const WORDLIST = [
     "abandon", "ability", "able", "about", "above", "absent", "absorb", "abstract", "absurd", "abuse", "access", "accident",
     "account", "accuse", "achieve", "acid", "acoustic", "acquire", "across", "act", "action", "actor", "actress", "actual",
@@ -140,19 +135,16 @@ function UniversalWalletPage() {
     const { user } = useAuth();
     const { toast } = useToast();
     
-    // UI Visibility States
     const [isMounted, setIsMounted] = useState(false);
     const [isBalanceVisible, setIsBalanceVisible] = useState(true);
     const [networkFilter, setNetworkFilter] = useState('all');
 
-    // Onboarding Seed Phrase States
     const [isOnboarding, setIsOnboarding] = useState(false);
-    const [onboardingStep, setOnboardingStep] = useState(1); // 1: Info, 2: Reveal, 3: Verify
+    const [onboardingStep, setOnboardingStep] = useState(1);
     const [generatedMnemonic, setGeneratedMnemonic] = useState<string[]>([]);
     const [verificationWords, setVerificationWords] = useState<string[]>([]);
     const [isCreatingWallet, setIsCreatingWallet] = useState(false);
 
-    // Action Sheets/Dialogs
     const [isTransferSheetOpen, setIsTransferSheetOpen] = useState(false);
     const [isReceiveSheetOpen, setIsReceiveSheetOpen] = useState(false);
     const [isSwapSheetOpen, setIsSwapSheetOpen] = useState(false);
@@ -162,7 +154,6 @@ function UniversalWalletPage() {
     const [isPinVerificationOpen, setIsPinVerificationOpen] = useState(false);
     const [isSuccessDialogOpen, setIsSuccessDialogOpen] = useState(false);
 
-    // Form States
     const [transferAmount, setTransferAmount] = useState("");
     const [transferMemo, setTransferMemo] = useState("");
     const [selectedRecipient, setSelectedRecipient] = useState<any>(null);
@@ -174,38 +165,29 @@ function UniversalWalletPage() {
     const [showPin, setShowPin] = useState(false);
     const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
 
-    // Swap States
     const [swapFrom, setSwapFrom] = useState('dkst');
     const [swapTo, setSwapTo] = useState('pi');
     const [swapAmount, setSwapAmount] = useState("");
 
-    // Staking States
     const [stakingAmount, setStakingAmount] = useState("");
-    const [selectedStakingOption, setSelectedStakingOption] = useState(STAKING_OPTIONS[3]); // Default 1 year
+    const [selectedStakingOption, setSelectedStakingOption] = useState(STAKING_OPTIONS[3]);
     const [stakingMode, setStakingMode] = useState<'stake' | 'unstake'>('stake');
 
-    // Network Setup States
     const [rpcUrl, setRpcUrl] = useState("");
-    const [chainId, setChainId] = useState("");
-    const [rpcPing, setRpcPing] = useState<number | null>(null);
     const [isRpcValidating, setIsRpcValidating] = useState(false);
 
-    // Processing States
     const [isProcessingAction, setIsProcessingAction] = useState(false);
     const [isEmergencyLockProcessing, setIsEmergencyLockProcessing] = useState(false);
     const [hasCopiedId, setHasCopiedId] = useState(false);
 
-    // Refs
     const scrollRef = useRef<HTMLDivElement>(null);
 
-    // Queries
     const txQuery = useMemoFirebase(() => {
         if (!user?.uid) return null;
         return query(collection(db, "tokenTransactions"), where("userId", "==", user.uid), orderBy("createdAt", "desc"), limit(50));
     }, [user?.uid]);
     const { data: transactions } = useCollection(txQuery);
 
-    // Seed Phrase Generation
     const generateNewMnemonic = () => {
         const words = [];
         const indices = new Uint32Array(12);
@@ -248,7 +230,6 @@ function UniversalWalletPage() {
         }
     };
 
-    // Stats Calculation
     const stats = useMemo(() => {
         if (!user) return { totalPoints: 0, availablePoints: 0, redeemableTokens: 0, progress: 0, stakingRewards: 0, gcvUSD: 0, totalTokens: 0, wealthHistory: [] };
 
@@ -311,21 +292,6 @@ function UniversalWalletPage() {
             setIsOnboarding(true);
         }
     }, [user]);
-
-    // RPC Ping Simulation
-    useEffect(() => {
-        if (rpcUrl.startsWith("http")) {
-            setIsRpcValidating(true);
-            const timeout = setTimeout(() => {
-                setRpcPing(Math.floor(Math.random() * 50) + 10);
-                setIsRpcValidating(false);
-            }, 800);
-            return () => clearTimeout(timeout);
-        } else {
-            setRpcPing(null);
-            setIsRpcValidating(false);
-        }
-    }, [rpcUrl]);
 
     const secureAction = (action: () => void) => {
         if (user?.isWalletLocked) {
@@ -417,6 +383,26 @@ function UniversalWalletPage() {
             });
             toast({ title: "Vault Actif" });
             setStakingAmount("");
+            setIsSuccessDialogOpen(true);
+        } catch (e) { toast({ title: "Erreur", variant: "destructive" }); } finally { setIsProcessingAction(false); }
+    };
+
+    const handleUnstake = async () => {
+        if (!user || !user.stakedBalance) return;
+        setIsProcessingAction(true);
+        try {
+            const amount = user.stakedBalance;
+            await updateDoc(doc(db, "users", user.uid), {
+                tokenBalance: increment(amount + stats.stakingRewards),
+                stakedBalance: 0,
+                stakingStartedAt: null,
+                updatedAt: serverTimestamp()
+            });
+            await addDoc(collection(db, "tokenTransactions"), { 
+                userId: user.uid, userName: user.name, type: 'unstaking', 
+                tokenAmount: amount, createdAt: serverTimestamp() 
+            });
+            toast({ title: "Fonds Libérés" });
             setIsSuccessDialogOpen(true);
         } catch (e) { toast({ title: "Erreur", variant: "destructive" }); } finally { setIsProcessingAction(false); }
     };
