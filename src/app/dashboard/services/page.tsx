@@ -288,18 +288,6 @@ function ServiceManagementPage() {
                                     <div className="flex flex-col gap-3 shrink-0 min-w-[220px]">
                                         {isStaff ? (
                                             <div className="space-y-3">
-                                                <Select value={booking.technicianId || ""} onValueChange={(val) => {
-                                                    const tech = staffMembers.find(s => s.id === val);
-                                                    assignTechnician(booking.id, val, tech?.displayName || tech?.name);
-                                                }}>
-                                                    <SelectTrigger className="h-10 bg-primary/10 border-primary/20 rounded-xl font-bold uppercase text-[9px]">
-                                                        <UserCheck className="mr-2 h-3 w-3" />
-                                                        <SelectValue placeholder="Assigner Instructeur" />
-                                                    </SelectTrigger>
-                                                    <SelectContent className="bg-card border-white/10">
-                                                        {staffMembers.map(m => <SelectItem key={m.id} value={m.id}>{m.displayName || m.name}</SelectItem>)}
-                                                    </SelectContent>
-                                                </Select>
                                                 <div className="flex gap-2">
                                                     <Select value={booking.status} onValueChange={(val) => updateBookingStatus(booking, val)}>
                                                         <SelectTrigger className="flex-1 h-10 bg-white/5 border-white/10 rounded-xl font-black uppercase italic text-[9px]"><SelectValue placeholder="Suivi Cursus" /></SelectTrigger>
@@ -389,8 +377,13 @@ function ServiceManagementPage() {
                                                     </textPath>
                                                 </text>
                                             </svg>
-                                            <p className="text-[5px] font-black text-blue-900 uppercase leading-none">DKS ACADEMY</p>
-                                            <ShieldCheck size={18} className="text-blue-900 my-0.5" />
+                                            <p className="text-[5px] font-black text-blue-900 leading-none">DKS ACADEMY</p>
+                                            <div className="my-1">
+                                                <svg viewBox="0 0 200 200" className="w-10 h-10 text-blue-900">
+                                                    <path d="M65 65V135M65 100L95 65M65 100L95 135" stroke="currentColor" strokeWidth="16" strokeLinecap="round" strokeLinejoin="round" />
+                                                    <path d="M135 65V135M135 100L105 65M135 100L105 135" stroke="currentColor" strokeWidth="16" strokeLinecap="round" strokeLinejoin="round" />
+                                                </svg>
+                                            </div>
                                             <p className="text-[4px] font-bold text-blue-900 uppercase">OFFICIAL SEAL</p>
                                             <p className="text-[6px] font-black text-blue-900 uppercase tracking-widest mt-0.5">BUNIA</p>
                                         </div>

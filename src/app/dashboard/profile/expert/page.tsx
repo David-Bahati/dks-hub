@@ -126,7 +126,12 @@ function ExpertProfilePage() {
                                             </text>
                                         </svg>
                                         <p className="text-[5px] font-black text-blue-900 uppercase leading-none">DKS EXPERT CERT</p>
-                                        <ShieldCheck size={18} className="text-blue-900 my-0.5" />
+                                        <div className="my-1">
+                                            <svg viewBox="0 0 200 200" className="w-10 h-10 text-blue-900">
+                                                <path d="M65 65V135M65 100L95 65M65 100L95 135" stroke="currentColor" strokeWidth="16" strokeLinecap="round" strokeLinejoin="round" />
+                                                <path d="M135 65V135M135 100L105 65M135 100L105 135" stroke="currentColor" strokeWidth="16" strokeLinecap="round" strokeLinejoin="round" />
+                                            </svg>
+                                        </div>
                                         <p className="text-[4px] font-bold text-blue-900 uppercase">OFFICIAL SEAL</p>
                                         <p className="text-[6px] font-black text-blue-900 uppercase tracking-widest mt-0.5">BUNIA</p>
                                     </div>

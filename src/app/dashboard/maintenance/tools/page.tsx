@@ -25,7 +25,8 @@ import {
     Download,
     QrCode,
     Printer,
-    Lock
+    Lock,
+    X
 } from "lucide-react";
 import { db } from '@/lib/firebase';
 import { collection, addDoc, doc, updateDoc, serverTimestamp, query, orderBy, increment } from 'firebase/firestore';
@@ -91,53 +92,6 @@ function ToolMaintenancePage() {
             toast({ title: "Erreur", variant: "destructive" });
         } finally {
             setIsSubmitting(false);
-        }
-    };
-
-    const recordUsage = async (tool: any) => {
-        try {
-            const newCount = tool.usageCount + 1;
-            let newStatus = tool.status;
-            
-            if (newCount >= tool.usageThreshold) {
-                newStatus = 'service_needed';
-            } else if (newCount >= tool.usageThreshold * 0.8) {
-                newStatus = 'warning';
-            }
-
-            await updateDoc(doc(db, "labTools", tool.id), {
-                usageCount: increment(1),
-                status: newStatus,
-                updatedAt: serverTimestamp()
-            });
-
-            toast({ title: "Utilisation notée", description: `Session enregistrée pour ${tool.name}.` });
-        } catch (error) {
-            toast({ title: "Erreur", variant: "destructive" });
-        }
-    };
-
-    const performMaintenance = async (tool: any) => {
-        try {
-            await updateDoc(doc(db, "labTools", tool.id), {
-                usageCount: 0,
-                status: 'excellent',
-                lastMaintenance: serverTimestamp(),
-                updatedAt: serverTimestamp()
-            });
-
-            await addDoc(collection(db, "maintenanceLogs"), {
-                toolId: tool.id,
-                toolName: tool.name,
-                type: 'checkup',
-                description: 'Maintenance préventive complète et remise à zéro des cycles.',
-                technicianName: user?.name || 'Expert DKS',
-                createdAt: serverTimestamp()
-            });
-
-            toast({ title: "Maintenance Validée", description: `${tool.name} repart pour un nouveau cycle.` });
-        } catch (error) {
-            toast({ title: "Erreur", variant: "destructive" });
         }
     };
 
@@ -230,6 +184,7 @@ function ToolMaintenancePage() {
 
                             <div className="grid grid-cols-3 items-end pt-12">
                                 <div className="text-center">
+                                    <p className="text-[10px] font-bold uppercase tracking-widest opacity-40">Seuil de conformité</p>
                                     <p className="text-sm font-bold uppercase">{selectedToolForCert.usageThreshold} Cycles</p>
                                 </div>
                                 <div className="flex flex-col items-center gap-4">
@@ -249,7 +204,12 @@ function ToolMaintenancePage() {
                                                 </text>
                                             </svg>
                                             <p className="text-[5px] font-black text-blue-900 uppercase leading-none">DKS LAB CALIB</p>
-                                            <ShieldCheck size={18} className="text-blue-900 my-0.5" />
+                                            <div className="my-1">
+                                                <svg viewBox="0 0 200 200" className="w-10 h-10 text-blue-900">
+                                                    <path d="M65 65V135M65 100L95 65M65 100L95 135" stroke="currentColor" strokeWidth="16" strokeLinecap="round" strokeLinejoin="round" />
+                                                    <path d="M135 65V135M135 100L105 65M135 100L105 135" stroke="currentColor" strokeWidth="16" strokeLinecap="round" strokeLinejoin="round" />
+                                                </svg>
+                                            </div>
                                             <p className="text-[4px] font-bold text-blue-900 uppercase">OFFICIAL SEAL</p>
                                             <p className="text-[6px] font-black text-blue-900 uppercase tracking-widest mt-0.5">BUNIA</p>
                                         </div>

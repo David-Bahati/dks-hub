@@ -68,60 +68,6 @@ function QuotesManagementPage() {
 
     const isStaff = user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'seller' || user?.role?.toLowerCase() === 'cashier';
 
-    const handleAddItem = () => {
-        setQuoteItems([...quoteItems, { name: "", quantity: 1, price: 0 }]);
-    };
-
-    const removeItem = (index: number) => {
-        setQuoteItems(quoteItems.filter((_, i) => i !== index));
-    };
-
-    const updateItem = (index: number, field: string, value: any) => {
-        const newItems = [...quoteItems];
-        newItems[index] = { ...newItems[index], [field]: value };
-        setQuoteItems(newItems);
-    };
-
-    const handleSubmitQuote = async (e: React.FormEvent<HTMLFormElement>) => {
-        e.preventDefault();
-        if (quoteItems.length === 0) {
-            toast({ title: "Devis vide", description: "Ajoutez au moins un article.", variant: "destructive" });
-            return;
-        }
-
-        setIsSubmitting(true);
-        const formData = new FormData(e.currentTarget);
-        const total = quoteItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
-
-        try {
-            const expiry = new Date();
-            expiry.setDate(expiry.getDate() + 15); // Valid 15 days
-
-            const quoteData = {
-                userId: formData.get('userId') || user?.uid, 
-                customerName: formData.get('customerName'),
-                businessName: formData.get('businessName'),
-                items: quoteItems,
-                total: total,
-                status: 'sent',
-                expiryDate: expiry.toISOString(),
-                notes: formData.get('notes'),
-                createdAt: serverTimestamp(),
-                updatedAt: serverTimestamp()
-            };
-
-            await addDoc(collection(db, "quotes"), quoteData);
-            
-            toast({ title: "Devis créé", description: "Le document est prêt à être exporté." });
-            setIsSheetOpen(false);
-            setQuoteItems([]);
-        } catch (error) {
-            toast({ title: "Erreur", variant: "destructive" });
-        } finally {
-            setIsSubmitting(false);
-        }
-    };
-
     const handleDownloadQuote = async (quote: any) => {
         setSelectedOrderForPDF(quote);
         setTimeout(async () => {
@@ -236,7 +182,12 @@ function QuotesManagementPage() {
                                             </text>
                                         </svg>
                                         <p className="text-[6px] font-black text-blue-900 leading-none">DOUBLE KING SHOP</p>
-                                        <ShieldCheck size={26} className="text-blue-900 my-1.5" />
+                                        <div className="my-1.5">
+                                            <svg viewBox="0 0 200 200" className="w-12 h-12 text-blue-900">
+                                                <path d="M65 65V135M65 100L95 65M65 100L95 135" stroke="currentColor" strokeWidth="16" strokeLinecap="round" strokeLinejoin="round" />
+                                                <path d="M135 65V135M135 100L105 65M135 100L105 135" stroke="currentColor" strokeWidth="16" strokeLinecap="round" strokeLinejoin="round" />
+                                            </svg>
+                                        </div>
                                         <p className="text-[6px] font-bold text-blue-900 uppercase">OFFICIAL QUOTE</p>
                                         <p className="text-[7px] font-black text-blue-900 uppercase tracking-widest mt-1">BUNIA</p>
                                     </div>

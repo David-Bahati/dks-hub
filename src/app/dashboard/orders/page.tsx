@@ -27,7 +27,8 @@ import {
   Globe,
   Lock,
   Banknote,
-  CheckCircle2
+  CheckCircle2,
+  X
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useCollection, useMemoFirebase } from '@/firebase';
@@ -492,7 +493,10 @@ export default function OrdersPage() {
                                     
                                     <p className="text-[8px] font-black text-blue-900 uppercase leading-none tracking-tighter z-10">DOUBLE KING SHOP</p>
                                     <div className="my-1 z-10">
-                                        <ShieldCheck className="text-blue-900" size={24} />
+                                        <svg viewBox="0 0 200 200" className="w-10 h-10 text-blue-900">
+                                            <path d="M65 65V135M65 100L95 65M65 100L95 135" stroke="currentColor" strokeWidth="14" strokeLinecap="round" strokeLinejoin="round" />
+                                            <path d="M135 65V135M135 100L105 65M135 100L105 135" stroke="currentColor" strokeWidth="14" strokeLinecap="round" strokeLinejoin="round" />
+                                        </svg>
                                     </div>
                                     <p className="text-[6px] font-bold text-blue-900 uppercase leading-none z-10">OFFICIAL HUB</p>
                                     <p className="text-[7px] font-black text-blue-900 uppercase tracking-widest mt-0.5 z-10">BUNIA • RDC</p>
@@ -557,7 +561,7 @@ export default function OrdersPage() {
                                 )}
 
                                 <p className="text-right text-xs font-bold text-gray-400 uppercase">
-                                    Équivalent : {(selectedOrderForPDF.cdfValue || selectedOrderForPDF.total * exchangeRate).toLocaleString()} CDF
+                                    Équivalent : {(selectedOrderForPDF.total * exchangeRate).toLocaleString()} CDF
                                 </p>
                             </div>
                         </div>
