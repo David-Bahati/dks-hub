@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useMemo, useState, useEffect, useRef } from 'react';
@@ -20,7 +19,7 @@ import {
     Vault,
     Timer,
     CircleDollarSign,
-    Search,
+    Search, 
     User as UserIcon,
     X,
     ArrowDownLeft,
@@ -43,7 +42,8 @@ import {
     Calculator,
     Medal,
     Sparkles,
-    Flame
+    Flame,
+    Star
 } from "lucide-react";
 import { db } from '@/lib/firebase';
 import { collection, query, where, orderBy, limit, addDoc, serverTimestamp, doc, updateDoc, increment, getDocs, Timestamp } from 'firebase/firestore';
