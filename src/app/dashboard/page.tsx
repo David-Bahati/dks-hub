@@ -68,7 +68,9 @@ import {
   Briefcase,
   UserCheck,
   ShieldAlert,
-  Building
+  Building,
+  BatteryMedium,
+  Shield
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -85,7 +87,7 @@ import {
 import withAuth from '@/components/auth/withAuth';
 import { useAuth } from '@/context/AuthContext';
 import { useCollection, useMemoFirebase, useDoc } from '@/firebase';
-import { collection, query, where, addDoc, serverTimestamp, doc, updateDoc, increment, Timestamp, arrayUnion, setDoc } from 'firebase/firestore';
+import { collection, query, where, addDoc, serverTimestamp, doc, updateDoc, increment, Timestamp, arrayUnion, setDoc, orderBy } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
 import { signOut } from 'firebase/auth';
 import { cn } from "@/lib/utils";
@@ -638,6 +640,10 @@ function DashboardPage() {
                           <div className="space-y-1">
                               <Badge className="bg-accent text-black font-black uppercase italic text-[9px] px-4 py-1 mb-2">Pool Communautaire 65%</Badge>
                               <h2 className="text-3xl font-black uppercase italic tracking-tighter">MINAGE <span className="text-accent">D'ÉLITE</span></h2>
+                              <div className="flex items-center gap-2 mt-2">
+                                <BatteryMedium size={12} className="text-green-400" />
+                                <span className="text-[8px] font-black uppercase text-green-400 tracking-widest">Simulated Cloud Mining • Battery Safe</span>
+                              </div>
                           </div>
                           <div className={cn("border p-3 rounded-2xl text-center transition-all duration-500", getRarityColor(user?.lastBlockRarity || 'common'))}>
                               <p className="text-[8px] font-black uppercase mb-1">Rareté</p>
@@ -662,7 +668,7 @@ function DashboardPage() {
                                   <div className="space-y-4">
                                       <div className="flex flex-col items-center gap-2">
                                           <Badge variant="outline" className="bg-accent/10 border-accent/20 text-accent text-[9px] font-black uppercase flex items-center gap-2">
-                                              <Activity size={10} className="animate-pulse" /> Extraction active
+                                              <Activity size={10} className="animate-pulse" /> Extraction Cloud Active
                                           </Badge>
                                           {realTimeGain > 0 && (
                                               <p className="text-xl font-black text-green-400 italic">
@@ -688,8 +694,8 @@ function DashboardPage() {
                                   </div>
 
                                   <div className="flex items-center gap-3 justify-center">
-                                      <Timer size={14} className="text-accent/40" />
-                                      <p className="text-[8px] font-black uppercase tracking-widest text-white/20">Cycle 24h par bloc</p>
+                                      <Shield size={14} className="text-accent/40" />
+                                      <p className="text-[8px] font-black uppercase tracking-widest text-white/20">Processus Cloud Éco-responsable</p>
                                   </div>
                               </div>
                           )}
