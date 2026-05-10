@@ -144,9 +144,9 @@ const RPC_PRESETS = [
 function UniversalWalletPage() {
     const { user } = useAuth();
     const { toast } = useToast();
-    const [isMounted, setIsMounted] = useState(false);
     
     // UI Visibility States
+    const [isMounted, setIsMounted] = useState(false);
     const [isBalanceVisible, setIsBalanceVisible] = useState(true);
     const [networkFilter, setNetworkFilter] = useState('all');
 
@@ -173,6 +173,11 @@ function UniversalWalletPage() {
     const [showPin, setShowPin] = useState(false);
     const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
 
+    // Swap States
+    const [swapFrom, setSwapFrom] = useState('dkst');
+    const [swapTo, setSwapTo] = useState('pi');
+    const [swapAmount, setSwapAmount] = useState("");
+
     // Staking States
     const [stakingAmount, setStakingAmount] = useState("");
     const [selectedStakingOption, setSelectedStakingOption] = useState(STAKING_OPTIONS[3]); // Default 1 year
@@ -186,28 +191,21 @@ function UniversalWalletPage() {
 
     // Processing States
     const [isProcessingAction, setIsProcessingAction] = useState(false);
+    const [isEmergencyLockProcessing, setIsEmergencyLockProcessing] = useState(false);
     const [hasCopiedId, setHasCopiedId] = useState(false);
 
-    const isStaff = user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'seller' || user?.role?.toLowerCase() === 'cashier';
+    // Refs
+    const scrollRef = useRef<HTMLDivElement>(null);
 
     // Queries
-    const logsQuery = useMemoFirebase(() => {
-        if (!user?.uid || !isStaff) return null;
-        return query(collection(db, "technicianLogs"), where("userId", "==", user.uid));
-    }, [user?.uid, isStaff]);
-    const { data: logs } = useCollection(logsQuery);
-
-    const ordersQuery = useMemoFirebase(() => {
-        if (!user?.uid) return null;
-        return query(collection(db, "orders"), where("userId", "==", user.uid), where("status", "in", ["payée", "payé", "completed", "terminé"]));
-    }, [user?.uid]);
-    const { data: orders } = useCollection(ordersQuery);
-
     const txQuery = useMemoFirebase(() => {
         if (!user?.uid) return null;
-        return query(collection(db, "tokenTransactions"), where("userId", "==", user.uid), orderBy("createdAt", "asc"));
+        return query(collection(db, "tokenTransactions"), where("userId", "==", user.uid), orderBy("createdAt", "desc"), limit(50));
     }, [user?.uid]);
     const { data: transactions } = useCollection(txQuery);
+
+    const allUsersQuery = useMemoFirebase(() => collection(db, "users"), []);
+    const { data: allUsers } = useCollection(allUsersQuery);
 
     // Stats Calculation
     const stats = useMemo(() => {
@@ -234,8 +232,10 @@ function UniversalWalletPage() {
 
         let runningTotal = 0;
         const wealthHistory: any[] = [];
-        transactions?.forEach((tx, idx) => {
-            const isIncoming = ['mint', 'mining', 'unstaking', 'dividend'].includes(tx.type) || (tx.type === 'transfer' && tx.direction === 'received');
+        const sortedTx = transactions ? [...transactions].sort((a, b) => (a.createdAt?.toMillis?.() || 0) - (b.createdAt?.toMillis?.() || 0)) : [];
+        
+        sortedTx.forEach((tx, idx) => {
+            const isIncoming = ['mint', 'mining', 'unstaking', 'dividend', 'exchange'].includes(tx.type) || (tx.type === 'transfer' && tx.direction === 'received');
             runningTotal += isIncoming ? tx.tokenAmount : -tx.tokenAmount;
             const date = tx.createdAt?.toDate ? format(tx.createdAt.toDate(), 'dd/MM') : `T${idx}`;
             wealthHistory.push({ name: date, wealth: runningTotal * GCV_VALUE });
@@ -268,7 +268,7 @@ function UniversalWalletPage() {
         setIsMounted(true);
     }, []);
 
-    // Search Logic
+    // Search Logic for Recipients
     useEffect(() => {
         const delayDebounce = setTimeout(async () => {
             if (searchQuery.length < 3) { setSearchResults([]); return; }
@@ -314,8 +314,10 @@ function UniversalWalletPage() {
     const handleVerifyPin = () => {
         if (enteredPin === user?.walletPin) {
             setIsPinVerificationOpen(false);
+            const actionToExec = pendingAction;
             setEnteredPin("");
-            if (pendingAction) pendingAction();
+            setPendingAction(null);
+            if (actionToExec) actionToExec();
         } else {
             toast({ title: "PIN Incorrect", variant: "destructive" });
             setEnteredPin("");
@@ -365,6 +367,8 @@ function UniversalWalletPage() {
             });
             toast({ title: "Transfert effectué" });
             setIsTransferSheetOpen(false);
+            setTransferAmount("");
+            setSelectedRecipient(null);
             setIsSuccessDialogOpen(true);
         } catch (e) { toast({ title: "Erreur", variant: "destructive" }); } finally { setIsProcessingAction(false); }
     };
@@ -380,30 +384,57 @@ function UniversalWalletPage() {
                 stakingStartedAt: serverTimestamp(),
                 updatedAt: serverTimestamp()
             });
-            await addDoc(collection(db, "tokenTransactions"), { userId: user.uid, type: 'staking', tokenAmount: amount, createdAt: serverTimestamp() });
+            await addDoc(collection(db, "tokenTransactions"), { 
+                userId: user.uid, userName: user.name, type: 'staking', 
+                tokenAmount: amount, createdAt: serverTimestamp() 
+            });
             toast({ title: "Vault Actif" });
             setStakingAmount("");
             setIsSuccessDialogOpen(true);
         } catch (e) { toast({ title: "Erreur", variant: "destructive" }); } finally { setIsProcessingAction(false); }
     };
 
-    const handleConnectNetwork = async () => {
-        if (!rpcUrl) return;
+    const handleUnstake = async () => {
+        if (!user || !user.stakedBalance) return;
         setIsProcessingAction(true);
-        setTimeout(() => {
-            setIsProcessingAction(false);
-            setIsNetworkSheetOpen(false);
+        try {
+            const total = user.stakedBalance + stats.stakingRewards;
+            await updateDoc(doc(db, "users", user.uid), {
+                tokenBalance: increment(total),
+                stakedBalance: 0,
+                stakingStartedAt: null,
+                updatedAt: serverTimestamp()
+            });
+            await addDoc(collection(db, "tokenTransactions"), { 
+                userId: user.uid, userName: user.name, type: 'unstaking', 
+                tokenAmount: total, createdAt: serverTimestamp() 
+            });
+            toast({ title: "Position clôturée", description: "Fonds et intérêts débloqués." });
             setIsSuccessDialogOpen(true);
-            setRpcUrl("");
-            setChainId("");
-        }, 1500);
+        } catch (e) { toast({ title: "Erreur", variant: "destructive" }); } finally { setIsProcessingAction(false); }
+    };
+
+    const toggleEmergencyLock = async () => {
+        if (!user) return;
+        setIsEmergencyLockProcessing(true);
+        try {
+            const newState = !user.isWalletLocked;
+            await updateDoc(doc(db, "users", user.uid), {
+                isWalletLocked: newState,
+                updatedAt: serverTimestamp()
+            });
+            toast({ 
+                title: newState ? "Wallet Verrouillé" : "Wallet Déverrouillé", 
+                variant: newState ? "destructive" : "default" 
+            });
+        } catch (e) { toast({ title: "Erreur", variant: "destructive" }); } finally { setIsEmergencyLockProcessing(false); }
     };
 
     const getReceiveAddress = (asset: string) => {
         if (!user) return "...";
         switch(asset) {
             case 'dkst': return `DKS-WALLET-${user.uid.substring(0, 12).toUpperCase()}`;
-            case 'pi': return `G${Math.random().toString(36).substring(2, 20).toUpperCase()}`;
+            case 'pi': return `G${user.uid.substring(0, 20).toUpperCase()}`;
             case 'usd': return `CD-DKS-BANK-${user.uid.substring(0, 8).toUpperCase()}`;
             default: return user.uid;
         }
@@ -539,8 +570,12 @@ function UniversalWalletPage() {
                                 <div className="space-y-5">
                                     <div className="flex justify-between items-end"><p className="text-[10px] font-black uppercase text-white/30 tracking-widest">Potentiel de Minting</p><span className="text-2xl font-black text-accent">{isBalanceVisible ? stats.availablePoints : "••"} <span className="text-[10px] not-italic opacity-40">PTS</span></span></div>
                                     <Progress value={stats.progress} className="h-2 bg-white/5" indicatorClassName="bg-accent shadow-[0_0_15px_rgba(56,189,248,0.5)]" />
-                                    <Button onClick={() => secureAction(mintTokens)} disabled={isMinting || stats.redeemableTokens < 1} className="w-full h-14 bg-white text-black font-black uppercase italic rounded-2xl text-[11px] gap-2 shadow-xl hover:bg-accent transition-all">
-                                        {isMinting ? <Loader2 className="animate-spin" /> : <><RefreshCw size={16}/> Transformer Points en DKST</>}
+                                    <Button 
+                                        onClick={() => secureAction(handleConvertPoints)} 
+                                        disabled={isProcessingAction || stats.redeemableTokens < 1} 
+                                        className="w-full h-14 bg-white text-black font-black uppercase italic rounded-2xl text-[11px] gap-2 shadow-xl hover:bg-accent transition-all"
+                                    >
+                                        {isProcessingAction ? <Loader2 className="animate-spin" /> : <><RefreshCw size={16}/> Transformer Points en DKST</>}
                                     </Button>
                                 </div>
                             </Card>
@@ -601,7 +636,7 @@ function UniversalWalletPage() {
                                             </div>
                                             <div className="pt-4 border-t border-white/5">
                                                 <div className="flex items-center gap-3 text-[9px] font-bold uppercase text-white/40 italic">
-                                                    <Clock size={12} className="text-accent" /> Date de libération : {format(new Date(Date.now() + selectedStakingOption.months * 30 * 24 * 60 * 60 * 1000), "dd MMMM yyyy", { locale: fr })}
+                                                    <Clock size={12} className="text-accent" /> Libération : {format(new Date(Date.now() + selectedStakingOption.months * 30 * 24 * 60 * 60 * 1000), "dd MMMM yyyy", { locale: fr })}
                                                 </div>
                                             </div>
                                         </div>
@@ -668,8 +703,6 @@ function UniversalWalletPage() {
                     </TabsContent>
                 </Tabs>
             </main>
-
-            {/* ACTION SHEETS & DIALOGS */}
 
             {/* RECEIVE SHEET */}
             <Sheet open={isReceiveSheetOpen} onOpenChange={setIsReceiveSheetOpen}>
@@ -749,7 +782,7 @@ function UniversalWalletPage() {
                                         <div className="w-14 h-14 rounded-2xl bg-accent text-black flex items-center justify-center font-black text-xl italic shadow-lg shadow-accent/20">{(selectedRecipient.name || selectedRecipient.displayName)?.substring(0, 1)}</div>
                                         <div><p className="text-[9px] font-black text-accent uppercase tracking-widest">Envoi vers</p><p className="text-lg font-black uppercase italic text-white mt-1">{selectedRecipient.name || selectedRecipient.displayName}</p></div>
                                     </div>
-                                    <Button variant="ghost" size="icon" onClick={() => setSelectedRecipient(null)} className="h-10 w-10 rounded-xl hover:bg-red-500/10 hover:text-red-500"><X size={20}/></Button>
+                                    <button onClick={() => setSelectedRecipient(null)} className="h-10 w-10 rounded-xl hover:bg-red-500/10 hover:text-red-500 flex items-center justify-center"><X size={20}/></button>
                                 </div>
                                 <div className="space-y-8">
                                     <div className="space-y-3">
@@ -772,11 +805,10 @@ function UniversalWalletPage() {
             {/* SWAP SHEET */}
             <Sheet open={isSwapSheetOpen} onOpenChange={setIsSwapSheetOpen}>
                 <SheetContent side="right" className="bg-card/95 backdrop-blur-3xl border-white/10 w-full sm:max-w-md flex flex-col p-0">
-                    <SheetHeader className="p-10 bg-accent/10 border-b border-white/5">
-                        <div className="flex items-center gap-5">
-                            <div className="w-16 h-16 rounded-2xl bg-accent text-black flex items-center justify-center shadow-xl"><ArrowDownUp size={32} /></div>
-                            <div><SheetTitle className="text-3xl font-black uppercase italic tracking-tighter">Instant Swap</SheetTitle><p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Échange Décentralisé DKS</p></div>
-                        </div>
+                    <SheetHeader className="p-10 bg-accent/10 border-b border-white/5 text-center">
+                        <div className="w-16 h-16 rounded-[1.5rem] bg-accent text-black flex items-center justify-center mx-auto mb-4 shadow-xl"><ArrowDownUp size={32} /></div>
+                        <SheetTitle className="text-3xl font-black uppercase italic tracking-tighter">Instant Swap</SheetTitle>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Échange Décentralisé DKS</p>
                     </SheetHeader>
                     <div className="flex-1 p-10 space-y-10">
                         <div className="space-y-8">
@@ -805,39 +837,7 @@ function UniversalWalletPage() {
                                 </div>
                             </div>
                         </div>
-                        <Button className="w-full h-20 bg-accent text-black font-black uppercase italic rounded-2xl shadow-xl">Confirmer le Swap</Button>
-                    </div>
-                </SheetContent>
-            </Sheet>
-
-            {/* POINTS CONVERSION SHEET */}
-            <Sheet open={isPointsSheetOpen} onOpenChange={setIsPointsSheetOpen}>
-                <SheetContent side="right" className="bg-card/95 backdrop-blur-3xl border-white/10 w-full sm:max-w-md flex flex-col p-0">
-                    <SheetHeader className="p-10 bg-orange-500/10 border-b border-white/5">
-                        <div className="flex items-center gap-5">
-                            <div className="w-16 h-16 rounded-2xl bg-orange-500/20 flex items-center justify-center text-orange-500 shadow-xl shadow-orange-500/10"><Gift size={32} /></div>
-                            <div><SheetTitle className="text-3xl font-black uppercase italic tracking-tighter text-orange-500">DKS Rewards</SheetTitle><p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Capitaliser votre engagement</p></div>
-                        </div>
-                    </SheetHeader>
-                    <div className="flex-1 p-10 space-y-10">
-                        <div className="p-8 bg-orange-500/5 rounded-[2rem] border border-orange-500/10 flex flex-col items-center text-center gap-4">
-                            <p className="text-[10px] font-black uppercase text-orange-500/60 tracking-widest">Points de Prestige</p>
-                            <h4 className="text-6xl font-black italic text-white tracking-tighter">{stats.availablePoints}</h4>
-                            <div className="flex items-center gap-2 text-[9px] font-bold uppercase text-white/20"><TrendingUp size={12}/> 100 PTS = 1 DKST</div>
-                        </div>
-                        <div className="space-y-4">
-                            <Label className="text-[10px] font-black uppercase tracking-widest opacity-40 ml-1">Points à Brûler</Label>
-                            <div className="relative">
-                                <Ticket className="absolute left-6 top-1/2 -translate-y-1/2 text-orange-500" size={24} />
-                                <Input type="number" value={pointsToConvert} onChange={(e) => setPointsToConvert(e.target.value)} className="h-20 pl-16 bg-background/50 border-white/10 rounded-[2rem] text-4xl font-black text-orange-500" />
-                                <button onClick={() => setPointsToConvert(stats.availablePoints.toString())} className="absolute right-6 top-1/2 -translate-y-1/2 font-black text-white/40 hover:text-orange-500 transition-colors uppercase text-[10px]">MAX</button>
-                            </div>
-                            <div className="p-5 bg-white/5 rounded-2xl border border-white/5 flex justify-between items-center">
-                                <p className="text-[10px] font-black uppercase text-white/40 italic">Valeur générée</p>
-                                <p className="text-xl font-black text-accent">+{pointsToConvert ? Math.floor(parseInt(pointsToConvert) / 100) : 0} DKST</p>
-                            </div>
-                        </div>
-                        <Button onClick={() => secureAction(handleConvertPoints)} disabled={isProcessingAction || !pointsToConvert || parseInt(pointsToConvert) < 100} className="w-full h-20 bg-orange-500 text-white font-black uppercase italic rounded-[2.5rem] shadow-2xl shadow-orange-500/20 text-lg">Convertir en DKST</Button>
+                        <Button onClick={() => secureAction(() => toast({ title: "Swap Exécuté", description: "L'ordre a été validé." }))} className="w-full h-20 bg-accent text-black font-black uppercase italic rounded-2xl shadow-xl">Confirmer le Swap</Button>
                     </div>
                 </SheetContent>
             </Sheet>
@@ -878,15 +878,11 @@ function UniversalWalletPage() {
                                 <div className="space-y-2"><Label className="text-[10px] font-black uppercase tracking-widest opacity-40">Chain ID</Label><Input value={chainId} onChange={(e) => setChainId(e.target.value)} placeholder="Ex: 137" className="h-14 bg-background/50 border-white/5 rounded-2xl font-mono text-xs" /></div>
                                 <div className="space-y-2"><Label className="text-[10px] font-black uppercase tracking-widest opacity-40">Symbole</Label><Input placeholder="Ex: MATIC" className="h-14 bg-background/50 border-white/5 rounded-2xl font-black text-center" /></div>
                             </div>
-                            <div className="space-y-2">
-                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-40">Explorateur (Optionnel)</Label>
-                                <Input placeholder="https://..." className="h-14 bg-background/50 border-white/5 rounded-2xl font-mono text-[10px]" />
-                            </div>
                         </div>
 
                         <div className="p-6 bg-red-500/5 rounded-2xl border border-red-500/10 flex items-start gap-4">
                             <ShieldAlert className="text-red-500 shrink-0 mt-0.5" size={18} />
-                            <p className="text-[10px] font-bold text-red-400 uppercase leading-relaxed italic">AVERTISSEMENT : L'ajout d'un réseau personnalisé comporte des risques. Vérifiez toujours la source de vos URLs RPC.</p>
+                            <p className="text-[10px] font-bold text-red-400 uppercase leading-relaxed italic">AVERTISSEMENT : L'ajout d'un réseau personnalisé comporte des risques.</p>
                         </div>
 
                         <Button onClick={() => secureAction(handleConnectNetwork)} disabled={isProcessingAction || !rpcUrl} className="w-full h-20 bg-primary text-white font-black uppercase italic rounded-[2.5rem] shadow-2xl text-xl gap-4">
@@ -919,10 +915,6 @@ function UniversalWalletPage() {
                                 </Select>
                             </div>
                             <div className="space-y-2"><Label className="text-[10px] font-black uppercase tracking-widest opacity-40 ml-1">Adresse du Contrat</Label><Input placeholder="0x..." className="h-14 bg-background/50 border-white/5 rounded-2xl font-mono text-xs pr-10" /></div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2"><Label className="text-[10px] font-black uppercase tracking-widest opacity-40 ml-1">Symbole</Label><Input placeholder="TKN" className="h-14 bg-background/50 border-white/5 rounded-2xl font-black text-center" /></div>
-                                <div className="space-y-2"><Label className="text-[10px] font-black uppercase tracking-widest opacity-40 ml-1">Décimales</Label><Input defaultValue="18" className="h-14 bg-background/50 border-white/5 rounded-2xl text-center" /></div>
-                            </div>
                         </div>
                         <Button onClick={() => secureAction(() => { setIsImportSheetOpen(false); setIsSuccessDialogOpen(true); })} className="w-full h-18 bg-accent text-black font-black uppercase italic rounded-2xl shadow-xl shadow-accent/20">Importer l'Actif</Button>
                     </div>
