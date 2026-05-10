@@ -120,11 +120,13 @@ function DashboardPage() {
   const [miningTimeLeft, setMiningTimeLeft] = useState<string | null>(null);
   const [miningProgress, setMiningProgress] = useState(0);
   const [realTimeGain, setRealTimeGain] = useState(0);
+  const [isInitializing, setIsInitializing] = useState(false);
 
   // Missions States
   const [claimingMission, setClaimingId] = useState<string | null>(null);
 
   const isStaff = user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'seller' || user?.role?.toLowerCase() === 'cashier';
+  const isAdmin = user?.role?.toLowerCase() === 'admin';
 
   const handleLogout = async () => {
     try {
@@ -267,6 +269,90 @@ function DashboardPage() {
     setIsMining(false);
   };
 
+  const handleInitializeDemo = async () => {
+    setIsInitializing(true);
+    try {
+        // 1. Catégories
+        const cats = [
+            { name: "GPU", icon: "🎮" },
+            { name: "Laptops", icon: "💻" },
+            { name: "Réseaux", icon: "🌐" },
+            { name: "Academy", icon: "🎓" },
+            { name: "Consommables", icon: "🧪" }
+        ];
+        for (const cat of cats) {
+            await addDoc(collection(db, "categories"), { ...cat, slug: cat.name.toLowerCase(), createdAt: serverTimestamp() });
+        }
+
+        // 2. Produits
+        const prods = [
+            { name: "NVIDIA RTX 4090 OC", category: "GPU", sellingPrice: 2450, purchasePrice: 1900, stockQuantity: 3, isPublished: true, imageUrl: "https://picsum.photos/seed/gpu/600/400", description: "La puissance ultime pour le gaming 4K et le rendu IA." },
+            { name: "Kit Starlink Business", category: "Réseaux", sellingPrice: 1200, purchasePrice: 850, stockQuantity: 5, isPublished: true, imageUrl: "https://picsum.photos/seed/starlink/600/400", description: "Connectivité satellite haute performance pour entreprises." },
+            { name: "MacBook Pro M3 Max", category: "Laptops", sellingPrice: 3800, purchasePrice: 3100, stockQuantity: 2, isPublished: true, imageUrl: "https://picsum.photos/seed/macbook/600/400", description: "Le laptop le plus puissant pour les créateurs d'élite." }
+        ];
+        for (const prod of prods) {
+            await addDoc(collection(db, "products"), { ...prod, createdAt: serverTimestamp() });
+        }
+
+        // 3. RÉALISATIONS (PROJETS)
+        const projects = [
+            {
+                title: "Déploiement Starlink Business",
+                client: "RawBank Bunia",
+                category: "Infrastructure",
+                description: "Installation d'un réseau satellite redondant pour garantir la continuité des services bancaires en cas de coupure fibre.",
+                imageUrl: "https://picsum.photos/seed/project1/800/600",
+                iconName: "Globe",
+                tags: ["Starlink", "Banking", "Satellite"],
+                isPublished: true,
+                views: 124,
+                createdAt: serverTimestamp()
+            },
+            {
+                title: "Vidéosurveillance IP 8K",
+                client: "Hôtel Plaza",
+                category: "Sécurité",
+                description: "Déploiement d'un système de surveillance intelligent avec reconnaissance faciale et stockage cloud sécurisé.",
+                imageUrl: "https://picsum.photos/seed/project2/800/600",
+                iconName: "Video",
+                tags: ["CCTV", "AI", "Security"],
+                isPublished: true,
+                views: 89,
+                createdAt: serverTimestamp()
+            },
+            {
+                title: "Optimisation Réseau Maillé",
+                client: "UNICEF Ituri",
+                category: "Réseaux",
+                description: "Architecture d'un réseau Wi-Fi maillé haute densité pour couvrir l'intégralité du campus humanitaire.",
+                imageUrl: "https://picsum.photos/seed/project3/800/600",
+                iconName: "Network",
+                tags: ["Wi-Fi 6", "NGO", "Infrastructure"],
+                isPublished: true,
+                views: 215,
+                createdAt: serverTimestamp()
+            }
+        ];
+        for (const project of projects) {
+            await addDoc(collection(db, "projects"), project);
+        }
+
+        // 4. Devis (Quotes)
+        const quotes = [
+            { customerName: "Jean Bahati", businessName: "Logistique Plus", total: 4500, status: "pending", items: [{ name: "Starlink Kit", quantity: 2, price: 1200 }, { name: "Audit Réseau", quantity: 1, price: 1500 }], createdAt: serverTimestamp() }
+        ];
+        for (const q of quotes) {
+            await addDoc(collection(db, "quotes"), q);
+        }
+
+        toast({ title: "Hub Initialisé", description: "L'écosystème est prêt avec des produits, projets et devis démo." });
+    } catch (e) {
+        toast({ title: "Erreur Initialisation", variant: "destructive" });
+    } finally {
+        setIsInitializing(false);
+    }
+  };
+
   const handleCompleteMission = (mission: any) => {
     if (!user || user.completedMissionsToday?.includes(mission.id)) return;
     
@@ -340,9 +426,13 @@ function DashboardPage() {
                 <Link href="/" className="hover:scale-105 transition-transform">
                     <Logo size="sm" showText />
                 </Link>
+                {isAdmin && (
+                    <Button onClick={handleInitializeDemo} disabled={isInitializing} variant="outline" className="hidden lg:flex border-accent/20 text-accent h-10 rounded-xl font-black uppercase italic text-[9px] gap-2 px-4 shadow-xl shadow-accent/5">
+                        {isInitializing ? <Loader2 className="animate-spin h-3 w-3" /> : <Zap size={14} />} Initialiser Démo
+                    </Button>
+                )}
             </div>
             <div className="flex items-center gap-4">
-                {/* KYC/KYB STATUS BADGE */}
                 {user && (
                     <div className="flex gap-2">
                         <Link href="/dashboard/kyc">

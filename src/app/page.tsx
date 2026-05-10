@@ -81,9 +81,14 @@ export default function LandingPage() {
   const [email, setEmail] = useState('');
   const [subscribed, setSubscribed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [mounted, setMounted] = useState(false);
   
   const { addToCart } = useCart();
   const { toast } = useToast();
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const configRef = useMemoFirebase(() => doc(db, "system", "config"), []);
   const { data: config } = useDoc(configRef);
@@ -130,8 +135,8 @@ export default function LandingPage() {
         setProducts(productsList);
       } catch (error) { console.error(error); } finally { setLoading(false); }
     }
-    fetchData();
-  }, []);
+    if (mounted) fetchData();
+  }, [mounted]);
 
   const filteredProducts = useMemo(() => {
     return products.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -174,6 +179,8 @@ export default function LandingPage() {
     return <IconComp size={24} className="text-accent" />;
   };
 
+  if (!mounted) return null;
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <Navbar />
@@ -199,9 +206,9 @@ export default function LandingPage() {
           <div className="flex whitespace-nowrap animate-in slide-in-from-right-full duration-[30s] infinite gap-12 items-center">
               {[1, 2].map(i => (
                   <div key={i} className="flex gap-12 items-center">
-                      <div className="flex items-center gap-3 text-[10px] font-black uppercase tracking-widest text-accent"><Flame size={14} className="animate-pulse" /> Bloc légendaire miné par @Expert_Bahati (+5.0 DKST)</div>
-                      <div className="flex items-center gap-3 text-[10px] font-black uppercase tracking-widest text-primary"><UserCheck size={14} /> Nouvel Expert Certifié IA : @John_Doe_Bunia</div>
-                      <div className="flex items-center gap-3 text-[10px] font-black uppercase tracking-widest text-green-400"><Globe size={14} /> Déploiement Starlink activé : @RawBank_Bunia</div>
+                      <div className="flex items-center gap-3 text-[10px] font-black uppercase tracking-widest text-accent"><Flame size={14} className="animate-pulse" /> Bloc légendaire miné par @david_ceo (+5.0 DKST)</div>
+                      <div className="flex items-center gap-3 text-[10px] font-black uppercase tracking-widest text-primary"><UserCheck size={14} /> Nouvel Expert Certifié IA : @bahati_expert</div>
+                      <div className="flex items-center gap-3 text-[10px] font-black uppercase tracking-widest text-green-400"><Globe size={14} /> Déploiement Starlink activé : @Hôtel_Plaza</div>
                       <div className="flex items-center gap-3 text-[10px] font-black uppercase tracking-widest text-yellow-500"><Coins size={14} /> Consensus GCV validé par 24 validateurs</div>
                   </div>
               ))}
