@@ -99,7 +99,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Progress } from "@/components/ui/progress";
 import { UserGuide } from "@/components/dashboard/UserGuide";
 import { Separator } from "@/components/ui/separator";
-import { Avatar, AvatarFallback, AvatarImage } from "@/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { fr } from 'date-fns/locale';
 import { format } from 'date-fns';
 import { errorEmitter } from '@/firebase/error-emitter';
@@ -342,15 +342,7 @@ function DashboardPage() {
             await addDoc(collection(db, "projects"), project);
         }
 
-        // 4. Devis (Quotes)
-        const quotes = [
-            { customerName: "Jean Bahati", businessName: "Logistique Plus", total: 4500, status: "pending", items: [{ name: "Starlink Kit", quantity: 2, price: 1200 }, { name: "Audit Réseau", quantity: 1, price: 1500 }], createdAt: serverTimestamp() }
-        ];
-        for (const q of quotes) {
-            await addDoc(collection(db, "quotes"), q);
-        }
-
-        toast({ title: "Hub Initialisé", description: "L'écosystème est prêt avec des produits, projets et devis démo." });
+        toast({ title: "Hub Initialisé", description: "L'écosystème est prêt avec des produits et projets démo." });
     } catch (e) {
         toast({ title: "Erreur Initialisation", variant: "destructive" });
     } finally {
