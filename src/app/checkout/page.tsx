@@ -113,11 +113,12 @@ export default function CheckoutPage() {
 
         if (method === 'dkst') {
             const currentBalance = user.tokenBalance || 0;
+            const dkstCost = totalPrice / PI_GCV; // Alignement sur le consensus GCV
             
-            if (currentBalance < totalPrice) {
+            if (currentBalance < dkstCost) {
                 toast({ 
                     title: "Solde insuffisant", 
-                    description: `Il vous manque ${(totalPrice - currentBalance).toFixed(2)} DKST dans votre wallet.`,
+                    description: `Il vous manque ${(dkstCost - currentBalance).toFixed(6)} DKST pour finaliser cet achat au taux GCV.`,
                     variant: "destructive" 
                 });
                 return;
@@ -172,6 +173,7 @@ export default function CheckoutPage() {
 
     const executeOrder = (piTxId?: string) => {
         setIsProcessing(true);
+        const dkstCost = totalPrice / PI_GCV;
         
         const orderData = {
             userId: user?.uid,
@@ -180,6 +182,7 @@ export default function CheckoutPage() {
             items: cartItems,
             total: totalPrice,
             piValue: totalPrice / PI_GCV,
+            dkstValue: method === 'dkst' ? dkstCost : null,
             piTxId: piTxId || null,
             cdfValue: totalPrice * exchangeRate,
             status: method === 'dkst' || method === 'visa' || method === 'mobile_money' ? "payée" : "pending_payment",
@@ -198,7 +201,7 @@ export default function CheckoutPage() {
                     const txRef = collection(db, "tokenTransactions");
 
                     const balanceUpdate = {
-                        tokenBalance: increment(-totalPrice),
+                        tokenBalance: increment(-dkstCost),
                         updatedAt: serverTimestamp()
                     };
 
@@ -214,8 +217,8 @@ export default function CheckoutPage() {
                         userId: user.uid,
                         userName: user.name,
                         type: 'exchange',
-                        tokenAmount: totalPrice,
-                        memo: `Achat Boutique DKS #${orderRef.id.substring(0, 8)}`,
+                        tokenAmount: dkstCost,
+                        memo: `Achat Boutique DKS #${orderRef.id.substring(0, 8)} (GCV)`,
                         createdAt: serverTimestamp()
                     };
 
@@ -279,7 +282,7 @@ export default function CheckoutPage() {
                 return (
                     <div className="text-right">
                         <p className="text-4xl font-black text-white italic tracking-tighter">${totalPrice.toFixed(2)}</p>
-                        <p className="text-[10px] font-black text-accent uppercase tracking-widest mt-1">{totalPrice.toFixed(2)} DKST</p>
+                        <p className="text-[10px] font-black text-accent uppercase tracking-widest mt-1">≈ {(totalPrice / PI_GCV).toFixed(6)} DKST (GCV)</p>
                     </div>
                 );
             default:
@@ -482,7 +485,7 @@ export default function CheckoutPage() {
                                             <Input 
                                                 placeholder="**** **** **** ****" 
                                                 value={cardNumber} 
-                                                onChange={e => setCardNumber(e.target.value)} 
+                                                onChange={(e) => setCardNumber(e.target.value)} 
                                                 className="h-14 bg-background/50 border-white/10 rounded-2xl"
                                             />
                                         </div>
@@ -515,15 +518,24 @@ export default function CheckoutPage() {
                                     <Lock size={40} className="text-accent animate-pulse" />
                                     <div className="space-y-2">
                                         <h4 className="text-xl font-black uppercase italic">Signature Cryptographique DKS</h4>
-                                        <p className="text-sm text-white/60 italic">
-                                            L'achat sera débité directement de votre solde miné.
+                                        <p className="text-sm text-white/60 italic leading-relaxed">
+                                            L'achat sera débité au taux du consensus global de l'écosystème.
                                         </p>
                                     </div>
-                                    <div className="w-full max-w-xs p-4 rounded-2xl border border-white/5 bg-black/40 flex justify-between items-center">
-                                        <span className="text-[10px] font-black uppercase opacity-40">Votre Solde</span>
-                                        <span className={cn("text-lg font-black", (user?.tokenBalance || 0) < totalPrice ? "text-red-500" : "text-accent")}>
-                                            {user?.tokenBalance?.toFixed(2) || 0} DKST
-                                        </span>
+                                    <div className="w-full max-w-sm p-6 rounded-2xl border border-white/5 bg-black/40 space-y-4">
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-[10px] font-black uppercase opacity-40">Prix GCV</span>
+                                            <span className="text-accent font-black">{(totalPrice / PI_GCV).toFixed(6)} DKST</span>
+                                        </div>
+                                        <div className="flex justify-between items-center border-t border-white/5 pt-4">
+                                            <span className="text-[10px] font-black uppercase opacity-40">Votre Solde</span>
+                                            <span className={cn("text-lg font-black", (user?.tokenBalance || 0) < (totalPrice / PI_GCV) ? "text-red-500" : "text-accent")}>
+                                                {user?.tokenBalance?.toFixed(6) || 0} DKST
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2 text-[9px] font-bold text-accent/60 uppercase">
+                                        <Info size={12} /> Indexé sur le GCV $314,159
                                     </div>
                                 </div>
                             )}
