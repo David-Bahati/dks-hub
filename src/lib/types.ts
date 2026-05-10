@@ -28,6 +28,8 @@ export type AppUser = {
   lastBlockRarity?: 'common' | 'rare' | 'legendary';
   walletPin?: string;
   isWalletLocked?: boolean;
+  hasMnemonic?: boolean;
+  mnemonicHash?: string;
   dailySpendingLimit?: number;
   todaySpent?: number;
   beneficiaryId?: string;

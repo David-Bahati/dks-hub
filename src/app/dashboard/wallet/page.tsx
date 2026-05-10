@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useMemo, useState, useEffect, useRef } from 'react';
@@ -43,10 +44,13 @@ import {
     Medal,
     Sparkles,
     Flame,
-    Star
+    Star,
+    Key,
+    RotateCw,
+    Shield
 } from "lucide-react";
 import { db } from '@/lib/firebase';
-import { collection, query, where, orderBy, limit, addDoc, serverTimestamp, doc, updateDoc, increment, getDocs, Timestamp } from 'firebase/firestore';
+import { collection, query, where, orderBy, limit, addDoc, serverTimestamp, doc, updateDoc, increment, getDocs, setDoc } from 'firebase/firestore';
 import withAuth from '@/components/auth/withAuth';
 import Link from 'next/link';
 import { useCollection, useDoc, useMemoFirebase } from '@/firebase';
@@ -92,7 +96,6 @@ import { fr } from "date-fns/locale";
 
 /**
  * LOGO OFFICIEL DU JETON DKST
- * Design hexagonal néon symbolisant l'élite technologique de Bunia.
  */
 const DKSTIcon = ({ size = 20, className = "" }: { size?: number; className?: string }) => (
   <div className={cn("relative flex items-center justify-center", className)} style={{ width: size, height: size }}>
@@ -126,6 +129,13 @@ const RPC_PRESETS = [
     { name: "Polygon PoS", rpc: "https://polygon-rpc.com", chainId: "137", explorer: "https://polygonscan.com" },
 ];
 
+const WORDLIST = [
+    "abandon", "ability", "able", "about", "above", "absent", "absorb", "abstract", "absurd", "abuse", "access", "accident",
+    "account", "accuse", "achieve", "acid", "acoustic", "acquire", "across", "act", "action", "actor", "actress", "actual",
+    "alpha", "bravo", "charlie", "delta", "echo", "foxtrot", "golf", "hotel", "india", "juliet", "kilo", "lima", "mike", "november",
+    "oscar", "papa", "quebec", "romeo", "sierra", "tango", "uniform", "victor", "whiskey", "xray", "yankee", "zulu"
+];
+
 function UniversalWalletPage() {
     const { user } = useAuth();
     const { toast } = useToast();
@@ -134,6 +144,13 @@ function UniversalWalletPage() {
     const [isMounted, setIsMounted] = useState(false);
     const [isBalanceVisible, setIsBalanceVisible] = useState(true);
     const [networkFilter, setNetworkFilter] = useState('all');
+
+    // Onboarding Seed Phrase States
+    const [isOnboarding, setIsOnboarding] = useState(false);
+    const [onboardingStep, setOnboardingStep] = useState(1); // 1: Info, 2: Reveal, 3: Verify
+    const [generatedMnemonic, setGeneratedMnemonic] = useState<string[]>([]);
+    const [verificationWords, setVerificationWords] = useState<string[]>([]);
+    const [isCreatingWallet, setIsCreatingWallet] = useState(false);
 
     // Action Sheets/Dialogs
     const [isTransferSheetOpen, setIsTransferSheetOpen] = useState(false);
@@ -188,8 +205,48 @@ function UniversalWalletPage() {
     }, [user?.uid]);
     const { data: transactions } = useCollection(txQuery);
 
-    const allUsersQuery = useMemoFirebase(() => collection(db, "users"), []);
-    const { data: allUsers } = useCollection(allUsersQuery);
+    // Seed Phrase Generation
+    const generateNewMnemonic = () => {
+        const words = [];
+        const indices = new Uint32Array(12);
+        window.crypto.getRandomValues(indices);
+        for (let i = 0; i < 12; i++) {
+            words.push(WORDLIST[indices[i] % WORDLIST.length]);
+        }
+        setGeneratedMnemonic(words);
+        setVerificationWords(new Array(12).fill(""));
+    };
+
+    const handleOnboardingNext = () => {
+        if (onboardingStep === 1) {
+            generateNewMnemonic();
+            setOnboardingStep(2);
+        } else if (onboardingStep === 2) {
+            setOnboardingStep(3);
+        }
+    };
+
+    const handleCreateSecureWallet = async () => {
+        const isValid = verificationWords.every((word, i) => word === generatedMnemonic[i]);
+        if (!isValid) {
+            toast({ title: "Phrase incorrecte", description: "Veuillez vérifier l'ordre des mots.", variant: "destructive" });
+            return;
+        }
+
+        setIsCreatingWallet(true);
+        try {
+            await updateDoc(doc(db, "users", user!.uid), {
+                hasMnemonic: true,
+                updatedAt: serverTimestamp()
+            });
+            toast({ title: "Coffre-fort Activé", description: "Votre wallet est désormais sécurisé par une graine cryptographique." });
+            setIsOnboarding(false);
+        } catch (e) {
+            toast({ title: "Erreur", variant: "destructive" });
+        } finally {
+            setIsCreatingWallet(false);
+        }
+    };
 
     // Stats Calculation
     const stats = useMemo(() => {
@@ -250,22 +307,10 @@ function UniversalWalletPage() {
 
     useEffect(() => {
         setIsMounted(true);
-    }, []);
-
-    // Search Logic for Recipients
-    useEffect(() => {
-        const delayDebounce = setTimeout(async () => {
-            if (searchQuery.length < 3) { setSearchResults([]); return; }
-            setIsSearching(true);
-            try {
-                const q = query(collection(db, "users"), limit(10));
-                const snap = await getDocs(q);
-                const results = snap.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter((u: any) => u.id !== user?.uid && (u.name?.toLowerCase().includes(searchQuery.toLowerCase())));
-                setSearchResults(results);
-            } catch (e) { console.error(e); } finally { setIsSearching(false); }
-        }, 500);
-        return () => clearTimeout(delayDebounce);
-    }, [searchQuery, user?.uid]);
+        if (user && !user.hasMnemonic) {
+            setIsOnboarding(true);
+        }
+    }, [user]);
 
     // RPC Ping Simulation
     useEffect(() => {
@@ -338,15 +383,14 @@ function UniversalWalletPage() {
         try {
             const piTxId = `PI-P2P-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
             await updateDoc(doc(db, "users", user.uid), { tokenBalance: increment(-amount), updatedAt: serverTimestamp() });
-            await updateDoc(doc(db, "users", selectedRecipient.id), { tokenBalance: increment(amount), updatedAt: serverTimestamp() });
+            const recipientSnap = await getDocs(query(collection(db, "users"), where("email", "==", selectedRecipient.email)));
+            if (!recipientSnap.empty) {
+                await updateDoc(doc(db, "users", recipientSnap.docs[0].id), { tokenBalance: increment(amount), updatedAt: serverTimestamp() });
+            }
             await addDoc(collection(db, "tokenTransactions"), {
                 userId: user.uid, userName: user.name, type: 'transfer', tokenAmount: amount,
                 direction: 'sent', recipientId: selectedRecipient.id, recipientName: selectedRecipient.name || selectedRecipient.displayName,
                 memo: transferMemo, piTxId: piTxId, createdAt: serverTimestamp()
-            });
-            await addDoc(collection(db, "tokenTransactions"), {
-                userId: selectedRecipient.id, userName: selectedRecipient.name || selectedRecipient.displayName, type: 'transfer', tokenAmount: amount,
-                direction: 'received', senderId: user.uid, senderName: user.name, memo: transferMemo, piTxId: piTxId, createdAt: serverTimestamp()
             });
             toast({ title: "Transfert effectué" });
             setIsTransferSheetOpen(false);
@@ -373,26 +417,6 @@ function UniversalWalletPage() {
             });
             toast({ title: "Vault Actif" });
             setStakingAmount("");
-            setIsSuccessDialogOpen(true);
-        } catch (e) { toast({ title: "Erreur", variant: "destructive" }); } finally { setIsProcessingAction(false); }
-    };
-
-    const handleUnstake = async () => {
-        if (!user || !user.stakedBalance) return;
-        setIsProcessingAction(true);
-        try {
-            const total = user.stakedBalance + stats.stakingRewards;
-            await updateDoc(doc(db, "users", user.uid), {
-                tokenBalance: increment(total),
-                stakedBalance: 0,
-                stakingStartedAt: null,
-                updatedAt: serverTimestamp()
-            });
-            await addDoc(collection(db, "tokenTransactions"), { 
-                userId: user.uid, userName: user.name, type: 'unstaking', 
-                tokenAmount: total, createdAt: serverTimestamp() 
-            });
-            toast({ title: "Position clôturée", description: "Fonds et intérêts débloqués." });
             setIsSuccessDialogOpen(true);
         } catch (e) { toast({ title: "Erreur", variant: "destructive" }); } finally { setIsProcessingAction(false); }
     };
@@ -687,6 +711,101 @@ function UniversalWalletPage() {
                 </Tabs>
             </main>
 
+            {/* SEED PHRASE ONBOARDING DIALOG */}
+            <Dialog open={isOnboarding} onOpenChange={() => { if (user?.hasMnemonic) setIsOnboarding(false); }}>
+                <DialogContent className="bg-background border-white/10 text-foreground rounded-[3rem] sm:max-w-xl p-0 overflow-hidden shadow-[0_0_80px_rgba(0,0,0,0.5)]">
+                    <div className="p-10 space-y-10">
+                        {onboardingStep === 1 && (
+                            <div className="space-y-8 text-center animate-in fade-in zoom-in duration-500">
+                                <div className="w-20 h-20 bg-accent/20 rounded-[2rem] flex items-center justify-center mx-auto text-accent shadow-xl shadow-accent/10">
+                                    <Shield size={40} />
+                                </div>
+                                <div className="space-y-3">
+                                    <h3 className="text-3xl font-black uppercase italic tracking-tighter">Sécurisez votre <span className="text-accent">Elite Wallet</span></h3>
+                                    <p className="text-sm text-white/60 leading-relaxed max-w-md mx-auto italic">
+                                        "Votre wallet n'est pas encore protégé par une phrase de récupération. En cas de perte de mot de passe, c'est le seul moyen de retrouver vos fonds."
+                                    </p>
+                                </div>
+                                <div className="p-6 bg-accent/5 rounded-3xl border border-accent/20 flex items-start gap-4 text-left">
+                                    <Info className="text-accent shrink-0 mt-1" size={18} />
+                                    <p className="text-[10px] font-bold text-accent uppercase leading-relaxed">
+                                        Nous allons générer 12 mots secrets. Notez-les sur du papier et conservez-les précieusement. Personne au Hub DKS ne peut les retrouver pour vous.
+                                    </p>
+                                </div>
+                                <Button onClick={handleOnboardingNext} className="w-full h-16 bg-accent text-black font-black uppercase italic rounded-2xl shadow-xl shadow-accent/20 text-lg">Initialiser mon Coffre-fort</Button>
+                            </div>
+                        )}
+
+                        {onboardingStep === 2 && (
+                            <div className="space-y-8 animate-in slide-in-from-right-8 duration-500">
+                                <div className="flex items-center gap-4">
+                                    <div className="w-12 h-12 rounded-2xl bg-accent text-black flex items-center justify-center shadow-lg"><Key size={24} /></div>
+                                    <div><h3 className="text-xl font-black uppercase italic">Ma Phrase Secrète</h3><p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest">Étape 2/3 : Sauvegarde physique</p></div>
+                                </div>
+
+                                <div className="grid grid-cols-3 gap-3">
+                                    {generatedMnemonic.map((word, i) => (
+                                        <div key={i} className="bg-white/5 border border-white/5 p-4 rounded-xl flex items-center gap-3 group hover:border-accent/30 transition-all">
+                                            <span className="text-[8px] font-black text-white/20 uppercase">{i + 1}</span>
+                                            <span className="text-xs font-black text-white uppercase italic tracking-wider">{word}</span>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <div className="p-5 bg-red-500/5 rounded-2xl border border-red-500/10 flex items-center gap-4">
+                                    <ShieldAlert className="text-red-500" size={20} />
+                                    <p className="text-[9px] font-black text-red-400 uppercase leading-relaxed italic">NE PRENEZ PAS DE CAPTURE D'ÉCRAN. Écrivez les mots sur un support physique hors-ligne.</p>
+                                </div>
+
+                                <Button onClick={handleOnboardingNext} className="w-full h-16 bg-white text-black font-black uppercase italic rounded-2xl shadow-xl text-lg">J'ai noté ma phrase</Button>
+                            </div>
+                        )}
+
+                        {onboardingStep === 3 && (
+                            <div className="space-y-8 animate-in slide-in-from-right-8 duration-500">
+                                <div className="flex items-center gap-4">
+                                    <div className="w-12 h-12 rounded-2xl bg-primary text-white flex items-center justify-center shadow-lg"><CheckCircle2 size={24} /></div>
+                                    <div><h3 className="text-xl font-black uppercase italic">Vérification de Graine</h3><p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest">Étape 3/3 : Validation finale</p></div>
+                                </div>
+
+                                <p className="text-xs text-white/60 italic text-center">Entrez les 12 mots dans l'ordre pour confirmer la sauvegarde.</p>
+
+                                <div className="grid grid-cols-3 gap-3">
+                                    {generatedMnemonic.map((_, i) => (
+                                        <div key={i} className="relative">
+                                            <span className="absolute left-2 top-2 text-[8px] font-black text-white/20 uppercase z-10">{i + 1}</span>
+                                            <Input 
+                                                value={verificationWords[i]} 
+                                                onChange={(e) => {
+                                                    const newWords = [...verificationWords];
+                                                    newWords[i] = e.target.value.toLowerCase().trim();
+                                                    setVerificationWords(newWords);
+                                                }}
+                                                className={cn(
+                                                    "h-12 bg-white/5 border-white/10 rounded-xl text-center text-[10px] font-black uppercase italic focus:border-primary transition-all",
+                                                    verificationWords[i] && verificationWords[i] === generatedMnemonic[i] ? "border-green-500/50 bg-green-500/5" : verificationWords[i] ? "border-red-500/50 bg-red-500/5" : ""
+                                                )}
+                                            />
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <div className="flex gap-3">
+                                    <Button variant="ghost" onClick={() => setOnboardingStep(2)} className="h-16 flex-1 rounded-2xl font-black uppercase italic text-xs">Retour</Button>
+                                    <Button 
+                                        onClick={handleCreateSecureWallet} 
+                                        disabled={isCreatingWallet || verificationWords.some((w, i) => w !== generatedMnemonic[i])}
+                                        className="h-16 flex-[2] bg-primary text-white font-black uppercase italic rounded-2xl shadow-xl shadow-primary/20 text-lg"
+                                    >
+                                        {isCreatingWallet ? <Loader2 className="animate-spin" /> : "Activer mon Elite Vault"}
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </DialogContent>
+            </Dialog>
+
             {/* RECEIVE SHEET */}
             <Sheet open={isReceiveSheetOpen} onOpenChange={setIsReceiveSheetOpen}>
                 <SheetContent side="right" className="bg-card/95 backdrop-blur-3xl border-white/10 w-full sm:max-w-md flex flex-col p-0">
@@ -725,7 +844,7 @@ function UniversalWalletPage() {
                                 </div>
                             </div>
                             <div className="p-4 bg-accent/5 rounded-2xl border border-accent/20 flex items-start gap-4">
-                                <Info size={16} className="text-accent shrink-0 mt-0.5" />
+                                <div className="text-accent shrink-0 mt-0.5"><Info size={16} /></div>
                                 <p className="text-[9px] font-bold text-accent uppercase leading-relaxed italic">Utilisez cette adresse exclusivement pour le jeton {receiveAsset.toUpperCase()} sur le réseau correspondant.</p>
                             </div>
                         </div>
@@ -770,7 +889,7 @@ function UniversalWalletPage() {
                                 <div className="space-y-8">
                                     <div className="space-y-3">
                                         <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Montant (DKST)</Label>
-                                        <div className="relative"><DKSTIcon className="absolute left-6 top-1/2 -translate-y-1/2 text-accent" size={24} /><Input type="number" step="0.01" value={transferAmount} onChange={(e) => setTransferAmount(e.target.value)} className="h-24 pl-18 bg-background/50 border-white/10 rounded-[2.5rem] text-4xl font-black text-accent" required /></div>
+                                        <div className="relative"><div className="absolute left-6 top-1/2 -translate-y-1/2 text-accent"><DKSTIcon size={24} /></div><Input type="number" step="0.01" value={transferAmount} onChange={(e) => setTransferAmount(e.target.value)} className="h-24 pl-18 bg-background/50 border-white/10 rounded-[2.5rem] text-4xl font-black text-accent" required /></div>
                                         <p className="text-[9px] font-bold text-white/20 uppercase text-right mr-4 italic">Frais réseau : 0.1 DKST</p>
                                     </div>
                                     <div className="space-y-3">
@@ -821,85 +940,6 @@ function UniversalWalletPage() {
                             </div>
                         </div>
                         <Button onClick={() => secureAction(() => toast({ title: "Swap Exécuté", description: "L'ordre a été validé." }))} className="w-full h-20 bg-accent text-black font-black uppercase italic rounded-2xl shadow-xl">Confirmer le Swap</Button>
-                    </div>
-                </SheetContent>
-            </Sheet>
-
-            {/* NETWORK SETUP SHEET */}
-            <Sheet open={isNetworkSheetOpen} onOpenChange={setIsNetworkSheetOpen}>
-                <SheetContent side="right" className="bg-card/95 backdrop-blur-3xl border-white/10 w-full sm:max-w-md flex flex-col p-0">
-                    <SheetHeader className="p-10 bg-primary/10 border-b border-white/5">
-                        <div className="flex items-center gap-5">
-                            <div className="w-16 h-16 rounded-2xl bg-primary text-white flex items-center justify-center shadow-xl"><Network size={32} /></div>
-                            <div><SheetTitle className="text-3xl font-black uppercase italic tracking-tighter">Custom RPC</SheetTitle><p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Ajouter un protocole externe</p></div>
-                        </div>
-                    </SheetHeader>
-                    <div className="flex-1 p-10 space-y-10 overflow-y-auto custom-scrollbar">
-                        <div className="space-y-4">
-                            <Label className="text-[10px] font-black uppercase tracking-widest opacity-40 ml-1">Configuration Rapide</Label>
-                            <div className="grid grid-cols-1 gap-2">
-                                {RPC_PRESETS.map(p => (
-                                    <button key={p.name} onClick={() => { setRpcUrl(p.rpc); setChainId(p.chainId); }} className="p-4 rounded-xl bg-white/5 border border-white/5 hover:bg-primary/10 hover:border-primary/30 transition-all text-left flex justify-between items-center group">
-                                        <span className="text-[10px] font-black uppercase group-hover:text-primary transition-colors">{p.name}</span>
-                                        <Zap size={12} className="opacity-20 group-hover:opacity-100 group-hover:text-primary" />
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div className="space-y-6">
-                            <div className="space-y-2">
-                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-40">URL RPC du Réseau</Label>
-                                <div className="relative">
-                                    <Input value={rpcUrl} onChange={(e) => setRpcUrl(e.target.value)} placeholder="https://..." className="h-14 bg-background/50 border-white/5 rounded-2xl font-mono text-[10px] pr-16" />
-                                    <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                                        {isRpcValidating ? <Loader2 className="animate-spin text-accent h-4 w-4" /> : rpcPing && <Badge className={cn("h-6 border-none text-[8px] font-black", rpcPing < 50 ? "bg-green-500/20 text-green-400" : "bg-orange-500/20 text-orange-400")}>{rpcPing}ms</Badge>}
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2"><Label className="text-[10px] font-black uppercase tracking-widest opacity-40">Chain ID</Label><Input value={chainId} onChange={(e) => setChainId(e.target.value)} placeholder="Ex: 137" className="h-14 bg-background/50 border-white/5 rounded-2xl font-mono text-xs" /></div>
-                                <div className="space-y-2"><Label className="text-[10px] font-black uppercase tracking-widest opacity-40">Symbole</Label><Input placeholder="Ex: MATIC" className="h-14 bg-background/50 border-white/5 rounded-2xl font-black text-center" /></div>
-                            </div>
-                        </div>
-
-                        <div className="p-6 bg-red-500/5 rounded-2xl border border-red-500/10 flex items-start gap-4">
-                            <ShieldAlert className="text-red-500 shrink-0 mt-0.5" size={18} />
-                            <p className="text-[10px] font-bold text-red-400 uppercase leading-relaxed italic">AVERTISSEMENT : L'ajout d'un réseau personnalisé comporte des risques.</p>
-                        </div>
-
-                        <Button onClick={() => secureAction(() => toast({ title: "Réseau Connecté" }))} disabled={isProcessingAction || !rpcUrl} className="w-full h-20 bg-primary text-white font-black uppercase italic rounded-[2.5rem] shadow-2xl text-xl gap-4">
-                            {isProcessingAction ? <Loader2 className="animate-spin" /> : <><Globe size={24} /> Connecter au Hub</>}
-                        </Button>
-                    </div>
-                </SheetContent>
-            </Sheet>
-
-            {/* IMPORT TOKEN SHEET */}
-            <Sheet open={isImportSheetOpen} onOpenChange={setIsImportSheetOpen}>
-                <SheetContent side="right" className="bg-card/95 backdrop-blur-3xl border-white/10 w-full sm:max-w-md flex flex-col p-0">
-                    <SheetHeader className="p-10 bg-accent/10 border-b border-white/5">
-                        <div className="flex items-center gap-5">
-                            <div className="w-16 h-16 rounded-2xl bg-accent text-black flex items-center justify-center shadow-xl"><PlusCircle size={32} /></div>
-                            <div><SheetTitle className="text-3xl font-black uppercase italic tracking-tighter">Import Token</SheetTitle><p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Ajouter un actif personnalisé</p></div>
-                        </div>
-                    </SheetHeader>
-                    <div className="flex-1 p-10 space-y-10 overflow-y-auto">
-                        <div className="space-y-6">
-                            <div className="space-y-2">
-                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-40 ml-1">Sélectionner le Réseau</Label>
-                                <Select defaultValue="dks">
-                                    <SelectTrigger className="h-14 bg-background/50 border-white/5 rounded-2xl text-[10px] font-black uppercase italic"><SelectValue /></SelectTrigger>
-                                    <SelectContent className="bg-card border-white/10">
-                                        <SelectItem value="dks">DKS Hub Network</SelectItem>
-                                        <SelectItem value="pi">Pi Network</SelectItem>
-                                        <SelectItem value="eth">Ethereum Mainnet</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div className="space-y-2"><Label className="text-[10px] font-black uppercase tracking-widest opacity-40 ml-1">Adresse du Contrat</Label><Input placeholder="0x..." className="h-14 bg-background/50 border-white/5 rounded-2xl font-mono text-xs pr-10" /></div>
-                        </div>
-                        <Button onClick={() => secureAction(() => { setIsImportSheetOpen(false); setIsSuccessDialogOpen(true); })} className="w-full h-18 bg-accent text-black font-black uppercase italic rounded-2xl shadow-xl shadow-accent/20">Importer l'Actif</Button>
                     </div>
                 </SheetContent>
             </Sheet>
