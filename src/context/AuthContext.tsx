@@ -49,10 +49,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               tokenBalance: userData.tokenBalance ?? 0,
               piBalance: userData.piBalance ?? 0,
               usdBalance: userData.usdBalance ?? 0,
+              usdtBalance: userData.usdtBalance ?? 0,
+              lpBalance: userData.lpBalance ?? 0,
               miningPower: userData.miningPower ?? 1.0,
               points: userData.points ?? 0,
               pointsConverted: userData.pointsConverted ?? 0,
               completedMissionsToday: userData.completedMissionsToday ?? [],
+              hasMnemonic: userData.hasMnemonic ?? false,
+              mnemonicWords: userData.mnemonicWords ?? [],
+              walletPin: userData.walletPin || null,
+              isWalletLocked: userData.isWalletLocked ?? false,
             } as AppUser);
           } else {
             setUser({
@@ -64,9 +70,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               tokenBalance: 0,
               piBalance: 0,
               usdBalance: 0,
+              usdtBalance: 0,
+              lpBalance: 0,
               miningPower: 1.0,
               points: 0,
               pointsConverted: 0,
+              hasMnemonic: false,
+              mnemonicWords: [],
             } as AppUser);
           }
           setIsLoading(false);

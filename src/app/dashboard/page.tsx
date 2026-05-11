@@ -71,7 +71,8 @@ import {
   Building,
   BatteryMedium,
   Shield,
-  SearchCheck
+  SearchCheck,
+  IdCard
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -120,6 +121,12 @@ function DashboardPage() {
   const router = useRouter();
   const { toast } = useToast();
   
+  // Hydration fix
+  const [isMounted, setIsMounted] = useState(false);
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
   // Mining States
   const [isMining, setIsMining] = useState(false);
   const [miningTimeLeft, setMiningTimeLeft] = useState<string | null>(null);
@@ -147,7 +154,11 @@ function DashboardPage() {
   const { data: treasury } = useDoc(treasuryRef);
 
   // Queries for Mining Pool
-  const yesterday = useMemo(() => new Date(Date.now() - 24 * 60 * 60 * 1000), []);
+  const yesterday = useMemo(() => {
+    if (typeof window === 'undefined') return new Date();
+    return new Date(Date.now() - 24 * 60 * 60 * 1000);
+  }, []);
+
   const activeMinersQuery = useMemoFirebase(() => {
     return query(collection(db, "users"), where("lastMiningAt", ">=", Timestamp.fromDate(yesterday)));
   }, [yesterday]);
@@ -487,9 +498,11 @@ function DashboardPage() {
               <div className="text-center md:text-left space-y-2 relative z-10">
                   <div className="flex flex-wrap items-center justify-center md:justify-start gap-3">
                       <Badge className="bg-accent text-black font-black uppercase italic text-[8px] tracking-[0.3em] px-4 py-1">Membre {user?.loyaltyLevel || 'Bronze'}</Badge>
-                      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest opacity-40">Dernière activité: {user?.lastActivityAt?.toDate ? format(user.lastActivityAt.toDate(), "dd MMM HH:mm", { locale: fr }) : "Maintenant"}</span>
+                      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest opacity-40">
+                        Dernière activité: {isMounted && user?.lastActivityAt?.toDate ? format(user.lastActivityAt.toDate(), "dd MMM HH:mm", { locale: fr }) : "..."}
+                      </span>
                   </div>
-                  <h1 className="text-4xl md:text-5xl font-black uppercase italic tracking-tighter">Bienvenue, <span className="text-accent">{user?.name?.split(' ')[0]}</span></h1>
+                  <h1 className="text-4xl md:text-5xl font-black uppercase italic tracking-tighter text-white leading-none">Bienvenue, <span className="text-accent">{user?.name?.split(' ')[0]}</span></h1>
                   <p className="text-sm text-white/60 font-medium italic">"Prêt à dominer l'économie technologique aujourd'hui ?"</p>
               </div>
           </div>
@@ -562,7 +575,7 @@ function DashboardPage() {
               <section className="animate-in fade-in slide-in-from-top-4 duration-1000">
                 <div className="flex items-center gap-4 mb-6">
                     <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center text-green-500 shadow-lg"><Zap size={20} /></div>
-                    <h3 className="text-xl font-black uppercase italic tracking-tight">Actions Prioritaires</h3>
+                    <h3 className="text-xl font-black uppercase italic tracking-tight text-white">Actions Prioritaires</h3>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                     <Link href="/pos" className="group">
@@ -623,7 +636,7 @@ function DashboardPage() {
 
           <div className="grid gap-6 grid-cols-1 lg:grid-cols-12">
               <Card className="lg:col-span-5 bg-gradient-to-br from-accent/10 via-background to-black border-accent/20 rounded-[3rem] p-12 relative overflow-hidden group shadow-2xl">
-                  {miningTimeLeft && (
+                  {isMounted && miningTimeLeft && (
                       <div className="absolute inset-0 pointer-events-none z-0">
                           <div className="absolute top-1/4 left-1/4 w-1 h-1 bg-accent rounded-full animate-ping opacity-20" />
                           <div className="absolute top-3/4 right-1/4 w-1 h-1 bg-accent rounded-full animate-ping opacity-20 delay-700" />
@@ -647,7 +660,7 @@ function DashboardPage() {
                       </div>
 
                       <div className="p-10 bg-black/60 backdrop-blur-3xl rounded-[2.5rem] border border-white/5 flex flex-col items-center gap-8 shadow-inner relative overflow-hidden">
-                          {miningTimeLeft ? (
+                          {isMounted && miningTimeLeft ? (
                               <div className="text-center space-y-8 w-full relative">
                                   <div className="relative w-48 h-48 mx-auto flex items-center justify-center">
                                       <svg className="absolute w-full h-full rotate-[-90deg]">
@@ -678,7 +691,7 @@ function DashboardPage() {
                               <div className="text-center space-y-8">
                                   <div className="space-y-2">
                                       <p className="text-4xl font-black text-white uppercase italic tracking-tighter leading-none">PRÊT À <br /><span className="text-accent">EXTRAIRE</span></p>
-                                      <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest italic">Récompense : {(user?.loyaltyLevel === 'Gold' ? 0.5 : 0.1) * poolStats.halvingFactor} DKST</p>
+                                      <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest italic">Récompense : {isMounted ? ((user?.loyaltyLevel === 'Gold' ? 0.5 : 0.1) * poolStats.halvingFactor).toFixed(2) : "..."} DKST</p>
                                   </div>
                                   
                                   <div className="relative group">
@@ -744,7 +757,7 @@ function DashboardPage() {
                              <div className="space-y-4 relative z-10">
                                 <div className="flex items-center gap-3">
                                     <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-accent"><Building2 size={20} /></div>
-                                    <h4 className="text-sm font-black uppercase italic">Trésorerie Hub</h4>
+                                    <h4 className="text-sm font-black uppercase italic text-white">Trésorerie Hub</h4>
                                 </div>
                                 <div className="space-y-1">
                                     <p className="text-4xl font-black text-white italic">{treasury?.dkstBalance?.toLocaleString() || 0} <span className="text-xs opacity-40 not-italic">DKST</span></p>

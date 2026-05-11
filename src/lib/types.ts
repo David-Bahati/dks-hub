@@ -17,6 +17,8 @@ export type AppUser = {
   tokenBalance?: number;
   piBalance?: number;
   usdBalance?: number;
+  usdtBalance?: number;
+  lpBalance?: number;
   pointsConverted?: number;
   piWalletAddress?: string;
   stakedBalance?: number;
@@ -72,7 +74,8 @@ export type TokenTransaction = {
   id: string;
   userId: string;
   userName?: string;
-  type: 'mint' | 'burn' | 'transfer' | 'mining' | 'staking' | 'unstaking' | 'exchange' | 'heritage' | 'dividend';
+  tokenType: 'DKST' | 'PI' | 'USDT' | 'LP';
+  type: 'mint' | 'burn' | 'transfer' | 'mining' | 'staking' | 'unstaking' | 'exchange' | 'heritage' | 'dividend' | 'swap';
   pointsAmount?: number;
   tokenAmount: number;
   piTxId?: string;
@@ -108,8 +111,8 @@ export type Product = {
   stockQuantity: number;
   imageUrl: string;
   isPublished: boolean;
-  price: number; // For cart compatibility
-  image?: string; // For cart compatibility
+  price: number;
+  image?: string;
   purchasePrice?: number;
 };
 

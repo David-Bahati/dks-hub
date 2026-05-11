@@ -7,6 +7,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/componen
 import { Button } from "@/components/ui/button";
 import { 
     ArrowLeft, 
+    ArrowRight,
     Loader2, 
     RefreshCw, 
     Send, 
@@ -88,25 +89,12 @@ import {
     Area, 
     XAxis, 
     YAxis, 
-    CartesianGrid, 
     Tooltip, 
-    ResponsiveContainer 
+    ResponsiveContainer,
+    CartesianGrid
 } from 'recharts';
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-
-/**
- * LOGO OFFICIEL DU JETON DKST
- */
-const DKSTIcon = ({ size = 20, className = "" }: { size?: number; className?: string }) => (
-  <div className={cn("relative flex items-center justify-center", className)} style={{ width: size, height: size }}>
-    <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full drop-shadow-[0_0_8px_rgba(56,189,248,0.6)]">
-      <path d="M50 5L93.3 30V70L50 95L6.7 70V30L50 5Z" fill="black" stroke="currentColor" strokeWidth="4" />
-      <path d="M35 35V65M35 50H55L65 35V65" stroke="currentColor" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx="50" cy="50" r="40" stroke="currentColor" strokeWidth="1" strokeDasharray="4 4" className="opacity-20 animate-spin-slow" />
-    </svg>
-  </div>
-);
 
 const POINTS_PER_TOKEN = 100;
 const GCV_VALUE = 314159; 
@@ -130,6 +118,16 @@ const WORDLIST = [
     "alpha", "bravo", "charlie", "delta", "echo", "foxtrot", "golf", "hotel", "india", "juliet", "kilo", "lima", "mike", "november",
     "oscar", "papa", "quebec", "romeo", "sierra", "tango", "uniform", "victor", "whiskey", "xray", "yankee", "zulu"
 ];
+
+const DKSTIcon = ({ size = 20, className = "" }: { size?: number; className?: string }) => (
+  <div className={cn("relative flex items-center justify-center", className)} style={{ width: size, height: size }}>
+    <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full drop-shadow-[0_0_8px_rgba(56,189,248,0.6)]">
+      <path d="M50 5L93.3 30V70L50 95L6.7 70V30L50 5Z" fill="black" stroke="currentColor" strokeWidth="4" />
+      <path d="M35 35V65M35 50H55L65 35V65" stroke="currentColor" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="50" cy="50" r="40" stroke="currentColor" strokeWidth="1" strokeDasharray="4 4" className="opacity-20 animate-spin-slow" />
+    </svg>
+  </div>
+);
 
 function UniversalWalletPage() {
     const { user } = useAuth();
@@ -174,14 +172,9 @@ function UniversalWalletPage() {
     const [selectedStakingOption, setSelectedStakingOption] = useState(STAKING_OPTIONS[3]);
     const [stakingMode, setStakingMode] = useState<'stake' | 'unstake'>('stake');
 
-    const [rpcUrl, setRpcUrl] = useState("");
-    const [isRpcValidating, setIsRpcValidating] = useState(false);
-
     const [isProcessingAction, setIsProcessingAction] = useState(false);
     const [isEmergencyLockProcessing, setIsEmergencyLockProcessing] = useState(false);
     const [hasCopiedId, setHasCopiedId] = useState(false);
-
-    const scrollRef = useRef<HTMLDivElement>(null);
 
     const txQuery = useMemoFirebase(() => {
         if (!user?.uid) return null;
@@ -440,7 +433,7 @@ function UniversalWalletPage() {
     const currentStakingBalance = stakingMode === 'stake' ? (user?.tokenBalance || 0) : (user?.stakedBalance || 0);
 
     return (
-        <div className="min-h-screen bg-background text-foreground pb-20">
+        <div className="min-h-screen bg-background text-foreground pb-24">
             <Navbar />
             <main className="max-w-4xl mx-auto px-4 py-10">
                 
@@ -993,12 +986,12 @@ function UniversalWalletPage() {
                         </div>
 
                         <div className="grid grid-cols-2 gap-3">
-                            {user?.mnemonicWords?.map((word, i) => (
+                            {user?.mnemonicWords && user.mnemonicWords.length > 0 ? user.mnemonicWords.map((word, i) => (
                                 <div key={i} className="bg-white/5 border border-white/5 p-4 rounded-xl flex items-center gap-3">
                                     <span className="text-[8px] font-black text-white/20 uppercase">{i + 1}</span>
                                     <span className="text-xs font-black text-white uppercase italic tracking-wider">{word}</span>
                                 </div>
-                            )) || <p className="col-span-2 text-center text-xs opacity-20 italic">Aucune phrase enregistrée.</p>}
+                            )) : <p className="col-span-2 text-center text-xs opacity-20 italic">Aucune phrase enregistrée.</p>}
                         </div>
 
                         <Button onClick={() => setIsMnemonicSheetOpen(false)} className="w-full h-16 bg-white text-black font-black uppercase italic rounded-2xl">J'ai fini de consulter</Button>

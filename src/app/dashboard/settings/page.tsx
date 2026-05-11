@@ -477,7 +477,7 @@ export default function SettingsPage() {
 
                                         <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
                                             {ads.map((ad) => (
-                                                <div key={ad.id} className="p-6 rounded-3xl bg-white/5 border border-white/5 space-y-4 relative group">
+                                                <div className="p-6 rounded-3xl bg-white/5 border border-white/5 space-y-4 relative group" key={ad.id}>
                                                     <div className="flex justify-between items-center border-b border-white/5 pb-3">
                                                         <Badge variant="outline" className="text-[8px] font-black uppercase border-accent/20 text-accent">Annonce ID: {ad.id}</Badge>
                                                         <div className="flex items-center gap-4">
@@ -552,4 +552,3 @@ export default function SettingsPage() {
         </div>
     );
 }
-
