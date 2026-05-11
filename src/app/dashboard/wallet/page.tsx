@@ -153,6 +153,7 @@ function UniversalWalletPage() {
     const [isImportSheetOpen, setIsImportSheetOpen] = useState(false);
     const [isPinVerificationOpen, setIsPinVerificationOpen] = useState(false);
     const [isSuccessDialogOpen, setIsSuccessDialogOpen] = useState(false);
+    const [isMnemonicSheetOpen, setIsMnemonicSheetOpen] = useState(false);
 
     const [transferAmount, setTransferAmount] = useState("");
     const [transferMemo, setTransferMemo] = useState("");
@@ -219,6 +220,7 @@ function UniversalWalletPage() {
         try {
             await updateDoc(doc(db, "users", user!.uid), {
                 hasMnemonic: true,
+                mnemonicWords: generatedMnemonic,
                 updatedAt: serverTimestamp()
             });
             toast({ title: "Coffre-fort Activé", description: "Votre wallet est désormais sécurisé par une graine cryptographique." });
@@ -665,18 +667,32 @@ function UniversalWalletPage() {
 
                     <TabsContent value="security" className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                            <Card className="glossy-card border-none rounded-[3rem] p-12 space-y-10 relative overflow-hidden">
-                                <div className="absolute top-0 right-0 p-8 opacity-5"><Lock size={120} /></div>
+                            <Card className="glossy-card border-none rounded-[3rem] p-12 space-y-10 relative overflow-hidden group">
+                                <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:scale-110 transition-transform duration-[20s]"><Key size={120} /></div>
                                 <div className="relative z-10 space-y-8">
-                                    <div className="flex items-center gap-4"><ShieldCheck className="text-red-500" size={32} /><h2 className="text-2xl font-black uppercase italic tracking-tight leading-none">Sécurité de <br />Portefeuille</h2></div>
-                                    <p className="text-sm text-white/60 italic leading-relaxed">"Votre Wallet est protégé par une signature PIN requise pour chaque transaction. Ne partagez jamais votre code."</p>
+                                    <div className="flex items-center gap-4 text-accent"><ShieldCheck size={32} /><h2 className="text-2xl font-black uppercase italic tracking-tight leading-none">Sauvegarde <br />de Sécurité</h2></div>
+                                    <p className="text-sm text-white/60 italic leading-relaxed">"Perdu vos accès ? Votre phrase de récupération de 12 mots est le seul moyen de restaurer votre fortune DKS."</p>
                                     
-                                    <div className="space-y-4">
-                                        <div className="p-5 rounded-3xl bg-white/5 border border-white/5 flex justify-between items-center">
-                                            <div className="flex items-center gap-4"><div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-accent"><Fingerprint size={20}/></div><span className="text-[10px] font-black uppercase">Protection PIN</span></div>
-                                            <Badge className={cn("border-none text-[8px] font-black uppercase px-3 h-5", user?.walletPin ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400")}>{user?.walletPin ? "ACTIVE" : "NON CONFIGURÉ"}</Badge>
-                                        </div>
-                                        <Button asChild variant="outline" className="w-full h-14 rounded-2xl border-white/10 font-black uppercase italic text-[10px] hover:bg-white/5"><Link href="/dashboard/settings">Mettre à jour mes accès</Link></Button>
+                                    {user?.hasMnemonic ? (
+                                        <Button 
+                                            onClick={() => secureAction(() => setIsMnemonicSheetOpen(true))} 
+                                            variant="outline" 
+                                            className="w-full h-16 border-white/10 rounded-2xl font-black uppercase italic text-[11px] hover:bg-accent hover:text-black transition-all gap-3"
+                                        >
+                                            <Eye size={18} /> Afficher ma phrase secrète
+                                        </Button>
+                                    ) : (
+                                        <Button 
+                                            onClick={() => setIsOnboarding(true)} 
+                                            className="w-full h-16 bg-accent text-black font-black uppercase italic rounded-2xl shadow-xl shadow-accent/20"
+                                        >
+                                            Activer la Sauvegarde Seed
+                                        </Button>
+                                    )}
+                                    
+                                    <div className="p-5 bg-accent/5 rounded-2xl border border-accent/20 flex items-start gap-4">
+                                        <ShieldAlert className="text-accent shrink-0 mt-0.5" size={16} />
+                                        <p className="text-[9px] font-bold text-accent uppercase leading-relaxed italic">Ne montrez jamais ces mots à personne. L'équipe DKS ne vous les demandera jamais.</p>
                                     </div>
                                 </div>
                             </Card>
@@ -959,6 +975,36 @@ function UniversalWalletPage() {
                     </div>
                 </DialogContent>
             </Dialog>
+
+            {/* VIEW MNEMONIC SHEET */}
+            <Sheet open={isMnemonicSheetOpen} onOpenChange={setIsMnemonicSheetOpen}>
+                <SheetContent side="right" className="bg-card/95 backdrop-blur-3xl border-white/10 w-full sm:max-w-md flex flex-col p-0">
+                    <SheetHeader className="p-10 bg-accent/10 border-b border-white/5 text-center">
+                        <div className="w-16 h-16 rounded-[1.5rem] bg-accent text-black flex items-center justify-center mx-auto mb-4 shadow-xl shadow-accent/10"><Key size={32} /></div>
+                        <SheetTitle className="text-3xl font-black uppercase italic tracking-tighter">Ma Phrase Seed</SheetTitle>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Sauvegarde Cryptographique</p>
+                    </SheetHeader>
+                    <div className="flex-1 p-10 space-y-10 overflow-y-auto custom-scrollbar">
+                        <div className="p-6 bg-red-500/5 rounded-2xl border border-red-500/10 flex items-start gap-4">
+                            <ShieldAlert className="text-red-500 shrink-0 mt-1" size={18} />
+                            <p className="text-[10px] font-black text-red-400 uppercase leading-relaxed italic">
+                                ATTENTION : Ces 12 mots donnent un accès total à vos fonds. Si quelqu'un les possède, il peut vider votre wallet.
+                            </p>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                            {user?.mnemonicWords?.map((word, i) => (
+                                <div key={i} className="bg-white/5 border border-white/5 p-4 rounded-xl flex items-center gap-3">
+                                    <span className="text-[8px] font-black text-white/20 uppercase">{i + 1}</span>
+                                    <span className="text-xs font-black text-white uppercase italic tracking-wider">{word}</span>
+                                </div>
+                            )) || <p className="col-span-2 text-center text-xs opacity-20 italic">Aucune phrase enregistrée.</p>}
+                        </div>
+
+                        <Button onClick={() => setIsMnemonicSheetOpen(false)} className="w-full h-16 bg-white text-black font-black uppercase italic rounded-2xl">J'ai fini de consulter</Button>
+                    </div>
+                </SheetContent>
+            </Sheet>
 
             {/* SUCCESS FEEDBACK DIALOG */}
             <Dialog open={isSuccessDialogOpen} onOpenChange={setIsSuccessDialogOpen}>

@@ -29,6 +29,7 @@ export type AppUser = {
   walletPin?: string;
   isWalletLocked?: boolean;
   hasMnemonic?: boolean;
+  mnemonicWords?: string[];
   mnemonicHash?: string;
   dailySpendingLimit?: number;
   todaySpent?: number;
