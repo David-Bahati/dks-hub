@@ -17,7 +17,8 @@ import {
     Clock,
     FileText,
     Image as ImageIcon,
-    Filter
+    Filter,
+    X
 } from "lucide-react";
 import { db } from '@/lib/firebase';
 import { collection, query, where, updateDoc, doc, addDoc, serverTimestamp, orderBy } from 'firebase/firestore';

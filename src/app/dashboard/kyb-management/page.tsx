@@ -20,7 +20,7 @@ import {
     X,
     MapPin,
     Briefcase
-} from "lucide-center";
+} from "lucide-react";
 import { db } from '@/lib/firebase';
 import { collection, query, where, updateDoc, doc, addDoc, serverTimestamp, orderBy } from 'firebase/firestore';
 import withAuth from '@/components/auth/withAuth';
@@ -233,4 +233,3 @@ function KybManagementPage() {
 }
 
 export default withAuth(KybManagementPage);
-
