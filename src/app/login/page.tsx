@@ -7,7 +7,18 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { Lock, ArrowRight, Home, Mail, Loader2, ShieldCheck, Sparkles, Github } from 'lucide-react';
+import { 
+  Lock, 
+  ArrowRight, 
+  Home, 
+  Mail, 
+  Loader2, 
+  ShieldCheck, 
+  Sparkles, 
+  Github,
+  KeyRound,
+  X
+} from 'lucide-react';
 import { initializeFirebase } from '@/firebase';
 import { 
   signInWithEmailAndPassword, 
@@ -15,11 +26,21 @@ import {
   signOut, 
   GoogleAuthProvider, 
   GithubAuthProvider, 
-  signInWithPopup 
+  signInWithPopup,
+  sendPasswordResetEmail 
 } from 'firebase/auth';
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { Badge } from '@/components/ui/badge';
 import { Logo } from '@/components/ui/Logo';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -27,6 +48,12 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isSocialLoading, setIsSocialLoading] = useState<string | null>(null);
   const [isSettingUp, setIsSettingUp] = useState(false);
+  
+  // Forgot Password States
+  const [isResetOpen, setIsResetOpen] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [isResetLoading, setIsResetLoading] = useState(false);
+
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
@@ -49,7 +76,6 @@ export default function LoginPage() {
       await signInWithEmailAndPassword(auth, email, password);
       toast({ title: 'Connexion réussie', description: 'Ravi de vous revoir !' });
       
-      // Smart Redirect: check for redirect param
       const redirect = searchParams.get('redirect');
       if (redirect) {
         router.push(redirect);
@@ -65,6 +91,31 @@ export default function LoginPage() {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetEmail) return;
+
+    setIsResetLoading(true);
+    try {
+      await sendPasswordResetEmail(auth, resetEmail);
+      toast({
+        title: "E-mail envoyé",
+        description: "Un lien de réinitialisation a été envoyé à votre adresse.",
+      });
+      setIsResetOpen(false);
+      setResetEmail("");
+    } catch (error: any) {
+      console.error(error);
+      toast({
+        title: "Erreur",
+        description: "Impossible d'envoyer l'e-mail. Vérifiez l'adresse saisie.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsResetLoading(false);
     }
   };
 
@@ -213,16 +264,27 @@ export default function LoginPage() {
                     disabled={isLoading || !!isSocialLoading} 
                   />
                 </div>
-                <div className="relative group/input">
-                  <Lock className="absolute left-5 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within/input:text-accent transition-colors" size={18} />
-                  <Input 
-                    type="password" 
-                    placeholder="Mot de passe" 
-                    className="h-14 pl-14 rounded-2xl bg-background/50 border-white/5 focus:border-accent focus:ring-4 focus:ring-accent/5 text-sm transition-all duration-300" 
-                    value={password} 
-                    onChange={(e) => setPassword(e.target.value)} 
-                    disabled={isLoading || !!isSocialLoading} 
-                  />
+                <div className="space-y-2">
+                  <div className="relative group/input">
+                    <Lock className="absolute left-5 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within/input:text-accent transition-colors" size={18} />
+                    <Input 
+                      type="password" 
+                      placeholder="Mot de passe" 
+                      className="h-14 pl-14 rounded-2xl bg-background/50 border-white/5 focus:border-accent focus:ring-4 focus:ring-accent/5 text-sm transition-all duration-300" 
+                      value={password} 
+                      onChange={(e) => setPassword(e.target.value)} 
+                      disabled={isLoading || !!isSocialLoading} 
+                    />
+                  </div>
+                  <div className="flex justify-end px-2">
+                    <button 
+                      type="button" 
+                      onClick={() => setIsResetOpen(true)}
+                      className="text-[10px] font-black uppercase italic text-white/40 hover:text-accent transition-colors tracking-widest"
+                    >
+                      Mot de passe oublié ?
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -305,6 +367,62 @@ export default function LoginPage() {
             </div>
         </div>
       </div>
+
+      {/* PASSWORD RESET DIALOG */}
+      <Dialog open={isResetOpen} onOpenChange={setIsResetOpen}>
+        <DialogContent className="bg-card border-white/10 text-foreground rounded-[2.5rem] sm:max-w-md overflow-hidden p-0">
+            <DialogHeader className="p-8 bg-accent/10 border-b border-white/5">
+                <div className="flex flex-col items-center gap-6 text-center">
+                    <div className="w-20 h-20 rounded-[2.5rem] bg-accent/20 flex items-center justify-center text-accent shadow-xl shadow-accent/10">
+                        <KeyRound size={40} />
+                    </div>
+                    <div className="space-y-1">
+                        <DialogTitle className="text-2xl font-black uppercase italic tracking-tighter leading-none">RÉCUPÉRATION</DialogTitle>
+                        <DialogDescription className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Lien de réinitialisation sécurisé</DialogDescription>
+                    </div>
+                </div>
+            </DialogHeader>
+            <form onSubmit={handleResetPassword} className="p-10 space-y-8">
+                <div className="space-y-3">
+                    <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Adresse E-mail du compte</Label>
+                    <div className="relative group/input">
+                        <Mail className="absolute left-5 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
+                        <Input 
+                            type="email" 
+                            placeholder="votre@email.com" 
+                            className="h-14 pl-14 rounded-2xl bg-background/50 border-white/5 focus:border-accent text-sm" 
+                            value={resetEmail} 
+                            onChange={(e) => setResetEmail(e.target.value)} 
+                            required
+                            disabled={isResetLoading}
+                        />
+                    </div>
+                    <p className="text-[9px] text-muted-foreground italic text-center uppercase font-bold opacity-40">
+                        Vous recevrez un lien pour créer un nouveau mot de passe.
+                    </p>
+                </div>
+
+                <div className="flex flex-col gap-3">
+                    <Button 
+                        type="submit" 
+                        disabled={isResetLoading || !resetEmail}
+                        className="w-full h-16 bg-accent text-black font-black uppercase italic rounded-2xl shadow-xl shadow-accent/20 text-lg gap-3"
+                    >
+                        {isResetLoading ? <Loader2 className="animate-spin" /> : "Envoyer le lien"}
+                    </Button>
+                    <Button 
+                        type="button" 
+                        variant="ghost" 
+                        onClick={() => setIsResetOpen(false)}
+                        className="h-12 rounded-2xl font-black uppercase italic text-[10px] text-muted-foreground hover:text-white"
+                    >
+                        Annuler
+                    </Button>
+                </div>
+            </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
+
