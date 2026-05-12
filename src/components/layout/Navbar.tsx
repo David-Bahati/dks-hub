@@ -1,6 +1,7 @@
 
 "use client";
 
+import { useState, useEffect } from 'react';
 import { LogOut, LayoutDashboard, ShoppingCart, Home, Trash2, User, Sparkles, Loader2, GraduationCap, Wrench, Laptop, Layout, Bell, Award, Wallet, Coins, ArrowRight, Minus, Plus, ShoppingBag, ShieldCheck, CheckCircle2 } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
@@ -21,6 +22,11 @@ export function Navbar() {
     const { cartItems, cartCount, totalPrice, removeFromCart, updateQuantity } = useCart();
     const router = useRouter();
     const pathname = usePathname();
+    const [isMounted, setIsMounted] = useState(false);
+
+    useEffect(() => {
+        setIsMounted(true);
+    }, []);
 
     // Fetch unread notifications for badge
     const notificationsQuery = useMemoFirebase(() => {
@@ -70,7 +76,7 @@ export function Navbar() {
 
                 <div className="flex items-center gap-4">
                     {/* NOTIFICATIONS BADGE */}
-                    {user && (
+                    {isMounted && user && (
                         <Link href="/dashboard/notifications">
                             <Button variant="ghost" size="icon" className="relative h-12 w-12 rounded-2xl hover:bg-white/5 transition-all text-muted-foreground hover:text-accent">
                                 <Bell size={20} />
@@ -82,7 +88,7 @@ export function Navbar() {
                     )}
 
                     {/* UNIVERSAL DKST WALLET BADGE */}
-                    {user && (
+                    {isMounted && user && (
                         <Link href="/dashboard/wallet">
                             <Badge className="bg-accent/20 text-accent border-accent/20 h-10 px-4 rounded-xl gap-2 font-black italic cursor-pointer hover:bg-accent/30 transition-all hidden sm:flex">
                                 <Coins size={16} /> {user?.tokenBalance?.toFixed(2) || 0} DKST
@@ -94,7 +100,7 @@ export function Navbar() {
                         <SheetTrigger asChild>
                             <Button variant="ghost" size="icon" className="relative h-12 w-12 rounded-2xl hover:bg-white/5 transition-all">
                                 <ShoppingCart size={22} />
-                                {cartCount > 0 && (
+                                {isMounted && cartCount > 0 && (
                                     <Badge className="absolute -top-1 -right-1 h-5 min-w-5 p-0 flex items-center justify-center bg-accent text-black text-[10px] font-black rounded-full animate-pulse">{cartCount}</Badge>
                                 )}
                             </Button>
@@ -113,13 +119,13 @@ export function Navbar() {
                             </SheetHeader>
                             
                             <div className="flex-1 overflow-y-auto p-8 space-y-6 custom-scrollbar">
-                                {cartItems.length === 0 ? (
+                                {isMounted && cartItems.length === 0 ? (
                                     <div className="flex flex-col items-center justify-center h-full opacity-20 text-center space-y-4">
                                         <ShoppingBag size={64} />
                                         <p className="font-black uppercase italic text-sm">Le panier attend votre excellence...</p>
                                     </div>
                                 ) : (
-                                    cartItems.map(item => (
+                                    isMounted && cartItems.map(item => (
                                         <div key={item.id} className="flex gap-4 p-4 bg-white/5 rounded-2xl border border-white/5 group transition-all hover:bg-white/[0.08]">
                                             <div className="w-16 h-16 rounded-xl overflow-hidden bg-black/40 border border-white/5 shrink-0">
                                                 <img src={item.imageUrl || item.image || 'https://picsum.photos/seed/dks/400/300'} className="w-full h-full object-cover" alt={item.name} />
@@ -141,7 +147,7 @@ export function Navbar() {
                                 )}
                             </div>
                             
-                            {cartItems.length > 0 && (
+                            {isMounted && cartItems.length > 0 && (
                                 <SheetFooter className="p-8 bg-black/40 border-t border-white/5 flex flex-col gap-6">
                                     <div className="w-full flex justify-between items-end">
                                         <span className="text-xs font-black uppercase text-muted-foreground">Total à régler</span>
@@ -162,7 +168,7 @@ export function Navbar() {
                         </SheetContent>
                     </Sheet>
 
-                    {authLoading ? <Loader2 className="animate-spin h-5 w-5 text-accent" /> : user ? (
+                    {authLoading ? <Loader2 className="animate-spin h-5 w-5 text-accent" /> : isMounted && user ? (
                         <div className="flex items-center gap-3">
                              <Link href="/dashboard/settings" className="relative group">
                                 <Avatar className="h-11 w-11 border-2 border-white/5 group-hover:border-accent transition-all cursor-pointer shadow-lg">
@@ -182,7 +188,7 @@ export function Navbar() {
                              </Button>
                         </div>
                     ) : (
-                        <Button asChild className="bg-primary px-6 text-[10px] font-black uppercase italic rounded-xl h-11 shadow-lg shadow-primary/20"><Link href="/login">Connexion</Link></Button>
+                        isMounted && <Button asChild className="bg-primary px-6 text-[10px] font-black uppercase italic rounded-xl h-11 shadow-lg shadow-primary/20"><Link href="/login">Connexion</Link></Button>
                     )}
                 </div>
             </div>

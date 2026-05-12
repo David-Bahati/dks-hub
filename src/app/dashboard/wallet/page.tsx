@@ -451,10 +451,10 @@ function UniversalWalletPage() {
                             </button>
                         </p>
                         <h2 className="text-6xl md:text-8xl font-black text-white italic tracking-tighter leading-none mb-3 drop-shadow-[0_0_30px_rgba(56,189,248,0.2)]">
-                            {isBalanceVisible ? `$${stats.gcvUSD.toLocaleString('fr-FR', { maximumFractionDigits: 0 })}` : "••••••"}
+                            {isMounted && isBalanceVisible ? `$${stats.gcvUSD.toLocaleString('fr-FR', { maximumFractionDigits: 0 })}` : "••••••"}
                         </h2>
                         <div className="flex items-center justify-center gap-3">
-                            <Badge className="bg-accent text-black font-black italic text-[10px]">≈ {isBalanceVisible ? stats.totalTokens.toFixed(4) : "••"} Actifs</Badge>
+                            <Badge className="bg-accent text-black font-black italic text-[10px]">≈ {isMounted && isBalanceVisible ? stats.totalTokens.toFixed(4) : "••"} Actifs</Badge>
                             <span className="text-[9px] font-bold text-white/20 uppercase tracking-widest">Indexé sur $314,159 GCV</span>
                         </div>
                     </div>
@@ -503,14 +503,14 @@ function UniversalWalletPage() {
                                                 <Badge className="bg-white/5 text-white/20 border-none text-[7px] font-black px-1.5 uppercase h-4">{asset.network}</Badge>
                                             </div>
                                             <p className="text-[9px] font-bold text-accent/40 uppercase tracking-widest mt-1.5 italic">
-                                                Price/Token: ${asset.price.toLocaleString()}
+                                                Price/Token: {isMounted ? `$${asset.price.toLocaleString()}` : "..."}
                                             </p>
                                         </div>
                                     </div>
                                     <div className="text-right">
-                                        <p className="text-xl font-black text-white leading-none">{isBalanceVisible ? asset.balance.toFixed(asset.id === 'pi' ? 6 : 2) : "••••"}</p>
+                                        <p className="text-xl font-black text-white leading-none">{isMounted && isBalanceVisible ? asset.balance.toFixed(asset.id === 'pi' ? 6 : 2) : "••••"}</p>
                                         <p className="text-[10px] font-bold text-white/20 mt-1.5 uppercase tracking-tighter">
-                                            ≈ {isBalanceVisible ? `$${(asset.balance * asset.price).toLocaleString()}` : "••••"}
+                                            ≈ {isMounted && isBalanceVisible ? `$${(asset.balance * asset.price).toLocaleString()}` : "••••"}
                                         </p>
                                     </div>
                                 </div>
@@ -556,7 +556,7 @@ function UniversalWalletPage() {
                             <Card className="bg-white/5 border border-white/10 rounded-[3rem] p-10 space-y-6">
                                 <div className="flex items-center gap-4"><Flame className="text-orange-500" size={24} /><h4 className="text-lg font-black uppercase italic">Burn & Mint</h4></div>
                                 <div className="space-y-5">
-                                    <div className="flex justify-between items-end"><p className="text-[10px] font-black uppercase text-white/30 tracking-widest">Potentiel de Minting</p><span className="text-2xl font-black text-accent">{isBalanceVisible ? stats.availablePoints : "••"} <span className="text-[10px] not-italic opacity-40">PTS</span></span></div>
+                                    <div className="flex justify-between items-end"><p className="text-[10px] font-black uppercase text-white/30 tracking-widest">Potentiel de Minting</p><span className="text-2xl font-black text-accent">{isMounted && isBalanceVisible ? stats.availablePoints : "••"} <span className="text-[10px] not-italic opacity-40">PTS</span></span></div>
                                     <Progress value={stats.progress} className="h-2 bg-white/5" indicatorClassName="bg-accent shadow-[0_0_15px_rgba(56,189,248,0.5)]" />
                                     <Button 
                                         onClick={() => secureAction(handleConvertPoints)} 
@@ -608,7 +608,7 @@ function UniversalWalletPage() {
                                         <div className="space-y-4">
                                             <div className="flex justify-between items-end px-1">
                                                 <Label className="text-[10px] font-black uppercase tracking-widest opacity-40">Montant à Sécuriser</Label>
-                                                <p className="text-[9px] font-bold text-white/40 uppercase">Disponible : <span className="text-accent">{isBalanceVisible ? currentStakingBalance.toFixed(2) : "••••"}</span> DKST</p>
+                                                <p className="text-[9px] font-bold text-white/40 uppercase">Disponible : <span className="text-accent">{isMounted && isBalanceVisible ? currentStakingBalance.toFixed(2) : "••••"}</span> DKST</p>
                                             </div>
                                             <div className="relative">
                                                 <Input type="number" placeholder="0.00" value={stakingAmount} onChange={(e) => setStakingAmount(e.target.value)} className="h-20 bg-background/50 border-white/10 rounded-[2rem] text-3xl font-black text-white px-8 pr-24" />
@@ -624,7 +624,7 @@ function UniversalWalletPage() {
                                             </div>
                                             <div className="pt-4 border-t border-white/5">
                                                 <div className="flex items-center gap-3 text-[9px] font-bold uppercase text-white/40 italic">
-                                                    <Clock size={12} className="text-accent" /> Libération : {format(new Date(Date.now() + selectedStakingOption.months * 30 * 24 * 60 * 60 * 1000), "dd MMMM yyyy", { locale: fr })}
+                                                    <Clock size={12} className="text-accent" /> Libération : {isMounted ? format(new Date(Date.now() + selectedStakingOption.months * 30 * 24 * 60 * 60 * 1000), "dd MMMM yyyy", { locale: fr }) : "..."}
                                                 </div>
                                             </div>
                                         </div>
@@ -640,13 +640,13 @@ function UniversalWalletPage() {
                                 <Card className="bg-black/40 border border-white/5 rounded-[3rem] p-10 flex flex-col justify-between group overflow-hidden relative">
                                     <div className="absolute -bottom-10 -right-10 p-6 opacity-5 group-hover:scale-110 transition-transform duration-[10s]"><Timer size={160} className="text-accent" /></div>
                                     <div className="space-y-10 relative z-10">
-                                        <div className="flex justify-between items-start">
+                                        <div className="justify-between items-start flex">
                                             <div><h3 className="text-xl font-black uppercase italic">Ma Position Staking</h3><p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest mt-1">Actifs en cours de fructification</p></div>
                                             <div className="w-14 h-14 rounded-2xl bg-white/5 flex items-center justify-center text-accent shadow-2xl"><Timer size={28}/></div>
                                         </div>
                                         <div className="space-y-8">
-                                            <div><p className="text-[10px] font-black uppercase text-white/40 mb-2 tracking-[0.2em]">Capital bloqué</p><p className="text-5xl font-black text-white italic tracking-tighter">{isBalanceVisible ? (user?.stakedBalance || 0).toFixed(2) : "••••"} <span className="text-xs not-italic opacity-40">DKST</span></p></div>
-                                            <div><p className="text-[10px] font-black uppercase text-white/40 mb-2 tracking-[0.2em]">Récompenses de session</p><p className="text-5xl font-black text-green-400 italic tracking-tighter">+{isBalanceVisible ? stats.stakingRewards.toFixed(6) : "••••"}</p></div>
+                                            <div><p className="text-[10px] font-black uppercase text-white/40 mb-2 tracking-[0.2em]">Capital bloqué</p><p className="text-5xl font-black text-white italic tracking-tighter">{isMounted && isBalanceVisible ? (user?.stakedBalance || 0).toFixed(2) : "••••"} <span className="text-xs not-italic opacity-40">DKST</span></p></div>
+                                            <div><p className="text-[10px] font-black uppercase text-white/40 mb-2 tracking-[0.2em]">Récompenses de session</p><p className="text-5xl font-black text-green-400 italic tracking-tighter">+{isMounted && isBalanceVisible ? stats.stakingRewards.toFixed(6) : "••••"}</p></div>
                                         </div>
                                     </div>
                                     <div className="mt-12 space-y-4 relative z-10">
@@ -1005,7 +1005,7 @@ function UniversalWalletPage() {
                     <div className="w-24 h-24 rounded-full bg-green-500/10 flex items-center justify-center text-green-400 shadow-[0_0_50px_rgba(34,197,94,0.2)] animate-in zoom-in-50 duration-500"><ShieldCheck size={56} /></div>
                     <div className="space-y-2">
                         <h2 className="text-3xl font-black uppercase italic tracking-tighter">Action Validée</h2>
-                        <p className="text-sm text-white/60 italic">Le protocole DKS a confirmé la réussite de l'opération avec succès.</p>
+                        <p className="text-sm text-white/60 italic">Le protocole DKS pas a confirmé la réussite de l'opération avec succès.</p>
                     </div>
                     <Button onClick={() => setIsSuccessDialogOpen(false)} className="w-full h-14 bg-white text-black font-black uppercase italic rounded-2xl">Terminer</Button>
                 </DialogContent>

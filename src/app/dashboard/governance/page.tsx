@@ -1,6 +1,7 @@
+
 "use client";
 
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Navbar } from "@/components/layout/Navbar";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -50,6 +51,11 @@ function GovernanceDAOPage() {
     const [isSheetOpen, setIsSheetOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [votingOn, setVotingOn] = useState<string | null>(null);
+    const [isMounted, setIsMounted] = useState(false);
+
+    useEffect(() => {
+        setIsMounted(true);
+    }, []);
 
     // Fetch Proposals
     const proposalsQuery = useMemoFirebase(() => {
@@ -145,7 +151,7 @@ function GovernanceDAOPage() {
 
                     <div className="flex gap-3">
                         <Badge className="bg-accent/10 text-accent border-accent/20 h-14 px-6 rounded-2xl gap-3 font-black italic text-sm">
-                            <Coins size={20} /> Vote Power: {user?.tokenBalance?.toFixed(2) || 0}
+                            <Coins size={20} /> Vote Power: {isMounted ? (user?.tokenBalance?.toFixed(2) || 0) : "..."}
                         </Badge>
                         {isAdmin && (
                             <Button onClick={() => setIsSheetOpen(true)} className="bg-primary hover:bg-primary/90 h-14 px-8 rounded-2xl font-black uppercase italic gap-3 shadow-xl">
@@ -219,7 +225,7 @@ function GovernanceDAOPage() {
                                                     {proposal.status === 'active' ? 'Scrutin Ouvert' : 'Scrutin Clos'}
                                                 </Badge>
                                                 <p className="text-[8px] font-bold uppercase text-muted-foreground mt-2 opacity-40 tracking-widest">
-                                                    Expire le {new Date(proposal.endsAt).toLocaleDateString()}
+                                                    Expire le {isMounted ? new Date(proposal.endsAt).toLocaleDateString() : "..."}
                                                 </p>
                                             </div>
                                         </div>
@@ -253,7 +259,7 @@ function GovernanceDAOPage() {
                                         </div>
                                     </CardContent>
                                     <div className="bg-black/20 p-6 flex items-center justify-center gap-10 border-t border-white/5 text-[9px] font-black uppercase italic text-muted-foreground/40">
-                                        <div className="flex items-center gap-2"><Users size={12} /> participation: {Math.floor(Math.random() * 50) + 20} membres</div>
+                                        <div className="flex items-center gap-2"><Users size={12} /> participation: {isMounted ? (32 + proposal.title.length % 20) : "..."} membres</div>
                                         <div className="flex items-center gap-2"><ShieldCheck size={12} /> vérifié blockchain</div>
                                     </div>
                                 </Card>
