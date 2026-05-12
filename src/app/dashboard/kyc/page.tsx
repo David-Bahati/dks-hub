@@ -27,7 +27,9 @@ import {
     Video,
     Smartphone,
     Scale,
-    FileBadge
+    FileBadge,
+    XCircle,
+    RotateCcw
 } from "lucide-react";
 import Link from 'next/link';
 import { useAuth } from "@/context/AuthContext";
@@ -41,6 +43,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 
 type Step = 1 | 2 | 3 | 4 | 5;
 
@@ -50,6 +53,7 @@ export default function KycPage() {
     const router = useRouter();
     const [step, setStep] = useState<Step>(1);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [forceShowForm, setForceShowForm] = useState(false);
     
     // Form States - Part 1: Identity
     const [firstName, setFirstName] = useState("");
@@ -86,6 +90,24 @@ export default function KycPage() {
         back: useRef<HTMLInputElement>(null),
         address: useRef<HTMLInputElement>(null)
     };
+
+    // Pré-remplissage si déjà existant
+    useEffect(() => {
+        if (user) {
+            setFirstName(user.kycFirstName || "");
+            setLastName(user.kycLastName || "");
+            setBirthDate(user.kycBirthDate || "");
+            setBirthPlace(user.kycBirthPlace || "");
+            setNationality(user.kycNationality || "");
+            setGender(user.kycGender || "M");
+            setDocType(user.kycDocumentType || "national_id");
+            setDocNumber(user.kycDocumentNumber || "");
+            setResidentialAddress(user.kycResidentialAddress || "");
+            setProfession(user.kycProfession || "");
+            setSourceOfFunds(user.kycSourceOfFunds || "salaire");
+            setIsPep(user.kycIsPep || false);
+        }
+    }, [user]);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, target: 'front' | 'back' | 'address') => {
         const file = e.target.files?.[0];
@@ -150,6 +172,7 @@ export default function KycPage() {
             });
 
             toast({ title: "Dossier Élite Soumis", description: "Votre dossier est en cours d'audit par le Sceau du Hub." });
+            setForceShowForm(false);
             router.push('/dashboard');
         } catch (error) {
             toast({ title: "Erreur", description: "Impossible de soumettre le dossier.", variant: "destructive" });
@@ -158,7 +181,7 @@ export default function KycPage() {
         }
     };
 
-    if (user?.kycStatus === 'pending') {
+    if (user?.kycStatus === 'pending' && !forceShowForm) {
         return (
             <div className="min-h-screen bg-background text-foreground">
                 <Navbar />
@@ -180,7 +203,7 @@ export default function KycPage() {
         );
     }
 
-    if (user?.kycStatus === 'verified') {
+    if (user?.kycStatus === 'verified' && !forceShowForm) {
         return (
             <div className="min-h-screen bg-background text-foreground">
                 <Navbar />
@@ -197,6 +220,40 @@ export default function KycPage() {
                     <Button variant="outline" className="rounded-2xl border-white/10" asChild>
                         <Link href="/dashboard">Retour au Dashboard</Link>
                     </Button>
+                </main>
+            </div>
+        );
+    }
+
+    if (user?.kycStatus === 'rejected' && !forceShowForm) {
+        return (
+            <div className="min-h-screen bg-background text-foreground">
+                <Navbar />
+                <main className="max-w-4xl mx-auto px-6 py-24 text-center space-y-8">
+                    <div className="w-24 h-24 rounded-[2.5rem] bg-red-500/10 flex items-center justify-center mx-auto text-red-500 shadow-xl shadow-red-500/10">
+                        <XCircle size={48} />
+                    </div>
+                    <div className="space-y-4">
+                        <h1 className="text-4xl font-black uppercase italic tracking-tighter">AUDIT <span className="text-red-500">REFUSÉ</span></h1>
+                        <Alert variant="destructive" className="bg-red-500/5 border-red-500/20 max-w-lg mx-auto rounded-3xl p-6">
+                            <AlertCircle className="h-5 w-5" />
+                            <AlertTitle className="font-black uppercase italic text-sm">Motif de la décision</AlertTitle>
+                            <AlertDescription className="text-xs italic opacity-80 mt-2">
+                                {user.kycRejectionReason || "Documents non conformes ou illisibles."}
+                            </AlertDescription>
+                        </Alert>
+                        <p className="text-muted-foreground text-sm max-w-md mx-auto italic">
+                            Veuillez corriger les informations signalées par nos auditeurs et soumettre à nouveau votre dossier complet.
+                        </p>
+                    </div>
+                    <div className="flex justify-center gap-4">
+                        <Button variant="outline" className="rounded-2xl border-white/10" asChild>
+                            <Link href="/dashboard">Dashboard</Link>
+                        </Button>
+                        <Button onClick={() => setForceShowForm(true)} className="rounded-2xl bg-accent text-black font-black uppercase italic gap-2">
+                            <RotateCcw size={18} /> Ressoumettre mon dossier
+                        </Button>
+                    </div>
                 </main>
             </div>
         );
@@ -356,7 +413,7 @@ export default function KycPage() {
 
                                     <div className="aspect-video max-w-sm mx-auto rounded-[2rem] bg-black/60 border-4 border-white/5 relative overflow-hidden flex items-center justify-center">
                                         {livenessStatus === 'not_started' && (
-                                            <Button onClick={simulateLiveness} className="bg-accent text-black font-black uppercase italic rounded-xl px-10 h-14">Démarrer le Test</Button>
+                                            <Button onClick={simulateLiveness} className="bg-accent text-black font-black uppercase italic rounded-xl px-8 h-12 shadow-2xl">Démarrer le Test</Button>
                                         )}
                                         {livenessStatus === 'recording' && (
                                             <div className="w-full h-full flex flex-col items-center justify-center space-y-6 p-10">
@@ -404,3 +461,4 @@ export default function KycPage() {
         </div>
     );
 }
+
