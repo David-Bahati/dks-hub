@@ -17,14 +17,12 @@ import {
     Clock,
     FileText,
     X as CloseIcon,
-    UserX,
     RotateCcw,
     MapPin,
     User as UserIcon,
     Calendar as CalendarIcon,
     Briefcase,
     Globe as GlobeIcon,
-    Info as InfoIcon,
     Smartphone,
     Scale as ScaleIcon,
     Video as VideoIcon
@@ -82,10 +80,10 @@ function KycManagementPage() {
 
             if (newStatus === 'verified') {
                 notifTitle = "KYC Élite Approuvé !";
-                notifMsg = "Votre dossier complet a été validé. Vous bénéficiez maintenant des pleins privilèges du Hub.";
+                notifMsg = "Votre dossier a été validé. Vous bénéficiez désormais des pleins privilèges du Hub.";
                 notifType = 'success';
             } else if (newStatus === 'rejected') {
-                notifTitle = "KYC Refusé / Révoqué";
+                notifTitle = "KYC Refusé";
                 notifMsg = `Audit négatif. Motif : ${rejectionReason || "Pièces non conformes"}`;
                 notifType = 'error';
             } else {
@@ -128,7 +126,9 @@ function KycManagementPage() {
         return [...filtered].sort((a, b) => {
             const dateA = a.kycSubmittedAt?.toDate?.() || 0;
             const dateB = b.kycSubmittedAt?.toDate?.() || 0;
-            return (dateB instanceof Date ? dateB.getTime() : 0) - (dateA instanceof Date ? dateA.getTime() : 0);
+            const timeA = dateA instanceof Date ? dateA.getTime() : 0;
+            const timeB = dateB instanceof Date ? dateB.getTime() : 0;
+            return timeB - timeA;
         });
     }, [allKyc, search, activeTab]);
 
@@ -225,12 +225,13 @@ function KycManagementPage() {
                             <div className="space-y-6">
                                 <h4 className="text-xs font-black uppercase text-accent tracking-[0.4em] flex items-center gap-2"><UserIcon size={16}/> État Civil & Identité</h4>
                                 <div className="p-8 bg-white/5 rounded-[2rem] border border-white/5 grid grid-cols-2 gap-6">
-                                    <div><p className="text-[8px] font-black uppercase opacity-40 mb-1">Nom complet</p><p className="text-sm font-bold uppercase">{selectedKyc?.kycLastName} {selectedKyc?.kycFirstName}</p></div>
+                                    <div className="col-span-2">
+                                        <p className="text-[8px] font-black uppercase opacity-40 mb-1">Nom complet</p>
+                                        <p className="text-sm font-bold uppercase">{selectedKyc?.kycLastName} {selectedKyc?.kycFirstName}</p>
+                                    </div>
                                     <div><p className="text-[8px] font-black uppercase opacity-40 mb-1">Sexe</p><p className="text-sm font-bold uppercase">{selectedKyc?.kycGender === 'M' ? 'Masculin' : 'Féminin'}</p></div>
                                     <div><p className="text-[8px] font-black uppercase opacity-40 mb-1">Date de Naissance</p><p className="text-sm font-bold">{selectedKyc?.kycBirthDate}</p></div>
-                                    <div><p className="text-[8px] font-black uppercase opacity-40 mb-1">Lieu de Naissance</p><p className="text-sm font-bold">{selectedKyc?.kycBirthPlace}</p></div>
-                                    <div><p className="text-[8px] font-black uppercase opacity-40 mb-1">Nationalité</p><p className="text-sm font-bold uppercase">{selectedKyc?.kycNationality}</p></div>
-                                    <div><p className="text-[8px] font-black uppercase opacity-40 mb-1">Profession</p><p className="text-sm font-bold uppercase text-accent">{selectedKyc?.kycProfession}</p></div>
+                                    <div className="col-span-2"><p className="text-[8px] font-black uppercase opacity-40 mb-1">Nationalité</p><p className="text-sm font-bold uppercase">{selectedKyc?.kycNationality}</p></div>
                                 </div>
                             </div>
 
@@ -239,36 +240,36 @@ function KycManagementPage() {
                                 <div className="p-8 bg-white/5 rounded-[2rem] border border-white/5 space-y-6">
                                     <div><p className="text-[8px] font-black uppercase opacity-40 mb-1">Origine des Fonds</p><Badge className="bg-primary/20 text-primary border-none uppercase font-black text-[9px]">{selectedKyc?.kycSourceOfFunds}</Badge></div>
                                     <div className="flex items-center justify-between border-t border-white/5 pt-4">
-                                        <p className="text-[10px] font-black uppercase">Statut PEP (Politiquement Exposé)</p>
-                                        {selectedKyc?.kycIsPep ? <Badge className="bg-red-500 text-white border-none uppercase text-[8px] font-black">OUI (RISQUE HAUT)</Badge> : <Badge className="bg-green-500/10 text-green-400 border-none uppercase text-[8px] font-black">NON (RISQUE BAS)</Badge>}
+                                        <p className="text-[10px] font-black uppercase">Statut PEP</p>
+                                        {selectedKyc?.kycIsPep ? <Badge className="bg-red-500 text-white border-none uppercase text-[8px] font-black">OUI (RISQUE HAUT)</Badge> : <Badge className="bg-green-500/10 text-green-400 border-none uppercase text-[8px] font-black">NON</Badge>}
                                     </div>
                                     <div className="flex items-center justify-between border-t border-white/5 pt-4">
-                                        <p className="text-[10px] font-black uppercase">Test de Vivacité (Biométrie)</p>
-                                        <Badge className="bg-green-500/10 text-green-400 border-none uppercase text-[8px] font-black flex items-center gap-2"><VideoIcon size={10}/> SUCCÈS</Badge>
+                                        <p className="text-[10px] font-black uppercase">Test de Vivacité</p>
+                                        <Badge className="bg-green-500/10 text-green-400 border-none uppercase text-[8px] font-black flex items-center gap-2"><VideoIcon size={10}/> VALIDE</Badge>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
                         <div className="space-y-6">
-                            <h4 className="text-xs font-black uppercase text-accent tracking-[0.4em] flex items-center gap-2"><FileText size={16}/> Pièces Justificatives Numérisées</h4>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <h4 className="text-xs font-black uppercase text-accent tracking-[0.4em] flex items-center gap-2"><FileText size={16}/> Pièces Justificatives</h4>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                 <div className="space-y-3">
                                     <Label className="text-[8px] font-black uppercase opacity-40 block text-center">ID Recto</Label>
-                                    <div className="aspect-video rounded-3xl bg-black/40 border border-white/10 overflow-hidden shadow-inner group cursor-zoom-in">
-                                        <img src={selectedKyc?.kycDocumentImage} className="w-full h-full object-contain transition-transform group-hover:scale-110" />
+                                    <div className="aspect-video rounded-3xl bg-black/40 border border-white/10 overflow-hidden group cursor-zoom-in">
+                                        <img src={selectedKyc?.kycDocumentImage} className="w-full h-full object-contain" alt="ID Front" />
                                     </div>
                                 </div>
                                 <div className="space-y-3">
                                     <Label className="text-[8px] font-black uppercase opacity-40 block text-center">ID Verso</Label>
-                                    <div className="aspect-video rounded-3xl bg-black/40 border border-white/10 overflow-hidden shadow-inner group cursor-zoom-in">
-                                        <img src={selectedKyc?.kycDocumentImageBack} className="w-full h-full object-contain transition-transform group-hover:scale-110" />
+                                    <div className="aspect-video rounded-3xl bg-black/40 border border-white/10 overflow-hidden group cursor-zoom-in">
+                                        <img src={selectedKyc?.kycDocumentImageBack} className="w-full h-full object-contain" alt="ID Back" />
                                     </div>
                                 </div>
                                 <div className="space-y-3">
-                                    <Label className="text-[8px] font-black uppercase opacity-40 block text-center">Preuve de Domicile</Label>
-                                    <div className="aspect-video rounded-3xl bg-black/40 border border-white/10 overflow-hidden shadow-inner group cursor-zoom-in">
-                                        <img src={selectedKyc?.kycAddressProofImage} className="w-full h-full object-contain transition-transform group-hover:scale-110" />
+                                    <Label className="text-[8px] font-black uppercase opacity-40 block text-center">Preuve Domicile</Label>
+                                    <div className="aspect-video rounded-3xl bg-black/40 border border-white/10 overflow-hidden group cursor-zoom-in">
+                                        <img src={selectedKyc?.kycAddressProofImage} className="w-full h-full object-contain" alt="Residence" />
                                     </div>
                                 </div>
                             </div>
@@ -282,7 +283,7 @@ function KycManagementPage() {
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <Button onClick={() => handleAction(selectedKyc?.id, 'pending')} disabled={isProcessing || selectedKyc?.kycStatus === 'pending'} variant="outline" className="h-16 rounded-2xl font-black uppercase italic text-xs border-white/10 hover:bg-white/5 gap-3"><RotateCcw size={18} /> Réexaminer</Button>
                             <Button onClick={() => handleAction(selectedKyc?.id, 'rejected')} disabled={isProcessing || selectedKyc?.kycStatus === 'rejected'} variant="outline" className="h-16 rounded-2xl font-black uppercase italic text-xs border-red-500/20 text-red-500 hover:bg-red-500/10 gap-3"><XCircle size={18} /> Rejeter Dossier</Button>
-                            <Button onClick={() => handleAction(selectedKyc?.id, 'verified')} disabled={isProcessing || selectedKyc?.kycStatus === 'verified'} className="h-16 bg-accent text-black font-black uppercase italic rounded-2xl shadow-xl shadow-accent/20 gap-3 text-xs">{isProcessing ? <Loader2 className="animate-spin" /> : <><CheckCircle2 size={18} /> Certifier l'Identité Élite</>}</Button>
+                            <Button onClick={() => handleAction(selectedKyc?.id, 'verified')} disabled={isProcessing || selectedKyc?.kycStatus === 'verified'} className="h-16 bg-accent text-black font-black uppercase italic rounded-2xl shadow-xl shadow-accent/20 gap-3 text-xs">{isProcessing ? <Loader2 className="animate-spin" /> : <><CheckCircle2 size={18} /> Certifier l'Identité</>}</Button>
                         </div>
                     </div>
                 </DialogContent>
