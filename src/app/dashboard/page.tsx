@@ -406,7 +406,14 @@ function DashboardPage() {
         <Link href="/" className="group flex items-center gap-3 px-4 py-3 rounded-2xl transition-all text-sm font-black uppercase italic text-accent hover:bg-accent/10 mb-4">
            <ShoppingBag size={18} /> Retour Boutique
         </Link>
-        {navConfig.filter(link => link.roles.map(r => r.toLowerCase()).includes(user?.role?.toLowerCase() || "")).map(link => (
+        {navConfig.filter(link => {
+            const hasRole = link.roles.map(r => r.toLowerCase()).includes(user?.role?.toLowerCase() || "");
+            // MASK KYB FOR REGULAR CUSTOMERS
+            if (link.href === '/dashboard/kyb') {
+                return hasRole && (isStaff || (user?.kybStatus && user?.kybStatus !== 'none'));
+            }
+            return hasRole;
+        }).map(link => (
           <Link key={link.href} href={link.href} className={cn("group flex items-center gap-3 px-4 py-3 rounded-2xl transition-all text-sm font-bold", pathname === link.href ? 'bg-accent/10 text-accent' : 'text-slate-400 hover:bg-white/5 hover:text-white')}>
             <link.icon className={cn("h-4 w-4", pathname === link.href ? 'text-accent' : '')} />{link.label}
           </Link>
@@ -453,16 +460,19 @@ function DashboardPage() {
                                 <UserIcon size={16} /> KYC
                             </Badge>
                         </Link>
-                        <Link href="/dashboard/kyb">
-                            <Badge className={cn(
-                                "h-10 px-4 rounded-xl gap-2 font-black italic cursor-pointer transition-all",
-                                user.kybStatus === 'verified' ? "bg-primary/20 text-primary border-primary/20" : 
-                                user.kybStatus === 'pending' ? "bg-blue-500/20 text-blue-400 border-blue-500/20" :
-                                "bg-white/5 text-muted-foreground border-white/10"
-                            )}>
-                                <Building size={16} /> KYB
-                            </Badge>
-                        </Link>
+                        {/* MASK KYB BADGE FOR REGULAR CUSTOMERS */}
+                        {(isStaff || (user.kybStatus && user.kybStatus !== 'none')) && (
+                            <Link href="/dashboard/kyb">
+                                <Badge className={cn(
+                                    "h-10 px-4 rounded-xl gap-2 font-black italic cursor-pointer transition-all",
+                                    user.kybStatus === 'verified' ? "bg-primary/20 text-primary border-primary/20" : 
+                                    user.kybStatus === 'pending' ? "bg-blue-500/20 text-blue-400 border-blue-500/20" :
+                                    "bg-white/5 text-muted-foreground border-white/10"
+                                )}>
+                                    <Building size={16} /> KYB
+                                </Badge>
+                            </Link>
+                        )}
                     </div>
                 )}
 
