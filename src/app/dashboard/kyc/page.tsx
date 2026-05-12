@@ -24,12 +24,13 @@ import {
     CheckCircle2,
     ArrowRight,
     ArrowLeft as ArrowLeftIcon,
-    Video,
+    Video as VideoIcon,
     Smartphone,
     Scale,
     FileBadge,
     XCircle,
-    RotateCcw
+    RotateCcw,
+    Lock
 } from "lucide-react";
 import Link from 'next/link';
 import { useAuth } from "@/context/AuthContext";
@@ -403,7 +404,7 @@ export default function KycPage() {
                             {step === 5 && (
                                 <div className="space-y-10 animate-in fade-in slide-in-from-right-4 text-center">
                                     <div className="flex flex-col items-center gap-6">
-                                        <div className="w-20 h-20 rounded-full bg-accent/10 flex items-center justify-center text-accent shadow-xl"><Video size={40} /></div>
+                                        <div className="w-20 h-20 rounded-full bg-accent/10 flex items-center justify-center text-accent shadow-xl"><VideoIcon size={40} /></div>
                                         <h3 className="text-3xl font-black uppercase italic tracking-tighter">Test de Vivacité</h3>
                                         <p className="text-sm text-white/60 italic max-w-sm">
                                             Pour prouver que vous êtes bien réel, suivez les instructions à l'écran. 
@@ -461,4 +462,3 @@ export default function KycPage() {
         </div>
     );
 }
-

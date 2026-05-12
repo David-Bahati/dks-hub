@@ -82,10 +82,10 @@ export function AiAssistant() {
 
     useEffect(() => {
         if (typeof window !== 'undefined') {
-            const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-            if (SpeechRecognition && typeof SpeechRecognition === 'function') {
+            const SpeechRecognitionConstructor = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+            if (SpeechRecognitionConstructor && typeof SpeechRecognitionConstructor === 'function') {
                 try {
-                    recognitionRef.current = new SpeechRecognition();
+                    recognitionRef.current = new SpeechRecognitionConstructor();
                     recognitionRef.current.continuous = false;
                     recognitionRef.current.interimResults = false;
                     recognitionRef.current.lang = currentLanguage.voiceCode;
@@ -113,7 +113,15 @@ export function AiAssistant() {
     const toggleListening = () => {
         if (!recognitionRef.current) return;
         if (isListening) recognitionRef.current.stop();
-        else { setIsListening(true); recognitionRef.current.start(); }
+        else { 
+            try {
+                setIsListening(true); 
+                recognitionRef.current.start(); 
+            } catch (e) {
+                console.error("Speech recognition error", e);
+                setIsListening(false);
+            }
+        }
     };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
