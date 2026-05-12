@@ -408,8 +408,8 @@ function DashboardPage() {
         </Link>
         {navConfig.filter(link => {
             const hasRole = link.roles.map(r => r.toLowerCase()).includes(user?.role?.toLowerCase() || "");
-            // MASK KYB FOR REGULAR CUSTOMERS
-            if (link.href === '/dashboard/kyb') {
+            // Masquer KYB pour les clients standards
+            if (link.href === '/dashboard/kyb' || link.href === '/dashboard/kyb-management') {
                 return hasRole && (isStaff || (user?.kybStatus && user?.kybStatus !== 'none'));
             }
             return hasRole;
@@ -460,7 +460,6 @@ function DashboardPage() {
                                 <UserIcon size={16} /> KYC
                             </Badge>
                         </Link>
-                        {/* MASK KYB BADGE FOR REGULAR CUSTOMERS */}
                         {(isStaff || (user.kybStatus && user.kybStatus !== 'none')) && (
                             <Link href="/dashboard/kyb">
                                 <Badge className={cn(
@@ -517,7 +516,6 @@ function DashboardPage() {
               </div>
           </div>
 
-          {/* DKS EXPANSION MODULES */}
           <section className="animate-in fade-in slide-in-from-top-4 duration-1000">
             <div className="flex items-center gap-4 mb-6">
                 <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-accent shadow-lg"><Rocket size={20} /></div>
@@ -580,7 +578,6 @@ function DashboardPage() {
             </div>
           </section>
 
-          {/* ACTIONS PRIORITAIRES STAFF */}
           {isStaff && (
               <section className="animate-in fade-in slide-in-from-top-4 duration-1000">
                 <div className="flex items-center gap-4 mb-6">
@@ -722,7 +719,6 @@ function DashboardPage() {
               </Card>
 
               <div className="lg:col-span-7 space-y-6">
-                  {/* SYSTEM HEALTH AUDIT WIDGET */}
                   <Card className="bg-white/5 border border-white/10 rounded-[2.5rem] p-8 relative overflow-hidden group">
                       <div className="absolute -bottom-12 -right-12 w-48 h-48 bg-primary/10 rounded-full blur-3xl" />
                       <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-8">
@@ -849,6 +845,8 @@ const navConfig = [
   { href: "/dashboard/hardware", icon: Laptop, label: "Parc Hardware", roles: ["Admin", "Seller", "Cashier", "customer"] },
   { href: "/dashboard/customers", icon: Users, label: "Base Clients", roles: ["Admin", "Seller", "Cashier"] },
   { href: "/dashboard/users", icon: UsersRound, label: "Équipe DKS", roles: ["Admin"] },
+  { href: "/dashboard/kyc-management", icon: ShieldCheck, label: "Validateur KYC", roles: ["Admin"] },
+  { href: "/dashboard/kyb-management", icon: Building2, label: "Validateur KYB", roles: ["Admin"] },
   { href: "/dashboard/settings", icon: Settings, label: "Réglages", roles: ["Admin", "Seller", "Cashier", "customer"] },
 ];
 

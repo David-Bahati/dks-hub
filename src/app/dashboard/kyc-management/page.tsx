@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Navbar } from "@/components/layout/Navbar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,12 +16,10 @@ import {
     CheckCircle2,
     Clock,
     FileText,
-    Image as ImageIcon,
-    Filter,
     X
 } from "lucide-react";
 import { db } from '@/lib/firebase';
-import { collection, query, where, updateDoc, doc, addDoc, serverTimestamp, orderBy } from 'firebase/firestore';
+import { collection, query, where, updateDoc, doc, addDoc, serverTimestamp } from 'firebase/firestore';
 import withAuth from '@/components/auth/withAuth';
 import Link from 'next/link';
 import { useCollection, useMemoFirebase } from '@/firebase';
@@ -41,11 +39,11 @@ function KycManagementPage() {
     const [rejectionReason, setRejectionReason] = useState("");
     const [isProcessing, setIsProcessing] = useState(false);
 
+    // Suppression de l'orderBy pour éviter l'erreur d'index composite Firestore
     const pendingKycQuery = useMemoFirebase(() => {
         return query(
             collection(db, "users"), 
-            where("kycStatus", "==", "pending"),
-            orderBy("kycSubmittedAt", "asc")
+            where("kycStatus", "==", "pending")
         );
     }, []);
 
@@ -84,14 +82,29 @@ function KycManagementPage() {
         }
     };
 
+    const filteredAndSortedPendings = useMemo(() => {
+        if (!pendings) return [];
+        
+        // Tri en mémoire au lieu de Firestore
+        const sorted = [...pendings].sort((a, b) => {
+            const dateA = a.kycSubmittedAt?.toDate?.() || new Date(0);
+            const dateB = b.kycSubmittedAt?.toDate?.() || new Date(0);
+            return dateA - dateB;
+        });
+
+        if (!search.trim()) return sorted;
+
+        const term = search.toLowerCase();
+        return sorted.filter(p => 
+            (p.name || "").toLowerCase().includes(term) || 
+            (p.displayName || "").toLowerCase().includes(term) ||
+            (p.email || "").toLowerCase().includes(term)
+        );
+    }, [pendings, search]);
+
     if (admin?.role?.toLowerCase() !== 'admin') {
         return <div className="p-20 text-center uppercase font-black italic opacity-20">Accès réservé au service conformité.</div>;
     }
-
-    const filteredPendings = pendings?.filter(p => 
-        p.name?.toLowerCase().includes(search.toLowerCase()) || 
-        p.email?.toLowerCase().includes(search.toLowerCase())
-    );
 
     return (
         <div className="min-h-screen bg-background text-foreground pb-20">
@@ -124,8 +137,8 @@ function KycManagementPage() {
                 <div className="grid grid-cols-1 gap-6">
                     {isLoading ? (
                         <div className="py-20 flex justify-center"><Loader2 className="animate-spin text-accent h-12 w-12" /></div>
-                    ) : filteredPendings && filteredPendings.length > 0 ? (
-                        filteredPendings.map((pending) => (
+                    ) : filteredAndSortedPendings.length > 0 ? (
+                        filteredAndSortedPendings.map((pending) => (
                             <Card key={pending.id} className="glossy-card border-none rounded-[2.5rem] overflow-hidden group">
                                 <CardContent className="p-8 flex flex-col lg:flex-row items-center gap-10">
                                     <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center shrink-0">
@@ -173,7 +186,7 @@ function KycManagementPage() {
                                 <div className="w-16 h-16 rounded-2xl bg-accent text-black flex items-center justify-center shadow-xl"><UserCheck size={32} /></div>
                                 <div>
                                     <DialogTitle className="text-3xl font-black uppercase italic tracking-tighter">Examen KYC</DialogTitle>
-                                    <DialogDescription className="text-[10px] font-black uppercase text-muted-foreground opacity-60 mt-1">Candidat : {selectedKyc?.name}</DialogDescription>
+                                    <DialogDescription className="text-[10px] font-black uppercase text-muted-foreground opacity-60 mt-1">Candidat : {selectedKyc?.name || selectedKyc?.displayName}</DialogDescription>
                                 </div>
                             </div>
                             <Button variant="ghost" size="icon" onClick={() => setSelectedKyc(null)} className="h-12 w-12 rounded-2xl hover:bg-white/5"><X size={24}/></Button>
@@ -217,7 +230,7 @@ function KycManagementPage() {
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <Button 
-                                onClick={() => handleAction(selectedKyc.id, 'reject')}
+                                onClick={() => handleAction(selectedKyc?.id, 'reject')}
                                 disabled={isProcessing || !rejectionReason}
                                 variant="outline"
                                 className="h-16 rounded-2xl font-black uppercase italic text-xs border-red-500/20 text-red-500 hover:bg-red-500/10 gap-3"
@@ -225,7 +238,7 @@ function KycManagementPage() {
                                 <XCircle size={18} /> Rejeter le Dossier
                             </Button>
                             <Button 
-                                onClick={() => handleAction(selectedKyc.id, 'verify')}
+                                onClick={() => handleAction(selectedKyc?.id, 'verify')}
                                 disabled={isProcessing}
                                 className="h-16 bg-accent text-black font-black uppercase italic rounded-2xl shadow-xl shadow-accent/20 gap-3 text-xs"
                             >

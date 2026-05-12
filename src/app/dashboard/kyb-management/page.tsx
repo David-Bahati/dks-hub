@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Navbar } from "@/components/layout/Navbar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,14 +15,12 @@ import {
     Eye,
     CheckCircle2,
     Clock,
-    FileText,
-    ExternalLink,
     X,
     MapPin,
     Briefcase
 } from "lucide-react";
 import { db } from '@/lib/firebase';
-import { collection, query, where, updateDoc, doc, addDoc, serverTimestamp, orderBy } from 'firebase/firestore';
+import { collection, query, where, updateDoc, doc, addDoc, serverTimestamp } from 'firebase/firestore';
 import withAuth from '@/components/auth/withAuth';
 import Link from 'next/link';
 import { useCollection, useMemoFirebase } from '@/firebase';
@@ -42,11 +40,11 @@ function KybManagementPage() {
     const [rejectionReason, setRejectionReason] = useState("");
     const [isProcessing, setIsProcessing] = useState(false);
 
+    // Suppression de l'orderBy pour éviter l'erreur d'index composite Firestore
     const pendingKybQuery = useMemoFirebase(() => {
         return query(
             collection(db, "users"), 
-            where("kybStatus", "==", "pending"),
-            orderBy("kybSubmittedAt", "asc")
+            where("kybStatus", "==", "pending")
         );
     }, []);
 
@@ -85,14 +83,28 @@ function KybManagementPage() {
         }
     };
 
+    const filteredAndSortedPendings = useMemo(() => {
+        if (!pendings) return [];
+
+        const sorted = [...pendings].sort((a, b) => {
+            const dateA = a.kybSubmittedAt?.toDate?.() || new Date(0);
+            const dateB = b.kybSubmittedAt?.toDate?.() || new Date(0);
+            return dateA - dateB;
+        });
+
+        if (!search.trim()) return sorted;
+
+        const term = search.toLowerCase();
+        return sorted.filter(p => 
+            (p.businessName || "").toLowerCase().includes(term) || 
+            (p.businessRegistrationNumber || "").toLowerCase().includes(term) ||
+            (p.name || "").toLowerCase().includes(term)
+        );
+    }, [pendings, search]);
+
     if (admin?.role?.toLowerCase() !== 'admin') {
         return <div className="p-20 text-center uppercase font-black italic opacity-20">Accès réservé au service conformité business.</div>;
     }
-
-    const filteredPendings = pendings?.filter(p => 
-        p.businessName?.toLowerCase().includes(search.toLowerCase()) || 
-        p.businessRegistrationNumber?.toLowerCase().includes(search.toLowerCase())
-    );
 
     return (
         <div className="min-h-screen bg-background text-foreground pb-20">
@@ -125,8 +137,8 @@ function KybManagementPage() {
                 <div className="grid grid-cols-1 gap-6">
                     {isLoading ? (
                         <div className="py-20 flex justify-center"><Loader2 className="animate-spin text-primary h-12 w-12" /></div>
-                    ) : filteredPendings && filteredPendings.length > 0 ? (
-                        filteredPendings.map((pending) => (
+                    ) : filteredAndSortedPendings.length > 0 ? (
+                        filteredAndSortedPendings.map((pending) => (
                             <Card key={pending.id} className="glossy-card border-none rounded-[2.5rem] overflow-hidden group">
                                 <CardContent className="p-8 flex flex-col lg:flex-row items-center gap-10">
                                     <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center shrink-0">
@@ -210,7 +222,7 @@ function KybManagementPage() {
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <Button 
-                                onClick={() => handleAction(selectedKyb.id, 'reject')}
+                                onClick={() => handleAction(selectedKyb?.id, 'reject')}
                                 disabled={isProcessing || !rejectionReason}
                                 variant="outline"
                                 className="h-16 rounded-2xl font-black uppercase italic text-xs border-red-500/20 text-red-500 hover:bg-red-500/10 gap-3"
@@ -218,7 +230,7 @@ function KybManagementPage() {
                                 <XCircle size={18} /> Refuser Certification
                             </Button>
                             <Button 
-                                onClick={() => handleAction(selectedKyb.id, 'verify')}
+                                onClick={() => handleAction(selectedKyb?.id, 'verify')}
                                 disabled={isProcessing}
                                 className="h-16 bg-primary text-white font-black uppercase italic rounded-2xl shadow-xl shadow-primary/20 gap-3 text-xs"
                             >
