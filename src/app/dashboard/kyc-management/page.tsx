@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Navbar } from "@/components/layout/Navbar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,9 @@ import {
     CheckCircle2,
     Clock,
     FileText,
-    X
+    X,
+    AlertCircle,
+    UserX
 } from "lucide-react";
 import { db } from '@/lib/firebase';
 import { collection, query, where, updateDoc, doc, addDoc, serverTimestamp } from 'firebase/firestore';
@@ -29,6 +31,7 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 
 function KycManagementPage() {
@@ -38,16 +41,22 @@ function KycManagementPage() {
     const [selectedKyc, setSelectedKyc] = useState<any>(null);
     const [rejectionReason, setRejectionReason] = useState("");
     const [isProcessing, setIsProcessing] = useState(false);
+    const [activeTab, setActiveTab] = useState("pending");
+    const [isMounted, setIsMounted] = useState(false);
 
-    // Suppression de l'orderBy pour éviter l'erreur d'index composite Firestore
-    const pendingKycQuery = useMemoFirebase(() => {
+    useEffect(() => {
+        setIsMounted(true);
+    }, []);
+
+    // Récupération de tous les dossiers KYC (sauf ceux qui n'ont rien soumis)
+    const kycQuery = useMemoFirebase(() => {
         return query(
             collection(db, "users"), 
-            where("kycStatus", "==", "pending")
+            where("kycStatus", "in", ["pending", "verified", "rejected"])
         );
     }, []);
 
-    const { data: pendings, isLoading } = useCollection(pendingKycQuery);
+    const { data: allKyc, isLoading } = useCollection(kycQuery);
 
     const handleAction = async (userId: string, action: 'verify' | 'reject') => {
         setIsProcessing(true);
@@ -82,29 +91,42 @@ function KycManagementPage() {
         }
     };
 
-    const filteredAndSortedPendings = useMemo(() => {
-        if (!pendings) return [];
+    const filteredAndSortedKyc = useMemo(() => {
+        if (!allKyc) return [];
         
-        // Tri en mémoire au lieu de Firestore
-        const sorted = [...pendings].sort((a, b) => {
+        // Filtre par onglet
+        let filtered = allKyc.filter(p => p.kycStatus === activeTab);
+
+        // Filtre par recherche
+        if (search.trim()) {
+            const term = search.toLowerCase();
+            filtered = filtered.filter(p => 
+                (p.name || "").toLowerCase().includes(term) || 
+                (p.displayName || "").toLowerCase().includes(term) ||
+                (p.email || "").toLowerCase().includes(term) ||
+                (p.kycDocumentNumber || "").toLowerCase().includes(term)
+            );
+        }
+
+        // Tri par date
+        return [...filtered].sort((a, b) => {
             const dateA = a.kycSubmittedAt?.toDate?.() || new Date(0);
             const dateB = b.kycSubmittedAt?.toDate?.() || new Date(0);
-            return dateA - dateB;
+            return dateB - dateA;
         });
-
-        if (!search.trim()) return sorted;
-
-        const term = search.toLowerCase();
-        return sorted.filter(p => 
-            (p.name || "").toLowerCase().includes(term) || 
-            (p.displayName || "").toLowerCase().includes(term) ||
-            (p.email || "").toLowerCase().includes(term)
-        );
-    }, [pendings, search]);
+    }, [allKyc, search, activeTab]);
 
     if (admin?.role?.toLowerCase() !== 'admin') {
         return <div className="p-20 text-center uppercase font-black italic opacity-20">Accès réservé au service conformité.</div>;
     }
+
+    const getStatusIcon = (status: string) => {
+        switch (status) {
+            case 'verified': return <CheckCircle2 className="text-green-500" size={28} />;
+            case 'rejected': return <UserX className="text-red-500" size={28} />;
+            default: return <Clock className="text-orange-400 animate-pulse" size={28} />;
+        }
+    };
 
     return (
         <div className="min-h-screen bg-background text-foreground pb-20">
@@ -118,62 +140,94 @@ function KycManagementPage() {
                             </Button>
                         </Link>
                         <div>
-                            <h1 className="text-4xl font-black uppercase italic tracking-tighter">Validateur <span className="text-accent">KYC Élite</span></h1>
-                            <p className="text-muted-foreground text-xs uppercase font-black opacity-40 mt-1">Examen des dossiers d'identité en attente</p>
+                            <h1 className="text-4xl font-black uppercase italic tracking-tighter text-white">Validateur <span className="text-accent">KYC Élite</span></h1>
+                            <p className="text-muted-foreground text-xs uppercase font-black opacity-40 mt-1">Audit et archivage des dossiers d'identité</p>
                         </div>
                     </div>
                 </div>
 
-                <div className="mb-10 relative">
-                    <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-muted-foreground" size={20} />
-                    <Input 
-                        placeholder="Chercher un membre par nom ou email..." 
-                        className="h-16 pl-14 bg-white/5 border-white/10 rounded-2xl focus:border-accent"
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                    />
-                </div>
-
-                <div className="grid grid-cols-1 gap-6">
-                    {isLoading ? (
-                        <div className="py-20 flex justify-center"><Loader2 className="animate-spin text-accent h-12 w-12" /></div>
-                    ) : filteredAndSortedPendings.length > 0 ? (
-                        filteredAndSortedPendings.map((pending) => (
-                            <Card key={pending.id} className="glossy-card border-none rounded-[2.5rem] overflow-hidden group">
-                                <CardContent className="p-8 flex flex-col lg:flex-row items-center gap-10">
-                                    <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center shrink-0">
-                                        <Clock className="text-orange-400" size={28} />
-                                    </div>
-                                    
-                                    <div className="flex-1 space-y-2 text-center md:text-left">
-                                        <h3 className="text-xl font-black uppercase italic tracking-tight">{pending.name || pending.displayName}</h3>
-                                        <div className="flex flex-wrap justify-center md:justify-start gap-4 text-[10px] font-black uppercase italic text-muted-foreground/60 tracking-widest">
-                                            <span className="flex items-center gap-2"><FileText size={12} className="text-accent" /> {pending.kycDocumentType?.replace('_', ' ').toUpperCase()}</span>
-                                            <span>•</span>
-                                            <span className="flex items-center gap-2">S/N: {pending.kycDocumentNumber}</span>
-                                            <span>•</span>
-                                            <span className="flex items-center gap-2"><Clock size={12} /> Reçu le {pending.kycSubmittedAt?.toDate ? pending.kycSubmittedAt.toDate().toLocaleDateString() : 'Récemment'}</span>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex gap-3 shrink-0">
-                                        <Button 
-                                            onClick={() => setSelectedKyc(pending)}
-                                            className="h-12 px-8 bg-white text-black font-black uppercase italic rounded-xl text-[10px] shadow-lg hover:bg-accent transition-all"
-                                        >
-                                            <Eye size={16} className="mr-2" /> Examiner Dossier
-                                        </Button>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        ))
-                    ) : (
-                        <div className="py-32 text-center bg-white/5 rounded-[3rem] border border-dashed border-white/10 opacity-30 flex flex-col items-center gap-6">
-                            <ShieldCheck size={80} strokeWidth={1} />
-                            <p className="text-xl font-black uppercase italic tracking-tighter">Aucun dossier en attente</p>
-                            <p className="text-xs max-w-sm uppercase font-black tracking-widest leading-relaxed">Les demandes de vérification KYC s'afficheront ici pour validation.</p>
+                <div className="space-y-10">
+                    <div className="flex flex-col md:flex-row gap-6 items-center">
+                        <div className="relative flex-1 w-full">
+                            <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-muted-foreground" size={20} />
+                            <Input 
+                                placeholder="Chercher un membre par nom, email ou document..." 
+                                className="h-16 pl-14 bg-white/5 border-white/10 rounded-2xl focus:border-accent"
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                            />
                         </div>
-                    )}
+
+                        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full md:w-auto">
+                            <TabsList className="bg-white/5 border border-white/5 h-16 p-1.5 rounded-[1.5rem] flex w-full md:w-auto">
+                                <TabsTrigger value="pending" className="flex-1 px-8 rounded-xl font-black uppercase italic text-[10px] data-[state=active]:bg-orange-500 data-[state=active]:text-white">
+                                    En attente
+                                </TabsTrigger>
+                                <TabsTrigger value="verified" className="flex-1 px-8 rounded-xl font-black uppercase italic text-[10px] data-[state=active]:bg-green-600 data-[state=active]:text-white">
+                                    Vérifiés
+                                </TabsTrigger>
+                                <TabsTrigger value="rejected" className="flex-1 px-8 rounded-xl font-black uppercase italic text-[10px] data-[state=active]:bg-red-600 data-[state=active]:text-white">
+                                    Rejetés
+                                </TabsTrigger>
+                            </TabsList>
+                        </Tabs>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-6">
+                        {isLoading ? (
+                            <div className="py-20 flex justify-center"><Loader2 className="animate-spin text-accent h-12 w-12" /></div>
+                        ) : filteredAndSortedKyc.length > 0 ? (
+                            filteredAndSortedKyc.map((pending) => (
+                                <Card key={pending.id} className={cn(
+                                    "glossy-card border-none rounded-[2.5rem] overflow-hidden group transition-all",
+                                    pending.kycStatus === 'verified' ? "border-l-4 border-l-green-500" : 
+                                    pending.kycStatus === 'rejected' ? "border-l-4 border-l-red-500" : ""
+                                )}>
+                                    <CardContent className="p-8 flex flex-col lg:flex-row items-center gap-10">
+                                        <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center shrink-0">
+                                            {getStatusIcon(pending.kycStatus)}
+                                        </div>
+                                        
+                                        <div className="flex-1 space-y-2 text-center md:text-left">
+                                            <div className="flex flex-wrap justify-center md:justify-start items-center gap-3">
+                                                <h3 className="text-xl font-black uppercase italic tracking-tight">{pending.name || pending.displayName}</h3>
+                                                {pending.kycStatus === 'verified' && <Badge className="bg-green-500 text-black border-none text-[8px] font-black uppercase px-2">Vérifié</Badge>}
+                                                {pending.kycStatus === 'rejected' && <Badge className="bg-red-500 text-white border-none text-[8px] font-black uppercase px-2">Rejeté</Badge>}
+                                            </div>
+                                            <div className="flex flex-wrap justify-center md:justify-start gap-4 text-[10px] font-black uppercase italic text-muted-foreground/60 tracking-widest leading-none">
+                                                <span className="flex items-center gap-2"><FileText size={12} className="text-accent" /> {pending.kycDocumentType?.replace('_', ' ').toUpperCase()}</span>
+                                                <span className="opacity-20">•</span>
+                                                <span className="flex items-center gap-2">S/N: {pending.kycDocumentNumber}</span>
+                                                <span className="opacity-20">•</span>
+                                                <span className="flex items-center gap-2"><Clock size={12} /> Reçu le {isMounted && pending.kycSubmittedAt?.toDate ? pending.kycSubmittedAt.toDate().toLocaleDateString() : 'Récemment'}</span>
+                                            </div>
+                                            {pending.kycStatus === 'rejected' && pending.kycRejectionReason && (
+                                                <p className="text-[10px] text-red-400 font-bold bg-red-500/10 px-3 py-1 rounded-lg w-fit mt-3">
+                                                    Motif : {pending.kycRejectionReason}
+                                                </p>
+                                            )}
+                                        </div>
+
+                                        <div className="flex gap-3 shrink-0">
+                                            <Button 
+                                                onClick={() => setSelectedKyc(pending)}
+                                                className="h-12 px-8 bg-white text-black font-black uppercase italic rounded-xl text-[10px] shadow-lg hover:bg-accent hover:text-black transition-all"
+                                            >
+                                                <Eye size={16} className="mr-2" /> 
+                                                {pending.kycStatus === 'pending' ? 'Examiner Dossier' : 'Consulter Archive'}
+                                            </Button>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            ))
+                        ) : (
+                            <div className="py-32 text-center bg-white/5 rounded-[3rem] border border-dashed border-white/10 opacity-30 flex flex-col items-center gap-6">
+                                <ShieldCheck size={80} strokeWidth={1} />
+                                <p className="text-xl font-black uppercase italic tracking-tighter">Aucun dossier dans cette catégorie</p>
+                                <p className="text-xs max-w-sm uppercase font-black tracking-widest leading-relaxed">Les demandes de vérification KYC s'afficheront ici après soumission par les membres.</p>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </main>
 
@@ -185,8 +239,8 @@ function KycManagementPage() {
                             <div className="flex items-center gap-6">
                                 <div className="w-16 h-16 rounded-2xl bg-accent text-black flex items-center justify-center shadow-xl"><UserCheck size={32} /></div>
                                 <div>
-                                    <DialogTitle className="text-3xl font-black uppercase italic tracking-tighter">Examen KYC</DialogTitle>
-                                    <DialogDescription className="text-[10px] font-black uppercase text-muted-foreground opacity-60 mt-1">Candidat : {selectedKyc?.name || selectedKyc?.displayName}</DialogDescription>
+                                    <DialogTitle className="text-3xl font-black uppercase italic tracking-tighter">Examen de Dossier</DialogTitle>
+                                    <DialogDescription className="text-[10px] font-black uppercase text-muted-foreground opacity-60 mt-1">Membre : {selectedKyc?.name || selectedKyc?.displayName}</DialogDescription>
                                 </div>
                             </div>
                             <Button variant="ghost" size="icon" onClick={() => setSelectedKyc(null)} className="h-12 w-12 rounded-2xl hover:bg-white/5"><X size={24}/></Button>
@@ -196,55 +250,69 @@ function KycManagementPage() {
                     <div className="p-10 space-y-12">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                             <div className="space-y-4">
-                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 block text-center">Pièce d'Identité</Label>
-                                <div className="aspect-video rounded-3xl bg-black/40 border border-white/10 overflow-hidden shadow-inner group">
-                                    <img src={selectedKyc?.kycDocumentImage} className="w-full h-full object-contain transition-transform group-hover:scale-110" />
+                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 block text-center">Pièce d'Identité (Recto)</Label>
+                                <div className="aspect-video rounded-3xl bg-black/40 border border-white/10 overflow-hidden shadow-inner group cursor-zoom-in">
+                                    <img src={selectedKyc?.kycDocumentImage} className="w-full h-full object-contain transition-transform group-hover:scale-110" alt="ID Document" />
                                 </div>
                             </div>
                             <div className="space-y-4">
-                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 block text-center">Selfie de Contrôle</Label>
-                                <div className="aspect-video rounded-3xl bg-black/40 border border-white/10 overflow-hidden shadow-inner group">
-                                    <img src={selectedKyc?.kycSelfieImage} className="w-full h-full object-contain transition-transform group-hover:scale-110" />
+                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 block text-center">Selfie de Validation</Label>
+                                <div className="aspect-video rounded-3xl bg-black/40 border border-white/10 overflow-hidden shadow-inner group cursor-zoom-in">
+                                    <img src={selectedKyc?.kycSelfieImage} className="w-full h-full object-contain transition-transform group-hover:scale-110" alt="Selfie" />
                                 </div>
                             </div>
                         </div>
 
                         <div className="p-8 bg-white/5 rounded-[2rem] border border-white/10 space-y-6">
-                            <div className="flex items-center gap-4 text-accent"><CheckCircle2 size={24}/><h4 className="text-sm font-black uppercase italic">Vérification des Critères</h4></div>
+                            <div className="flex items-center gap-4 text-accent"><CheckCircle2 size={24}/><h4 className="text-sm font-black uppercase italic tracking-widest">Résumé du Profil</h4></div>
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-                                <div className="flex items-center gap-3"><div className="w-2 h-2 rounded-full bg-green-500" /><span className="text-[10px] font-bold uppercase text-white/60">Lisibilité Image</span></div>
-                                <div className="flex items-center gap-3"><div className="w-2 h-2 rounded-full bg-green-500" /><span className="text-[10px] font-bold uppercase text-white/60">Conformité Selfie</span></div>
-                                <div className="flex items-center gap-3"><div className="w-2 h-2 rounded-full bg-green-500" /><span className="text-[10px] font-bold uppercase text-white/60">Validité Document</span></div>
+                                <div><p className="text-[8px] font-black uppercase opacity-40 mb-1">Email</p><p className="text-xs font-bold truncate">{selectedKyc?.email}</p></div>
+                                <div><p className="text-[8px] font-black uppercase opacity-40 mb-1">Numéro Document</p><p className="text-xs font-bold font-mono">{selectedKyc?.kycDocumentNumber}</p></div>
+                                <div><p className="text-[8px] font-black uppercase opacity-40 mb-1">Status Actuel</p><Badge className="uppercase text-[8px] font-black">{selectedKyc?.kycStatus}</Badge></div>
                             </div>
                         </div>
 
-                        <div className="space-y-4">
-                            <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Motif de rejet (Si refusé)</Label>
-                            <Input 
-                                value={rejectionReason} 
-                                onChange={(e) => setRejectionReason(e.target.value)} 
-                                placeholder="Indiquez pourquoi le dossier est rejeté..."
-                                className="h-14 bg-background/50 border-white/5 rounded-2xl italic text-sm"
-                            />
-                        </div>
+                        {selectedKyc?.kycStatus === 'pending' ? (
+                            <div className="space-y-8 animate-in fade-in duration-500">
+                                <div className="space-y-4">
+                                    <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Motif de rejet (En cas de refus uniquement)</Label>
+                                    <Input 
+                                        value={rejectionReason} 
+                                        onChange={(e) => setRejectionReason(e.target.value)} 
+                                        placeholder="Ex: Image floue, document expiré..."
+                                        className="h-14 bg-background/50 border-white/5 rounded-2xl italic text-sm"
+                                    />
+                                </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <Button 
-                                onClick={() => handleAction(selectedKyc?.id, 'reject')}
-                                disabled={isProcessing || !rejectionReason}
-                                variant="outline"
-                                className="h-16 rounded-2xl font-black uppercase italic text-xs border-red-500/20 text-red-500 hover:bg-red-500/10 gap-3"
-                            >
-                                <XCircle size={18} /> Rejeter le Dossier
-                            </Button>
-                            <Button 
-                                onClick={() => handleAction(selectedKyc?.id, 'verify')}
-                                disabled={isProcessing}
-                                className="h-16 bg-accent text-black font-black uppercase italic rounded-2xl shadow-xl shadow-accent/20 gap-3 text-xs"
-                            >
-                                {isProcessing ? <Loader2 className="animate-spin" /> : <><CheckCircle2 size={18} /> Approuver l'Identité</>}
-                            </Button>
-                        </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
+                                    <Button 
+                                        onClick={() => handleAction(selectedKyc?.id, 'reject')}
+                                        disabled={isProcessing || !rejectionReason}
+                                        variant="outline"
+                                        className="h-16 rounded-2xl font-black uppercase italic text-xs border-red-500/20 text-red-500 hover:bg-red-500/10 gap-3"
+                                    >
+                                        <XCircle size={18} /> Rejeter le Dossier
+                                    </Button>
+                                    <Button 
+                                        onClick={() => handleAction(selectedKyc?.id, 'verify')}
+                                        disabled={isProcessing}
+                                        className="h-16 bg-accent text-black font-black uppercase italic rounded-2xl shadow-xl shadow-accent/20 gap-3 text-xs"
+                                    >
+                                        {isProcessing ? <Loader2 className="animate-spin" /> : <><CheckCircle2 size={18} /> Approuver l'Identité</>}
+                                    </Button>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="flex justify-center pt-4">
+                                <Button 
+                                    variant="outline" 
+                                    onClick={() => setSelectedKyc(null)}
+                                    className="h-14 px-10 rounded-2xl border-white/10 font-black uppercase italic text-xs"
+                                >
+                                    Fermer l'Archive
+                                </Button>
+                            </div>
+                        )}
                     </div>
                 </DialogContent>
             </Dialog>
