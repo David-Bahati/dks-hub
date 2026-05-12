@@ -18,7 +18,8 @@ import {
     FileText,
     X,
     AlertCircle,
-    UserX
+    UserX,
+    RotateCcw
 } from "lucide-react";
 import { db } from '@/lib/firebase';
 import { collection, query, where, updateDoc, doc, addDoc, serverTimestamp } from 'firebase/firestore';
@@ -58,30 +59,45 @@ function KycManagementPage() {
 
     const { data: allKyc, isLoading } = useCollection(kycQuery);
 
-    const handleAction = async (userId: string, action: 'verify' | 'reject') => {
+    const handleAction = async (userId: string, newStatus: 'pending' | 'verified' | 'rejected') => {
         setIsProcessing(true);
         try {
-            const status = action === 'verify' ? 'verified' : 'rejected';
             await updateDoc(doc(db, "users", userId), {
-                kycStatus: status,
-                kycVerifiedAt: serverTimestamp(),
-                kycRejectionReason: action === 'reject' ? rejectionReason : null,
+                kycStatus: newStatus,
+                kycVerifiedAt: newStatus === 'verified' ? serverTimestamp() : null,
+                kycRejectionReason: newStatus === 'rejected' ? rejectionReason : null,
                 updatedAt: serverTimestamp()
             });
 
+            let notifTitle = "";
+            let notifMsg = "";
+            let notifType: 'success' | 'error' | 'info' = 'info';
+
+            if (newStatus === 'verified') {
+                notifTitle = "KYC Approuvé !";
+                notifMsg = "Votre identité a été validée avec succès. Vous êtes maintenant un Membre Certifié DKS.";
+                notifType = 'success';
+            } else if (newStatus === 'rejected') {
+                notifTitle = "KYC Refusé / Révoqué";
+                notifMsg = `Désolé, votre statut KYC a été invalidé. Motif : ${rejectionReason || "Non spécifié"}`;
+                notifType = 'error';
+            } else {
+                notifTitle = "KYC en cours de révision";
+                notifMsg = "Votre dossier a été remis en attente pour un nouvel examen par nos experts.";
+                notifType = 'info';
+            }
+
             await addDoc(collection(db, "notifications"), {
                 userId: userId,
-                title: action === 'verify' ? "KYC Approuvé !" : "KYC Refusé",
-                message: action === 'verify' 
-                    ? "Votre identité a été validée avec succès. Vous êtes maintenant un Membre Certifié DKS." 
-                    : `Désolé, votre dossier a été rejeté. Motif : ${rejectionReason}`,
-                type: action === 'verify' ? 'success' : 'error',
+                title: notifTitle,
+                message: notifMsg,
+                type: notifType,
                 isRead: false,
                 createdAt: serverTimestamp(),
                 link: '/dashboard/kyc'
             });
 
-            toast({ title: action === 'verify' ? "Utilisateur Vérifié" : "Dossier Rejeté" });
+            toast({ title: "Statut mis à jour", description: `Le dossier est maintenant : ${newStatus.toUpperCase()}` });
             setSelectedKyc(null);
             setRejectionReason("");
         } catch (error) {
@@ -214,7 +230,7 @@ function KycManagementPage() {
                                                 className="h-12 px-8 bg-white text-black font-black uppercase italic rounded-xl text-[10px] shadow-lg hover:bg-accent hover:text-black transition-all"
                                             >
                                                 <Eye size={16} className="mr-2" /> 
-                                                {pending.kycStatus === 'pending' ? 'Examiner Dossier' : 'Consulter Archive'}
+                                                {pending.kycStatus === 'pending' ? 'Examiner Dossier' : 'Modifier Statut'}
                                             </Button>
                                         </div>
                                     </CardContent>
@@ -224,7 +240,6 @@ function KycManagementPage() {
                             <div className="py-32 text-center bg-white/5 rounded-[3rem] border border-dashed border-white/10 opacity-30 flex flex-col items-center gap-6">
                                 <ShieldCheck size={80} strokeWidth={1} />
                                 <p className="text-xl font-black uppercase italic tracking-tighter">Aucun dossier dans cette catégorie</p>
-                                <p className="text-xs max-w-sm uppercase font-black tracking-widest leading-relaxed">Les demandes de vérification KYC s'afficheront ici après soumission par les membres.</p>
                             </div>
                         )}
                     </div>
@@ -239,7 +254,7 @@ function KycManagementPage() {
                             <div className="flex items-center gap-6">
                                 <div className="w-16 h-16 rounded-2xl bg-accent text-black flex items-center justify-center shadow-xl"><UserCheck size={32} /></div>
                                 <div>
-                                    <DialogTitle className="text-3xl font-black uppercase italic tracking-tighter">Examen de Dossier</DialogTitle>
+                                    <DialogTitle className="text-3xl font-black uppercase italic tracking-tighter">Gestion du Statut KYC</DialogTitle>
                                     <DialogDescription className="text-[10px] font-black uppercase text-muted-foreground opacity-60 mt-1">Membre : {selectedKyc?.name || selectedKyc?.displayName}</DialogDescription>
                                 </div>
                             </div>
@@ -268,51 +283,47 @@ function KycManagementPage() {
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
                                 <div><p className="text-[8px] font-black uppercase opacity-40 mb-1">Email</p><p className="text-xs font-bold truncate">{selectedKyc?.email}</p></div>
                                 <div><p className="text-[8px] font-black uppercase opacity-40 mb-1">Numéro Document</p><p className="text-xs font-bold font-mono">{selectedKyc?.kycDocumentNumber}</p></div>
-                                <div><p className="text-[8px] font-black uppercase opacity-40 mb-1">Status Actuel</p><Badge className="uppercase text-[8px] font-black">{selectedKyc?.kycStatus}</Badge></div>
+                                <div><p className="text-[8px] font-black uppercase opacity-40 mb-1">Status Actuel</p><Badge className="uppercase text-[8px] font-black">{selectedKyc?.kycStatus?.toUpperCase()}</Badge></div>
                             </div>
                         </div>
 
-                        {selectedKyc?.kycStatus === 'pending' ? (
-                            <div className="space-y-8 animate-in fade-in duration-500">
-                                <div className="space-y-4">
-                                    <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Motif de rejet (En cas de refus uniquement)</Label>
-                                    <Input 
-                                        value={rejectionReason} 
-                                        onChange={(e) => setRejectionReason(e.target.value)} 
-                                        placeholder="Ex: Image floue, document expiré..."
-                                        className="h-14 bg-background/50 border-white/5 rounded-2xl italic text-sm"
-                                    />
-                                </div>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
-                                    <Button 
-                                        onClick={() => handleAction(selectedKyc?.id, 'reject')}
-                                        disabled={isProcessing || !rejectionReason}
-                                        variant="outline"
-                                        className="h-16 rounded-2xl font-black uppercase italic text-xs border-red-500/20 text-red-500 hover:bg-red-500/10 gap-3"
-                                    >
-                                        <XCircle size={18} /> Rejeter le Dossier
-                                    </Button>
-                                    <Button 
-                                        onClick={() => handleAction(selectedKyc?.id, 'verify')}
-                                        disabled={isProcessing}
-                                        className="h-16 bg-accent text-black font-black uppercase italic rounded-2xl shadow-xl shadow-accent/20 gap-3 text-xs"
-                                    >
-                                        {isProcessing ? <Loader2 className="animate-spin" /> : <><CheckCircle2 size={18} /> Approuver l'Identité</>}
-                                    </Button>
-                                </div>
+                        <div className="space-y-8 animate-in fade-in duration-500">
+                            <div className="space-y-4">
+                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Motif de changement / rejet (Si applicable)</Label>
+                                <Input 
+                                    value={rejectionReason} 
+                                    onChange={(e) => setRejectionReason(e.target.value)} 
+                                    placeholder="Ex: Image floue, audit complémentaire nécessaire..."
+                                    className="h-14 bg-background/50 border-white/5 rounded-2xl italic text-sm"
+                                />
                             </div>
-                        ) : (
-                            <div className="flex justify-center pt-4">
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4">
                                 <Button 
-                                    variant="outline" 
-                                    onClick={() => setSelectedKyc(null)}
-                                    className="h-14 px-10 rounded-2xl border-white/10 font-black uppercase italic text-xs"
+                                    onClick={() => handleAction(selectedKyc?.id, 'pending')}
+                                    disabled={isProcessing || selectedKyc?.kycStatus === 'pending'}
+                                    variant="outline"
+                                    className="h-16 rounded-2xl font-black uppercase italic text-xs border-white/10 hover:bg-white/5 gap-3"
                                 >
-                                    Fermer l'Archive
+                                    <RotateCcw size={18} /> Remettre en Attente
+                                </Button>
+                                <Button 
+                                    onClick={() => handleAction(selectedKyc?.id, 'rejected')}
+                                    disabled={isProcessing || selectedKyc?.kycStatus === 'rejected'}
+                                    variant="outline"
+                                    className="h-16 rounded-2xl font-black uppercase italic text-xs border-red-500/20 text-red-500 hover:bg-red-500/10 gap-3"
+                                >
+                                    <XCircle size={18} /> Rejeter / Révoquer
+                                </Button>
+                                <Button 
+                                    onClick={() => handleAction(selectedKyc?.id, 'verified')}
+                                    disabled={isProcessing || selectedKyc?.kycStatus === 'verified'}
+                                    className="h-16 bg-accent text-black font-black uppercase italic rounded-2xl shadow-xl shadow-accent/20 gap-3 text-xs"
+                                >
+                                    {isProcessing ? <Loader2 className="animate-spin" /> : <><CheckCircle2 size={18} /> Approuver l'Identité</>}
                                 </Button>
                             </div>
-                        )}
+                        </div>
                     </div>
                 </DialogContent>
             </Dialog>
