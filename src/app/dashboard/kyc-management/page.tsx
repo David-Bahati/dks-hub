@@ -3,7 +3,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { Navbar } from "@/components/layout/Navbar";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { 
     ShieldCheck, 
@@ -25,7 +25,11 @@ import {
     Globe as GlobeIcon,
     Smartphone,
     Scale as ScaleIcon,
-    Video as VideoIcon
+    Video as VideoIcon,
+    Activity,
+    BarChart3,
+    PieChart,
+    Users
 } from "lucide-react";
 import { db } from '@/lib/firebase';
 import { collection, query, where, updateDoc, doc, addDoc, serverTimestamp } from 'firebase/firestore';
@@ -40,6 +44,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
+import { Progress } from "@/components/ui/progress";
 
 function KycManagementPage() {
     const { user: admin } = useAuth();
@@ -132,6 +137,16 @@ function KycManagementPage() {
         });
     }, [allKyc, search, activeTab]);
 
+    const stats = useMemo(() => {
+        if (!allKyc) return { pending: 0, verified: 0, rejected: 0, total: 0, ratio: 0 };
+        const pending = allKyc.filter(k => k.kycStatus === 'pending').length;
+        const verified = allKyc.filter(k => k.kycStatus === 'verified').length;
+        const rejected = allKyc.filter(k => k.kycStatus === 'rejected').length;
+        const total = allKyc.length;
+        const ratio = total > 0 ? (verified / (verified + rejected || 1)) * 100 : 0;
+        return { pending, verified, rejected, total, ratio };
+    }, [allKyc]);
+
     if (admin?.role?.toLowerCase() !== 'admin') {
         return <div className="p-20 text-center uppercase font-black italic opacity-20">Accès réservé au Sceau du Hub.</div>;
     }
@@ -162,14 +177,14 @@ function KycManagementPage() {
                         </div>
                         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full md:w-auto">
                             <TabsList className="bg-white/5 border border-white/5 h-16 p-1.5 rounded-[1.5rem] flex w-full md:w-auto">
-                                <TabsTrigger value="pending" className="flex-1 px-8 rounded-xl font-black uppercase italic text-[10px] data-[state=active]:bg-orange-500">En attente</TabsTrigger>
-                                <TabsTrigger value="verified" className="flex-1 px-8 rounded-xl font-black uppercase italic text-[10px] data-[state=active]:bg-green-600">Vérifiés</TabsTrigger>
-                                <TabsTrigger value="rejected" className="flex-1 px-8 rounded-xl font-black uppercase italic text-[10px] data-[state=active]:bg-red-600">Rejetés</TabsTrigger>
+                                <TabsTrigger value="pending" className="flex-1 px-8 rounded-xl font-black uppercase italic text-[10px] data-[state=active]:bg-orange-500">En attente ({stats.pending})</TabsTrigger>
+                                <TabsTrigger value="verified" className="flex-1 px-8 rounded-xl font-black uppercase italic text-[10px] data-[state=active]:bg-green-600">Vérifiés ({stats.verified})</TabsTrigger>
+                                <TabsTrigger value="rejected" className="flex-1 px-8 rounded-xl font-black uppercase italic text-[10px] data-[state=active]:bg-red-600">Rejetés ({stats.rejected})</TabsTrigger>
                             </TabsList>
                         </Tabs>
                     </div>
 
-                    <div className="grid grid-cols-1 gap-6">
+                    <div className="grid grid-cols-1 gap-6 min-h-[400px]">
                         {isLoading ? (
                             <div className="py-20 flex justify-center"><Loader2 className="animate-spin text-accent h-12 w-12" /></div>
                         ) : filteredAndSortedKyc.length > 0 ? (
@@ -201,6 +216,57 @@ function KycManagementPage() {
                                 <p className="text-xl font-black uppercase italic tracking-tighter">Aucun dossier dans cette catégorie</p>
                             </div>
                         )}
+                    </div>
+
+                    {/* SECTION STATISTIQUES */}
+                    <div className="pt-20 border-t border-white/5 space-y-8">
+                        <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-accent"><BarChart3 size={20} /></div>
+                            <h2 className="text-2xl font-black uppercase italic tracking-tight">Analytique <span className="text-accent">Conformité</span></h2>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                            <Card className="bg-white/[0.02] border-white/5 rounded-[2rem] p-6 space-y-4">
+                                <div className="flex justify-between items-center">
+                                    <p className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Total Dossiers</p>
+                                    <Users size={14} className="text-white/20" />
+                                </div>
+                                <p className="text-3xl font-black text-white italic">{stats.total}</p>
+                            </Card>
+                            
+                            <Card className="bg-white/[0.02] border-white/5 rounded-[2rem] p-6 space-y-4">
+                                <div className="flex justify-between items-center">
+                                    <p className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">En Attente</p>
+                                    <Clock size={14} className="text-orange-400" />
+                                </div>
+                                <div className="space-y-2">
+                                    <p className="text-3xl font-black text-orange-400 italic">{stats.pending}</p>
+                                    <Progress value={(stats.pending / stats.total) * 100} className="h-1 bg-white/5" indicatorClassName="bg-orange-500" />
+                                </div>
+                            </Card>
+
+                            <Card className="bg-white/[0.02] border-white/5 rounded-[2rem] p-6 space-y-4">
+                                <div className="flex justify-between items-center">
+                                    <p className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Membres Vérifiés</p>
+                                    <CheckCircle2 size={14} className="text-green-400" />
+                                </div>
+                                <div className="space-y-2">
+                                    <p className="text-3xl font-black text-green-400 italic">{stats.verified}</p>
+                                    <Progress value={(stats.verified / stats.total) * 100} className="h-1 bg-white/5" indicatorClassName="bg-green-500" />
+                                </div>
+                            </Card>
+
+                            <Card className="bg-accent/5 border-accent/20 rounded-[2rem] p-6 space-y-4">
+                                <div className="flex justify-between items-center">
+                                    <p className="text-[9px] font-black uppercase text-accent tracking-widest">Taux d'Acceptation</p>
+                                    <Activity size={14} className="text-accent" />
+                                </div>
+                                <div className="space-y-2">
+                                    <p className="text-3xl font-black text-accent italic">{stats.ratio.toFixed(1)}%</p>
+                                    <p className="text-[8px] font-bold text-accent/40 uppercase italic">Indice de confiance Hub</p>
+                                </div>
+                            </Card>
+                        </div>
                     </div>
                 </div>
             </main>
@@ -240,11 +306,11 @@ function KycManagementPage() {
                                 <div className="p-8 bg-white/5 rounded-[2rem] border border-white/5 space-y-6">
                                     <div><p className="text-[8px] font-black uppercase opacity-40 mb-1">Origine des Fonds</p><Badge className="bg-primary/20 text-primary border-none uppercase font-black text-[9px]">{selectedKyc?.kycSourceOfFunds}</Badge></div>
                                     <div className="flex items-center justify-between border-t border-white/5 pt-4">
-                                        <p className="text-[10px] font-black uppercase">Statut PEP</p>
+                                        <p className="text-sm font-black uppercase italic">Statut PEP</p>
                                         {selectedKyc?.kycIsPep ? <Badge className="bg-red-500 text-white border-none uppercase text-[8px] font-black">OUI (RISQUE HAUT)</Badge> : <Badge className="bg-green-500/10 text-green-400 border-none uppercase text-[8px] font-black">NON</Badge>}
                                     </div>
                                     <div className="flex items-center justify-between border-t border-white/5 pt-4">
-                                        <p className="text-[10px] font-black uppercase">Test de Vivacité</p>
+                                        <p className="text-sm font-black uppercase italic">Test de Vivacité</p>
                                         <Badge className="bg-green-500/10 text-green-400 border-none uppercase text-[8px] font-black flex items-center gap-2"><VideoIcon size={10}/> VALIDE</Badge>
                                     </div>
                                 </div>
