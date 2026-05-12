@@ -38,12 +38,28 @@ export type AppUser = {
   beneficiaryId?: string;
   beneficiaryName?: string;
   heritageThresholdDays?: number;
-  // KYC Fields
+  // KYC Fields v4.0
   kycStatus?: 'none' | 'pending' | 'verified' | 'rejected';
+  kycFirstName?: string;
+  kycLastName?: string;
+  kycBirthDate?: string;
+  kycBirthPlace?: string;
+  kycNationality?: string;
+  kycGender?: string;
   kycDocumentType?: string;
   kycDocumentNumber?: string;
   kycDocumentImage?: string;
+  kycDocumentImageBack?: string;
   kycSelfieImage?: string;
+  kycAddressProofImage?: string;
+  kycResidentialAddress?: string;
+  kycCity?: string;
+  kycCountry?: string;
+  kycZipCode?: string;
+  kycProfession?: string;
+  kycSourceOfFunds?: string;
+  kycIsPep?: boolean;
+  kycLivenessVideoStatus?: 'passed' | 'failed' | 'not_started';
   kycSubmittedAt?: any;
   kycVerifiedAt?: any;
   kycRejectionReason?: string;
