@@ -15,7 +15,7 @@ import {
     Eye,
     CheckCircle2,
     Clock,
-    X,
+    X as CloseIcon,
     MapPin,
     Briefcase,
     RotateCcw
@@ -115,9 +115,9 @@ function KybManagementPage() {
         }
 
         return [...filtered].sort((a, b) => {
-            const dateA = a.kybSubmittedAt?.toDate?.() || new Date(0);
-            const dateB = b.kybSubmittedAt?.toDate?.() || new Date(0);
-            return dateB - dateA;
+            const dateA = a.kybSubmittedAt?.toDate?.() || 0;
+            const dateB = b.kybSubmittedAt?.toDate?.() || 0;
+            return (dateB instanceof Date ? dateB.getTime() : 0) - (dateA instanceof Date ? dateA.getTime() : 0);
         });
     }, [allKyb, search, activeTab]);
 
@@ -213,7 +213,6 @@ function KybManagementPage() {
                 </div>
             </main>
 
-            {/* KYB REVIEW DIALOG */}
             <Dialog open={!!selectedKyb} onOpenChange={() => setSelectedKyb(null)}>
                 <DialogContent className="bg-card border-white/10 text-foreground rounded-[2.5rem] sm:max-w-4xl max-h-[90vh] overflow-y-auto custom-scrollbar p-0">
                     <DialogHeader className="p-10 bg-primary/10 border-b border-white/5">
@@ -225,7 +224,7 @@ function KybManagementPage() {
                                     <DialogDescription className="text-[10px] font-black uppercase text-muted-foreground opacity-60 mt-1">Entité : {selectedKyb?.businessName}</DialogDescription>
                                 </div>
                             </div>
-                            <Button variant="ghost" size="icon" onClick={() => setSelectedKyb(null)} className="h-12 w-12 rounded-2xl hover:bg-white/5"><X size={24}/></Button>
+                            <Button variant="ghost" size="icon" onClick={() => setSelectedKyb(null)} className="h-12 w-12 rounded-2xl hover:bg-white/5"><CloseIcon size={24}/></Button>
                         </div>
                     </DialogHeader>
 

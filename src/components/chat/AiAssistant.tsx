@@ -4,7 +4,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { 
     MessageSquare, 
-    X, 
+    X as CloseIcon, 
     Send, 
     Sparkles, 
     Loader2, 
@@ -15,7 +15,7 @@ import {
     Volume2, 
     VolumeX, 
     Languages,
-    Globe,
+    Globe as GlobeIcon,
     Check,
     Camera,
     Image as ImageIcon,
@@ -83,17 +83,21 @@ export function AiAssistant() {
     useEffect(() => {
         if (typeof window !== 'undefined') {
             const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-            if (SpeechRecognition) {
-                recognitionRef.current = new SpeechRecognition();
-                recognitionRef.current.continuous = false;
-                recognitionRef.current.interimResults = false;
-                recognitionRef.current.lang = currentLanguage.voiceCode;
-                recognitionRef.current.onresult = (event: any) => {
-                    const transcript = event.results[0][0].transcript;
-                    setInput(transcript);
-                    setIsListening(false);
-                };
-                recognitionRef.current.onend = () => setIsListening(false);
+            if (SpeechRecognition && typeof SpeechRecognition === 'function') {
+                try {
+                    recognitionRef.current = new SpeechRecognition();
+                    recognitionRef.current.continuous = false;
+                    recognitionRef.current.interimResults = false;
+                    recognitionRef.current.lang = currentLanguage.voiceCode;
+                    recognitionRef.current.onresult = (event: any) => {
+                        const transcript = event.results[0][0].transcript;
+                        setInput(transcript);
+                        setIsListening(false);
+                    };
+                    recognitionRef.current.onend = () => setIsListening(false);
+                } catch (e) {
+                    console.warn("SpeechRecognition init failed");
+                }
             }
         }
     }, [currentLanguage]);
@@ -232,7 +236,7 @@ export function AiAssistant() {
                             <div className="w-10 h-10 rounded-xl bg-accent/20 flex items-center justify-center text-accent"><QrCode size={20}/></div>
                             <h3 className="font-black uppercase italic">Lecteur Insta-Info</h3>
                         </div>
-                        <Button variant="ghost" size="icon" onClick={toggleScanner}><X size={20}/></Button>
+                        <Button variant="ghost" size="icon" onClick={toggleScanner}><CloseIcon size={20}/></Button>
                     </div>
                     <div className="aspect-square relative bg-black flex items-center justify-center">
                         <video ref={videoRef} className="w-full h-full object-cover" autoPlay muted playsInline />
@@ -247,7 +251,7 @@ export function AiAssistant() {
             </Dialog>
 
             <Button onClick={() => { setIsOpen(!isOpen); setShowTeaser(false); }} className={cn("h-16 w-16 rounded-[2.2rem] shadow-2xl transition-all duration-500", isOpen ? "bg-background border border-white/10 text-white rotate-90" : "bg-accent text-black hover:scale-110 shadow-[0_0_30px_rgba(56,189,248,0.4)]")}>
-                {isOpen ? <X size={28} /> : <Sparkles size={28} className="animate-pulse" />}
+                {isOpen ? <CloseIcon size={28} /> : <Sparkles size={28} className="animate-pulse" />}
             </Button>
         </div>
     );

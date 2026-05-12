@@ -16,18 +16,18 @@ import {
     CheckCircle2,
     Clock,
     FileText,
-    X,
+    X as CloseIcon,
     UserX,
     RotateCcw,
     MapPin,
-    User,
-    Calendar,
+    User as UserIcon,
+    Calendar as CalendarIcon,
     Briefcase,
-    Globe,
-    Info,
+    Globe as GlobeIcon,
+    Info as InfoIcon,
     Smartphone,
-    Scale,
-    Video
+    Scale as ScaleIcon,
+    Video as VideoIcon
 } from "lucide-react";
 import { db } from '@/lib/firebase';
 import { collection, query, where, updateDoc, doc, addDoc, serverTimestamp } from 'firebase/firestore';
@@ -125,7 +125,11 @@ function KycManagementPage() {
                 (p.email || "").toLowerCase().includes(term)
             );
         }
-        return [...filtered].sort((a, b) => (b.kycSubmittedAt?.toDate?.() || 0) - (a.kycSubmittedAt?.toDate?.() || 0));
+        return [...filtered].sort((a, b) => {
+            const dateA = a.kycSubmittedAt?.toDate?.() || 0;
+            const dateB = b.kycSubmittedAt?.toDate?.() || 0;
+            return (dateB instanceof Date ? dateB.getTime() : 0) - (dateA instanceof Date ? dateA.getTime() : 0);
+        });
     }, [allKyc, search, activeTab]);
 
     if (admin?.role?.toLowerCase() !== 'admin') {
@@ -178,7 +182,7 @@ function KycManagementPage() {
                                         <div className="flex-1 space-y-2 text-center md:text-left">
                                             <h3 className="text-xl font-black uppercase italic tracking-tight">{pending.kycLastName} {pending.kycFirstName}</h3>
                                             <div className="flex flex-wrap justify-center md:justify-start gap-4 text-[10px] font-black uppercase italic text-muted-foreground/60 tracking-widest leading-none">
-                                                <span className="flex items-center gap-2"><Globe size={12} className="text-accent" /> {pending.kycNationality}</span>
+                                                <span className="flex items-center gap-2"><GlobeIcon size={12} className="text-accent" /> {pending.kycNationality}</span>
                                                 <span>•</span>
                                                 <span className="flex items-center gap-2"><Smartphone size={12} /> {pending.kycDocumentNumber}</span>
                                                 <span>•</span>
@@ -201,7 +205,6 @@ function KycManagementPage() {
                 </div>
             </main>
 
-            {/* KYC REVIEW DIALOG v4.0 */}
             <Dialog open={!!selectedKyc} onOpenChange={() => setSelectedKyc(null)}>
                 <DialogContent className="bg-card border-white/10 text-foreground rounded-[2.5rem] sm:max-w-5xl max-h-[90vh] overflow-y-auto custom-scrollbar p-0">
                     <DialogHeader className="p-10 bg-accent/10 border-b border-white/5">
@@ -213,15 +216,14 @@ function KycManagementPage() {
                                     <DialogDescription className="text-[10px] font-black uppercase text-muted-foreground opacity-60 mt-1">Dossier : {selectedKyc?.kycLastName} {selectedKyc?.kycFirstName}</DialogDescription>
                                 </div>
                             </div>
-                            <Button variant="ghost" size="icon" onClick={() => setSelectedKyc(null)} className="h-12 w-12 rounded-2xl hover:bg-white/5"><X size={24}/></Button>
+                            <Button variant="ghost" size="icon" onClick={() => setSelectedKyc(null)} className="h-12 w-12 rounded-2xl hover:bg-white/5"><CloseIcon size={24}/></Button>
                         </div>
                     </DialogHeader>
 
                     <div className="p-10 space-y-12">
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-                            {/* SECTION 1: IDENTITY DETAILS */}
                             <div className="space-y-6">
-                                <h4 className="text-xs font-black uppercase text-accent tracking-[0.4em] flex items-center gap-2"><User size={16}/> État Civil & Identité</h4>
+                                <h4 className="text-xs font-black uppercase text-accent tracking-[0.4em] flex items-center gap-2"><UserIcon size={16}/> État Civil & Identité</h4>
                                 <div className="p-8 bg-white/5 rounded-[2rem] border border-white/5 grid grid-cols-2 gap-6">
                                     <div><p className="text-[8px] font-black uppercase opacity-40 mb-1">Nom complet</p><p className="text-sm font-bold uppercase">{selectedKyc?.kycLastName} {selectedKyc?.kycFirstName}</p></div>
                                     <div><p className="text-[8px] font-black uppercase opacity-40 mb-1">Sexe</p><p className="text-sm font-bold uppercase">{selectedKyc?.kycGender === 'M' ? 'Masculin' : 'Féminin'}</p></div>
@@ -232,9 +234,8 @@ function KycManagementPage() {
                                 </div>
                             </div>
 
-                            {/* SECTION 2: AML & COMPLIANCE */}
                             <div className="space-y-6">
-                                <h4 className="text-xs font-black uppercase text-accent tracking-[0.4em] flex items-center gap-2"><Scale size={16}/> Conformité AML/PEP</h4>
+                                <h4 className="text-xs font-black uppercase text-accent tracking-[0.4em] flex items-center gap-2"><ScaleIcon size={16}/> Conformité AML/PEP</h4>
                                 <div className="p-8 bg-white/5 rounded-[2rem] border border-white/5 space-y-6">
                                     <div><p className="text-[8px] font-black uppercase opacity-40 mb-1">Origine des Fonds</p><Badge className="bg-primary/20 text-primary border-none uppercase font-black text-[9px]">{selectedKyc?.kycSourceOfFunds}</Badge></div>
                                     <div className="flex items-center justify-between border-t border-white/5 pt-4">
@@ -243,13 +244,12 @@ function KycManagementPage() {
                                     </div>
                                     <div className="flex items-center justify-between border-t border-white/5 pt-4">
                                         <p className="text-[10px] font-black uppercase">Test de Vivacité (Biométrie)</p>
-                                        <Badge className="bg-green-500/10 text-green-400 border-none uppercase text-[8px] font-black flex items-center gap-2"><Video size={10}/> SUCCÈS</Badge>
+                                        <Badge className="bg-green-500/10 text-green-400 border-none uppercase text-[8px] font-black flex items-center gap-2"><VideoIcon size={10}/> SUCCÈS</Badge>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        {/* SECTION 3: DOCUMENTS VISUALS */}
                         <div className="space-y-6">
                             <h4 className="text-xs font-black uppercase text-accent tracking-[0.4em] flex items-center gap-2"><FileText size={16}/> Pièces Justificatives Numérisées</h4>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
