@@ -457,7 +457,7 @@ function DashboardPage() {
                                 user.kycStatus === 'pending' ? "bg-orange-500/20 text-orange-400 border-orange-500/20" :
                                 "bg-white/5 text-muted-foreground border-white/10"
                             )}>
-                                <UserIcon size={16} /> KYC
+                                {user.kycStatus === 'verified' ? <ShieldCheck size={16} /> : <UserIcon size={16} />} KYC
                             </Badge>
                         </Link>
                         {(isStaff || (user.kybStatus && user.kybStatus !== 'none')) && (
@@ -483,11 +483,18 @@ function DashboardPage() {
                 <Link href="/dashboard/wallet"><Badge className="bg-accent/20 text-accent border-accent/20 h-10 px-4 rounded-xl gap-2 font-black italic cursor-pointer hover:bg-accent/30 transition-all hidden sm:flex"><Coins size={16} /> {user?.tokenBalance?.toFixed(2) || 0} DKST</Badge></Link>
                 <Separator orientation="vertical" className="h-8 bg-white/5 hidden sm:block" />
                 
-                <Link href="/dashboard/settings">
-                    <Avatar className="h-10 w-10 border-2 border-white/10 hover:border-accent transition-all cursor-pointer shadow-lg">
+                <Link href="/dashboard/settings" className="relative group">
+                    <Avatar className="h-10 w-10 border-2 border-white/10 group-hover:border-accent transition-all cursor-pointer shadow-lg">
                         <AvatarImage src={user?.photoURL} className="object-cover" />
                         <AvatarFallback className="bg-accent/20 text-accent font-black text-xs italic">{user?.name?.substring(0, 1)}</AvatarFallback>
                     </Avatar>
+                    {user?.kycStatus === 'verified' && (
+                        <div className="absolute -bottom-1 -right-1 bg-background rounded-full p-0.5 z-10">
+                            <div className="bg-green-500 text-white rounded-full p-0.5 shadow-lg">
+                                <CheckCircle2 size={10} strokeWidth={4} />
+                            </div>
+                        </div>
+                    )}
                 </Link>
 
                 <Button onClick={handleLogout} variant="ghost" size="icon" className="h-11 w-11 rounded-2xl text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all hidden sm:flex">
@@ -500,18 +507,34 @@ function DashboardPage() {
       <main className="flex-1 p-4 md:p-8 space-y-12 pb-24 max-w-[1600px] mx-auto w-full">
           <div className="flex flex-col md:flex-row items-center gap-8 mb-12 p-10 bg-white/[0.02] border border-white/5 rounded-[3rem] relative overflow-hidden group shadow-2xl">
               <div className="absolute top-0 right-0 p-8 opacity-5"><Sparkles size={160} className="text-accent animate-pulse" /></div>
-              <Avatar className="h-32 w-32 border-4 border-accent p-1.5 bg-background shadow-2xl transition-transform group-hover:scale-105 duration-500 overflow-hidden">
-                  <AvatarImage src={user?.photoURL} className="rounded-full object-cover" />
-                  <AvatarFallback className="bg-primary/20 text-accent text-4xl font-black italic">{user?.name?.substring(0, 1)}</AvatarFallback>
-              </Avatar>
+              <div className="relative">
+                  <Avatar className="h-32 w-32 border-4 border-accent p-1.5 bg-background shadow-2xl transition-transform group-hover:scale-105 duration-500 overflow-hidden">
+                      <AvatarImage src={user?.photoURL} className="rounded-full object-cover" />
+                      <AvatarFallback className="bg-primary/20 text-accent text-4xl font-black italic">{user?.name?.substring(0, 1)}</AvatarFallback>
+                  </Avatar>
+                  {user?.kycStatus === 'verified' && (
+                      <div className="absolute bottom-1 right-1 bg-background rounded-full p-1 shadow-2xl border border-white/10">
+                          <div className="bg-green-500 text-white rounded-full p-1.5">
+                              <ShieldCheck size={20} />
+                          </div>
+                      </div>
+                  )}
+              </div>
               <div className="text-center md:text-left space-y-2 relative z-10">
                   <div className="flex flex-wrap items-center justify-center md:justify-start gap-3">
                       <Badge className="bg-accent text-black font-black uppercase italic text-[8px] tracking-[0.3em] px-4 py-1">Membre {user?.loyaltyLevel || 'Bronze'}</Badge>
+                      {user?.kycStatus === 'verified' && (
+                          <Badge className="bg-green-500/20 text-green-400 border-green-500/20 font-black uppercase italic text-[8px] tracking-[0.3em] px-4 py-1">
+                              <ShieldCheck size={10} className="mr-1.5" /> Identité Vérifiée
+                          </Badge>
+                      )}
                       <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest opacity-40">
                         Dernière activité: {isMounted && user?.lastActivityAt?.toDate ? format(user.lastActivityAt.toDate(), "dd MMM HH:mm", { locale: fr }) : "..."}
                       </span>
                   </div>
-                  <h1 className="text-4xl md:text-5xl font-black uppercase italic tracking-tighter text-white leading-none">Bienvenue, <span className="text-accent">{user?.name?.split(' ')[0]}</span></h1>
+                  <h1 className="text-4xl md:text-5xl font-black uppercase italic tracking-tighter text-white leading-none">
+                    Bienvenue, <span className="text-accent">{user?.name?.split(' ')[0]}</span>
+                  </h1>
                   <p className="text-sm text-white/60 font-medium italic">"Prêt à dominer l'économie technologique aujourd'hui ?"</p>
               </div>
           </div>

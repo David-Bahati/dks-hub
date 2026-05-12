@@ -1,7 +1,7 @@
 
 "use client";
 
-import { LogOut, LayoutDashboard, ShoppingCart, Home, Trash2, User, Sparkles, Loader2, GraduationCap, Wrench, Laptop, Layout, Bell, Award, Wallet, Coins, ArrowRight, Minus, Plus, ShoppingBag } from 'lucide-react';
+import { LogOut, LayoutDashboard, ShoppingCart, Home, Trash2, User, Sparkles, Loader2, GraduationCap, Wrench, Laptop, Layout, Bell, Award, Wallet, Coins, ArrowRight, Minus, Plus, ShoppingBag, ShieldCheck, CheckCircle2 } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from "@/components/ui/button";
@@ -164,11 +164,18 @@ export function Navbar() {
 
                     {authLoading ? <Loader2 className="animate-spin h-5 w-5 text-accent" /> : user ? (
                         <div className="flex items-center gap-3">
-                             <Link href="/dashboard/settings">
-                                <Avatar className="h-11 w-11 border-2 border-white/5 hover:border-accent transition-all cursor-pointer shadow-lg">
+                             <Link href="/dashboard/settings" className="relative group">
+                                <Avatar className="h-11 w-11 border-2 border-white/5 group-hover:border-accent transition-all cursor-pointer shadow-lg">
                                     <AvatarImage src={user.photoURL} className="object-cover" />
                                     <AvatarFallback className="bg-accent/20 text-accent font-black italic text-sm">{user.name?.substring(0, 1)}</AvatarFallback>
                                 </Avatar>
+                                {user.kycStatus === 'verified' && (
+                                    <div className="absolute -bottom-1 -right-1 bg-background rounded-full p-0.5 z-10">
+                                        <div className="bg-green-500 text-white rounded-full p-0.5 shadow-lg">
+                                            <CheckCircle2 size={10} strokeWidth={4} />
+                                        </div>
+                                    </div>
+                                )}
                              </Link>
                              <Button variant="ghost" onClick={handleLogout} className="text-muted-foreground hover:text-destructive h-11 w-11 p-0 rounded-2xl bg-white/5 hover:bg-destructive/10 transition-all">
                                 <LogOut size={20} />

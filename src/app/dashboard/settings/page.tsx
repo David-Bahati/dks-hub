@@ -265,9 +265,19 @@ export default function SettingsPage() {
                                             accept="image/*" 
                                             onChange={handleFileChange} 
                                         />
+                                        {user?.kycStatus === 'verified' && (
+                                            <div className="absolute bottom-2 right-2 bg-background rounded-full p-1 z-20 shadow-2xl">
+                                                <div className="bg-green-500 text-white rounded-full p-1.5">
+                                                    <ShieldCheck size={20} />
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                     <div className="space-y-2">
-                                        <h3 className="text-2xl font-black uppercase italic tracking-tighter truncate">{name}</h3>
+                                        <div className="flex items-center justify-center gap-2">
+                                            <h3 className="text-2xl font-black uppercase italic tracking-tighter truncate">{name}</h3>
+                                            {user?.kycStatus === 'verified' && <CheckCircle2 className="text-green-500" size={20} />}
+                                        </div>
                                         <Button 
                                             variant="outline" 
                                             size="sm" 
@@ -281,6 +291,11 @@ export default function SettingsPage() {
                                         <p className="text-[8px] font-black uppercase opacity-40">Détails Système</p>
                                         <div className="flex items-center gap-3 text-[10px] font-bold uppercase"><Mail size={12} className="text-accent" /> {user?.email}</div>
                                         <div className="flex items-center gap-3 text-[10px] font-bold uppercase"><Smartphone size={12} className="text-accent" /> {whatsapp}</div>
+                                        {user?.kycStatus === 'verified' && (
+                                            <div className="flex items-center gap-3 text-[10px] font-black uppercase text-green-400 pt-1">
+                                                <ShieldCheck size={12} /> Profil Certifié
+                                            </div>
+                                        )}
                                     </div>
                                 </Card>
 
