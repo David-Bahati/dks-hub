@@ -180,6 +180,11 @@ function UniversalWalletPage() {
     const [showPin, setShowPin] = useState(false);
     const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
 
+    // Swap states
+    const [swapFrom, setSwapFrom] = useState('pi');
+    const [swapTo, setSwapTo] = useState('dkst');
+    const [swapAmount, setSwapAmount] = useState("");
+
     const [stakingAmount, setStakingAmount] = useState("");
     const [selectedStakingOption, setSelectedStakingOption] = useState(STAKING_OPTIONS[3]);
     const [stakingMode, setStakingMode] = useState<'stake' | 'unstake'>('stake');
@@ -244,7 +249,7 @@ function UniversalWalletPage() {
         const sortedTx = transactions ? [...transactions].sort((a, b) => (a.createdAt?.toMillis?.() || 0) - (b.createdAt?.toMillis?.() || 0)) : [];
         
         sortedTx.forEach((tx, idx) => {
-            const isIncoming = ['mint', 'mining', 'unstaking', 'dividend', 'exchange'].includes(tx.type) || (tx.type === 'transfer' && tx.direction === 'received');
+            const isIncoming = ['mint', 'mining', 'unstaking', 'dividend', 'exchange', 'swap'].includes(tx.type) || (tx.type === 'transfer' && tx.direction === 'received');
             runningTotal += isIncoming ? tx.tokenAmount : -tx.tokenAmount;
             const date = tx.createdAt?.toDate ? format(tx.createdAt.toDate(), 'dd/MM') : `T${idx}`;
             wealthHistory.push({ name: date, wealth: runningTotal * GCV_VALUE });
@@ -370,6 +375,61 @@ function UniversalWalletPage() {
             setTransferAmount("");
             setSelectedRecipient(null);
         } catch (e) { toast({ title: "Erreur", variant: "destructive" }); } finally { setIsProcessingAction(false); }
+    };
+
+    // LOGIQUE DE SWAP FONCTIONNELLE
+    const handleSwap = async () => {
+        const amt = parseFloat(swapAmount);
+        if (!user || isNaN(amt) || amt <= 0) return;
+
+        const fromAsset = ASSETS.find(a => a.id === swapFrom);
+        const toAsset = ASSETS.find(a => a.id === swapTo);
+        
+        if (!fromAsset || !toAsset || fromAsset.balance < amt) {
+            toast({ title: "Solde insuffisant", variant: "destructive" });
+            return;
+        }
+
+        setIsProcessingAction(true);
+        try {
+            // Calcul du montant reçu
+            // Si GCV to GCV (Pi to DKST), c'est 1 pour 1
+            let receivedAmt = amt;
+            if (swapFrom === 'usd' && (swapTo === 'dkst' || swapTo === 'pi')) {
+                receivedAmt = amt / GCV_VALUE;
+            } else if ((swapFrom === 'dkst' || swapFrom === 'pi') && swapTo === 'usd') {
+                receivedAmt = amt * GCV_VALUE;
+            }
+
+            const updateData: any = { updatedAt: serverTimestamp() };
+            updateData[`${swapFrom}Balance`] = increment(-amt);
+            if (swapFrom === 'dkst') updateData['tokenBalance'] = increment(-amt);
+            
+            updateData[`${swapTo}Balance`] = increment(receivedAmt);
+            if (swapTo === 'dkst') updateData['tokenBalance'] = increment(receivedAmt);
+
+            await updateDoc(doc(db, "users", user.uid), updateData);
+
+            await addDoc(collection(db, "tokenTransactions"), {
+                userId: user.uid,
+                userName: user.name,
+                type: 'swap',
+                tokenAmount: receivedAmt,
+                fromAsset: swapFrom,
+                toAsset: swapTo,
+                fromAmount: amt,
+                memo: `Swap ${swapFrom.toUpperCase()} vers ${swapTo.toUpperCase()}`,
+                createdAt: serverTimestamp()
+            });
+
+            toast({ title: "Swap Réussi", description: `${receivedAmt.toFixed(4)} ${swapTo.toUpperCase()} reçus.` });
+            setSwapAmount("");
+            setIsSwapSheetOpen(false);
+        } catch (e) {
+            toast({ title: "Erreur Swap", variant: "destructive" });
+        } finally {
+            setIsProcessingAction(false);
+        }
     };
 
     const handleStake = async () => {
@@ -574,7 +634,7 @@ function UniversalWalletPage() {
                                 <ResponsiveContainer width="100%" height="100%">
                                     <AreaChart data={stats.wealthHistory}>
                                         <defs>
-                                            <linearGradient id="colorW" x1="0" y1="0" x2="0" y2="1">
+                                            <linearGradient id="colorW" x1="0" x2="0" x2="0" y2="1">
                                                 <stop offset="5%" stopColor="hsl(var(--accent))" stopOpacity={0.3}/>
                                                 <stop offset="95%" stopColor="hsl(var(--accent))" stopOpacity={0}/>
                                             </linearGradient>
@@ -737,16 +797,108 @@ function UniversalWalletPage() {
                 </SheetContent>
             </Sheet>
 
-            {/* SWAP SHEET */}
+            {/* SWAP SHEET FONCTIONNELLE */}
             <Sheet open={isSwapSheetOpen} onOpenChange={setIsSwapSheetOpen}>
                 <SheetContent side="right" className="bg-card/95 backdrop-blur-3xl border-white/10 w-full sm:max-w-md flex flex-col p-0">
-                    <SheetHeader className="p-8 bg-accent/10 border-b border-white/5">
-                        <SheetTitle className="text-2xl font-black uppercase italic tracking-tighter">Swap Élite</SheetTitle>
-                        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Conversion Pi / DKST au taux GCV</p>
+                    <SheetHeader className="p-10 bg-accent/10 border-b border-white/5">
+                        <div className="flex items-center gap-5">
+                            <div className="w-16 h-16 rounded-2xl bg-accent/20 flex items-center justify-center text-accent shadow-xl shadow-accent/10">
+                                <ArrowDownUp size={32} />
+                            </div>
+                            <div>
+                                <SheetTitle className="text-3xl font-black uppercase italic tracking-tighter">Swap Élite</SheetTitle>
+                                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Conversion instantanée GCV</p>
+                            </div>
+                        </div>
                     </SheetHeader>
-                    <div className="p-10 flex flex-col items-center justify-center h-full space-y-8 opacity-20 italic">
-                        <RefreshCw size={80} className="animate-spin-slow" />
-                        <p className="text-center text-sm font-black uppercase tracking-widest">Passerelle de Liquidité en cours de synchronisation...</p>
+                    
+                    <div className="flex-1 p-10 space-y-10 overflow-y-auto bg-black/20">
+                        <div className="space-y-6">
+                            {/* FROM ASSET */}
+                            <div className="space-y-3">
+                                <div className="flex justify-between items-end px-1">
+                                    <Label className="text-[10px] font-black uppercase tracking-widest opacity-40">De (Actif Source)</Label>
+                                    <p className="text-[9px] font-bold text-white/40 uppercase">Solde : {isMounted ? ASSETS.find(a => a.id === swapFrom)?.balance.toFixed(4) : "..."}</p>
+                                </div>
+                                <div className="p-6 bg-white/5 rounded-3xl border border-white/5 space-y-4">
+                                    <Select value={swapFrom} onValueChange={setSwapFrom}>
+                                        <SelectTrigger className="h-10 bg-transparent border-none text-white font-black uppercase italic">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent className="bg-card border-white/10">
+                                            {ASSETS.map(a => <SelectItem key={a.id} value={a.id} className="font-bold uppercase text-[10px]">{a.name}</SelectItem>)}
+                                        </SelectContent>
+                                    </Select>
+                                    <div className="relative">
+                                        <Input 
+                                            type="number" 
+                                            value={swapAmount} 
+                                            onChange={e => setSwapAmount(e.target.value)} 
+                                            placeholder="0.00"
+                                            className="h-16 bg-background/40 border-white/5 rounded-2xl text-2xl font-black text-white" 
+                                        />
+                                        <button 
+                                            onClick={() => setSwapAmount((ASSETS.find(a => a.id === swapFrom)?.balance || 0).toString())}
+                                            className="absolute right-4 top-1/2 -translate-y-1/2 h-8 px-3 rounded-lg bg-accent/20 text-accent font-black text-[8px]"
+                                        >
+                                            MAX
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="flex justify-center -my-8 relative z-10">
+                                <button 
+                                    onClick={() => { const temp = swapFrom; setSwapFrom(swapTo); setSwapTo(temp); }}
+                                    className="w-12 h-12 rounded-2xl bg-accent text-black flex items-center justify-center shadow-xl hover:rotate-180 transition-transform duration-500"
+                                >
+                                    <ArrowDownUp size={20} />
+                                </button>
+                            </div>
+
+                            {/* TO ASSET */}
+                            <div className="space-y-3">
+                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-40 ml-1">À (Actif Destination)</Label>
+                                <div className="p-6 bg-accent/5 rounded-3xl border border-accent/10 space-y-4">
+                                    <Select value={swapTo} onValueChange={setSwapTo}>
+                                        <SelectTrigger className="h-10 bg-transparent border-none text-accent font-black uppercase italic">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent className="bg-card border-white/10">
+                                            {ASSETS.filter(a => a.id !== swapFrom).map(a => <SelectItem key={a.id} value={a.id} className="font-bold uppercase text-[10px]">{a.name}</SelectItem>)}
+                                        </SelectContent>
+                                    </Select>
+                                    <div className="h-16 flex items-center px-4 bg-background/40 rounded-2xl border border-white/5">
+                                        <p className="text-2xl font-black text-accent italic">
+                                            {isMounted && swapAmount ? (
+                                                swapFrom === 'usd' ? (parseFloat(swapAmount) / GCV_VALUE).toFixed(8) :
+                                                swapTo === 'usd' ? (parseFloat(swapAmount) * GCV_VALUE).toFixed(2) :
+                                                parseFloat(swapAmount).toFixed(4)
+                                            ) : "0.00"}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="p-6 bg-white/5 rounded-2xl border border-white/10 space-y-4">
+                            <div className="flex justify-between items-center text-[9px] font-black uppercase">
+                                <span className="text-white/40">Taux de Conversion</span>
+                                <span className="text-accent">1 {swapFrom.toUpperCase()} = {swapFrom === 'usd' ? (1/GCV_VALUE).toFixed(8) : swapTo === 'usd' ? GCV_VALUE : 1} {swapTo.toUpperCase()}</span>
+                            </div>
+                            <div className="flex justify-between items-center text-[9px] font-black uppercase">
+                                <span className="text-white/40">Frais de Réseau</span>
+                                <span className="text-green-400">ZÉRO FRAIS</span>
+                            </div>
+                        </div>
+
+                        <Button 
+                            onClick={() => secureAction(handleSwap)} 
+                            disabled={isProcessingAction || !swapAmount || parseFloat(swapAmount) <= 0}
+                            className="w-full h-20 bg-accent text-black font-black uppercase italic rounded-[2rem] shadow-2xl text-xl gap-4 hover:scale-[1.02] transition-all"
+                        >
+                            {isProcessingAction ? <Loader2 className="animate-spin" /> : <><RefreshCw size={24} /> Lancer le Swap</>}
+                        </Button>
                     </div>
                 </SheetContent>
             </Sheet>
