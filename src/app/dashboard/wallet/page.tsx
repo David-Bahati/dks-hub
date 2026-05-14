@@ -55,7 +55,8 @@ import {
     Maximize,
     Coins,
     ChevronRight,
-    Smartphone
+    Smartphone,
+    Snowflake
 } from "lucide-react";
 import { db } from '@/lib/firebase';
 import { collection, query, where, orderBy, limit, addDoc, serverTimestamp, doc, updateDoc, increment, getDocs, setDoc } from 'firebase/firestore';
@@ -99,9 +100,8 @@ import {
     ResponsiveContainer,
     CartesianGrid
 } from 'recharts';
-import { format } from "date-fns";
+import { format, addMonths, differenceInSeconds } from "date-fns";
 import { fr } from "date-fns/locale";
-import { PI_GCV } from "@/lib/constants";
 
 const GCV_VALUE = 314159; 
 const POINTS_PER_TOKEN = 100;
@@ -188,6 +188,7 @@ function UniversalWalletPage() {
     const [stakingAmount, setStakingAmount] = useState("");
     const [selectedStakingOption, setSelectedStakingOption] = useState(STAKING_OPTIONS[3]);
     const [stakingMode, setStakingMode] = useState<'stake' | 'unstake'>('stake');
+    const [stakingCountdown, setStakingCountdown] = useState<string>("");
 
     const [isProcessingAction, setIsProcessingAction] = useState(false);
     const [isEmergencyLockProcessing, setIsEmergencyLockProcessing] = useState(false);
@@ -222,6 +223,36 @@ function UniversalWalletPage() {
         }
     }, [user]);
 
+    // Timer pour le Staking
+    useEffect(() => {
+        if (!user?.stakingStartedAt || (user.stakedBalance || 0) <= 0) {
+            setStakingCountdown("");
+            return;
+        }
+
+        const interval = setInterval(() => {
+            const start = user.stakingStartedAt?.toDate ? user.stakingStartedAt.toDate() : new Date(user.stakingStartedAt);
+            // Par défaut on simule un blocage de 12 mois basé sur l'option sélectionnée lors du staking
+            // Pour l'exercice, on va utiliser 12 mois par défaut ou essayer de le déduire
+            const unlockDate = addMonths(start, 12);
+            const now = new Date();
+            const diff = differenceInSeconds(unlockDate, now);
+
+            if (diff <= 0) {
+                setStakingCountdown("DÉBLOQUÉ");
+                clearInterval(interval);
+            } else {
+                const days = Math.floor(diff / 86400);
+                const hours = Math.floor((diff % 86400) / 3600);
+                const minutes = Math.floor((diff % 3600) / 60);
+                const seconds = diff % 60;
+                setStakingCountdown(`${days}j ${hours}h ${minutes}m ${seconds}s`);
+            }
+        }, 1000);
+
+        return () => clearInterval(interval);
+    }, [user?.stakingStartedAt, user?.stakedBalance]);
+
     const stats = useMemo(() => {
         if (!user) return { totalPoints: 0, availablePoints: 0, redeemableTokens: 0, progress: 0, stakingRewards: 0, gcvUSD: 0, totalTokens: 0, wealthHistory: [] };
 
@@ -244,14 +275,11 @@ function UniversalWalletPage() {
         const totalTokens = (user.tokenBalance || 0) + (user.stakedBalance || 0) + (user.piBalance || 0);
         const gcvUSD = totalTokens * GCV_VALUE;
 
-        // Curve Dynamique "Trading Pro"
-        // On construit l'historique en se basant sur les transactions mais en injectant de la granularité
         let runningTotal = 0;
         const wealthHistory: any[] = [];
         const sortedTx = transactions ? [...transactions].sort((a, b) => (a.createdAt?.toMillis?.() || 0) - (b.createdAt?.toMillis?.() || 0)) : [];
         
         if (sortedTx.length === 0) {
-            // Mock data si aucune transaction pour ne pas avoir un graphique vide
             for(let i=0; i<10; i++) {
                 const noise = Math.random() * 0.1 - 0.05;
                 wealthHistory.push({ name: `H-${10-i}`, wealth: (totalTokens + noise) * GCV_VALUE });
@@ -261,8 +289,6 @@ function UniversalWalletPage() {
                 const isIncoming = ['mint', 'mining', 'unstaking', 'dividend', 'exchange', 'swap'].includes(tx.type) || (tx.type === 'transfer' && tx.direction === 'received');
                 runningTotal += isIncoming ? tx.tokenAmount : -tx.tokenAmount;
                 const date = tx.createdAt?.toDate ? format(tx.createdAt.toDate(), 'dd/MM') : `T${idx}`;
-                
-                // On ajoute un point "noise" juste avant pour l'effet trading
                 wealthHistory.push({ name: date, wealth: (runningTotal + (Math.random()*0.02 - 0.01)) * GCV_VALUE });
             });
         }
@@ -281,7 +307,6 @@ function UniversalWalletPage() {
         ];
     }, [user]);
 
-    // FILTRAGE DES ACTIFS SELON LE RÉSEAU SÉLECTIONNÉ
     const filteredAssets = useMemo(() => {
         return ASSETS.filter(asset => asset.network === activeNetwork.id);
     }, [activeNetwork, ASSETS]);
@@ -340,7 +365,7 @@ function UniversalWalletPage() {
 
     const secureAction = (action: () => void) => {
         if (user?.isWalletLocked) {
-            toast({ title: "Wallet Verrouillé", variant: "destructive" });
+            toast({ title: "Wallet Verrouillé", description: "Veuillez déverrouiller votre wallet dans l'onglet Sécurité.", variant: "destructive" });
             return;
         }
         if (!user?.walletPin) {
@@ -463,13 +488,18 @@ function UniversalWalletPage() {
                 tokenAmount: amt, memo: `Staking Vault ${selectedStakingOption.label}`,
                 createdAt: serverTimestamp()
             });
-            toast({ title: "Staking Activé" });
+            toast({ title: "Staking Activé", description: "Vos fonds sont sécurisés dans le Vault." });
             setStakingAmount("");
         } catch (e) { toast({ title: "Erreur", variant: "destructive" }); } finally { setIsProcessingAction(false); }
     };
 
     const handleUnstake = async () => {
         if (!user || (user.stakedBalance || 0) <= 0) return;
+        if (stakingCountdown !== "DÉBLOQUÉ") {
+            toast({ title: "Contrat en cours", description: "Vous ne pouvez pas retirer avant la fin du décompte.", variant: "destructive" });
+            return;
+        }
+
         setIsProcessingAction(true);
         try {
             const rewards = stats.stakingRewards;
@@ -485,7 +515,7 @@ function UniversalWalletPage() {
                 tokenAmount: total, memo: "Unstaking capital + intérêts",
                 createdAt: serverTimestamp()
             });
-            toast({ title: "Capital débloqué" });
+            toast({ title: "Capital débloqué", description: "Les fonds ont rejoint votre balance disponible." });
         } catch (e) { toast({ title: "Erreur", variant: "destructive" }); } finally { setIsProcessingAction(false); }
     };
 
@@ -542,13 +572,25 @@ function UniversalWalletPage() {
 
     if (!isMounted) return null;
 
+    const isLocked = !!user?.isWalletLocked;
+
     return (
         <div className="min-h-screen bg-background text-foreground pb-24">
             <Navbar />
             <main className="max-w-4xl mx-auto px-4 py-10">
                 
-                {/* WEALTH HEADER PRO */}
-                <div className="mb-12 flex flex-col items-center text-center animate-in fade-in zoom-in duration-700">
+                {/* WEALTH HEADER PRO - AVEC EFFET GEL SI VERROUILLÉ */}
+                <div className={cn(
+                    "mb-12 flex flex-col items-center text-center animate-in fade-in zoom-in duration-700 relative transition-all",
+                    isLocked && "blur-md opacity-50 grayscale pointer-events-none"
+                )}>
+                    {isLocked && (
+                        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/20 backdrop-blur-sm rounded-[3rem]">
+                             <Snowflake size={64} className="text-red-500 animate-pulse mb-4" />
+                             <Badge className="bg-red-500 text-white font-black uppercase italic px-6 py-2 shadow-xl">ACTIFS GELÉS</Badge>
+                        </div>
+                    )}
+                    
                     <button 
                         onClick={() => setIsNetworkSheetOpen(true)}
                         className="mb-8 bg-white/5 border border-white/10 px-5 py-2 rounded-full flex items-center gap-3 hover:bg-white/10 transition-all group"
@@ -590,8 +632,11 @@ function UniversalWalletPage() {
                     </div>
                 </div>
 
-                {/* ASSET LIST CRYSTAL - FILTRÉE PAR RÉSEAU */}
-                <div className="space-y-6 mb-16">
+                {/* ASSET LIST CRYSTAL - FILTRÉE PAR RÉSEAU AVEC EFFET GEL */}
+                <div className={cn(
+                    "space-y-6 mb-16 transition-all",
+                    isLocked && "blur-md opacity-50 grayscale pointer-events-none"
+                )}>
                     <div className="flex items-center justify-between px-4">
                         <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-white/40 italic">Portefeuille : {activeNetwork.name}</h3>
                         <Button onClick={() => setIsImportSheetOpen(true)} variant="ghost" size="sm" className="text-accent font-black uppercase italic text-[10px] gap-2">
@@ -729,10 +774,33 @@ function UniversalWalletPage() {
                                     <h3 className="text-xl font-black uppercase italic">Ma Position</h3>
                                     <div className="space-y-8">
                                         <div><p className="text-[10px] font-black uppercase text-white/40 mb-2 tracking-[0.2em]">Capital bloqué</p><p className="text-5xl font-black text-white italic tracking-tighter">{isMounted && isBalanceVisible ? (user?.stakedBalance || 0).toFixed(2) : "••••"} <span className="text-xs not-italic opacity-40">DKST</span></p></div>
+                                        
+                                        {/* COMPTE À REBOURS DE DÉBLOCAGE */}
+                                        {stakingCountdown && (
+                                            <div className="p-6 rounded-[2rem] bg-accent/5 border border-accent/20 animate-in slide-in-from-right-4 duration-700">
+                                                <p className="text-[10px] font-black uppercase text-accent mb-2 flex items-center gap-2">
+                                                    <Clock size={12} className="animate-pulse" /> Déverrouillage dans :
+                                                </p>
+                                                <p className="text-2xl font-black text-white italic tracking-widest font-mono">
+                                                    {stakingCountdown}
+                                                </p>
+                                            </div>
+                                        )}
+
                                         <div><p className="text-[10px] font-black uppercase text-white/40 mb-2 tracking-[0.2em]">Intérêts courus</p><p className="text-5xl font-black text-green-400 italic tracking-tighter">+{isMounted && isBalanceVisible ? stats.stakingRewards.toFixed(6) : "••••"}</p></div>
                                     </div>
                                 </div>
-                                <Button onClick={() => secureAction(handleUnstake)} disabled={isProcessingAction || !user?.stakedBalance} variant="outline" className="mt-12 w-full h-16 border-white/10 rounded-2xl font-black uppercase italic text-[11px] hover:bg-white/5 relative z-10">Unstake All</Button>
+                                <Button 
+                                    onClick={() => secureAction(handleUnstake)} 
+                                    disabled={isProcessingAction || !user?.stakedBalance || stakingCountdown !== "DÉBLOQUÉ"} 
+                                    variant="outline" 
+                                    className={cn(
+                                        "mt-12 w-full h-16 border-white/10 rounded-2xl font-black uppercase italic text-[11px] transition-all relative z-10",
+                                        stakingCountdown === "DÉBLOQUÉ" ? "bg-accent/10 border-accent text-accent hover:bg-accent hover:text-black" : "opacity-40"
+                                    )}
+                                >
+                                    {stakingCountdown === "DÉBLOQUÉ" ? "Réclamer Capital + Profits" : "Capital sous séquestre"}
+                                </Button>
                             </Card>
                         </div>
                     </TabsContent>
@@ -1292,5 +1360,3 @@ function UniversalWalletPage() {
 }
 
 export default withAuth(UniversalWalletPage);
-
-    
