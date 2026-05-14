@@ -101,6 +101,7 @@ import {
 } from 'recharts';
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
+import { PI_GCV } from "@/lib/constants";
 
 const GCV_VALUE = 314159; 
 const POINTS_PER_TOKEN = 100;
@@ -206,6 +207,9 @@ function UniversalWalletPage() {
     }, [user?.uid]);
     const { data: transactions } = useCollection(txQuery);
 
+    const allUsersQuery = useMemoFirebase(() => collection(db, "users"), []);
+    const { data: allUsers } = useCollection(allUsersQuery);
+
     useEffect(() => {
         setIsMounted(true);
         if (user && !user.hasMnemonic) {
@@ -259,6 +263,15 @@ function UniversalWalletPage() {
             { id: 'usd', name: 'US Dollar', balance: user?.usdBalance || 0, icon: <CircleDollarSign className="text-green-500" size={24} />, network: 'dks', price: 1, bg: 'bg-green-500/10' }
         ];
     }, [user]);
+
+    const filteredRecipients = useMemo(() => {
+        if (!allUsers) return [];
+        return allUsers.filter(u => 
+            u.uid !== user?.uid && 
+            (u.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+             u.email?.toLowerCase().includes(searchQuery.toLowerCase()))
+        );
+    }, [allUsers, searchQuery, user?.uid]);
 
     const generateNewMnemonic = () => {
         const words = [];
@@ -327,6 +340,79 @@ function UniversalWalletPage() {
             toast({ title: "PIN Incorrect", variant: "destructive" });
             setEnteredPin("");
         }
+    };
+
+    const handleTransfer = async () => {
+        if (!user || !selectedRecipient || !transferAmount) return;
+        const amt = parseFloat(transferAmount);
+        if (amt > (user.tokenBalance || 0)) return;
+
+        setIsProcessingAction(true);
+        try {
+            const piTxId = `PI-SEND-${Math.random().toString(36).substring(2, 12).toUpperCase()}`;
+            await updateDoc(doc(db, "users", user.uid), { tokenBalance: increment(-amt), updatedAt: serverTimestamp() });
+            await updateDoc(doc(db, "users", selectedRecipient.uid), { tokenBalance: increment(amt), updatedAt: serverTimestamp() });
+            
+            await addDoc(collection(db, "tokenTransactions"), {
+                userId: user.uid, userName: user.name, type: 'transfer', direction: 'sent',
+                tokenAmount: amt, recipientId: selectedRecipient.uid, recipientName: selectedRecipient.name,
+                memo: transferMemo, piTxId, createdAt: serverTimestamp()
+            });
+            
+            await addDoc(collection(db, "tokenTransactions"), {
+                userId: selectedRecipient.uid, userName: selectedRecipient.name, type: 'transfer', direction: 'received',
+                tokenAmount: amt, senderId: user.uid, senderName: user.name,
+                memo: transferMemo, piTxId, createdAt: serverTimestamp()
+            });
+
+            toast({ title: "Transfert réussi", description: `${amt} DKST envoyés.` });
+            setIsTransferSheetOpen(false);
+            setTransferAmount("");
+            setSelectedRecipient(null);
+        } catch (e) { toast({ title: "Erreur", variant: "destructive" }); } finally { setIsProcessingAction(false); }
+    };
+
+    const handleStake = async () => {
+        const amt = parseFloat(stakingAmount);
+        if (!user || amt <= 0 || amt > (user.tokenBalance || 0)) return;
+
+        setIsProcessingAction(true);
+        try {
+            await updateDoc(doc(db, "users", user.uid), {
+                tokenBalance: increment(-amt),
+                stakedBalance: increment(amt),
+                stakingStartedAt: serverTimestamp(),
+                updatedAt: serverTimestamp()
+            });
+            await addDoc(collection(db, "tokenTransactions"), {
+                userId: user.uid, userName: user.name, type: 'staking',
+                tokenAmount: amt, memo: `Staking Vault ${selectedStakingOption.label}`,
+                createdAt: serverTimestamp()
+            });
+            toast({ title: "Staking Activé" });
+            setStakingAmount("");
+        } catch (e) { toast({ title: "Erreur", variant: "destructive" }); } finally { setIsProcessingAction(false); }
+    };
+
+    const handleUnstake = async () => {
+        if (!user || (user.stakedBalance || 0) <= 0) return;
+        setIsProcessingAction(true);
+        try {
+            const rewards = stats.stakingRewards;
+            const total = user.stakedBalance + rewards;
+            await updateDoc(doc(db, "users", user.uid), {
+                tokenBalance: increment(total),
+                stakedBalance: 0,
+                stakingStartedAt: null,
+                updatedAt: serverTimestamp()
+            });
+            await addDoc(collection(db, "tokenTransactions"), {
+                userId: user.uid, userName: user.name, type: 'unstaking',
+                tokenAmount: total, memo: "Unstaking capital + intérêts",
+                createdAt: serverTimestamp()
+            });
+            toast({ title: "Capital débloqué" });
+        } catch (e) { toast({ title: "Erreur", variant: "destructive" }); } finally { setIsProcessingAction(false); }
     };
 
     const handleConvertPoints = async () => {
@@ -580,6 +666,125 @@ function UniversalWalletPage() {
                 </Tabs>
             </main>
 
+            {/* RECEIVE SHEET */}
+            <Sheet open={isReceiveSheetOpen} onOpenChange={setIsReceiveSheetOpen}>
+                <SheetContent side="right" className="bg-card/95 backdrop-blur-3xl border-white/10 w-full sm:max-w-md flex flex-col p-0">
+                    <SheetHeader className="p-8 bg-accent/10 border-b border-white/5">
+                        <div className="flex flex-col items-center text-center gap-6">
+                            <div className="w-20 h-20 rounded-[2.5rem] bg-accent/20 flex items-center justify-center text-accent shadow-xl shadow-accent/10"><ArrowDownLeft size={40} /></div>
+                            <div>
+                                <SheetTitle className="text-2xl font-black uppercase italic tracking-tighter">Recevoir des fonds</SheetTitle>
+                                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60 mt-2">Dépôt sécurisé sur le Hub</p>
+                            </div>
+                        </div>
+                    </SheetHeader>
+                    <div className="p-10 space-y-10 flex flex-col items-center">
+                        <div className="bg-white p-8 rounded-[3rem] shadow-2xl border-8 border-accent/5">
+                            <QrCode size={200} className="text-black" />
+                        </div>
+                        <div className="w-full space-y-6">
+                            <div className="p-6 bg-white/5 rounded-3xl border border-white/5 space-y-2">
+                                <p className="text-[8px] font-black uppercase text-muted-foreground tracking-widest">Votre adresse de réception</p>
+                                <p className="text-xs font-mono font-bold break-all text-accent">{getReceiveAddress(receiveAsset)}</p>
+                            </div>
+                            <Button onClick={() => { navigator.clipboard.writeText(getReceiveAddress(receiveAsset)); toast({ title: "Adresse Copiée" }); }} className="w-full h-16 rounded-2xl bg-white text-black font-black uppercase italic gap-2">
+                                <Copy size={18} /> Copier l'adresse
+                            </Button>
+                        </div>
+                    </div>
+                </SheetContent>
+            </Sheet>
+
+            {/* TRANSFER SHEET */}
+            <Sheet open={isTransferSheetOpen} onOpenChange={setIsTransferSheetOpen}>
+                <SheetContent side="right" className="bg-card/95 backdrop-blur-3xl border-white/10 w-full sm:max-w-md flex flex-col p-0">
+                    <SheetHeader className="p-8 bg-accent/10 border-b border-white/5">
+                        <div className="flex items-center gap-4">
+                            <div className="w-14 h-14 rounded-2xl bg-accent text-black flex items-center justify-center shadow-xl"><Send size={28} /></div>
+                            <div>
+                                <SheetTitle className="text-2xl font-black uppercase italic tracking-tighter">Envoyer des DKST</SheetTitle>
+                                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Transfert instantané sans frais</p>
+                            </div>
+                        </div>
+                    </SheetHeader>
+                    <div className="p-8 space-y-8 flex-1 overflow-y-auto">
+                        <div className="space-y-4">
+                            <Label className="text-[10px] font-black uppercase tracking-widest opacity-40 ml-1">Destinataire</Label>
+                            <div className="relative">
+                                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
+                                <Input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Nom, email ou ID..." className="h-14 pl-12 bg-white/5 border-white/10 rounded-2xl" />
+                            </div>
+                            <div className="space-y-2 max-h-[150px] overflow-y-auto pr-2 custom-scrollbar">
+                                {filteredRecipients.map(u => (
+                                    <button key={u.uid} onClick={() => setSelectedRecipient(u)} className={cn("w-full p-4 rounded-xl border transition-all flex items-center justify-between", selectedRecipient?.uid === u.uid ? "bg-accent/10 border-accent text-white" : "bg-white/5 border-transparent text-white/60 hover:bg-white/10")}>
+                                        <span className="font-bold text-xs uppercase">{u.name}</span>
+                                        {selectedRecipient?.uid === u.uid && <CheckCircle2 size={16} className="text-accent" />}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="space-y-4">
+                            <Label className="text-[10px] font-black uppercase tracking-widest opacity-40 ml-1">Montant</Label>
+                            <div className="relative">
+                                <Input type="number" value={transferAmount} onChange={e => setTransferAmount(e.target.value)} className="h-20 bg-background/50 border-white/10 rounded-[2rem] text-4xl font-black text-white px-8" />
+                                <span className="absolute right-6 top-1/2 -translate-y-1/2 text-accent font-black">DKST</span>
+                            </div>
+                        </div>
+                        <Button onClick={() => secureAction(handleTransfer)} disabled={isProcessingAction || !selectedRecipient || !transferAmount} className="w-full h-16 bg-accent text-black font-black uppercase italic rounded-2xl shadow-xl shadow-accent/20 text-lg">
+                            {isProcessingAction ? <Loader2 className="animate-spin" /> : "Signer & Envoyer"}
+                        </Button>
+                    </div>
+                </SheetContent>
+            </Sheet>
+
+            {/* SWAP SHEET */}
+            <Sheet open={isSwapSheetOpen} onOpenChange={setIsSwapSheetOpen}>
+                <SheetContent side="right" className="bg-card/95 backdrop-blur-3xl border-white/10 w-full sm:max-w-md flex flex-col p-0">
+                    <SheetHeader className="p-8 bg-accent/10 border-b border-white/5">
+                        <SheetTitle className="text-2xl font-black uppercase italic tracking-tighter">Swap Élite</SheetTitle>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Conversion Pi / DKST au taux GCV</p>
+                    </SheetHeader>
+                    <div className="p-10 flex flex-col items-center justify-center h-full space-y-8 opacity-20 italic">
+                        <RefreshCw size={80} className="animate-spin-slow" />
+                        <p className="text-center text-sm font-black uppercase tracking-widest">Passerelle de Liquidité en cours de synchronisation...</p>
+                    </div>
+                </SheetContent>
+            </Sheet>
+
+            {/* POINTS SHEET */}
+            <Sheet open={isPointsSheetOpen} onOpenChange={setIsPointsSheetOpen}>
+                <SheetContent side="right" className="bg-card/95 backdrop-blur-3xl border-white/10 w-full sm:max-w-md flex flex-col p-0">
+                    <SheetHeader className="p-8 bg-primary/10 border-b border-white/5">
+                        <div className="flex items-center gap-4">
+                            <div className="w-14 h-14 rounded-2xl bg-primary text-white flex items-center justify-center shadow-xl"><Gift size={28} /></div>
+                            <div>
+                                <SheetTitle className="text-2xl font-black uppercase italic tracking-tighter">Prestige Rewards</SheetTitle>
+                                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Convertissez votre activité en actifs</p>
+                            </div>
+                        </div>
+                    </SheetHeader>
+                    <div className="p-10 space-y-10 flex-1 overflow-y-auto">
+                        <div className="text-center space-y-2">
+                            <p className="text-[10px] font-black uppercase text-white/40 tracking-widest">Points accumulés</p>
+                            <p className="text-6xl font-black text-white italic tracking-tighter">{isMounted ? stats.availablePoints : "..."}</p>
+                        </div>
+                        <div className="p-8 bg-white/5 rounded-[2.5rem] border border-white/5 space-y-6">
+                            <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest">
+                                <span>Conversion Directe</span>
+                                <span className="text-primary">{POINTS_PER_TOKEN} PTS = 1 DKST</span>
+                            </div>
+                            <div className="space-y-3">
+                                <p className="text-[9px] text-muted-foreground uppercase font-bold italic">Eligible pour conversion :</p>
+                                <p className="text-2xl font-black text-white">{isMounted ? stats.redeemableTokens : "..."} <span className="text-xs opacity-40 not-italic uppercase">DKST</span></p>
+                            </div>
+                            <Button onClick={handleConvertPoints} disabled={isProcessingAction || stats.redeemableTokens <= 0} className="w-full h-14 bg-primary text-white font-black uppercase italic rounded-xl shadow-lg">
+                                {isProcessingAction ? <Loader2 className="animate-spin" /> : "Réclamer mes Jetons"}
+                            </Button>
+                        </div>
+                    </div>
+                </SheetContent>
+            </Sheet>
+
             {/* NETWORK SELECTION SHEET */}
             <Sheet open={isNetworkSheetOpen} onOpenChange={setIsNetworkSheetOpen}>
                 <SheetContent side="bottom" className="bg-[#1e1e1e] border-none text-white rounded-t-[2.5rem] h-[70vh] flex flex-col p-0">
@@ -629,7 +834,7 @@ function UniversalWalletPage() {
                 </SheetContent>
             </Sheet>
 
-            {/* ADD NETWORK SHEET (POPULAR / CUSTOM) */}
+            {/* ADD NETWORK SHEET */}
             <Sheet open={isAddNetworkSheetOpen} onOpenChange={setIsAddNetworkSheetOpen}>
                 <SheetContent side="bottom" className="bg-[#f5f5f5] border-none text-black rounded-t-[2.5rem] h-[85vh] flex flex-col p-0 overflow-hidden">
                     <div className="p-6 border-b border-gray-200 flex justify-between items-center bg-white">
@@ -712,7 +917,7 @@ function UniversalWalletPage() {
                 </SheetContent>
             </Sheet>
 
-            {/* IMPORT TOKEN SHEET (SEARCH / CUSTOM) */}
+            {/* IMPORT TOKEN SHEET */}
             <Sheet open={isImportSheetOpen} onOpenChange={setIsImportSheetOpen}>
                 <SheetContent side="bottom" className="bg-[#f5f5f5] border-none text-black rounded-t-[2.5rem] h-[85vh] flex flex-col p-0 overflow-hidden shadow-[0_-20px_50px_rgba(0,0,0,0.3)]">
                     <div className="p-6 border-b border-gray-200 flex justify-between items-center bg-white">
@@ -801,7 +1006,7 @@ function UniversalWalletPage() {
                 </SheetContent>
             </Sheet>
 
-            {/* ONBOARDING, PIN AND OTHER MODALS MAINTAINED AS BEFORE */}
+            {/* ONBOARDING DIALOG */}
             <Dialog open={isOnboarding} onOpenChange={() => { if (user?.hasMnemonic) setIsOnboarding(false); }}>
                 <DialogContent className="bg-background border-white/10 text-foreground rounded-[3rem] sm:max-w-xl p-0 overflow-hidden shadow-[0_0_80px_rgba(0,0,0,0.5)]">
                     <div className="p-10 space-y-10">
@@ -843,6 +1048,7 @@ function UniversalWalletPage() {
                 </DialogContent>
             </Dialog>
 
+            {/* PIN VERIFICATION DIALOG */}
             <Dialog open={isPinVerificationOpen} onOpenChange={setIsPinVerificationOpen}>
                 <DialogContent className="bg-card border-white/10 text-foreground rounded-[2.5rem] sm:max-w-md overflow-hidden p-0">
                     <DialogHeader className="p-8 bg-accent/10 border-b border-white/5">
@@ -861,13 +1067,43 @@ function UniversalWalletPage() {
                 </DialogContent>
             </Dialog>
 
+            {/* MNEMONIC SHEET */}
+            <Sheet open={isMnemonicSheetOpen} onOpenChange={setIsMnemonicSheetOpen}>
+                <SheetContent side="right" className="bg-card/95 backdrop-blur-3xl border-white/10 w-full sm:max-w-md flex flex-col p-0">
+                    <SheetHeader className="p-8 bg-accent/10 border-b border-white/5">
+                        <SheetTitle className="text-2xl font-black uppercase italic tracking-tighter text-accent">Recovery Phrase</SheetTitle>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Confidentialité Maximale Requise</p>
+                    </SheetHeader>
+                    <div className="p-10 space-y-8">
+                        <div className="p-6 bg-red-500/5 border border-red-500/20 rounded-2xl">
+                            <p className="text-[10px] text-red-400 font-bold uppercase italic leading-relaxed">NE JAMAIS partager ces mots. Quiconque possède cette phrase possède vos fonds.</p>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            {user?.mnemonicWords?.map((word: string, i: number) => (
+                                <div key={i} className="p-4 bg-white/5 border border-white/5 rounded-xl flex items-center gap-3">
+                                    <span className="text-[8px] font-black opacity-20">{i+1}</span>
+                                    <span className="text-xs font-bold uppercase tracking-wider">{word}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </SheetContent>
+            </Sheet>
+
+            {/* SUCCESS DIALOG */}
+            <Dialog open={isSuccessDialogOpen} onOpenChange={setIsSuccessDialogOpen}>
+                <DialogContent className="bg-background border-white/10 text-foreground rounded-[3rem] sm:max-w-md text-center p-12">
+                    <div className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mx-auto text-green-500 mb-6 shadow-[0_0_40px_rgba(34,197,94,0.3)] animate-in zoom-in">
+                        <CheckCircle2 size={40} />
+                    </div>
+                    <h3 className="text-3xl font-black uppercase italic tracking-tighter mb-4 text-white">Succès !</h3>
+                    <p className="text-sm text-white/60 mb-8 italic">Vos points ont été convertis avec succès au taux officiel du Hub.</p>
+                    <Button onClick={() => setIsSuccessDialogOpen(false)} className="w-full h-14 bg-white text-black font-black uppercase italic rounded-2xl">Continuer</Button>
+                </DialogContent>
+            </Dialog>
+
         </div>
     );
 }
 
-// MOCK DATA FETCH FUNCTIONS REUSED
-async function handleStake() {}
-async function handleUnstake() {}
-
 export default withAuth(UniversalWalletPage);
-
