@@ -23,6 +23,7 @@ export type AppUser = {
   piWalletAddress?: string;
   stakedBalance?: number;
   stakingStartedAt?: any;
+  stakingDurationMonths?: number;
   lastMiningAt?: any;
   lastActivityAt?: any;
   miningPower?: number;

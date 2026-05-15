@@ -223,7 +223,7 @@ function UniversalWalletPage() {
         }
     }, [user]);
 
-    // Timer pour le Staking
+    // Timer pour le Staking Dynamique basé sur le plan choisi
     useEffect(() => {
         if (!user?.stakingStartedAt || (user.stakedBalance || 0) <= 0) {
             setStakingCountdown("");
@@ -232,9 +232,8 @@ function UniversalWalletPage() {
 
         const interval = setInterval(() => {
             const start = user.stakingStartedAt?.toDate ? user.stakingStartedAt.toDate() : new Date(user.stakingStartedAt);
-            // Par défaut on simule un blocage de 12 mois basé sur l'option sélectionnée lors du staking
-            // Pour l'exercice, on va utiliser 12 mois par défaut ou essayer de le déduire
-            const unlockDate = addMonths(start, 12);
+            const monthsToWait = user.stakingDurationMonths || 12; // Utilise la durée stockée ou 12 mois par défaut
+            const unlockDate = addMonths(start, monthsToWait);
             const now = new Date();
             const diff = differenceInSeconds(unlockDate, now);
 
@@ -251,7 +250,7 @@ function UniversalWalletPage() {
         }, 1000);
 
         return () => clearInterval(interval);
-    }, [user?.stakingStartedAt, user?.stakedBalance]);
+    }, [user?.stakingStartedAt, user?.stakedBalance, user?.stakingDurationMonths]);
 
     const stats = useMemo(() => {
         if (!user) return { totalPoints: 0, availablePoints: 0, redeemableTokens: 0, progress: 0, stakingRewards: 0, gcvUSD: 0, totalTokens: 0, wealthHistory: [] };
@@ -481,6 +480,7 @@ function UniversalWalletPage() {
                 tokenBalance: increment(-amt),
                 stakedBalance: increment(amt),
                 stakingStartedAt: serverTimestamp(),
+                stakingDurationMonths: selectedStakingOption.months, // Sauvegarde de la durée du plan choisi
                 updatedAt: serverTimestamp()
             });
             await addDoc(collection(db, "tokenTransactions"), {
@@ -488,7 +488,7 @@ function UniversalWalletPage() {
                 tokenAmount: amt, memo: `Staking Vault ${selectedStakingOption.label}`,
                 createdAt: serverTimestamp()
             });
-            toast({ title: "Staking Activé", description: "Vos fonds sont sécurisés dans le Vault." });
+            toast({ title: "Staking Activé", description: `Vos fonds sont sécurisés pour ${selectedStakingOption.label}.` });
             setStakingAmount("");
         } catch (e) { toast({ title: "Erreur", variant: "destructive" }); } finally { setIsProcessingAction(false); }
     };
@@ -508,6 +508,7 @@ function UniversalWalletPage() {
                 tokenBalance: increment(total),
                 stakedBalance: 0,
                 stakingStartedAt: null,
+                stakingDurationMonths: null,
                 updatedAt: serverTimestamp()
             });
             await addDoc(collection(db, "tokenTransactions"), {
@@ -775,7 +776,7 @@ function UniversalWalletPage() {
                                     <div className="space-y-8">
                                         <div><p className="text-[10px] font-black uppercase text-white/40 mb-2 tracking-[0.2em]">Capital bloqué</p><p className="text-5xl font-black text-white italic tracking-tighter">{isMounted && isBalanceVisible ? (user?.stakedBalance || 0).toFixed(2) : "••••"} <span className="text-xs not-italic opacity-40">DKST</span></p></div>
                                         
-                                        {/* COMPTE À REBOURS DE DÉBLOCAGE */}
+                                        {/* COMPTE À REBOURS DE DÉBLOCAGE DYNAMIQUE */}
                                         {stakingCountdown && (
                                             <div className="p-6 rounded-[2rem] bg-accent/5 border border-accent/20 animate-in slide-in-from-right-4 duration-700">
                                                 <p className="text-[10px] font-black uppercase text-accent mb-2 flex items-center gap-2">
