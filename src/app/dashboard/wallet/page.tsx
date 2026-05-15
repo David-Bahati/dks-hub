@@ -216,11 +216,17 @@ function UniversalWalletPage() {
     const allUsersQuery = useMemoFirebase(() => collection(db, "users"), []);
     const { data: allUsers } = useCollection(allUsersQuery);
 
+    // Simplified query for multi-staking to avoid complex index requirements
     const stakesQuery = useMemoFirebase(() => {
         if (!user?.uid) return null;
-        return query(collection(db, "users", user.uid, "stakes"), where("status", "==", "active"), orderBy("startedAt", "desc"));
+        return query(collection(db, "users", user.uid, "stakes"), orderBy("startedAt", "desc"));
     }, [user?.uid]);
-    const { data: activeStakes, isLoading: loadingStakes } = useCollection(stakesQuery);
+    const { data: rawStakes, isLoading: loadingStakes } = useCollection(stakesQuery);
+
+    const activeStakes = useMemo(() => {
+        if (!rawStakes) return [];
+        return rawStakes.filter(s => s.status === 'active');
+    }, [rawStakes]);
 
     useEffect(() => {
         setIsMounted(true);
@@ -289,7 +295,7 @@ function UniversalWalletPage() {
     const filteredRecipients = useMemo(() => {
         if (!allUsers) return [];
         return allUsers.filter(u => 
-            u.uid !== user?.uid && 
+            u.id !== user?.uid && 
             (u.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
              u.email?.toLowerCase().includes(searchQuery.toLowerCase()))
         );
@@ -425,16 +431,16 @@ function UniversalWalletPage() {
         try {
             const piTxId = `PI-SEND-${Math.random().toString(36).substring(2, 12).toUpperCase()}`;
             await updateDoc(doc(db, "users", user.uid), { tokenBalance: increment(-amt), updatedAt: serverTimestamp() });
-            await updateDoc(doc(db, "users", selectedRecipient.uid), { tokenBalance: increment(amt), updatedAt: serverTimestamp() });
+            await updateDoc(doc(db, "users", selectedRecipient.uid || selectedRecipient.id), { tokenBalance: increment(amt), updatedAt: serverTimestamp() });
             
             await addDoc(collection(db, "tokenTransactions"), {
                 userId: user.uid, userName: user.name, type: 'transfer', direction: 'sent',
-                tokenAmount: amt, recipientId: selectedRecipient.uid, recipientName: selectedRecipient.name,
+                tokenAmount: amt, recipientId: selectedRecipient.uid || selectedRecipient.id, recipientName: selectedRecipient.name || selectedRecipient.displayName,
                 memo: transferMemo, piTxId, createdAt: serverTimestamp()
             });
             
             await addDoc(collection(db, "tokenTransactions"), {
-                userId: selectedRecipient.uid, userName: selectedRecipient.name, type: 'transfer', direction: 'received',
+                userId: selectedRecipient.uid || selectedRecipient.id, userName: selectedRecipient.name || selectedRecipient.displayName, type: 'transfer', direction: 'received',
                 tokenAmount: amt, senderId: user.uid, senderName: user.name,
                 memo: transferMemo, piTxId, createdAt: serverTimestamp()
             });
@@ -507,6 +513,7 @@ function UniversalWalletPage() {
             const startedAt = new Date();
             const unlockAt = addMonths(startedAt, selectedStakingOption.months);
 
+            // 1. Create a new stake record in the subcollection
             await addDoc(collection(db, "users", user.uid, "stakes"), {
                 amount: amt,
                 durationMonths: selectedStakingOption.months,
@@ -516,21 +523,28 @@ function UniversalWalletPage() {
                 status: 'active'
             });
 
+            // 2. Update user balances
             await updateDoc(doc(db, "users", user.uid), {
                 tokenBalance: increment(-amt),
                 stakedBalance: increment(amt),
                 updatedAt: serverTimestamp()
             });
 
+            // 3. Log transaction
             await addDoc(collection(db, "tokenTransactions"), {
                 userId: user.uid, userName: user.name, type: 'staking',
                 tokenAmount: amt, memo: `Staking ${selectedStakingOption.label}`,
                 createdAt: serverTimestamp()
             });
 
-            toast({ title: "Contrat Activé" });
+            toast({ title: "Contrat Activé", description: "Votre dépôt est maintenant sécurisé dans le Vault." });
             setStakingAmount("");
-        } catch (e) { toast({ title: "Erreur Staking", variant: "destructive" }); } finally { setIsProcessingAction(false); }
+        } catch (e) { 
+            console.error(e);
+            toast({ title: "Erreur Staking", variant: "destructive" }); 
+        } finally { 
+            setIsProcessingAction(false); 
+        }
     };
 
     const handleUnstakePosition = async (stake: any) => {
@@ -546,15 +560,19 @@ function UniversalWalletPage() {
             const totalToReturn = stake.amount + rewards;
 
             await updateDoc(doc(db, "users", user.uid, "stakes", stake.id), { status: 'completed', unstakedAt: serverTimestamp() });
-            await updateDoc(doc(db, "users", user.uid), { tokenBalance: increment(totalToReturn), stakedBalance: increment(-stake.amount), updatedAt: serverTimestamp() });
+            await updateDoc(doc(db, "users", user.uid), { 
+                tokenBalance: increment(totalToReturn), 
+                stakedBalance: increment(-stake.amount), 
+                updatedAt: serverTimestamp() 
+            });
 
             await addDoc(collection(db, "tokenTransactions"), {
                 userId: user.uid, userName: user.name, type: 'unstaking',
-                tokenAmount: totalToReturn, memo: `Retrait capital + profits`,
+                tokenAmount: totalToReturn, memo: `Retrait capital + profits (${stake.durationMonths}m)`,
                 createdAt: serverTimestamp()
             });
 
-            toast({ title: "Fonds Libérés" });
+            toast({ title: "Fonds Libérés", description: "Votre capital et vos profits ont été reversés sur votre solde." });
         } catch (e) { toast({ title: "Erreur", variant: "destructive" }); } finally { setIsProcessingAction(false); }
     };
 
@@ -598,26 +616,26 @@ function UniversalWalletPage() {
         const rewards = (stake.amount * (stake.apr || 0.05) * (hours / 8760));
 
         return (
-            <div className="p-6 rounded-3xl bg-white/5 border border-white/5 space-y-4 hover:border-accent/20 transition-all group">
+            <div className="p-6 rounded-3xl bg-white/5 border border-white/5 space-y-4 hover:border-accent/20 transition-all group animate-in fade-in slide-in-from-right-4">
                 <div className="flex justify-between items-start">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-accent"><Timer size={20} /></div>
+                        <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-accent shadow-lg shadow-accent/10"><Timer size={20} /></div>
                         <div>
-                            <p className="text-xs font-black uppercase italic text-white">{stake.amount} DKST</p>
-                            <p className="text-[8px] font-bold text-accent uppercase tracking-widest">Plan {stake.durationMonths} Mois</p>
+                            <p className="text-xs font-black uppercase italic text-white">{stake.amount.toFixed(2)} DKST</p>
+                            <p className="text-[8px] font-bold text-accent uppercase tracking-widest">Plan {stake.durationMonths} Mois ({(stake.apr * 100).toFixed(1)}%)</p>
                         </div>
                     </div>
                     <Badge className={cn("border-none text-[8px] font-black uppercase px-2", isUnlocked ? "bg-green-500 text-white animate-pulse" : "bg-white/5 text-white/40")}>
-                        {isUnlocked ? "Débloqué" : "Séquestre"}
+                        {isUnlocked ? "Libéré" : "Séquestre"}
                     </Badge>
                 </div>
                 <div className="flex justify-between items-end">
                     <div className="space-y-1">
-                        <p className="text-[8px] font-black uppercase text-white/20">Profits</p>
+                        <p className="text-[8px] font-black uppercase text-white/20">Profits Actuels</p>
                         <p className="text-sm font-black text-green-400 italic">+{rewards.toFixed(6)}</p>
                     </div>
                     <div className="text-right">
-                        <p className="text-[8px] font-black uppercase text-white/20">Libération</p>
+                        <p className="text-[8px] font-black uppercase text-white/20">Compte à rebours</p>
                         <p className="text-[10px] font-mono font-bold text-white/60 tracking-widest">{timeRemaining}</p>
                     </div>
                 </div>
@@ -653,13 +671,13 @@ function UniversalWalletPage() {
                     </button>
                     
                     <div className="group relative">
-                        <p className="text-[10px] font-black text-white/40 uppercase tracking-[0.3em] mb-4 flex items-center justify-center gap-2">Avoirs Totaux (GCV) <button onClick={() => setIsBalanceVisible(!isBalanceVisible)} className="hover:text-accent transition-colors">{isBalanceVisible ? <Eye size={12}/> : <EyeOff size={12}/>}</button></p>
+                        <p className="text-[10px] font-black text-white/40 uppercase tracking-[0.3em] mb-4 flex items-center justify-center gap-2">Fortune Globale (GCV) <button onClick={() => setIsBalanceVisible(!isBalanceVisible)} className="hover:text-accent transition-colors">{isBalanceVisible ? <Eye size={12}/> : <EyeOff size={12}/>}</button></p>
                         <h2 className="text-6xl md:text-8xl font-black text-white italic tracking-tighter leading-none mb-4 drop-shadow-[0_0_30px_rgba(56,189,248,0.2)]">
                             {isMounted && isBalanceVisible ? `$${stats.gcvUSD.toLocaleString('fr-FR', { maximumFractionDigits: 0 })}` : "••••••"}
                         </h2>
                         <div className="flex items-center justify-center gap-3">
                             <Badge className="bg-accent text-black font-black italic text-[10px]">≈ {isMounted && isBalanceVisible ? stats.totalTokens.toFixed(4) : "••"} Actifs</Badge>
-                            <span className="text-[9px] font-bold text-white/20 uppercase tracking-widest">Sovereign Protocol v4.0</span>
+                            <span className="text-[9px] font-bold text-white/20 uppercase tracking-widest">Universal DKS Protocol v4.0</span>
                         </div>
                     </div>
 
@@ -679,8 +697,8 @@ function UniversalWalletPage() {
 
                 <div className={cn("space-y-6 mb-16 transition-all", isLocked && "blur-md opacity-50 grayscale pointer-events-none")}>
                     <div className="flex items-center justify-between px-4">
-                        <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-white/40 italic">Portefeuille : {activeNetwork.name}</h3>
-                        <Button onClick={() => setIsImportSheetOpen(true)} variant="ghost" size="sm" className="text-accent font-black uppercase italic text-[10px] gap-2"><Plus size={14}/> Importer</Button>
+                        <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-white/40 italic">Réseau : {activeNetwork.name}</h3>
+                        <Button onClick={() => setIsImportSheetOpen(true)} variant="ghost" size="sm" className="text-accent font-black uppercase italic text-[10px] gap-2"><Plus size={14}/> Importer Jeton</Button>
                     </div>
                     <Card className="glossy-card border-none rounded-[3rem] overflow-hidden shadow-2xl">
                         <div className="divide-y divide-white/5">
@@ -698,7 +716,7 @@ function UniversalWalletPage() {
                                         <p className="text-[10px] font-bold text-white/20 mt-2 uppercase tracking-tighter">≈ {isMounted && isBalanceVisible ? `$${(asset.balance * asset.price).toLocaleString()}` : "••••"}</p>
                                     </div>
                                 </div>
-                            )) : <div className="p-20 text-center space-y-4 opacity-30"><Search size={40} className="mx-auto" /><p className="text-[10px] font-black uppercase tracking-widest">Aucun actif</p></div>}
+                            )) : <div className="p-20 text-center space-y-4 opacity-30"><Search size={40} className="mx-auto" /><p className="text-[10px] font-black uppercase tracking-widest">Aucun actif sur ce réseau</p></div>}
                         </div>
                     </Card>
                 </div>
@@ -713,7 +731,7 @@ function UniversalWalletPage() {
                     <TabsContent value="overview" className="space-y-10 animate-in fade-in slide-in-from-bottom-4">
                         <Card className="glossy-card border-none rounded-[3rem] p-10 relative overflow-hidden">
                             <div className="absolute top-0 right-0 p-6 opacity-5"><Activity size={120} /></div>
-                            <div className="flex justify-between items-center mb-10 relative z-10"><div><h3 className="text-2xl font-black uppercase italic">Performance <span className="text-accent">Global</span></h3><p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mt-1">Courbe dynamique des avoirs GCV</p></div><div className="flex items-center gap-2 text-green-400"><TrendingUp size={20} /><span className="text-sm font-black italic">+8.4% (30j)</span></div></div>
+                            <div className="flex justify-between items-center mb-10 relative z-10"><div><h3 className="text-2xl font-black uppercase italic">Analyse <span className="text-accent">Performance</span></h3><p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mt-1">Estimation GCV temps réel</p></div><div className="flex items-center gap-2 text-green-400"><TrendingUp size={20} /><span className="text-sm font-black italic">+8.4% (30j)</span></div></div>
                             <div className="h-[320px] w-full">
                                 <ResponsiveContainer width="100%" height="100%">
                                     <AreaChart data={stats.wealthHistory}>
@@ -734,10 +752,10 @@ function UniversalWalletPage() {
                             <Card className="glossy-card border-none rounded-[3rem] p-10 space-y-10 relative overflow-hidden">
                                 <div className="absolute top-0 right-0 p-6 opacity-5"><Vault size={120} className="text-primary" /></div>
                                 <div className="relative z-10 space-y-8">
-                                    <div className="flex items-center gap-4"><div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shadow-lg shadow-primary/20"><Vault size={28}/></div><div><h3 className="text-2xl font-black uppercase italic tracking-tight">Nouveau Contrat</h3><p className="text-[9px] font-bold text-primary uppercase tracking-widest">Multi-Staking Activé</p></div></div>
+                                    <div className="flex items-center gap-4"><div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shadow-lg shadow-primary/20"><Vault size={28}/></div><div><h3 className="text-2xl font-black uppercase italic tracking-tight">Ouvrir Position</h3><p className="text-[9px] font-bold text-primary uppercase tracking-widest">Contrat de Blocage DKS</p></div></div>
                                     <div className="space-y-8">
                                         <div className="space-y-4">
-                                            <Label className="text-[10px] font-black uppercase tracking-widest opacity-40 ml-1">Plan de blocage</Label>
+                                            <Label className="text-[10px] font-black uppercase tracking-widest opacity-40 ml-1">Période de Staking</Label>
                                             <div className="grid grid-cols-4 gap-2">
                                                 {STAKING_OPTIONS.map((opt) => (
                                                     <button key={opt.months} onClick={() => setSelectedStakingOption(opt)} className={cn("p-4 rounded-2xl border-2 transition-all flex flex-col items-center gap-2", selectedStakingOption.months === opt.months ? "bg-primary/20 border-primary text-white" : "bg-white/5 border-transparent text-white/40 hover:bg-white/10")}>
@@ -748,17 +766,28 @@ function UniversalWalletPage() {
                                             </div>
                                         </div>
                                         <div className="space-y-4">
-                                            <div className="flex justify-between items-end px-1"><Label className="text-[10px] font-black uppercase tracking-widest opacity-40">Montant à bloquer</Label><p className="text-[9px] font-bold text-white/40 uppercase">Max : <span className="text-accent">{(user?.tokenBalance || 0).toFixed(2)}</span> DKST</p></div>
+                                            <div className="flex justify-between items-end px-1"><Label className="text-[10px] font-black uppercase tracking-widest opacity-40">Montant DKST</Label><p className="text-[9px] font-bold text-white/40 uppercase">Max : <span className="text-accent">{(user?.tokenBalance || 0).toFixed(2)}</span></p></div>
                                             <div className="relative"><Input type="number" value={stakingAmount} onChange={(e) => setStakingAmount(e.target.value)} className="h-20 bg-background/50 border-white/10 rounded-[2rem] text-3xl font-black text-white px-8" /><button onClick={() => setStakingAmount((user?.tokenBalance || 0).toString())} className="absolute right-6 top-1/2 -translate-y-1/2 h-10 px-4 rounded-xl bg-accent text-black font-black uppercase italic text-[10px]">MAX</button></div>
                                         </div>
-                                        <Button onClick={() => secureAction(handleStake)} disabled={isProcessingAction || !stakingAmount} className="w-full h-16 bg-primary text-white font-black uppercase italic rounded-2xl shadow-xl shadow-primary/20 text-lg gap-3">{isProcessingAction ? <Loader2 className="animate-spin" /> : <><ShieldCheck size={24} /> Créer le Contrat</>}</Button>
+                                        <Button onClick={() => secureAction(handleStake)} disabled={isProcessingAction || !stakingAmount} className="w-full h-16 bg-primary text-white font-black uppercase italic rounded-2xl shadow-xl shadow-primary/20 text-lg gap-3">{isProcessingAction ? <Loader2 className="animate-spin" /> : <><ShieldCheck size={24} /> Sceller le Contrat</>}</Button>
                                     </div>
                                 </div>
                             </Card>
                             <div className="space-y-6">
-                                <div className="flex justify-between items-center px-4"><h3 className="text-xs font-black uppercase italic text-white/60 flex items-center gap-2"><Timer size={16} /> Mes Contrats</h3><Badge className="bg-white/5 text-muted-foreground border-none text-[8px] font-black uppercase">{activeStakes?.length || 0} Positions</Badge></div>
+                                <div className="flex justify-between items-center px-4">
+                                    <h3 className="text-xs font-black uppercase italic text-white/60 flex items-center gap-2"><Timer size={16} /> Mes Contrats Actifs</h3>
+                                    <Badge className="bg-white/5 text-muted-foreground border-none text-[8px] font-black uppercase">{activeStakes.length} Positions</Badge>
+                                </div>
                                 <div className="space-y-4 max-h-[550px] overflow-y-auto pr-2 custom-scrollbar">
-                                    {loadingStakes ? <div className="py-20 flex justify-center"><Loader2 className="animate-spin text-accent" /></div> : activeStakes && activeStakes.length > 0 ? activeStakes.map(stake => <StakeItem key={stake.id} stake={stake} />) : <div className="py-20 text-center opacity-30 italic text-[10px] uppercase font-black">Aucun contrat actif.</div>}
+                                    {loadingStakes ? (
+                                        <div className="py-20 flex justify-center"><Loader2 className="animate-spin text-accent" /></div>
+                                    ) : activeStakes && activeStakes.length > 0 ? (
+                                        activeStakes.map(stake => <StakeItem key={stake.id} stake={stake} />)
+                                    ) : (
+                                        <div className="py-20 text-center bg-white/[0.02] border border-dashed border-white/5 rounded-[3rem] opacity-30 italic text-[10px] uppercase font-black">
+                                            Aucun contrat de staking actif.
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -768,14 +797,14 @@ function UniversalWalletPage() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                             <Card className="glossy-card border-none rounded-[3rem] p-12 space-y-10">
                                 <div className="flex items-center gap-4 text-accent"><ShieldCheck size={32} /><h2 className="text-2xl font-black uppercase italic tracking-tight">Recovery Seed</h2></div>
-                                <p className="text-sm text-white/60 italic leading-relaxed">"Votre phrase de récupération est le seul moyen de restaurer votre wallet."</p>
-                                <Button onClick={() => secureAction(() => setIsMnemonicSheetOpen(true))} variant="outline" className="w-full h-16 border-white/10 rounded-2xl font-black uppercase italic text-[11px] hover:bg-accent hover:text-black gap-3"><Eye size={18} /> Voir ma phrase secrète</Button>
+                                <p className="text-sm text-white/60 italic leading-relaxed">"Votre phrase de récupération de 12 mots est le seul moyen de restaurer vos avoirs en cas de perte de compte."</p>
+                                <Button onClick={() => secureAction(() => setIsMnemonicSheetOpen(true))} variant="outline" className="w-full h-16 border-white/10 rounded-2xl font-black uppercase italic text-[11px] hover:bg-accent hover:text-black gap-3"><Eye size={18} /> Afficher ma phrase secrète</Button>
                             </Card>
                             <Card className="bg-red-500/10 border-red-500/20 rounded-[3rem] p-12 space-y-8">
-                                <div className="flex items-center gap-4 text-red-500"><ShieldX size={32} /><h3 className="text-2xl font-black uppercase italic tracking-tight">Blocage d'Urgence</h3></div>
-                                <p className="text-sm text-red-400 font-medium leading-relaxed italic">"Gelez instantanément tous les mouvements de fonds sur votre wallet en cas de suspicion de fraude."</p>
+                                <div className="flex items-center gap-4 text-red-500"><ShieldX size={32} /><h3 className="text-2xl font-black uppercase italic tracking-tight">GEL IMMÉDIAT</h3></div>
+                                <p className="text-sm text-red-400 font-medium leading-relaxed italic">"Gelez instantanément tous les mouvements de fonds si vous suspectez une intrusion. Seul votre PIN pourra débloquer le wallet."</p>
                                 <Button onClick={toggleEmergencyLock} disabled={isEmergencyLockProcessing} className={cn("w-full h-20 rounded-3xl font-black uppercase italic text-xs gap-3 shadow-2xl transition-all", user?.isWalletLocked ? "bg-white text-black" : "bg-red-500 text-white shadow-red-500/20")}>
-                                    {isEmergencyLockProcessing ? <Loader2 className="animate-spin" /> : user?.isWalletLocked ? <><Lock size={20} /> Déverrouiller</> : <><ShieldX size={20} /> Verrouiller Wallet</>}
+                                    {isEmergencyLockProcessing ? <Loader2 className="animate-spin" /> : user?.isWalletLocked ? <><Lock size={20} /> Déverrouiller le Wallet</> : <><ShieldX size={20} /> Verrouiller maintenant</>}
                                 </Button>
                             </Card>
                         </div>
@@ -787,13 +816,13 @@ function UniversalWalletPage() {
             <Sheet open={isReceiveSheetOpen} onOpenChange={setIsReceiveSheetOpen}>
                 <SheetContent side="right" className="bg-card/95 backdrop-blur-3xl border-white/10 w-full sm:max-w-md flex flex-col p-0">
                     <SheetHeader className="p-8 bg-accent/10 border-b border-white/5">
-                        <div className="flex flex-col items-center text-center gap-6"><div className="w-20 h-20 rounded-[2.5rem] bg-accent/20 flex items-center justify-center text-accent shadow-xl shadow-accent/10"><ArrowDownLeft size={40} /></div><div><SheetTitle className="text-2xl font-black uppercase italic tracking-tighter">Recevoir des fonds</SheetTitle></div></div>
+                        <div className="flex flex-col items-center text-center gap-6"><div className="w-20 h-20 rounded-[2.5rem] bg-accent/20 flex items-center justify-center text-accent shadow-xl shadow-accent/10"><ArrowDownLeft size={40} /></div><div><SheetTitle className="text-2xl font-black uppercase italic tracking-tighter">Réception DKS</SheetTitle></div></div>
                     </SheetHeader>
                     <div className="p-10 space-y-10 flex flex-col items-center">
                         <div className="bg-white p-8 rounded-[3rem] border-8 border-accent/5"><QrCode size={200} className="text-black" /></div>
                         <div className="w-full space-y-6">
-                            <div className="p-6 bg-white/5 rounded-3xl border border-white/5 space-y-2"><p className="text-[8px] font-black uppercase text-muted-foreground">Adresse</p><p className="text-xs font-mono font-bold break-all text-accent">{getReceiveAddress(receiveAsset)}</p></div>
-                            <Button onClick={() => { navigator.clipboard.writeText(getReceiveAddress(receiveAsset)); toast({ title: "Copié" }); }} className="w-full h-16 rounded-2xl bg-white text-black font-black">Copier l'adresse</Button>
+                            <div className="p-6 bg-white/5 rounded-3xl border border-white/5 space-y-2"><p className="text-[8px] font-black uppercase text-muted-foreground">Mon Adresse de Réception</p><p className="text-xs font-mono font-bold break-all text-accent">{getReceiveAddress(receiveAsset)}</p></div>
+                            <Button onClick={() => { navigator.clipboard.writeText(getReceiveAddress(receiveAsset)); toast({ title: "Adresse Copiée" }); }} className="w-full h-16 rounded-2xl bg-white text-black font-black">Copier dans le presse-papier</Button>
                         </div>
                     </div>
                 </SheetContent>
@@ -803,27 +832,27 @@ function UniversalWalletPage() {
             <Sheet open={isTransferSheetOpen} onOpenChange={setIsTransferSheetOpen}>
                 <SheetContent side="right" className="bg-card/95 backdrop-blur-3xl border-white/10 w-full sm:max-w-md flex flex-col p-0">
                     <SheetHeader className="p-8 bg-accent/10 border-b border-white/5">
-                        <div className="flex items-center gap-4"><div className="w-14 h-14 rounded-2xl bg-accent text-black flex items-center justify-center shadow-xl"><Send size={28} /></div><SheetTitle className="text-2xl font-black uppercase italic tracking-tighter">Envoyer des DKST</SheetTitle></div>
+                        <div className="flex items-center gap-4"><div className="w-14 h-14 rounded-2xl bg-accent text-black flex items-center justify-center shadow-xl"><Send size={28} /></div><SheetTitle className="text-2xl font-black uppercase italic tracking-tighter">Envoi de fonds</SheetTitle></div>
                     </SheetHeader>
                     <div className="p-8 space-y-8 flex-1 overflow-y-auto">
                         <div className="space-y-4">
-                            <Label className="text-[10px] font-black uppercase opacity-40 ml-1">Destinataire</Label>
-                            <div className="relative"><Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" /><Input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Nom ou email..." className="h-14 pl-12 bg-white/5 border-white/10 rounded-2xl" /></div>
+                            <Label className="text-[10px] font-black uppercase opacity-40 ml-1">Rechercher un membre</Label>
+                            <div className="relative"><Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" /><Input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Nom, email ou ID..." className="h-14 pl-12 bg-white/5 border-white/10 rounded-2xl" /></div>
                             <div className="space-y-2 max-h-[150px] overflow-y-auto pr-2 custom-scrollbar">
                                 {filteredRecipients.map(u => (
-                                    <button key={u.uid} onClick={() => setSelectedRecipient(u)} className={cn("w-full p-4 rounded-xl border transition-all flex items-center justify-between", selectedRecipient?.uid === u.uid ? "bg-accent/10 border-accent text-white" : "bg-white/5 border-transparent text-white/60 hover:bg-white/10")}>
-                                        <span className="font-bold text-xs uppercase">{u.name}</span>
-                                        {selectedRecipient?.uid === u.uid && <CheckCircle2 size={16} className="text-accent" />}
+                                    <button key={u.id} onClick={() => setSelectedRecipient(u)} className={cn("w-full p-4 rounded-xl border transition-all flex items-center justify-between", (selectedRecipient?.id === u.id || selectedRecipient?.uid === u.id) ? "bg-accent/10 border-accent text-white" : "bg-white/5 border-transparent text-white/60 hover:bg-white/10")}>
+                                        <span className="font-bold text-xs uppercase">{u.name || u.displayName}</span>
+                                        {(selectedRecipient?.id === u.id || selectedRecipient?.uid === u.id) && <CheckCircle2 size={16} className="text-accent" />}
                                     </button>
                                 ))}
                             </div>
                         </div>
                         <div className="space-y-4">
-                            <Label className="text-[10px] font-black uppercase opacity-40 ml-1">Montant</Label>
+                            <Label className="text-[10px] font-black uppercase opacity-40 ml-1">Montant à envoyer</Label>
                             <div className="relative"><Input type="number" value={transferAmount} onChange={e => setTransferAmount(e.target.value)} className="h-20 bg-background/50 border-white/10 rounded-[2rem] text-4xl font-black text-white px-8" /><span className="absolute right-6 top-1/2 -translate-y-1/2 text-accent font-black">DKST</span></div>
                         </div>
                         <Button onClick={handleTransfer} disabled={isProcessingAction || !selectedRecipient || !transferAmount} className="w-full h-16 bg-accent text-black font-black uppercase italic rounded-2xl shadow-xl shadow-accent/20">
-                            {isProcessingAction ? <Loader2 className="animate-spin" /> : "Confirmer l'envoi"}
+                            {isProcessingAction ? <Loader2 className="animate-spin" /> : "Signer & Envoyer"}
                         </Button>
                     </div>
                 </SheetContent>
@@ -833,7 +862,7 @@ function UniversalWalletPage() {
             <Sheet open={isSwapSheetOpen} onOpenChange={setIsSwapSheetOpen}>
                 <SheetContent side="right" className="bg-card/95 backdrop-blur-3xl border-white/10 w-full sm:max-w-md flex flex-col p-0">
                     <SheetHeader className="p-10 bg-accent/10 border-b border-white/5">
-                        <div className="flex items-center gap-5"><div className="w-16 h-16 rounded-2xl bg-accent text-black flex items-center justify-center shadow-xl"><ArrowDownUp size={32} /></div><div><SheetTitle className="text-3xl font-black uppercase italic tracking-tighter">Swap Élite</SheetTitle></div></div>
+                        <div className="flex items-center gap-5"><div className="w-16 h-16 rounded-2xl bg-accent text-black flex items-center justify-center shadow-xl"><ArrowDownUp size={32} /></div><div><SheetTitle className="text-3xl font-black uppercase italic tracking-tighter">Swap Élite GCV</SheetTitle></div></div>
                     </SheetHeader>
                     <div className="flex-1 p-10 space-y-10 overflow-y-auto">
                         <div className="space-y-6">
@@ -848,7 +877,7 @@ function UniversalWalletPage() {
                             </div>
                         </div>
                         <Button onClick={() => secureAction(handleSwap)} disabled={isProcessingAction || !swapAmount} className="w-full h-20 bg-accent text-black font-black uppercase italic rounded-[2rem] shadow-2xl">
-                            {isProcessingAction ? <Loader2 className="animate-spin" /> : "Lancer le Swap"}
+                            {isProcessingAction ? <Loader2 className="animate-spin" /> : "Confirmer la conversion"}
                         </Button>
                     </div>
                 </SheetContent>
@@ -863,10 +892,10 @@ function UniversalWalletPage() {
                     <div className="p-10 space-y-10 flex-1 overflow-y-auto">
                         <div className="text-center space-y-2"><p className="text-[10px] font-black uppercase opacity-40">Points accumulés</p><p className="text-6xl font-black text-white italic">{stats.availablePoints}</p></div>
                         <div className="p-8 bg-white/5 rounded-[2.5rem] border border-white/5 space-y-6">
-                            <p className="text-[10px] font-black uppercase opacity-40">Eligible :</p>
+                            <p className="text-[10px] font-black uppercase opacity-40">Solde éligible au mint :</p>
                             <p className="text-2xl font-black text-white">{stats.redeemableTokens} <span className="text-xs opacity-40">DKST</span></p>
                             <Button onClick={handleConvertPoints} disabled={isProcessingAction || stats.redeemableTokens <= 0} className="w-full h-14 bg-primary text-white font-black uppercase italic rounded-xl">
-                                {isProcessingAction ? <Loader2 className="animate-spin" /> : "Réclamer mes Jetons"}
+                                {isProcessingAction ? <Loader2 className="animate-spin" /> : "Réclamer les Jetons"}
                             </Button>
                         </div>
                     </div>
@@ -876,25 +905,25 @@ function UniversalWalletPage() {
             {/* NETWORK SELECTION SHEET */}
             <Sheet open={isNetworkSheetOpen} onOpenChange={setIsNetworkSheetOpen}>
                 <SheetContent side="bottom" className="bg-[#1e1e1e] border-none text-white rounded-t-[2.5rem] h-[70vh] flex flex-col p-0">
-                    <div className="p-6 border-b border-white/5 flex justify-between items-center"><div className="w-10"></div><SheetTitle className="text-lg font-black uppercase italic text-white">Network selection</SheetTitle><button onClick={() => setIsNetworkSheetOpen(false)}><X size={20} /></button></div>
+                    <div className="p-6 border-b border-white/5 flex justify-between items-center"><div className="w-10"></div><SheetTitle className="text-lg font-black uppercase italic text-white">Sélection du Réseau</SheetTitle><button onClick={() => setIsNetworkSheetOpen(false)}><X size={20} /></button></div>
                     <div className="flex-1 overflow-y-auto py-4">
                         {NETWORKS.map((net) => (
                             <button key={net.id} onClick={() => { setActiveNetwork(net); setIsNetworkSheetOpen(false); }} className={cn("w-full px-6 py-5 flex items-center gap-5 transition-all relative", activeNetwork.id === net.id ? "bg-white/[0.08]" : "hover:bg-white/[0.04]")}>
                                 {activeNetwork.id === net.id && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0 h-0 border-t-[6px] border-t-transparent border-l-[8px] border-l-accent border-b-[6px] border-b-transparent" />}
                                 <div className={cn("w-12 h-12 rounded-full flex items-center justify-center shrink-0 shadow-lg", net.color)}><div className={net.iconColor}>{net.icon}</div></div>
-                                <div className="text-left"><p className="font-black text-base uppercase italic tracking-tight">{net.name}</p><p className="text-[10px] font-bold text-white/40 uppercase">Mainnet Connected</p></div>
+                                <div className="text-left"><p className="font-black text-base uppercase italic tracking-tight">{net.name}</p><p className="text-[10px] font-bold text-white/40 uppercase">Connecté au Mainnet</p></div>
                             </button>
                         ))}
                     </div>
-                    <div className="p-8 border-t border-white/5"><Button onClick={() => { setIsNetworkSheetOpen(false); setIsAddNetworkSheetOpen(true); }} variant="outline" className="w-full h-14 rounded-full border-white/10 bg-white/5 hover:bg-white/10 font-black uppercase italic gap-2"><Plus size={18} /> Add Network</Button></div>
+                    <div className="p-8 border-t border-white/5"><Button onClick={() => { setIsNetworkSheetOpen(false); setIsAddNetworkSheetOpen(true); }} variant="outline" className="w-full h-14 rounded-full border-white/10 bg-white/5 hover:bg-white/10 font-black uppercase italic gap-2"><Plus size={18} /> Ajouter un Réseau</Button></div>
                 </SheetContent>
             </Sheet>
 
             {/* ADD NETWORK SHEET */}
             <Sheet open={isAddNetworkSheetOpen} onOpenChange={setIsAddNetworkSheetOpen}>
                 <SheetContent side="bottom" className="bg-[#f5f5f5] border-none text-black rounded-t-[2.5rem] h-[85vh] flex flex-col p-0">
-                    <div className="p-6 border-b border-gray-200 flex justify-between items-center bg-white"><button onClick={() => { setIsAddNetworkSheetOpen(false); setIsNetworkSheetOpen(true); }}><ArrowLeft size={20} /></button><SheetTitle className="text-lg font-black uppercase italic text-black">Add Network</SheetTitle><button onClick={() => setIsAddNetworkSheetOpen(false)}><X size={20} /></button></div>
-                    <div className="bg-white px-6 py-2 flex gap-10 border-b border-gray-100"><button onClick={() => setActiveAddNetworkTab('popular')} className={cn("pb-3 font-black uppercase text-[11px] tracking-widest transition-all", activeAddNetworkTab === 'popular' ? "text-black border-b-4 border-[#2b1b17]" : "text-gray-400")}>Popular</button><button onClick={() => setActiveAddNetworkTab('custom')} className={cn("pb-3 font-black uppercase text-[11px] tracking-widest transition-all", activeAddNetworkTab === 'custom' ? "text-black border-b-4 border-[#2b1b17]" : "text-gray-400")}>Custom Network</button></div>
+                    <div className="p-6 border-b border-gray-200 flex justify-between items-center bg-white"><button onClick={() => { setIsAddNetworkSheetOpen(false); setIsNetworkSheetOpen(true); }}><ArrowLeft size={20} /></button><SheetTitle className="text-lg font-black uppercase italic text-black">Ajouter un Réseau</SheetTitle><button onClick={() => setIsAddNetworkSheetOpen(false)}><X size={20} /></button></div>
+                    <div className="bg-white px-6 py-2 flex gap-10 border-b border-gray-100"><button onClick={() => setActiveAddNetworkTab('popular')} className={cn("pb-3 font-black uppercase text-[11px] tracking-widest transition-all", activeAddNetworkTab === 'popular' ? "text-black border-b-4 border-[#2b1b17]" : "text-gray-400")}>Populaires</button><button onClick={() => setActiveAddNetworkTab('custom')} className={cn("pb-3 font-black uppercase text-[11px] tracking-widest transition-all", activeAddNetworkTab === 'custom' ? "text-black border-b-4 border-[#2b1b17]" : "text-gray-400")}>Réseau Personnel</button></div>
                     <div className="flex-1 overflow-y-auto p-8 space-y-6 bg-white">
                         {activeAddNetworkTab === 'popular' ? (
                             <div className="divide-y divide-gray-100">
@@ -907,7 +936,7 @@ function UniversalWalletPage() {
                                 <div className="space-y-2"><Label className="text-[11px] font-bold text-gray-500 uppercase">Network Name</Label><Input value={newNetworkName} onChange={e => setNewNetworkName(e.target.value)} className="h-14 bg-white border-gray-200 rounded-2xl text-black font-bold" /></div>
                                 <div className="space-y-2"><Label className="text-[11px] font-bold text-gray-500 uppercase">RPC URL</Label><Input value={newRpcUrl} onChange={e => setNewRpcUrl(e.target.value)} className="h-14 bg-white border-gray-200 rounded-2xl text-black font-bold" /></div>
                                 <div className="space-y-2"><Label className="text-[11px] font-bold text-gray-500 uppercase">Chain ID</Label><Input value={newChainId} onChange={e => setNewChainId(e.target.value)} className="h-14 bg-white border-gray-200 rounded-2xl text-black font-bold" /></div>
-                                <Button className="w-full h-16 rounded-[2rem] bg-black text-white font-black uppercase italic text-lg shadow-2xl mt-8">Add</Button>
+                                <Button className="w-full h-16 rounded-[2rem] bg-black text-white font-black uppercase italic text-lg shadow-2xl mt-8">Ajouter</Button>
                             </div>
                         )}
                     </div>
@@ -917,24 +946,24 @@ function UniversalWalletPage() {
             {/* IMPORT TOKEN SHEET */}
             <Sheet open={isImportSheetOpen} onOpenChange={setIsImportSheetOpen}>
                 <SheetContent side="bottom" className="bg-[#f5f5f5] border-none text-black rounded-t-[2.5rem] h-[85vh] flex flex-col p-0">
-                    <div className="p-6 border-b border-gray-200 flex justify-between items-center bg-white"><div className="w-10"></div><SheetTitle className="text-lg font-black uppercase italic text-black">Import Token</SheetTitle><button onClick={() => setIsImportSheetOpen(false)}><X size={20} /></button></div>
-                    <div className="bg-white px-6 py-2 flex gap-10 border-b border-gray-100"><button onClick={() => setActiveImportTab('search')} className={cn("pb-3 font-black uppercase text-[11px] tracking-widest", activeImportTab === 'search' ? "text-black border-b-4 border-[#2b1b17]" : "text-gray-400")}>Search</button><button onClick={() => setActiveImportTab('custom')} className={cn("pb-3 font-black uppercase text-[11px] tracking-widest px-6 py-2 rounded-2xl", activeImportTab === 'custom' ? "text-white bg-[#2b1b17]" : "text-gray-400")}>Custom token</button></div>
+                    <div className="p-6 border-b border-gray-200 flex justify-between items-center bg-white"><div className="w-10"></div><SheetTitle className="text-lg font-black uppercase italic text-black">Importer un Jeton</SheetTitle><button onClick={() => setIsImportSheetOpen(false)}><X size={20} /></button></div>
+                    <div className="bg-white px-6 py-2 flex gap-10 border-b border-gray-100"><button onClick={() => setActiveImportTab('search')} className={cn("pb-3 font-black uppercase text-[11px] tracking-widest", activeImportTab === 'search' ? "text-black border-b-4 border-[#2b1b17]" : "text-gray-400")}>Recherche</button><button onClick={() => setActiveImportTab('custom')} className={cn("pb-3 font-black uppercase text-[11px] tracking-widest px-6 py-2 rounded-2xl", activeImportTab === 'custom' ? "text-white bg-[#2b1b17]" : "text-gray-400")}>Jeton Personnel</button></div>
                     <div className="flex-1 overflow-y-auto p-8 space-y-8 bg-white">
-                        {activeImportTab === 'search' ? <div className="py-20 text-center opacity-20 uppercase font-black text-[10px]">Recherche...</div> : (
+                        {activeImportTab === 'search' ? <div className="py-20 text-center opacity-20 uppercase font-black text-[10px]">Recherche de jetons...</div> : (
                             <div className="space-y-8">
-                                <div className="space-y-3"><Label className="text-[12px] font-bold text-gray-800">Token contract address</Label><div className="relative"><Input placeholder="0x..." value={tokenAddress} onChange={e => setTokenAddress(e.target.value)} className="h-16 bg-white border-2 border-gray-100 rounded-2xl text-black font-bold px-6" /><div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-3"><button><Copy size={18}/></button><button><Scan size={18}/></button></div></div></div>
-                                <div className="space-y-3"><Label className="text-[12px] font-bold text-gray-800">Token symbol</Label><Input value={tokenSymbol} onChange={e => setTokenSymbol(e.target.value)} className="h-16 bg-white border-2 border-gray-100 rounded-2xl text-black font-bold px-6" /></div>
+                                <div className="space-y-3"><Label className="text-[12px] font-bold text-gray-800">Adresse du contrat de jeton</Label><div className="relative"><Input placeholder="0x..." value={tokenAddress} onChange={e => setTokenAddress(e.target.value)} className="h-16 bg-white border-2 border-gray-100 rounded-2xl text-black font-bold px-6" /><div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-3"><button><Copy size={18}/></button><button><Scan size={18}/></button></div></div></div>
+                                <div className="space-y-3"><Label className="text-[12px] font-bold text-gray-800">Symbole du jeton</Label><Input value={tokenSymbol} onChange={e => setTokenSymbol(e.target.value)} className="h-16 bg-white border-2 border-gray-100 rounded-2xl text-black font-bold px-6" /></div>
                             </div>
                         )}
                     </div>
-                    <div className="p-8 bg-white border-t border-gray-100"><Button className="w-full h-20 rounded-[2.5rem] bg-[#a39f9b] text-white font-black uppercase italic text-lg shadow-2xl">Next</Button></div>
+                    <div className="p-8 bg-white border-t border-gray-100"><Button className="w-full h-20 rounded-[2.5rem] bg-[#a39f9b] text-white font-black uppercase italic text-lg shadow-2xl">Suivant</Button></div>
                 </SheetContent>
             </Sheet>
 
             {/* PIN VERIFICATION DIALOG */}
             <Dialog open={isPinVerificationOpen} onOpenChange={setIsPinVerificationOpen}>
                 <DialogContent className="bg-card border-white/10 text-foreground rounded-[2.5rem] sm:max-w-md p-0 overflow-hidden">
-                    <DialogHeader className="p-8 bg-accent/10 border-b border-white/5"><div className="flex flex-col items-center gap-6"><div className="w-20 h-20 rounded-[2.5rem] bg-accent/20 flex items-center justify-center text-accent"><Lock size={40} /></div><div className="text-center"><DialogTitle className="text-2xl font-black uppercase italic">Signature Élite</DialogTitle></div></div></DialogHeader>
+                    <DialogHeader className="p-8 bg-accent/10 border-b border-white/5"><div className="flex flex-col items-center gap-6"><div className="w-20 h-20 rounded-[2.5rem] bg-accent/20 flex items-center justify-center text-accent shadow-xl shadow-accent/10"><Lock size={40} /></div><div className="text-center"><DialogTitle className="text-2xl font-black uppercase italic">Signature Élite</DialogTitle></div></div></DialogHeader>
                     <div className="p-10 space-y-8">
                         <div className="space-y-4"><Label className="text-[10px] font-black uppercase text-center block opacity-40">Entrez votre code secret</Label><div className="flex justify-center"><Input type={showPin ? "text" : "password"} maxLength={4} value={enteredPin} onChange={(e) => setEnteredPin(e.target.value.replace(/\D/g, ''))} className="h-20 bg-background/50 border-white/10 rounded-2xl text-center text-5xl font-black tracking-[0.5em] focus:border-accent" /><button onClick={() => setShowPin(!showPin)}>{showPin ? <EyeOff size={20}/> : <Eye size={20}/>}</button></div></div>
                         <div className="grid grid-cols-2 gap-4"><Button variant="ghost" onClick={() => setIsPinVerificationOpen(false)}>Annuler</Button><Button onClick={handleVerifyPin} disabled={enteredPin.length < 4} className="bg-accent text-black font-black">Valider</Button></div>
@@ -947,7 +976,7 @@ function UniversalWalletPage() {
                 <SheetContent side="right" className="bg-card/95 backdrop-blur-3xl border-white/10 w-full sm:max-w-md flex flex-col p-0">
                     <SheetHeader className="p-8 bg-accent/10 border-b border-white/5"><SheetTitle className="text-2xl font-black uppercase italic text-accent">Recovery Phrase</SheetTitle></SheetHeader>
                     <div className="p-10 space-y-8">
-                        <div className="p-6 bg-red-500/5 border border-red-500/20 rounded-2xl"><p className="text-[10px] text-red-400 font-bold uppercase italic">NE JAMAIS partager ces mots.</p></div>
+                        <div className="p-6 bg-red-500/5 border border-red-500/20 rounded-2xl"><p className="text-[10px] text-red-400 font-bold uppercase italic">NE JAMAIS partager ces mots. Ils donnent un accès total à vos fonds.</p></div>
                         <div className="grid grid-cols-2 gap-4">{user?.mnemonicWords?.map((word: string, i: number) => (<div key={i} className="p-4 bg-white/5 border border-white/5 rounded-xl flex items-center gap-3"><span className="text-[8px] font-black opacity-20">{i+1}</span><span className="text-xs font-bold uppercase">{word}</span></div>))}</div>
                     </div>
                 </SheetContent>
