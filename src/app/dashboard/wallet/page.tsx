@@ -56,10 +56,11 @@ import {
     Coins,
     ChevronRight,
     Smartphone,
-    Snowflake
+    Snowflake,
+    Trash2
 } from "lucide-react";
 import { db } from '@/lib/firebase';
-import { collection, query, where, orderBy, limit, addDoc, serverTimestamp, doc, updateDoc, increment, getDocs, setDoc } from 'firebase/firestore';
+import { collection, query, where, orderBy, limit, addDoc, serverTimestamp, doc, updateDoc, increment, getDocs, setDoc, Timestamp } from 'firebase/firestore';
 import withAuth from '@/components/auth/withAuth';
 import Link from 'next/link';
 import { useCollection, useDoc, useMemoFirebase } from '@/firebase';
@@ -100,7 +101,7 @@ import {
     ResponsiveContainer,
     CartesianGrid
 } from 'recharts';
-import { format, addMonths, differenceInSeconds } from "date-fns";
+import { format, addMonths, differenceInSeconds, isAfter } from "date-fns";
 import { fr } from "date-fns/locale";
 
 const GCV_VALUE = 314159; 
@@ -185,11 +186,9 @@ function UniversalWalletPage() {
     const [swapTo, setSwapTo] = useState('dkst');
     const [swapAmount, setSwapAmount] = useState("");
 
+    // Staking Multi-contract states
     const [stakingAmount, setStakingAmount] = useState("");
     const [selectedStakingOption, setSelectedStakingOption] = useState(STAKING_OPTIONS[3]);
-    const [stakingMode, setStakingMode] = useState<'stake' | 'unstake'>('stake');
-    const [stakingCountdown, setStakingCountdown] = useState<string>("");
-
     const [isProcessingAction, setIsProcessingAction] = useState(false);
     const [isEmergencyLockProcessing, setIsEmergencyLockProcessing] = useState(false);
 
@@ -207,6 +206,7 @@ function UniversalWalletPage() {
     const [tokenSymbol, setTokenSymbol] = useState("");
     const [tokenDecimal, setTokenDecimal] = useState("");
 
+    // Queries
     const txQuery = useMemoFirebase(() => {
         if (!user?.uid) return null;
         return query(collection(db, "tokenTransactions"), where("userId", "==", user.uid), orderBy("createdAt", "desc"), limit(50));
@@ -216,6 +216,13 @@ function UniversalWalletPage() {
     const allUsersQuery = useMemoFirebase(() => collection(db, "users"), []);
     const { data: allUsers } = useCollection(allUsersQuery);
 
+    // Fetch Multiple Stakes
+    const stakesQuery = useMemoFirebase(() => {
+        if (!user?.uid) return null;
+        return query(collection(db, "users", user.uid, "stakes"), where("status", "==", "active"), orderBy("startedAt", "desc"));
+    }, [user?.uid]);
+    const { data: activeStakes, isLoading: loadingStakes } = useCollection(stakesQuery);
+
     useEffect(() => {
         setIsMounted(true);
         if (user && !user.hasMnemonic) {
@@ -223,52 +230,23 @@ function UniversalWalletPage() {
         }
     }, [user]);
 
-    // Timer pour le Staking Dynamique basé sur le plan choisi
-    useEffect(() => {
-        if (!user?.stakingStartedAt || (user.stakedBalance || 0) <= 0) {
-            setStakingCountdown("");
-            return;
-        }
-
-        const interval = setInterval(() => {
-            const start = user.stakingStartedAt?.toDate ? user.stakingStartedAt.toDate() : new Date(user.stakingStartedAt);
-            const monthsToWait = user.stakingDurationMonths || 12; // Utilise la durée stockée ou 12 mois par défaut
-            const unlockDate = addMonths(start, monthsToWait);
-            const now = new Date();
-            const diff = differenceInSeconds(unlockDate, now);
-
-            if (diff <= 0) {
-                setStakingCountdown("DÉBLOQUÉ");
-                clearInterval(interval);
-            } else {
-                const days = Math.floor(diff / 86400);
-                const hours = Math.floor((diff % 86400) / 3600);
-                const minutes = Math.floor((diff % 3600) / 60);
-                const seconds = diff % 60;
-                setStakingCountdown(`${days}j ${hours}h ${minutes}m ${seconds}s`);
-            }
-        }, 1000);
-
-        return () => clearInterval(interval);
-    }, [user?.stakingStartedAt, user?.stakedBalance, user?.stakingDurationMonths]);
-
     const stats = useMemo(() => {
-        if (!user) return { totalPoints: 0, availablePoints: 0, redeemableTokens: 0, progress: 0, stakingRewards: 0, gcvUSD: 0, totalTokens: 0, wealthHistory: [] };
+        if (!user) return { totalPoints: 0, availablePoints: 0, redeemableTokens: 0, progress: 0, totalStakingRewards: 0, gcvUSD: 0, totalTokens: 0, wealthHistory: [] };
 
         let total = user.points || 0;
         const availablePoints = total - (user.pointsConverted || 0);
         const redeemable = Math.floor(availablePoints / POINTS_PER_TOKEN);
         const progress = (availablePoints % POINTS_PER_TOKEN);
 
-        let apr = 5;
-        if (user.loyaltyLevel === 'Gold') apr = 12;
-        else if (user.loyaltyLevel === 'Silver') apr = 8;
-
-        let rewards = 0;
-        if (user.stakedBalance && user.stakingStartedAt) {
-            const start = user.stakingStartedAt?.toDate ? user.stakingStartedAt.toDate() : new Date(user.stakingStartedAt);
-            const hoursStaked = Math.max(0, (Date.now() - start.getTime()) / (1000 * 60 * 60));
-            rewards = (user.stakedBalance * (apr / 100) * (hoursStaked / 8760));
+        // Global Staking Rewards Sum
+        let totalRewards = 0;
+        if (activeStakes) {
+            activeStakes.forEach(stake => {
+                const start = stake.startedAt?.toDate ? stake.startedAt.toDate() : new Date(stake.startedAt);
+                const hoursStaked = Math.max(0, (Date.now() - start.getTime()) / (1000 * 60 * 60));
+                const stakeReward = (stake.amount * (stake.apr || 0.05) * (hoursStaked / 8760));
+                totalRewards += stakeReward;
+            });
         }
 
         const totalTokens = (user.tokenBalance || 0) + (user.stakedBalance || 0) + (user.piBalance || 0);
@@ -294,9 +272,9 @@ function UniversalWalletPage() {
 
         return { 
             totalPoints: total, availablePoints, redeemableTokens: redeemable, progress, 
-            stakingRewards: rewards, gcvUSD, totalTokens, wealthHistory: wealthHistory.slice(-20) 
+            totalStakingRewards: totalRewards, gcvUSD, totalTokens, wealthHistory: wealthHistory.slice(-20) 
         };
-    }, [user, transactions]);
+    }, [user, transactions, activeStakes]);
 
     const ASSETS = useMemo(() => {
         return [
@@ -476,87 +454,75 @@ function UniversalWalletPage() {
 
         setIsProcessingAction(true);
         try {
+            const startedAt = new Date();
+            const unlockAt = addMonths(startedAt, selectedStakingOption.months);
+
+            // Create New Stake Contract
+            await addDoc(collection(db, "users", user.uid, "stakes"), {
+                amount: amt,
+                durationMonths: selectedStakingOption.months,
+                apr: selectedStakingOption.apr,
+                startedAt: serverTimestamp(),
+                unlockAt: Timestamp.fromDate(unlockAt),
+                status: 'active'
+            });
+
+            // Update Global Balances
             await updateDoc(doc(db, "users", user.uid), {
                 tokenBalance: increment(-amt),
                 stakedBalance: increment(amt),
-                stakingStartedAt: serverTimestamp(),
-                stakingDurationMonths: selectedStakingOption.months, // Sauvegarde de la durée du plan choisi
                 updatedAt: serverTimestamp()
             });
+
             await addDoc(collection(db, "tokenTransactions"), {
                 userId: user.uid, userName: user.name, type: 'staking',
-                tokenAmount: amt, memo: `Staking Vault ${selectedStakingOption.label}`,
+                tokenAmount: amt, memo: `Contrat Staking ${selectedStakingOption.label} (${(selectedStakingOption.apr*100).toFixed(1)}% APR)`,
                 createdAt: serverTimestamp()
             });
-            toast({ title: "Staking Activé", description: `Vos fonds sont sécurisés pour ${selectedStakingOption.label}.` });
+
+            toast({ title: "Contrat Activé", description: `Vos ${amt} DKST sont bloqués pour ${selectedStakingOption.label}.` });
             setStakingAmount("");
-        } catch (e) { toast({ title: "Erreur", variant: "destructive" }); } finally { setIsProcessingAction(false); }
+        } catch (e) { toast({ title: "Erreur Staking", variant: "destructive" }); } finally { setIsProcessingAction(false); }
     };
 
-    const handleUnstake = async () => {
-        if (!user || (user.stakedBalance || 0) <= 0) return;
-        if (stakingCountdown !== "DÉBLOQUÉ") {
-            toast({ title: "Contrat en cours", description: "Vous ne pouvez pas retirer avant la fin du décompte.", variant: "destructive" });
+    const handleUnstakePosition = async (stake: any) => {
+        if (!user || !stake) return;
+        
+        const unlockDate = stake.unlockAt?.toDate ? stake.unlockAt.toDate() : new Date(stake.unlockAt);
+        if (isAfter(unlockDate, new Date())) {
+            toast({ title: "Contrat en cours", description: "Ce dépôt n'est pas encore débloqué.", variant: "destructive" });
             return;
         }
 
         setIsProcessingAction(true);
         try {
-            const rewards = stats.stakingRewards;
-            const total = user.stakedBalance + rewards;
+            // Calculate specific rewards for this stake
+            const start = stake.startedAt?.toDate ? stake.startedAt.toDate() : new Date(stake.startedAt);
+            const hoursStaked = Math.max(0, (Date.now() - start.getTime()) / (1000 * 60 * 60));
+            const rewards = (stake.amount * (stake.apr || 0.05) * (hoursStaked / 8760));
+            const totalToReturn = stake.amount + rewards;
+
+            // Mark contract as completed
+            await updateDoc(doc(db, "users", user.uid, "stakes", stake.id), {
+                status: 'completed',
+                unstakedAt: serverTimestamp()
+            });
+
+            // Return funds to available balance
             await updateDoc(doc(db, "users", user.uid), {
-                tokenBalance: increment(total),
-                stakedBalance: 0,
-                stakingStartedAt: null,
-                stakingDurationMonths: null,
+                tokenBalance: increment(totalToReturn),
+                stakedBalance: increment(-stake.amount),
                 updatedAt: serverTimestamp()
             });
+
             await addDoc(collection(db, "tokenTransactions"), {
                 userId: user.uid, userName: user.name, type: 'unstaking',
-                tokenAmount: total, memo: "Unstaking capital + intérêts",
+                tokenAmount: totalToReturn, memo: `Retrait capital + profits (Contrat #${stake.id.substring(0,6)})`,
                 createdAt: serverTimestamp()
             });
-            toast({ title: "Capital débloqué", description: "Les fonds ont rejoint votre balance disponible." });
-        } catch (e) { toast({ title: "Erreur", variant: "destructive" }); } finally { setIsProcessingAction(false); }
-    };
 
-    const handleConvertPoints = async () => {
-        const amt = stats.redeemableTokens * POINTS_PER_TOKEN;
-        if (!user || amt < POINTS_PER_TOKEN) return;
-
-        setIsProcessingAction(true);
-        try {
-            const tokens = stats.redeemableTokens;
-            await updateDoc(doc(db, "users", user.uid), {
-                tokenBalance: increment(tokens),
-                pointsConverted: increment(amt),
-                updatedAt: serverTimestamp()
-            });
-            await addDoc(collection(db, "tokenTransactions"), {
-                userId: user.uid, userName: user.name, type: 'exchange',
-                tokenAmount: tokens, memo: `Conversion de ${amt} points`,
-                createdAt: serverTimestamp()
-            });
-            toast({ title: "Conversion réussie !" });
-            setIsPointsSheetOpen(false);
-            setIsSuccessDialogOpen(true);
-        } catch (e) { toast({ title: "Erreur", variant: "destructive" }); } finally { setIsProcessingAction(false); }
-    };
-
-    const toggleEmergencyLock = async () => {
-        if (!user) return;
-        setIsEmergencyLockProcessing(true);
-        try {
-            const newState = !user.isWalletLocked;
-            await updateDoc(doc(db, "users", user.uid), {
-                isWalletLocked: newState,
-                updatedAt: serverTimestamp()
-            });
-            toast({ 
-                title: newState ? "Wallet Verrouillé" : "Wallet Déverrouillé", 
-                variant: newState ? "destructive" : "default" 
-            });
-        } catch (e) { toast({ title: "Erreur", variant: "destructive" }); } finally { setIsEmergencyLockProcessing(false); }
+            toast({ title: "Fonds Libérés", description: `${totalToReturn.toFixed(4)} DKST ont été versés sur votre solde.` });
+        } catch (e) { toast({ title: "Erreur Retrait", variant: "destructive" }); } finally { setIsProcessingAction(false); }
     };
 
     const getReceiveAddress = (asset: string) => {
@@ -569,18 +535,76 @@ function UniversalWalletPage() {
         }
     };
 
-    const currentStakingBalance = stakingMode === 'stake' ? (user?.tokenBalance || 0) : (user?.stakedBalance || 0);
-
     if (!isMounted) return null;
 
     const isLocked = !!user?.isWalletLocked;
+
+    const StakeItem = ({ stake }: { stake: any }) => {
+        const [timeRemaining, setTimeRemaining] = useState("");
+        const unlockDate = stake.unlockAt?.toDate ? stake.unlockAt.toDate() : new Date(stake.unlockAt);
+        const isUnlocked = !isAfter(unlockDate, new Date());
+
+        useEffect(() => {
+            const update = () => {
+                const diff = differenceInSeconds(unlockDate, new Date());
+                if (diff <= 0) setTimeRemaining("PRÊT");
+                else {
+                    const d = Math.floor(diff / 86400);
+                    const h = Math.floor((diff % 86400) / 3600);
+                    const m = Math.floor((diff % 3600) / 60);
+                    const s = diff % 60;
+                    setTimeRemaining(`${d}j ${h}h ${m}m ${s}s`);
+                }
+            };
+            const id = setInterval(update, 1000);
+            update();
+            return () => clearInterval(id);
+        }, [unlockDate]);
+
+        // Interêts actuels
+        const start = stake.startedAt?.toDate ? stake.startedAt.toDate() : new Date(stake.startedAt);
+        const hours = Math.max(0, (Date.now() - start.getTime()) / (1000 * 60 * 60));
+        const rewards = (stake.amount * (stake.apr || 0.05) * (hours / 8760));
+
+        return (
+            <div className="p-6 rounded-3xl bg-white/5 border border-white/5 space-y-4 hover:border-accent/20 transition-all group">
+                <div className="flex justify-between items-start">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-accent"><Timer size={20} /></div>
+                        <div>
+                            <p className="text-xs font-black uppercase italic text-white">{stake.amount} DKST</p>
+                            <p className="text-[8px] font-bold text-accent uppercase tracking-widest">Plan {stake.durationMonths} Mois ({(stake.apr*100).toFixed(1)}%)</p>
+                        </div>
+                    </div>
+                    <Badge className={cn("border-none text-[8px] font-black uppercase px-2", isUnlocked ? "bg-green-500 text-white animate-pulse" : "bg-white/5 text-white/40")}>
+                        {isUnlocked ? "Débloqué" : "Séquestre"}
+                    </Badge>
+                </div>
+                <div className="flex justify-between items-end">
+                    <div className="space-y-1">
+                        <p className="text-[8px] font-black uppercase text-white/20">Profits actuels</p>
+                        <p className="text-sm font-black text-green-400 italic">+{rewards.toFixed(6)}</p>
+                    </div>
+                    <div className="text-right">
+                        <p className="text-[8px] font-black uppercase text-white/20">Libération</p>
+                        <p className="text-[10px] font-mono font-bold text-white/60 tracking-widest">{timeRemaining}</p>
+                    </div>
+                </div>
+                {isUnlocked && (
+                    <Button onClick={() => secureAction(() => handleUnstakePosition(stake))} className="w-full h-10 bg-accent text-black font-black uppercase italic text-[9px] rounded-xl shadow-lg mt-2">
+                        Réclamer Capital + Profits
+                    </Button>
+                )}
+            </div>
+        );
+    };
 
     return (
         <div className="min-h-screen bg-background text-foreground pb-24">
             <Navbar />
             <main className="max-w-4xl mx-auto px-4 py-10">
                 
-                {/* WEALTH HEADER PRO - AVEC EFFET GEL SI VERROUILLÉ */}
+                {/* WEALTH HEADER PRO */}
                 <div className={cn(
                     "mb-12 flex flex-col items-center text-center animate-in fade-in zoom-in duration-700 relative transition-all",
                     isLocked && "blur-md opacity-50 grayscale pointer-events-none"
@@ -633,7 +657,7 @@ function UniversalWalletPage() {
                     </div>
                 </div>
 
-                {/* ASSET LIST CRYSTAL - FILTRÉE PAR RÉSEAU AVEC EFFET GEL */}
+                {/* ASSET LIST */}
                 <div className={cn(
                     "space-y-6 mb-16 transition-all",
                     isLocked && "blur-md opacity-50 grayscale pointer-events-none"
@@ -735,7 +759,7 @@ function UniversalWalletPage() {
                                 <div className="relative z-10 space-y-8">
                                     <div className="flex items-center gap-4">
                                         <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shadow-lg shadow-primary/20"><Vault size={28}/></div>
-                                        <div><h3 className="text-2xl font-black uppercase italic tracking-tight">Staking Vault</h3><p className="text-[9px] font-bold text-primary uppercase tracking-widest">Rendement Certifié</p></div>
+                                        <div><h3 className="text-2xl font-black uppercase italic tracking-tight">Nouveau Contrat</h3><p className="text-[9px] font-bold text-primary uppercase tracking-widest">Multi-Staking Activé</p></div>
                                     </div>
                                     
                                     <div className="space-y-8">
@@ -753,56 +777,51 @@ function UniversalWalletPage() {
 
                                         <div className="space-y-4">
                                             <div className="flex justify-between items-end px-1">
-                                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-40">Montant</Label>
-                                                <p className="text-[9px] font-bold text-white/40 uppercase">Max : <span className="text-accent">{isMounted && isBalanceVisible ? currentStakingBalance.toFixed(2) : "••••"}</span> DKST</p>
+                                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-40">Montant à bloquer</Label>
+                                                <p className="text-[9px] font-bold text-white/40 uppercase">Max : <span className="text-accent">{isMounted && isBalanceVisible ? (user?.tokenBalance || 0).toFixed(2) : "••••"}</span> DKST</p>
                                             </div>
                                             <div className="relative">
                                                 <Input type="number" placeholder="0.00" value={stakingAmount} onChange={(e) => setStakingAmount(e.target.value)} className="h-20 bg-background/50 border-white/10 rounded-[2rem] text-3xl font-black text-white px-8" />
-                                                <button onClick={() => setStakingAmount(currentStakingBalance.toString())} className="absolute right-6 top-1/2 -translate-y-1/2 h-10 px-4 rounded-xl bg-accent text-black font-black uppercase italic text-[10px]">MAX</button>
+                                                <button onClick={() => setStakingAmount((user?.tokenBalance || 0).toString())} className="absolute right-6 top-1/2 -translate-y-1/2 h-10 px-4 rounded-xl bg-accent text-black font-black uppercase italic text-[10px]">MAX</button>
                                             </div>
                                         </div>
 
                                         <Button onClick={() => secureAction(handleStake)} disabled={isProcessingAction || !stakingAmount} className="w-full h-16 bg-primary text-white font-black uppercase italic rounded-2xl shadow-xl shadow-primary/20 text-lg gap-3">
-                                            {isProcessingAction ? <Loader2 className="animate-spin" /> : <><ShieldCheck size={24} /> Activer Staking</>}
+                                            {isProcessingAction ? <Loader2 className="animate-spin" /> : <><ShieldCheck size={24} /> Créer le Contrat</>}
                                         </Button>
                                     </div>
                                 </div>
                             </Card>
 
-                            <Card className="bg-black/40 border border-white/5 rounded-[3rem] p-10 flex flex-col justify-between overflow-hidden relative group">
-                                <div className="absolute -bottom-10 -right-10 p-6 opacity-5 group-hover:scale-110 transition-transform"><Timer size={160} className="text-accent" /></div>
-                                <div className="space-y-10 relative z-10">
-                                    <h3 className="text-xl font-black uppercase italic">Ma Position</h3>
-                                    <div className="space-y-8">
-                                        <div><p className="text-[10px] font-black uppercase text-white/40 mb-2 tracking-[0.2em]">Capital bloqué</p><p className="text-5xl font-black text-white italic tracking-tighter">{isMounted && isBalanceVisible ? (user?.stakedBalance || 0).toFixed(2) : "••••"} <span className="text-xs not-italic opacity-40">DKST</span></p></div>
-                                        
-                                        {/* COMPTE À REBOURS DE DÉBLOCAGE DYNAMIQUE */}
-                                        {stakingCountdown && (
-                                            <div className="p-6 rounded-[2rem] bg-accent/5 border border-accent/20 animate-in slide-in-from-right-4 duration-700">
-                                                <p className="text-[10px] font-black uppercase text-accent mb-2 flex items-center gap-2">
-                                                    <Clock size={12} className="animate-pulse" /> Déverrouillage dans :
-                                                </p>
-                                                <p className="text-2xl font-black text-white italic tracking-widest font-mono">
-                                                    {stakingCountdown}
-                                                </p>
-                                            </div>
-                                        )}
-
-                                        <div><p className="text-[10px] font-black uppercase text-white/40 mb-2 tracking-[0.2em]">Intérêts courus</p><p className="text-5xl font-black text-green-400 italic tracking-tighter">+{isMounted && isBalanceVisible ? stats.stakingRewards.toFixed(6) : "••••"}</p></div>
-                                    </div>
+                            <div className="space-y-6">
+                                <div className="flex justify-between items-center px-4">
+                                    <h3 className="text-xs font-black uppercase italic text-white/60 flex items-center gap-2"><Timer size={16} /> Mes Contrats en Cours</h3>
+                                    <Badge className="bg-white/5 text-muted-foreground border-none text-[8px] font-black uppercase">{activeStakes?.length || 0} Positions</Badge>
                                 </div>
-                                <Button 
-                                    onClick={() => secureAction(handleUnstake)} 
-                                    disabled={isProcessingAction || !user?.stakedBalance || stakingCountdown !== "DÉBLOQUÉ"} 
-                                    variant="outline" 
-                                    className={cn(
-                                        "mt-12 w-full h-16 border-white/10 rounded-2xl font-black uppercase italic text-[11px] transition-all relative z-10",
-                                        stakingCountdown === "DÉBLOQUÉ" ? "bg-accent/10 border-accent text-accent hover:bg-accent hover:text-black" : "opacity-40"
+
+                                <div className="space-y-4 max-h-[550px] overflow-y-auto pr-2 custom-scrollbar">
+                                    {loadingStakes ? (
+                                        <div className="py-20 flex justify-center"><Loader2 className="animate-spin text-accent" /></div>
+                                    ) : activeStakes && activeStakes.length > 0 ? (
+                                        activeStakes.map(stake => <StakeItem key={stake.id} stake={stake} />)
+                                    ) : (
+                                        <div className="py-20 text-center bg-white/[0.02] border border-dashed border-white/5 rounded-[3rem] opacity-30 flex flex-col items-center gap-4">
+                                            <Vault size={48} strokeWidth={1} />
+                                            <p className="text-[10px] font-black uppercase tracking-widest italic leading-relaxed">Aucune position de staking active.<br/>Générez des revenus passifs maintenant.</p>
+                                        </div>
                                     )}
-                                >
-                                    {stakingCountdown === "DÉBLOQUÉ" ? "Réclamer Capital + Profits" : "Capital sous séquestre"}
-                                </Button>
-                            </Card>
+                                </div>
+
+                                {activeStakes && activeStakes.length > 0 && (
+                                    <div className="p-8 bg-accent/5 rounded-[2.5rem] border border-accent/20 space-y-4">
+                                        <p className="text-[9px] font-black uppercase text-accent/60 tracking-widest text-center">Gains consolidés (Tous contrats)</p>
+                                        <div className="text-center">
+                                            <p className="text-3xl font-black text-white italic tracking-tighter">+{isMounted && isBalanceVisible ? stats.totalStakingRewards.toFixed(6) : "••••"}</p>
+                                            <p className="text-[8px] font-bold text-accent uppercase mt-1">DKST Cumulés</p>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </TabsContent>
 
