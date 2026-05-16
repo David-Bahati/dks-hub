@@ -92,9 +92,13 @@ function ProductsPage() {
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-        // Limite à 800Ko pour éviter de saturer le document Firestore (limite 1Mo)
-        if (file.size > 800 * 1024) {
-            toast({ title: "Fichier trop lourd", description: "L'image ne doit pas dépasser 800Ko pour la base de données.", variant: "destructive" });
+        // Limite abaissée à 600Ko pour garantir que le document Firestore (limite 1Mo) ne sature pas avec l'encodage Base64
+        if (file.size > 600 * 1024) {
+            toast({ 
+                title: "Fichier trop volumineux", 
+                description: "Veuillez choisir une image de moins de 600 Ko pour assurer la sauvegarde.", 
+                variant: "destructive" 
+            });
             return;
         }
         const reader = new FileReader();
@@ -161,11 +165,8 @@ function ProductsPage() {
 
     if (editingProduct) {
       const docRef = doc(db, "products", editingProduct.id);
+      // Utilisation du mode non-bloquant pour une meilleure réactivité
       setDoc(docRef, productData, { merge: true })
-        .then(() => {
-          toast({ title: "Produit mis à jour", description: "Les changements ont été enregistrés." });
-          setIsSheetOpen(false);
-        })
         .catch(async (error) => {
           errorEmitter.emit('permission-error', new FirestorePermissionError({
             path: docRef.path,
@@ -173,17 +174,17 @@ function ProductsPage() {
             requestResourceData: productData
           }));
         });
+      
+      toast({ title: "Produit mis à jour", description: "Les changements sont synchronisés en arrière-plan." });
+      setIsSheetOpen(false);
     } else {
       const colRef = collection(db, "products");
       const fullData = {
         ...productData,
         createdAt: serverTimestamp()
       };
+      // Utilisation du mode non-bloquant
       addDoc(colRef, fullData)
-        .then(() => {
-          toast({ title: "Produit créé", description: "L'article est ajouté au stock." });
-          setIsSheetOpen(false);
-        })
         .catch(async (error) => {
           errorEmitter.emit('permission-error', new FirestorePermissionError({
             path: colRef.path,
@@ -191,6 +192,9 @@ function ProductsPage() {
             requestResourceData: fullData
           }));
         });
+
+      toast({ title: "Produit créé", description: "L'article est ajouté au stock du Hub." });
+      setIsSheetOpen(false);
     }
   }
 
@@ -315,7 +319,7 @@ function ProductsPage() {
                           ) : (
                             <>
                               <ImageIcon className="h-10 w-10 text-muted-foreground mb-2 group-hover:text-accent transition-colors" />
-                              <span className="text-[10px] text-muted-foreground group-hover:text-accent font-black uppercase tracking-widest">Cliquer pour importer</span>
+                              <span className="text-[10px] text-muted-foreground group-hover:text-accent font-black uppercase tracking-widest">Cliquer pour importer (Max 600 Ko)</span>
                             </>
                           )}
                         </div>
