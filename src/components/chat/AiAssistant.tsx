@@ -126,15 +126,34 @@ export function AiAssistant() {
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onloadend = () => setAttachedImage(reader.result as string);
-        reader.readAsDataURL(file);
+        if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => setAttachedImage(reader.result as string);
+            reader.readAsDataURL(file);
+        }
     };
 
     useEffect(() => {
-        const timer = setTimeout(() => { if (!isOpen) setShowTeaser(true); }, 5000);
-        return () => clearTimeout(timer);
+        let showTimer: any;
+        let hideTimer: any;
+
+        if (!isOpen) {
+            // Affiche le message après 5 secondes
+            showTimer = setTimeout(() => {
+                setShowTeaser(true);
+                // Le message disparaît automatiquement après 8 secondes supplémentaires
+                hideTimer = setTimeout(() => {
+                    setShowTeaser(false);
+                }, 8000);
+            }, 5000);
+        } else {
+            setShowTeaser(false);
+        }
+
+        return () => {
+            clearTimeout(showTimer);
+            clearTimeout(hideTimer);
+        };
     }, [isOpen]);
 
     useEffect(() => {
@@ -192,9 +211,12 @@ export function AiAssistant() {
     return (
         <div className="fixed bottom-6 right-6 z-[100] flex flex-col items-end gap-4">
             {showTeaser && !isOpen && (
-                <div onClick={() => { setIsOpen(true); setShowTeaser(false); }} className="bg-accent text-black p-4 rounded-2xl rounded-br-none shadow-2xl cursor-pointer animate-in slide-in-from-right-4 max-w-[220px] relative group">
+                <div onClick={() => { setIsOpen(true); setShowTeaser(false); }} className="bg-accent text-black p-4 rounded-2xl rounded-br-none shadow-2xl cursor-pointer animate-in fade-in slide-in-from-right-4 max-w-[220px] relative group hover:scale-105 transition-transform duration-300">
                     <p className="text-[10px] font-black uppercase italic leading-tight">Besoin d'aide ? Scannez un produit ou posez une question !</p>
                     <div className="absolute -bottom-2 right-4 w-4 h-4 bg-accent rotate-45" />
+                    <button onClick={(e) => { e.stopPropagation(); setShowTeaser(false); }} className="absolute -top-2 -left-2 bg-white/20 hover:bg-white/40 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <CloseIcon size={10} />
+                    </button>
                 </div>
             )}
 
