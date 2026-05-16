@@ -1,4 +1,3 @@
-
 'use server';
 /**
  * @fileOverview Flow Genkit pour l'Assistant Client de Double King Shop.
@@ -25,7 +24,6 @@ const AssistantInputSchema = z.object({
 
 /**
  * Outil de recherche de produits en stock.
- * Sécurisé pour éviter les crashs en cas de base vide.
  */
 const searchProducts = ai.defineTool(
   {
@@ -39,7 +37,7 @@ const searchProducts = ai.defineTool(
   async (input) => {
     try {
       const productsRef = collection(db, "products");
-      const q = query(productsRef, where("isPublished", "==", true), limit(20));
+      const q = query(productsRef, where("isPublished", "==", true), limit(10));
       const snapshot = await getDocs(q);
       
       const allProducts = snapshot.docs.map(doc => ({
@@ -55,7 +53,6 @@ const searchProducts = ai.defineTool(
         p.category.toLowerCase().includes(searchTerm)
       ).slice(0, 5);
     } catch (error) {
-      console.error("Tool searchProducts error:", error);
       return [];
     }
   }
@@ -76,39 +73,40 @@ const customerAssistantFlow = ai.defineFlow(
         'ln': 'Lingala'
       };
       
-      const systemInstruction = `Tu es l'Expert Double King (DKS), l'assistant IA de l'écosystème technologique Double King Shop à Bunia, RDC.
-      Ton rôle est de conseiller les clients sur le hardware premium et les services de l'Academy.
-
-      IMPORTANT : 
-      1. Tu dois répondre EXCLUSIVEMENT en ${langNames[input.language] || 'Français'}.
-      2. Si une image est fournie, analyse-la pour identifier le composant hardware.
-      3. Utilise l'outil searchProducts uniquement si le client cherche un article précis en stock.
-      4. Sois concis, technique et poli.
+      const systemInstruction = `Tu es l'Expert Double King (DKS), l'assistant IA de l'écosystème technologique Double King Shop à Bunia, RDC (Immeuble Bahati).
       
-      CONTEXTE DKS :
-      - Lieu : Immeuble Bahati, Boulevard de la Libération, Bunia.
+      TON RÔLE :
+      1. Répondre EXCLUSIVEMENT en ${langNames[input.language] || 'Français'}.
+      2. Identifier le hardware sur les photos fournies.
+      3. Utiliser searchProducts si le client cherche un article.
+      
+      CONTEXTE :
       - Spécialité : Hardware luxe (RTX 4090, Starlink), Formations IA & Blockchain.
-      - Économie : Paiements Pi Network (GCV $314,159) et jetons DKST acceptés.`;
+      - Paiements : Pi Network (GCV $314,159) et DKST acceptés.
+      - Ton : Professionnel, technophile et poli.`;
 
-      // Construction propre du prompt (Texte + Media optionnel)
-      const promptParts: any[] = [];
-      if (input.photoDataUri && input.photoDataUri.startsWith('data:')) {
-        promptParts.push({ media: { url: input.photoDataUri } });
+      // Construction du prompt avec support multimédia
+      const promptContent: any[] = [];
+      if (input.photoDataUri) {
+        promptContent.push({ media: { url: input.photoDataUri, contentType: 'image/jpeg' } });
       }
-      promptParts.push({ text: input.message || "Bonjour" });
+      promptContent.push({ text: input.message });
 
       const response = await ai.generate({
         model: 'googleai/gemini-1.5-flash',
         system: systemInstruction,
-        prompt: promptParts,
-        tools: [searchProducts],
+        prompt: promptContent,
         history: input.history || [],
+        tools: [searchProducts],
+        config: {
+            temperature: 0.7,
+        }
       });
 
-      return response.text || "Désolé, je n'ai pas pu formuler de réponse précise. Pouvez-vous reformuler ?";
+      return response.text;
     } catch (error: any) {
-      console.error("Genkit Flow Critical Error:", error);
-      return "Une interruption de communication avec le cerveau DKS a été détectée. Veuillez réessayer dans quelques instants.";
+      console.error("Genkit Flow Error:", error);
+      return "Une interruption de communication avec le cerveau DKS a été détectée. Veuillez réessayer.";
     }
   }
 );

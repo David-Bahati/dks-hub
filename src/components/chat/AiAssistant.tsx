@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useRef, useEffect } from 'react';
@@ -42,10 +41,10 @@ const LANGUAGES = [
 ];
 
 const INITIAL_MESSAGES: Record<string, string> = {
-    'fr': "Bonjour ! Je suis l'Expert Double King. Comment puis-je vous aider aujourd'hui ? Je peux identifier votre matériel par photo ou répondre à vos questions sur le stock.",
-    'en': "Hello! I am the Double King Expert. How can I help you today? I can identify your hardware by photo or answer your questions about stock.",
-    'sw': "Habari! Mimi ni Mtaalamu wa Double King. Naweza kukusaidia aje leo? Naweza kutambua kifaa chako kwa picha au kujibu maswali kuhusu bidhaa.",
-    'ln': "Mbote! Nazali Expert ya Double King. Nakoki kosalisa yo nini lelo? Nakoki koyeba matériel na photo to mpe koyanola mituna na yo."
+    'fr': "Bonjour ! Je suis l'Expert Double King. Comment puis-je vous aider aujourd'hui ?",
+    'en': "Hello! I am the Double King Expert. How can I help you today?",
+    'sw': "Habari! Mimi ni Mtaalamu wa Double King. Naweza kukusaidia aje leo?",
+    'ln': "Mbote! Nazali Expert ya Double King. Nakoki kosalisa yo nini lelo?"
 };
 
 export function AiAssistant() {
@@ -66,26 +65,14 @@ export function AiAssistant() {
     const videoRef = useRef<HTMLVideoElement>(null);
     const { toast } = useToast();
 
-    // Gestion de l'affichage du teaser "Besoin d'aide ?"
     useEffect(() => {
-        let showTimer: any;
-        let hideTimer: any;
-
         if (!isOpen) {
-            showTimer = setTimeout(() => {
-                setShowTeaser(true);
-                hideTimer = setTimeout(() => {
-                    setShowTeaser(false);
-                }, 8000);
-            }, 5000);
+            const timer = setTimeout(() => setShowTeaser(true), 5000);
+            const hideTimer = setTimeout(() => setShowTeaser(false), 13000);
+            return () => { clearTimeout(timer); clearTimeout(hideTimer); };
         } else {
             setShowTeaser(false);
         }
-
-        return () => {
-            clearTimeout(showTimer);
-            clearTimeout(hideTimer);
-        };
     }, [isOpen]);
 
     useEffect(() => {
@@ -99,10 +86,10 @@ export function AiAssistant() {
         if (!userMsg && !userImg) return;
         if (isLoading) return;
 
-        // 1. Préparation de l'historique filtré (Gemini exige que l'historique commence par 'user')
+        // CRITIQUE : L'historique envoyé doit exclure le message actuel et le message de bienvenue initial
         const conversationHistory = messages
             .filter((m, idx) => {
-                // On ignore le message de bienvenue du modèle s'il est au tout début
+                // On retire le tout premier message de bienvenue (model) car Gemini veut commencer par 'user'
                 if (idx === 0 && m.role === 'model') return false;
                 return true;
             })
@@ -111,15 +98,18 @@ export function AiAssistant() {
                 content: [{ text: m.text }]
             }));
 
-        // 2. Mise à jour de l'UI immédiate
-        const userMessage: Message = { role: 'user', text: userMsg || (userImg ? "Analyse cette image." : ""), image: userImg || undefined };
+        const userMessage: Message = { 
+            role: 'user', 
+            text: userMsg || (userImg ? "Analyse cette image." : ""), 
+            image: userImg || undefined 
+        };
+
         setMessages(prev => [...prev, userMessage]);
         setInput("");
         setAttachedImage(null);
         setIsLoading(true);
 
         try {
-            // 3. Appel au flux backend
             const response = await askAssistant({ 
                 message: userMessage.text, 
                 language: currentLanguage.code, 
@@ -127,18 +117,15 @@ export function AiAssistant() {
                 history: conversationHistory as any
             });
 
-            // 4. Affichage de la réponse du modèle
             setMessages(prev => [...prev, { role: 'model', text: response }]);
             
-            // 5. Synthèse vocale si activée
             if (isSpeechEnabled && typeof window !== 'undefined') {
                 const utterance = new SpeechSynthesisUtterance(response);
                 utterance.lang = currentLanguage.voiceCode;
                 window.speechSynthesis.speak(utterance);
             }
         } catch (error) {
-            console.error("AI Assistant Communication Error:", error);
-            setMessages(prev => [...prev, { role: 'model', text: "Désolé, j'ai rencontré une difficulté de communication avec le Hub. Veuillez réessayer." }]);
+            setMessages(prev => [...prev, { role: 'model', text: "Désolé, j'ai rencontré une difficulté de communication avec le hub." }]);
         } finally { 
             setIsLoading(false); 
         }
@@ -274,7 +261,6 @@ export function AiAssistant() {
                                 onClick={() => fileInputRef.current?.click()} 
                                 className="h-12 w-12 rounded-xl border-white/10 hover:bg-accent/10 transition-all shrink-0"
                                 disabled={isLoading}
-                                title="Joindre une photo"
                             >
                                 <ImageIcon size={18} />
                             </Button>
@@ -298,7 +284,6 @@ export function AiAssistant() {
                 </Card>
             )}
 
-            {/* Scanner Dialog (Simulé) */}
             <Dialog open={isScannerOpen} onOpenChange={setIsScannerOpen}>
                 <DialogContent className="bg-black/90 border-white/10 text-white rounded-[2.5rem] sm:max-w-lg p-0 overflow-hidden">
                     <div className="aspect-square relative bg-black flex items-center justify-center">
