@@ -13,13 +13,7 @@ const AssistantInputSchema = z.object({
   message: z.string(),
   language: z.string().optional().default('fr'),
   photoDataUri: z.string().optional().describe("Photo du matériel au format data URI base64"),
-  history: z.array(z.object({
-    role: z.enum(['user', 'model']),
-    content: z.array(z.object({ 
-      text: z.string().optional(),
-      media: z.object({ url: z.string() }).optional()
-    }))
-  })).optional(),
+  history: z.array(z.any()).optional(),
 });
 
 /**
@@ -36,6 +30,9 @@ const searchProducts = ai.defineTool(
   },
   async (input) => {
     try {
+      // Sécurité : Vérifier si db est accessible
+      if (!db) return [];
+      
       const productsRef = collection(db, "products");
       const q = query(productsRef, where("isPublished", "==", true), limit(10));
       const snapshot = await getDocs(q);
@@ -53,6 +50,7 @@ const searchProducts = ai.defineTool(
         p.category.toLowerCase().includes(searchTerm)
       ).slice(0, 5);
     } catch (error) {
+      console.error("Tool Error:", error);
       return [];
     }
   }
@@ -85,17 +83,16 @@ const customerAssistantFlow = ai.defineFlow(
       - Paiements : Pi Network (GCV $314,159) et DKST acceptés.
       - Ton : Professionnel, technophile et poli.`;
 
-      // Construction du prompt avec support multimédia
-      const promptContent: any[] = [];
+      // Préparation du prompt (Parties Texte + Image)
+      const promptParts: any[] = [];
       if (input.photoDataUri) {
-        promptContent.push({ media: { url: input.photoDataUri, contentType: 'image/jpeg' } });
+        promptParts.push({ media: { url: input.photoDataUri, contentType: 'image/jpeg' } });
       }
-      promptContent.push({ text: input.message });
+      promptParts.push({ text: input.message });
 
       const response = await ai.generate({
-        model: 'googleai/gemini-1.5-flash',
         system: systemInstruction,
-        prompt: promptContent,
+        prompt: promptParts,
         history: input.history || [],
         tools: [searchProducts],
         config: {
@@ -103,10 +100,10 @@ const customerAssistantFlow = ai.defineFlow(
         }
       });
 
-      return response.text;
+      return response.text || "Je n'ai pas pu formuler de réponse. Veuillez reformuler votre question.";
     } catch (error: any) {
       console.error("Genkit Flow Error:", error);
-      return "Une interruption de communication avec le cerveau DKS a été détectée. Veuillez réessayer.";
+      return "Une interruption de communication avec le cerveau DKS a été détectée. L'expert est momentanément indisponible.";
     }
   }
 );

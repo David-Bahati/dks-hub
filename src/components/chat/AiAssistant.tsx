@@ -86,17 +86,23 @@ export function AiAssistant() {
         if (!userMsg && !userImg) return;
         if (isLoading) return;
 
-        // CRITIQUE : L'historique envoyé doit exclure le message actuel et le message de bienvenue initial
+        // Préparation de l'historique SANS le message de bienvenue et SANS le message actuel
+        // On s'assure de l'alternance stricte : user -> model
         const conversationHistory = messages
-            .filter((m, idx) => {
-                // On retire le tout premier message de bienvenue (model) car Gemini veut commencer par 'user'
-                if (idx === 0 && m.role === 'model') return false;
-                return true;
-            })
-            .map(m => ({
-                role: m.role,
-                content: [{ text: m.text }]
-            }));
+            .filter((_, idx) => idx > 0) // On ignore le message de bienvenue initial (model)
+            .map(m => {
+                const parts = [];
+                if (m.image) {
+                    parts.push({ media: { url: m.image, contentType: 'image/jpeg' } });
+                }
+                if (m.text) {
+                    parts.push({ text: m.text });
+                }
+                return {
+                    role: m.role,
+                    content: parts
+                };
+            });
 
         const userMessage: Message = { 
             role: 'user', 
@@ -104,6 +110,7 @@ export function AiAssistant() {
             image: userImg || undefined 
         };
 
+        // Mise à jour visuelle immédiate
         setMessages(prev => [...prev, userMessage]);
         setInput("");
         setAttachedImage(null);
@@ -114,7 +121,7 @@ export function AiAssistant() {
                 message: userMessage.text, 
                 language: currentLanguage.code, 
                 photoDataUri: userImg || undefined, 
-                history: conversationHistory as any
+                history: conversationHistory
             });
 
             setMessages(prev => [...prev, { role: 'model', text: response }]);
@@ -125,7 +132,11 @@ export function AiAssistant() {
                 window.speechSynthesis.speak(utterance);
             }
         } catch (error) {
-            setMessages(prev => [...prev, { role: 'model', text: "Désolé, j'ai rencontré une difficulté de communication avec le hub." }]);
+            console.error("AI client error:", error);
+            setMessages(prev => [...prev, { 
+                role: 'model', 
+                text: "Désolé, j'ai rencontré une difficulté de communication avec le hub. Veuillez vérifier votre connexion." 
+            }]);
         } finally { 
             setIsLoading(false); 
         }
