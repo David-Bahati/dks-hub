@@ -1,8 +1,7 @@
 'use server';
 /**
- * @fileOverview Flow Genkit pour l'Assistant Client de Double King Shop avec support multilingue et vision par ordinateur.
- * 
- * Cet agent guide les clients, répond aux questions sur l'entreprise et les produits, et identifie le matériel par photo.
+ * @fileOverview Flow Genkit pour l'Assistant Client de Double King Shop.
+ * Support multilingue, vision par ordinateur et recherche de produits.
  */
 
 import { ai } from '@/ai/genkit';
@@ -16,7 +15,7 @@ const AssistantInputSchema = z.object({
   photoDataUri: z.string().optional().describe("Photo du matériel au format data URI base64"),
   history: z.array(z.object({
     role: z.enum(['user', 'model']),
-    content: z.array(z.object({ text: z.string().optional(), media: z.any().optional() }))
+    content: z.array(z.object({ text: z.string().optional() }))
   })).optional(),
 });
 
@@ -31,28 +30,25 @@ const searchProducts = ai.defineTool(
   },
   async (input) => {
     try {
+      // Recherche simplifiée pour la robustesse serveur
       const productsRef = collection(db, "products");
-      const q = query(
-        productsRef, 
-        where("isPublished", "==", true),
-        limit(15)
-      );
+      const q = query(productsRef, where("isPublished", "==", true), limit(20));
       const snapshot = await getDocs(q);
-      const products = snapshot.docs.map(doc => ({
+      
+      const allProducts = snapshot.docs.map(doc => ({
         name: doc.data().name,
         price: doc.data().sellingPrice || doc.data().price,
         category: doc.data().category,
-        stock: doc.data().stockQuantity,
-        description: doc.data().description
+        stock: doc.data().stockQuantity
       }));
       
       const searchTerm = input.query.toLowerCase();
-      return products.filter(p => 
+      return allProducts.filter(p => 
         p.name.toLowerCase().includes(searchTerm) || 
         p.category.toLowerCase().includes(searchTerm)
       ).slice(0, 5);
     } catch (error) {
-      console.error("Erreur tool searchProducts:", error);
+      console.error("Tool searchProducts error:", error);
       return [];
     }
   }
@@ -74,45 +70,37 @@ const customerAssistantFlow = ai.defineFlow(
       };
       
       const systemInstruction = `Tu es l'Expert Double King (DKS), l'assistant IA de l'écosystème technologique Double King Shop à Bunia, RDC.
-      Ton rôle est d'être un expert conseil en hardware, vision par ordinateur et économie numérique.
+      Ton rôle est de conseiller les clients sur le hardware premium et les services de l'Academy.
 
-      IMPORTANT : Tu dois répondre EXCLUSIVEMENT en ${langNames[input.language] || 'Français'}.
-      Garde un ton professionnel, technologique mais chaleureux.
-
-      CAPACITÉ VISUELLE :
-      Si une image est fournie, analyse-la pour identifier le composant informatique ou le problème technique.
-
+      IMPORTANT : 
+      1. Tu dois répondre EXCLUSIVEMENT en ${langNames[input.language] || 'Français'}.
+      2. Si une image est fournie, analyse-la pour identifier le composant.
+      3. Utilise l'outil searchProducts si le client cherche un article précis.
+      
       CONTEXTE :
-      - Localisation : Immeuble Bahati, Boulevard de la Libération, Bunia, RDC.
-      - Spécialité : Hardware premium (RTX 4090, Intel i9), Starlink, Vidéosurveillance.
-      - Économie : Paiement en Pi Network (GCV $314,159) et jetons DKST.
-      
-      INSTRUCTIONS DE REPONSE :
-      - Utilise l'outil searchProducts pour donner des infos réelles sur le stock si besoin.
-      - Propose toujours un ticket SAV si l'image montre un matériel cassé.`;
+      - Lieu : Immeuble Bahati, Boulevard de la Libération, Bunia.
+      - Spécialité : Hardware luxe (RTX 4090), Starlink, Formations IA.
+      - Paiements : Pi Network (GCV $314,159) et DKST acceptés.`;
 
-      const promptParts: any[] = [];
-      
-      // Ajout de l'image si présente
+      // Préparation du prompt multi-modal
+      const promptContent: any[] = [];
       if (input.photoDataUri) {
-        promptParts.push({ media: { url: input.photoDataUri } });
+        promptContent.push({ media: { url: input.photoDataUri } });
       }
-      
-      // Ajout du texte de l'utilisateur
-      promptParts.push({ text: input.message || "Bonjour" });
+      promptContent.push({ text: input.message || "Bonjour" });
 
       const response = await ai.generate({
         model: 'googleai/gemini-1.5-flash',
         system: systemInstruction,
-        prompt: promptParts,
+        prompt: promptContent,
         tools: [searchProducts],
         history: input.history || [],
       });
 
-      return response.text || "Je n'ai pas pu générer de réponse. Pouvez-vous reformuler ?";
+      return response.text || "Je n'ai pas pu formuler de réponse. Pouvez-vous reformuler ?";
     } catch (error: any) {
       console.error("Genkit Flow Error:", error);
-      return "Désolé, je rencontre une difficulté technique pour analyser votre demande. Veuillez réessayer dans quelques instants.";
+      throw new Error("Échec du traitement IA : " + (error.message || "Erreur inconnue"));
     }
   }
 );

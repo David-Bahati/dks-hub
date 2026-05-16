@@ -78,7 +78,6 @@ export function AiAssistant() {
     const videoRef = useRef<HTMLVideoElement>(null);
     const { toast } = useToast();
 
-    // Affichage et disparition du teaser
     useEffect(() => {
         let showTimer: any;
         let hideTimer: any;
@@ -105,34 +104,37 @@ export function AiAssistant() {
     }, [messages, isLoading]);
 
     const handleSend = async (overrideInput?: string) => {
-        const messageToSend = overrideInput || input || (attachedImage ? "Analyse de cette photo s'il vous plaît" : "");
+        const messageToSend = overrideInput || input || (attachedImage ? "Analyse cette image." : "");
         if (!messageToSend.trim() && !attachedImage) return;
         if (isLoading) return;
 
         const userMsg = messageToSend.trim();
         const userImg = attachedImage;
+        
+        // On ajoute le message utilisateur localement
+        const newMessages: Message[] = [...messages, { role: 'user', text: userMsg, image: userImg || undefined }];
+        setMessages(newMessages);
         setInput("");
         setAttachedImage(null);
         setShowTeaser(false);
-        
-        // Mise à jour locale de l'UI
-        const userMessageObject: Message = { role: 'user', text: userMsg, image: userImg || undefined };
-        setMessages(prev => [...prev, userMessageObject]);
         setIsLoading(true);
 
         try {
-            // Construction de l'historique propre pour le serveur
-            // On ne prend que les messages de texte pour simplifier l'historique
-            const historyForAi = messages.map(m => ({ 
-                role: m.role, 
-                content: [{ text: m.text }] 
-            }));
+            // Nettoyage de l'historique pour Gemini (Alternance User/Model obligatoire)
+            // On retire le tout premier message de bienvenue du modèle s'il est seul pour commencer par un message User
+            const conversationHistory = newMessages
+                .filter(m => m.text) // On s'assure qu'il y a du texte
+                .slice(0, -1) // On enlève le dernier message car il sera passé comme prompt principal
+                .map(m => ({
+                    role: m.role,
+                    content: [{ text: m.text }]
+                }));
 
             const response = await askAssistant({ 
                 message: userMsg, 
                 language: currentLanguage.code, 
                 photoDataUri: userImg || undefined, 
-                history: historyForAi 
+                history: conversationHistory 
             });
 
             setMessages(prev => [...prev, { role: 'model', text: response }]);
@@ -144,7 +146,7 @@ export function AiAssistant() {
             }
         } catch (error) {
             console.error("AI Assistant Error:", error);
-            setMessages(prev => [...prev, { role: 'model', text: "Désolé, je rencontre une difficulté de connexion. Pouvez-vous réessayer ?" }]);
+            setMessages(prev => [...prev, { role: 'model', text: "Désolé, je rencontre une difficulté de communication avec le Hub. Pouvez-vous réessayer ?" }]);
         } finally { 
             setIsLoading(false); 
         }
@@ -180,8 +182,8 @@ export function AiAssistant() {
 
     const simulateQrScan = () => {
         setIsScannerOpen(false);
-        toast({ title: "Code QR Détecté", description: "Recherche produit..." });
-        handleSend("Je viens de scanner un produit, donnez-moi les détails techniques.");
+        toast({ title: "Scan matériel actif", description: "Analyse en cours..." });
+        handleSend("Détaille-moi ce produit hardware s'il te plaît.");
     };
 
     const changeLanguage = (lang: typeof LANGUAGES[0]) => {
@@ -262,7 +264,7 @@ export function AiAssistant() {
                         {isLoading && (
                             <div className="flex items-center gap-3 p-4 rounded-2xl bg-white/[0.02] w-fit animate-pulse">
                                 <Loader2 className="animate-spin h-3 w-3 text-accent" />
-                                <span className="text-[10px] font-black uppercase text-accent/40 italic">L'expert réfléchit...</span>
+                                <span className="text-[10px] font-black uppercase text-accent/40 italic">L'expert analyse...</span>
                             </div>
                         )}
                     </CardContent>
@@ -273,7 +275,7 @@ export function AiAssistant() {
                                 <div className="w-10 h-10 rounded-lg overflow-hidden border border-accent/40 shrink-0">
                                     <img src={attachedImage} className="w-full h-full object-cover" alt="Thumb" />
                                 </div>
-                                <span className="text-[8px] font-black uppercase text-accent">Photo prête pour analyse</span>
+                                <span className="text-[8px] font-black uppercase text-accent">Pièce jointe prête</span>
                                 <button onClick={() => setAttachedImage(null)} className="ml-auto p-1 hover:text-red-500">
                                     <CloseIcon size={12}/>
                                 </button>
@@ -289,7 +291,7 @@ export function AiAssistant() {
                                 className="h-12 w-12 rounded-xl border-white/10 hover:bg-accent/10 transition-all shrink-0"
                                 disabled={isLoading}
                             >
-                                <Camera size={18} />
+                                <ImageIcon size={18} />
                             </Button>
                             <Input 
                                 placeholder="Posez votre question..." 
@@ -317,7 +319,7 @@ export function AiAssistant() {
                     <div className="p-8 border-b border-white/5 flex justify-between items-center bg-white/5">
                         <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-xl bg-accent/20 flex items-center justify-center text-accent"><QrCode size={20}/></div>
-                            <h3 className="font-black uppercase italic">Lecteur Hardware</h3>
+                            <h3 className="font-black uppercase italic">Lecteur Optique</h3>
                         </div>
                         <Button variant="ghost" size="icon" onClick={toggleScanner} className="hover:bg-white/10"><CloseIcon size={20}/></Button>
                     </div>
@@ -329,7 +331,7 @@ export function AiAssistant() {
                             </div>
                         </div>
                         <Button onClick={simulateQrScan} className="absolute bottom-8 bg-accent text-black font-black uppercase italic rounded-xl px-8 h-12 shadow-2xl hover:scale-105 active:scale-95 transition-all">
-                            Simuler Détection Produit
+                            Déclencher l'Analyse
                         </Button>
                     </div>
                 </DialogContent>
