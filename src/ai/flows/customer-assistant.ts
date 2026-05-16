@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview Flow Genkit pour l'Assistant Client de Double King Shop.
@@ -83,16 +84,16 @@ const customerAssistantFlow = ai.defineFlow(
       - Paiements : Pi Network (GCV $314,159) et DKST acceptés.`;
 
       // Préparation du prompt multi-modal
-      const promptContent: any[] = [];
+      const promptParts: any[] = [];
       if (input.photoDataUri) {
-        promptContent.push({ media: { url: input.photoDataUri } });
+        promptParts.push({ media: { url: input.photoDataUri } });
       }
-      promptContent.push({ text: input.message || "Bonjour" });
+      promptParts.push({ text: input.message || "Bonjour" });
 
       const response = await ai.generate({
         model: 'googleai/gemini-1.5-flash',
         system: systemInstruction,
-        prompt: promptContent,
+        prompt: promptParts,
         tools: [searchProducts],
         history: input.history || [],
       });

@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useRef, useEffect } from 'react';
@@ -111,8 +112,9 @@ export function AiAssistant() {
         const userMsg = messageToSend.trim();
         const userImg = attachedImage;
         
-        // On ajoute le message utilisateur localement
-        const newMessages: Message[] = [...messages, { role: 'user', text: userMsg, image: userImg || undefined }];
+        // 1. Ajouter le message utilisateur localement pour l'affichage
+        const userMessage: Message = { role: 'user', text: userMsg, image: userImg || undefined };
+        const newMessages: Message[] = [...messages, userMessage];
         setMessages(newMessages);
         setInput("");
         setAttachedImage(null);
@@ -120,11 +122,20 @@ export function AiAssistant() {
         setIsLoading(true);
 
         try {
-            // Nettoyage de l'historique pour Gemini (Alternance User/Model obligatoire)
-            // On retire le tout premier message de bienvenue du modèle s'il est seul pour commencer par un message User
-            const conversationHistory = newMessages
-                .filter(m => m.text) // On s'assure qu'il y a du texte
-                .slice(0, -1) // On enlève le dernier message car il sera passé comme prompt principal
+            /**
+             * CONSTRUCTION DE L'HISTORIQUE POUR GEMINI
+             * Gemini impose :
+             * 1. Début par un message 'user'.
+             * 2. Alternance stricte user/model.
+             * 3. Le prompt actuel n'est pas dans l'historique (il est passé à part).
+             */
+            const conversationHistory = messages
+                .filter((m, index) => {
+                    // On ignore le tout premier message si c'est le message de bienvenue du modèle
+                    // car l'historique DOIT commencer par un message utilisateur.
+                    if (index === 0 && m.role === 'model') return false;
+                    return !!m.text;
+                })
                 .map(m => ({
                     role: m.role,
                     content: [{ text: m.text }]
