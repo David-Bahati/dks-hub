@@ -39,6 +39,8 @@ import { Product } from '@/lib/types';
 import { PlusCircle, Edit, Trash2, Eye, EyeOff, Loader2, ArrowLeft, Sparkles, Image as ImageIcon, Upload } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useCollection, useMemoFirebase } from '@/firebase';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
 import Link from 'next/link';
 import { generateProductDescription } from '@/ai/flows/generate-product-description';
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -90,8 +92,9 @@ function ProductsPage() {
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-        if (file.size > 2 * 1024 * 1024) {
-            toast({ title: "Fichier trop lourd", description: "L'image ne doit pas dépasser 2Mo.", variant: "destructive" });
+        // Limite à 800Ko pour éviter de saturer le document Firestore (limite 1Mo)
+        if (file.size > 800 * 1024) {
+            toast({ title: "Fichier trop lourd", description: "L'image ne doit pas dépasser 800Ko pour la base de données.", variant: "destructive" });
             return;
         }
         const reader = new FileReader();
@@ -156,33 +159,54 @@ function ProductsPage() {
       updatedAt: serverTimestamp()
     };
 
-    try {
-      if (editingProduct) {
-        const docRef = doc(db, "products", editingProduct.id);
-        await setDoc(docRef, productData, { merge: true });
-        toast({ title: "Produit mis à jour", description: "Les changements ont été enregistrés." });
-      } else {
-        const colRef = collection(db, "products");
-        await addDoc(colRef, {
-          ...productData,
-          createdAt: serverTimestamp()
+    if (editingProduct) {
+      const docRef = doc(db, "products", editingProduct.id);
+      setDoc(docRef, productData, { merge: true })
+        .then(() => {
+          toast({ title: "Produit mis à jour", description: "Les changements ont été enregistrés." });
+          setIsSheetOpen(false);
+        })
+        .catch(async (error) => {
+          errorEmitter.emit('permission-error', new FirestorePermissionError({
+            path: docRef.path,
+            operation: 'update',
+            requestResourceData: productData
+          }));
         });
-        toast({ title: "Produit créé", description: "L'article est ajouté au stock." });
-      }
-      setIsSheetOpen(false);
-    } catch (e) {
-      toast({ title: "Erreur", description: "Impossible de sauvegarder en base.", variant: "destructive" });
+    } else {
+      const colRef = collection(db, "products");
+      const fullData = {
+        ...productData,
+        createdAt: serverTimestamp()
+      };
+      addDoc(colRef, fullData)
+        .then(() => {
+          toast({ title: "Produit créé", description: "L'article est ajouté au stock." });
+          setIsSheetOpen(false);
+        })
+        .catch(async (error) => {
+          errorEmitter.emit('permission-error', new FirestorePermissionError({
+            path: colRef.path,
+            operation: 'create',
+            requestResourceData: fullData
+          }));
+        });
     }
   }
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = (id: string) => {
     if(window.confirm("Supprimer définitivement cet article ?")){
-        try {
-            await deleteDoc(doc(db, "products", id));
-            toast({ title: "Produit supprimé", variant: "destructive" });
-        } catch (e) {
-            toast({ title: "Erreur", variant: "destructive" });
-        }
+        const docRef = doc(db, "products", id);
+        deleteDoc(docRef)
+            .then(() => {
+                toast({ title: "Produit supprimé", variant: "destructive" });
+            })
+            .catch(async (error) => {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
+                    path: docRef.path,
+                    operation: 'delete'
+                }));
+            });
     }
   };
 
