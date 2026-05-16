@@ -48,7 +48,8 @@ import {
   Video,
   Shield,
   Eye,
-  Share2
+  Share2,
+  X
 } from 'lucide-react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
@@ -63,6 +64,13 @@ import {
     CarouselContent, 
     CarouselItem 
 } from "@/components/ui/carousel";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import Autoplay from "embla-carousel-autoplay";
 
 const ICON_MAP: Record<string, any> = {
@@ -82,6 +90,7 @@ export default function LandingPage() {
   const [subscribed, setSubscribed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   
   const { addToCart } = useCart();
   const { toast } = useToast();
@@ -399,7 +408,7 @@ export default function LandingPage() {
                             <div className="aspect-square relative overflow-hidden">
                                 <img src={product.imageUrl} alt={product.name} className="object-cover w-full h-full group-hover:scale-110 transition-transform duration-500" />
                                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
-                                    <Button variant="secondary" size="icon" className="rounded-xl"><Info size={18}/></Button>
+                                    <Button variant="secondary" size="icon" className="rounded-xl" onClick={() => setSelectedProduct(product)}><Info size={18}/></Button>
                                     <Button className="rounded-xl bg-accent text-black" onClick={() => addToCart(product)}><ShoppingCart size={18}/></Button>
                                 </div>
                                 {product.stockQuantity < 5 && <Badge className="absolute top-4 right-4 bg-red-500 text-white border-none text-[8px] font-black uppercase px-2">Stock Limité</Badge>}
@@ -486,6 +495,64 @@ export default function LandingPage() {
             </div>
         </div>
       </footer>
+
+      {/* DIALOG DE DÉTAILS PRODUIT */}
+      <Dialog open={!!selectedProduct} onOpenChange={() => setSelectedProduct(null)}>
+        <DialogContent className="bg-card/95 backdrop-blur-3xl border-white/10 text-foreground rounded-[2.5rem] sm:max-w-3xl overflow-hidden p-0">
+          <div className="grid grid-cols-1 md:grid-cols-2">
+            <div className="aspect-square relative bg-black/40">
+              <img src={selectedProduct?.imageUrl} className="w-full h-full object-cover" alt={selectedProduct?.name} />
+              <Badge className="absolute top-6 left-6 bg-accent text-black font-black uppercase italic text-[10px]">Elite Stock</Badge>
+            </div>
+            <div className="p-10 flex flex-col justify-between">
+              <div className="space-y-6">
+                <div className="space-y-2">
+                  <div className="flex justify-between items-start">
+                    <Badge variant="outline" className="border-accent/20 text-accent text-[9px] font-black uppercase">{selectedProduct?.category}</Badge>
+                    <button onClick={() => setSelectedProduct(null)} className="text-white/20 hover:text-white transition-colors"><X size={24}/></button>
+                  </div>
+                  <DialogTitle className="text-3xl font-black uppercase italic tracking-tighter leading-none">{selectedProduct?.name}</DialogTitle>
+                </div>
+                
+                <div className="space-y-4">
+                  <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-2">
+                    <Zap size={12} className="text-accent" /> Description Technique
+                  </p>
+                  <p className="text-sm text-white/70 leading-relaxed italic">
+                    {selectedProduct?.description || "Ce produit d'exception fait partie de la sélection premium de Double King Shop, garantissant performance et fiabilité pour vos projets les plus exigeants."}
+                  </p>
+                </div>
+
+                <div className="pt-6 border-t border-white/5 flex items-center gap-10">
+                   <div>
+                     <p className="text-[9px] font-black uppercase text-muted-foreground mb-1">Disponibilité</p>
+                     <p className={cn("text-sm font-bold uppercase", selectedProduct?.stockQuantity && selectedProduct.stockQuantity > 0 ? "text-green-400" : "text-red-500")}>
+                        {selectedProduct?.stockQuantity && selectedProduct.stockQuantity > 0 ? `${selectedProduct.stockQuantity} Unités en Stock` : "Rupture de Stock"}
+                     </p>
+                   </div>
+                   <div>
+                     <p className="text-[9px] font-black uppercase text-muted-foreground mb-1">Consensus</p>
+                     <p className="text-sm font-black text-white italic">GCV Ready</p>
+                   </div>
+                </div>
+              </div>
+
+              <div className="mt-10 space-y-4">
+                <div className="flex justify-between items-end">
+                   <p className="text-[10px] font-black uppercase text-accent tracking-[0.3em]">Investissement</p>
+                   <p className="text-4xl font-black text-white italic">${selectedProduct?.sellingPrice.toFixed(2)}</p>
+                </div>
+                <Button 
+                  onClick={() => { if(selectedProduct) { addToCart(selectedProduct); setSelectedProduct(null); } }} 
+                  className="w-full h-16 bg-accent text-black font-black uppercase italic rounded-2xl shadow-xl shadow-accent/20 text-lg gap-3"
+                >
+                  <ShoppingCart size={24} /> Ajouter au Panier
+                </Button>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
