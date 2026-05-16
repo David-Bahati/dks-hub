@@ -86,23 +86,27 @@ export function AiAssistant() {
         if (!userMsg && !userImg) return;
         if (isLoading) return;
 
-        // Préparation de l'historique SANS le message de bienvenue et SANS le message actuel
-        // On s'assure de l'alternance stricte : user -> model
-        const conversationHistory = messages
-            .filter((_, idx) => idx > 0) // On ignore le message de bienvenue initial (model)
-            .map(m => {
-                const parts = [];
-                if (m.image) {
-                    parts.push({ media: { url: m.image, contentType: 'image/jpeg' } });
-                }
-                if (m.text) {
-                    parts.push({ text: m.text });
-                }
-                return {
-                    role: m.role,
-                    content: parts
-                };
+        // CONSTRUCTION DE L'HISTORIQUE SÉCURISÉ (Alternance User -> Model)
+        // Gemini rejette si l'historique ne commence pas par 'user' ou se termine par 'user'
+        const conversationHistory = [];
+        
+        // On ignore le message de bienvenue (idx 0) car c'est un 'model' message au début
+        // On ne prend que les paires terminées (User, Model)
+        for (let i = 1; i < messages.length; i++) {
+            const m = messages[i];
+            const parts = [];
+            if (m.image) parts.push({ media: { url: m.image, contentType: 'image/jpeg' } });
+            if (m.text) parts.push({ text: m.text });
+            
+            conversationHistory.push({
+                role: m.role,
+                content: parts
             });
+        }
+
+        // Si l'historique est impair ou vide, il commence forcément par User si on a sauté le message 0.
+        // On s'assure qu'il finit par 'model' pour que le prompt actuel soit le nouveau 'user'
+        const safeHistory = conversationHistory.length % 2 === 0 ? conversationHistory : conversationHistory.slice(0, -1);
 
         const userMessage: Message = { 
             role: 'user', 
@@ -110,28 +114,27 @@ export function AiAssistant() {
             image: userImg || undefined 
         };
 
-        // Mise à jour visuelle immédiate
         setMessages(prev => [...prev, userMessage]);
         setInput("");
         setAttachedImage(null);
         setIsLoading(true);
 
         try {
-            const response = await askAssistant({ 
+            const responseText = await askAssistant({ 
                 message: userMessage.text, 
                 language: currentLanguage.code, 
                 photoDataUri: userImg || undefined, 
-                history: conversationHistory
+                history: safeHistory
             });
 
-            setMessages(prev => [...prev, { role: 'model', text: response }]);
+            setMessages(prev => [...prev, { role: 'model', text: responseText }]);
             
             if (isSpeechEnabled && typeof window !== 'undefined') {
-                const utterance = new SpeechSynthesisUtterance(response);
+                const utterance = new SpeechSynthesisUtterance(responseText);
                 utterance.lang = currentLanguage.voiceCode;
                 window.speechSynthesis.speak(utterance);
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error("AI client error:", error);
             setMessages(prev => [...prev, { 
                 role: 'model', 
