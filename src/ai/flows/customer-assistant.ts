@@ -16,10 +16,17 @@ const AssistantInputSchema = z.object({
   photoDataUri: z.string().optional().describe("Photo du matériel au format data URI base64"),
   history: z.array(z.object({
     role: z.enum(['user', 'model']),
-    content: z.array(z.object({ text: z.string().optional() }))
+    content: z.array(z.object({ 
+      text: z.string().optional(),
+      media: z.object({ url: z.string() }).optional()
+    }))
   })).optional(),
 });
 
+/**
+ * Outil de recherche de produits en stock.
+ * Sécurisé pour éviter les crashs en cas de base vide.
+ */
 const searchProducts = ai.defineTool(
   {
     name: 'searchProducts',
@@ -74,14 +81,16 @@ const customerAssistantFlow = ai.defineFlow(
 
       IMPORTANT : 
       1. Tu dois répondre EXCLUSIVEMENT en ${langNames[input.language] || 'Français'}.
-      2. Si une image est fournie, analyse-la pour identifier le composant.
-      3. Utilise l'outil searchProducts si le client cherche un article précis.
+      2. Si une image est fournie, analyse-la pour identifier le composant hardware.
+      3. Utilise l'outil searchProducts uniquement si le client cherche un article précis en stock.
+      4. Sois concis, technique et poli.
       
-      CONTEXTE :
+      CONTEXTE DKS :
       - Lieu : Immeuble Bahati, Boulevard de la Libération, Bunia.
-      - Spécialité : Hardware luxe (RTX 4090), Starlink, Formations IA.
-      - Paiements : Pi Network (GCV $314,159) et DKST acceptés.`;
+      - Spécialité : Hardware luxe (RTX 4090, Starlink), Formations IA & Blockchain.
+      - Économie : Paiements Pi Network (GCV $314,159) et jetons DKST acceptés.`;
 
+      // Construction propre du prompt (Texte + Media optionnel)
       const promptParts: any[] = [];
       if (input.photoDataUri && input.photoDataUri.startsWith('data:')) {
         promptParts.push({ media: { url: input.photoDataUri } });
@@ -96,10 +105,10 @@ const customerAssistantFlow = ai.defineFlow(
         history: input.history || [],
       });
 
-      return response.text || "Je n'ai pas pu formuler de réponse. Pouvez-vous reformuler ?";
+      return response.text || "Désolé, je n'ai pas pu formuler de réponse précise. Pouvez-vous reformuler ?";
     } catch (error: any) {
-      console.error("Genkit Flow Error:", error);
-      return "Une difficulté technique empêche temporairement la communication avec le cerveau DKS. Veuillez réessayer dans quelques instants.";
+      console.error("Genkit Flow Critical Error:", error);
+      return "Une interruption de communication avec le cerveau DKS a été détectée. Veuillez réessayer dans quelques instants.";
     }
   }
 );

@@ -66,6 +66,7 @@ export function AiAssistant() {
     const videoRef = useRef<HTMLVideoElement>(null);
     const { toast } = useToast();
 
+    // Gestion de l'affichage du teaser "Besoin d'aide ?"
     useEffect(() => {
         let showTimer: any;
         let hideTimer: any;
@@ -91,52 +92,53 @@ export function AiAssistant() {
         if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }, [messages, isLoading]);
 
-    const handleSend = async (overrideInput?: string) => {
-        const messageToSend = overrideInput || input || (attachedImage ? "Analyse cette image." : "");
-        if (!messageToSend.trim() && !attachedImage) return;
-        if (isLoading) return;
-
-        const userMsg = messageToSend.trim();
+    const handleSend = async () => {
+        const userMsg = input.trim();
         const userImg = attachedImage;
         
-        // On prépare l'historique AVANT d'ajouter le nouveau message
-        // Gemini exige que l'historique commence par un message 'user'
+        if (!userMsg && !userImg) return;
+        if (isLoading) return;
+
+        // 1. Préparation de l'historique filtré (Gemini exige que l'historique commence par 'user')
         const conversationHistory = messages
             .filter((m, idx) => {
-                // On ignore le message de bienvenue initial pour l'IA (mais il reste dans l'UI)
+                // On ignore le message de bienvenue du modèle s'il est au tout début
                 if (idx === 0 && m.role === 'model') return false;
-                return !!m.text;
+                return true;
             })
             .map(m => ({
                 role: m.role,
                 content: [{ text: m.text }]
             }));
 
-        // Mise à jour de l'UI
-        const userMessage: Message = { role: 'user', text: userMsg, image: userImg || undefined };
+        // 2. Mise à jour de l'UI immédiate
+        const userMessage: Message = { role: 'user', text: userMsg || (userImg ? "Analyse cette image." : ""), image: userImg || undefined };
         setMessages(prev => [...prev, userMessage]);
         setInput("");
         setAttachedImage(null);
         setIsLoading(true);
 
         try {
+            // 3. Appel au flux backend
             const response = await askAssistant({ 
-                message: userMsg, 
+                message: userMessage.text, 
                 language: currentLanguage.code, 
                 photoDataUri: userImg || undefined, 
-                history: conversationHistory 
+                history: conversationHistory as any
             });
 
+            // 4. Affichage de la réponse du modèle
             setMessages(prev => [...prev, { role: 'model', text: response }]);
             
+            // 5. Synthèse vocale si activée
             if (isSpeechEnabled && typeof window !== 'undefined') {
                 const utterance = new SpeechSynthesisUtterance(response);
                 utterance.lang = currentLanguage.voiceCode;
                 window.speechSynthesis.speak(utterance);
             }
         } catch (error) {
-            console.error("AI Assistant Error:", error);
-            setMessages(prev => [...prev, { role: 'model', text: "Désolé, je rencontre une difficulté de communication avec le Hub. Pouvez-vous réessayer ?" }]);
+            console.error("AI Assistant Communication Error:", error);
+            setMessages(prev => [...prev, { role: 'model', text: "Désolé, j'ai rencontré une difficulté de communication avec le Hub. Veuillez réessayer." }]);
         } finally { 
             setIsLoading(false); 
         }
@@ -214,7 +216,7 @@ export function AiAssistant() {
                                 </div>
                             </div>
                             <div className="flex items-center gap-1">
-                                <Button variant="ghost" size="icon" onClick={toggleScanner} className="h-8 w-8 text-white/40 hover:text-accent">
+                                <Button variant="ghost" size="icon" onClick={toggleScanner} title="Scanner un QR/Produit" className="h-8 w-8 text-white/40 hover:text-accent">
                                     <QrCode size={14}/>
                                 </Button>
                                 <Button variant="ghost" size="icon" onClick={() => setIsSpeechEnabled(!isSpeechEnabled)} className={cn("h-8 w-8 rounded-xl", isSpeechEnabled ? "text-accent bg-accent/10" : "text-white/20")}>
@@ -246,7 +248,7 @@ export function AiAssistant() {
                         {isLoading && (
                             <div className="flex items-center gap-3 p-4 rounded-2xl bg-white/[0.02] w-fit animate-pulse">
                                 <Loader2 className="animate-spin h-3 w-3 text-accent" />
-                                <span className="text-[10px] font-black uppercase text-accent/40 italic">L'expert analyse...</span>
+                                <span className="text-[10px] font-black uppercase text-accent/40 italic">L'expert DKS réfléchit...</span>
                             </div>
                         )}
                     </CardContent>
@@ -257,7 +259,7 @@ export function AiAssistant() {
                                 <div className="w-10 h-10 rounded-lg overflow-hidden border border-accent/40 shrink-0">
                                     <img src={attachedImage} className="w-full h-full object-cover" alt="Thumb" />
                                 </div>
-                                <span className="text-[8px] font-black uppercase text-accent">Pièce jointe prête</span>
+                                <span className="text-[8px] font-black uppercase text-accent">Photo prête pour analyse</span>
                                 <button onClick={() => setAttachedImage(null)} className="ml-auto p-1 hover:text-red-500">
                                     <CloseIcon size={12}/>
                                 </button>
@@ -272,6 +274,7 @@ export function AiAssistant() {
                                 onClick={() => fileInputRef.current?.click()} 
                                 className="h-12 w-12 rounded-xl border-white/10 hover:bg-accent/10 transition-all shrink-0"
                                 disabled={isLoading}
+                                title="Joindre une photo"
                             >
                                 <ImageIcon size={18} />
                             </Button>
@@ -295,6 +298,7 @@ export function AiAssistant() {
                 </Card>
             )}
 
+            {/* Scanner Dialog (Simulé) */}
             <Dialog open={isScannerOpen} onOpenChange={setIsScannerOpen}>
                 <DialogContent className="bg-black/90 border-white/10 text-white rounded-[2.5rem] sm:max-w-lg p-0 overflow-hidden">
                     <div className="aspect-square relative bg-black flex items-center justify-center">
