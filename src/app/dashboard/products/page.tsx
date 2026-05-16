@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import withAuth from '@/components/auth/withAuth';
 import { Navbar } from "@/components/layout/Navbar";
 import { Button } from "@/components/ui/button";
@@ -34,9 +34,9 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { db } from '@/lib/firebase';
-import { collection, doc, serverTimestamp, setDoc, addDoc, deleteDoc } from 'firebase/firestore';
+import { collection, doc, serverTimestamp, setDoc, addDoc, deleteDoc, query, where, orderBy } from 'firebase/firestore';
 import { Product } from '@/lib/types';
-import { PlusCircle, Edit, Trash2, Eye, EyeOff, Loader2, ArrowLeft, Sparkles } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, Eye, EyeOff, Loader2, ArrowLeft, Sparkles, Image as ImageIcon, Upload } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useCollection, useMemoFirebase } from '@/firebase';
 import Link from 'next/link';
@@ -44,6 +44,7 @@ import { generateProductDescription } from '@/ai/flows/generate-product-descript
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
+import { cn } from "@/lib/utils";
 
 const productSchema = z.object({
   name: z.string().min(3, "Le nom doit contenir au moins 3 caractères"),
@@ -63,6 +64,7 @@ function ProductsPage() {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [isGeneratingDesc, setIsGeneratingDesc] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   const productsQuery = useMemoFirebase(() => collection(db, "products"), []);
@@ -84,6 +86,21 @@ function ProductsPage() {
       imageUrl: "",
     },
   });
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+        if (file.size > 2 * 1024 * 1024) {
+            toast({ title: "Fichier trop lourd", description: "L'image ne doit pas dépasser 2Mo.", variant: "destructive" });
+            return;
+        }
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            form.setValue("imageUrl", reader.result as string);
+        };
+        reader.readAsDataURL(file);
+    }
+  };
 
   const openSheet = (product: Product | null = null) => {
     setEditingProduct(product);
@@ -253,6 +270,43 @@ function ProductsPage() {
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="flex-1 overflow-y-auto p-8 space-y-8 custom-scrollbar">
               <div className="space-y-6">
+                  {/* CHAMP D'IMPORTATION PHOTO */}
+                  <FormField
+                    control={form.control}
+                    name="imageUrl"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Photo du Produit</FormLabel>
+                        <div 
+                          onClick={() => fileInputRef.current?.click()}
+                          className="aspect-video rounded-3xl border-2 border-dashed border-white/5 hover:border-accent/40 bg-background/50 flex flex-col items-center justify-center cursor-pointer transition-all overflow-hidden group relative"
+                        >
+                          {field.value ? (
+                            <>
+                              <img src={field.value} className="w-full h-full object-cover" alt="Preview" />
+                              <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                <Upload className="text-white" />
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <ImageIcon className="h-10 w-10 text-muted-foreground mb-2 group-hover:text-accent transition-colors" />
+                              <span className="text-[10px] text-muted-foreground group-hover:text-accent font-black uppercase tracking-widest">Cliquer pour importer</span>
+                            </>
+                          )}
+                        </div>
+                        <input 
+                          type="file" 
+                          ref={fileInputRef} 
+                          className="hidden" 
+                          accept="image/*"
+                          onChange={handleImageChange}
+                        />
+                        <FormMessage className="text-[10px]" />
+                      </FormItem>
+                    )}
+                  />
+
                   <div className="grid grid-cols-2 gap-6">
                       <FormField
                         control={form.control}
@@ -261,7 +315,7 @@ function ProductsPage() {
                           <FormItem>
                             <FormLabel className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Nom du produit</FormLabel>
                             <FormControl>
-                              <Input {...field} className="h-12 bg-background/50 border-white/5 rounded-xl focus:border-accent" />
+                              <Input {...field} className="h-12 bg-background/50 border-white/5 rounded-xl focus:border-accent font-bold" />
                             </FormControl>
                             <FormMessage className="text-[10px]" />
                           </FormItem>
@@ -345,7 +399,7 @@ function ProductsPage() {
                           </Button>
                         </div>
                         <FormControl>
-                          <Textarea {...field} className="min-h-[150px] bg-background/50 border-white/5 rounded-2xl focus:border-accent text-sm" />
+                          <Textarea {...field} className="min-h-[150px] bg-background/50 border-white/5 rounded-2xl focus:border-accent text-sm italic" />
                         </FormControl>
                         <FormMessage className="text-[10px]" />
                       </FormItem>
