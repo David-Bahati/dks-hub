@@ -16,7 +16,7 @@ const AssistantInputSchema = z.object({
   photoDataUri: z.string().optional().describe("Photo du matériel au format data URI base64"),
   history: z.array(z.object({
     role: z.enum(['user', 'model']),
-    content: z.array(z.object({ text: z.string().optional() }))
+    content: z.array(z.object({ text: z.string().optional(), media: z.any().optional() }))
   })).optional(),
 });
 
@@ -35,12 +35,12 @@ const searchProducts = ai.defineTool(
       const q = query(
         productsRef, 
         where("isPublished", "==", true),
-        limit(20)
+        limit(15)
       );
       const snapshot = await getDocs(q);
       const products = snapshot.docs.map(doc => ({
         name: doc.data().name,
-        price: doc.data().sellingPrice,
+        price: doc.data().sellingPrice || doc.data().price,
         category: doc.data().category,
         stock: doc.data().stockQuantity,
         description: doc.data().description
@@ -49,8 +49,7 @@ const searchProducts = ai.defineTool(
       const searchTerm = input.query.toLowerCase();
       return products.filter(p => 
         p.name.toLowerCase().includes(searchTerm) || 
-        p.category.toLowerCase().includes(searchTerm) ||
-        (p.description && p.description.toLowerCase().includes(searchTerm))
+        p.category.toLowerCase().includes(searchTerm)
       ).slice(0, 5);
     } catch (error) {
       console.error("Erreur tool searchProducts:", error);
@@ -82,38 +81,38 @@ const customerAssistantFlow = ai.defineFlow(
 
       CAPACITÉ VISUELLE :
       Si une image est fournie, analyse-la pour identifier le composant informatique ou le problème technique.
-      Utilise cette analyse pour conseiller le client sur le stock disponible ou la réparation nécessaire.
 
-      CONTEXTE ET VALEURS :
-      - Localisation : Immeuble Bahati, Boulevard de la Libération, Bunia, Ituri, RDC.
-      - Spécialité : Hardware premium, Starlink, Vidéosurveillance.
-      - Économie : Paiement en Pi Network (1 Pi = $314,159 GCV) et jetons DKST.
+      CONTEXTE :
+      - Localisation : Immeuble Bahati, Boulevard de la Libération, Bunia, RDC.
+      - Spécialité : Hardware premium (RTX 4090, Intel i9), Starlink, Vidéosurveillance.
+      - Économie : Paiement en Pi Network (GCV $314,159) et jetons DKST.
       
       INSTRUCTIONS DE REPONSE :
-      - Pour les produits, utilise l'outil searchProducts.
-      - Si l'image montre un composant cassé, propose d'ouvrir un ticket SAV au Hub.
-      - Explique toujours les bénéfices des paiements en Crypto.`;
+      - Utilise l'outil searchProducts pour donner des infos réelles sur le stock si besoin.
+      - Propose toujours un ticket SAV si l'image montre un matériel cassé.`;
 
       const promptParts: any[] = [];
       
+      // Ajout de l'image si présente
       if (input.photoDataUri) {
         promptParts.push({ media: { url: input.photoDataUri } });
       }
       
-      promptParts.push({ text: input.message });
+      // Ajout du texte de l'utilisateur
+      promptParts.push({ text: input.message || "Bonjour" });
 
       const response = await ai.generate({
         model: 'googleai/gemini-1.5-flash',
         system: systemInstruction,
         prompt: promptParts,
         tools: [searchProducts],
-        history: input.history,
+        history: input.history || [],
       });
 
-      return response.text;
+      return response.text || "Je n'ai pas pu générer de réponse. Pouvez-vous reformuler ?";
     } catch (error: any) {
       console.error("Genkit Flow Error:", error);
-      return "Désolé, je rencontre une difficulté technique pour analyser cette demande. Veuillez réessayer dans quelques instants.";
+      return "Désolé, je rencontre une difficulté technique pour analyser votre demande. Veuillez réessayer dans quelques instants.";
     }
   }
 );
