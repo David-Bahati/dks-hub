@@ -66,6 +66,7 @@ function ProductsPage() {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [isGeneratingDesc, setIsGeneratingDesc] = useState(false);
+  const [isCompressing, setIsCompressing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -89,23 +90,66 @@ function ProductsPage() {
     },
   });
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  /**
+   * Fonction de compression d'image intelligente.
+   * Redimensionne et compresse l'image pour qu'elle soit compatible avec Firestore (< 1Mo).
+   */
+  const compressImage = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+
+          // Redimensionnement max 800px pour garder un bon ratio poids/qualité
+          const MAX_WIDTH = 800;
+          const MAX_HEIGHT = 800;
+
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height *= MAX_WIDTH / width;
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width *= MAX_HEIGHT / height;
+              height = MAX_HEIGHT;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+
+          // Exportation en JPEG avec une qualité de 0.7 pour un poids optimal
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+          resolve(dataUrl);
+        };
+        img.onerror = (err) => reject(err);
+      };
+      reader.onerror = (err) => reject(err);
+    });
+  };
+
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-        // Limite abaissée à 600Ko pour garantir que le document Firestore (limite 1Mo) ne sature pas avec l'encodage Base64
-        if (file.size > 600 * 1024) {
-            toast({ 
-                title: "Fichier trop volumineux", 
-                description: "Veuillez choisir une image de moins de 600 Ko pour assurer la sauvegarde.", 
-                variant: "destructive" 
-            });
-            return;
+        setIsCompressing(true);
+        try {
+            const compressedBase64 = await compressImage(file);
+            form.setValue("imageUrl", compressedBase64);
+            toast({ title: "Image optimisée", description: "La photo a été adaptée pour la base de données." });
+        } catch (error) {
+            toast({ title: "Erreur traitement", description: "Impossible de traiter cette image.", variant: "destructive" });
+        } finally {
+            setIsCompressing(false);
         }
-        const reader = new FileReader();
-        reader.onloadend = () => {
-            form.setValue("imageUrl", reader.result as string);
-        };
-        reader.readAsDataURL(file);
     }
   };
 
@@ -158,14 +202,13 @@ function ProductsPage() {
   async function onSubmit(values: z.infer<typeof productSchema>) {
     const productData = {
       ...values,
-      price: values.sellingPrice, // Compatibilité panier
+      price: values.sellingPrice,
       imageUrl: values.imageUrl || `https://picsum.photos/seed/${Math.floor(Math.random() * 1000)}/600/400`,
       updatedAt: serverTimestamp()
     };
 
     if (editingProduct) {
       const docRef = doc(db, "products", editingProduct.id);
-      // Utilisation du mode non-bloquant pour une meilleure réactivité
       setDoc(docRef, productData, { merge: true })
         .catch(async (error) => {
           errorEmitter.emit('permission-error', new FirestorePermissionError({
@@ -175,7 +218,7 @@ function ProductsPage() {
           }));
         });
       
-      toast({ title: "Produit mis à jour", description: "Les changements sont synchronisés en arrière-plan." });
+      toast({ title: "Produit mis à jour" });
       setIsSheetOpen(false);
     } else {
       const colRef = collection(db, "products");
@@ -183,7 +226,6 @@ function ProductsPage() {
         ...productData,
         createdAt: serverTimestamp()
       };
-      // Utilisation du mode non-bloquant
       addDoc(colRef, fullData)
         .catch(async (error) => {
           errorEmitter.emit('permission-error', new FirestorePermissionError({
@@ -193,7 +235,7 @@ function ProductsPage() {
           }));
         });
 
-      toast({ title: "Produit créé", description: "L'article est ajouté au stock du Hub." });
+      toast({ title: "Produit créé", description: "L'article est ajouté au stock." });
       setIsSheetOpen(false);
     }
   }
@@ -298,18 +340,26 @@ function ProductsPage() {
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="flex-1 overflow-y-auto p-8 space-y-8 custom-scrollbar">
               <div className="space-y-6">
-                  {/* CHAMP D'IMPORTATION PHOTO */}
+                  {/* CHAMP D'IMPORTATION PHOTO AVEC COMPRESSION */}
                   <FormField
                     control={form.control}
                     name="imageUrl"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Photo du Produit</FormLabel>
+                        <FormLabel className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Photo du Produit (Haute Qualité acceptée)</FormLabel>
                         <div 
-                          onClick={() => fileInputRef.current?.click()}
-                          className="aspect-video rounded-3xl border-2 border-dashed border-white/5 hover:border-accent/40 bg-background/50 flex flex-col items-center justify-center cursor-pointer transition-all overflow-hidden group relative"
+                          onClick={() => !isCompressing && fileInputRef.current?.click()}
+                          className={cn(
+                              "aspect-video rounded-3xl border-2 border-dashed border-white/5 hover:border-accent/40 bg-background/50 flex flex-col items-center justify-center cursor-pointer transition-all overflow-hidden group relative",
+                              isCompressing && "opacity-50 cursor-wait"
+                          )}
                         >
-                          {field.value ? (
+                          {isCompressing ? (
+                              <div className="flex flex-col items-center gap-3">
+                                  <Loader2 className="animate-spin text-accent" />
+                                  <span className="text-[10px] font-black uppercase text-accent animate-pulse">Optimisation de la photo...</span>
+                              </div>
+                          ) : field.value ? (
                             <>
                               <img src={field.value} className="w-full h-full object-cover" alt="Preview" />
                               <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
@@ -319,7 +369,7 @@ function ProductsPage() {
                           ) : (
                             <>
                               <ImageIcon className="h-10 w-10 text-muted-foreground mb-2 group-hover:text-accent transition-colors" />
-                              <span className="text-[10px] text-muted-foreground group-hover:text-accent font-black uppercase tracking-widest">Cliquer pour importer (Max 600 Ko)</span>
+                              <span className="text-[10px] text-muted-foreground group-hover:text-accent font-black uppercase tracking-widest text-center px-4">Cliquer pour choisir votre photo</span>
                             </>
                           )}
                         </div>
@@ -452,7 +502,7 @@ function ProductsPage() {
               </div>
 
               <SheetFooter className="pt-6 border-t border-white/5">
-                  <Button type="submit" disabled={form.formState.isSubmitting} className="w-full h-16 bg-accent text-black font-black uppercase italic rounded-2xl shadow-xl shadow-accent/10 text-lg">
+                  <Button type="submit" disabled={form.formState.isSubmitting || isCompressing} className="w-full h-16 bg-accent text-black font-black uppercase italic rounded-2xl shadow-xl shadow-accent/10 text-lg">
                       {form.formState.isSubmitting ? <Loader2 className="animate-spin" /> : editingProduct ? 'Appliquer les modifications' : 'Enregistrer dans le Stock'}
                   </Button>
               </SheetFooter>
