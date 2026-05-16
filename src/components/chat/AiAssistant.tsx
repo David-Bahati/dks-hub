@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useRef, useEffect } from 'react';
@@ -23,7 +22,8 @@ import {
     Cpu,
     QrCode,
     Maximize,
-    Zap
+    Zap,
+    ChevronRight
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -105,23 +105,9 @@ export function AiAssistant() {
     const speak = (text: string) => {
         if (!isSpeechEnabled || typeof window === 'undefined') return;
         window.speechSynthesis.cancel();
-        const utterance = new SpeechSynthesisUtterance(text);
+        const utterance = new SynthesisUtterance(text);
         utterance.lang = currentLanguage.voiceCode;
         window.speechSynthesis.speak(utterance);
-    };
-
-    const toggleListening = () => {
-        if (!recognitionRef.current) return;
-        if (isListening) recognitionRef.current.stop();
-        else { 
-            try {
-                setIsListening(true); 
-                recognitionRef.current.start(); 
-            } catch (e) {
-                console.error("Speech recognition error", e);
-                setIsListening(false);
-            }
-        }
     };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -138,10 +124,8 @@ export function AiAssistant() {
         let hideTimer: any;
 
         if (!isOpen) {
-            // Affiche le message après 5 secondes
             showTimer = setTimeout(() => {
                 setShowTeaser(true);
-                // Le message disparaît automatiquement après 8 secondes supplémentaires
                 hideTimer = setTimeout(() => {
                     setShowTeaser(false);
                 }, 8000);
@@ -161,7 +145,7 @@ export function AiAssistant() {
     }, [messages, isLoading]);
 
     const handleSend = async (overrideInput?: string) => {
-        const messageToSend = overrideInput || input || (attachedImage ? "Analysez cette photo s'il vous plaît." : "");
+        const messageToSend = overrideInput || input || (attachedImage ? "Analyse de photo" : "");
         if (!messageToSend.trim() && !attachedImage) return;
         if (isLoading) return;
 
@@ -171,19 +155,32 @@ export function AiAssistant() {
         setAttachedImage(null);
         setShowTeaser(false);
         
-        const newMessages: Message[] = [...messages, { role: 'user', text: userMsg, image: userImg || undefined }];
-        setMessages(newMessages);
+        const currentMsgs: Message[] = [...messages, { role: 'user', text: userMsg, image: userImg || undefined }];
+        setMessages(currentMsgs);
         setIsLoading(true);
 
         try {
-            const historyForAi = newMessages.slice(0, -1).map(m => ({ role: m.role, content: [{ text: m.text }] }));
-            const response = await askAssistant({ message: userMsg, language: currentLanguage.code, photoDataUri: userImg || undefined, history: historyForAi });
+            // Formatage propre de l'historique pour Genkit 1.x
+            const historyForAi = currentMsgs.slice(0, -1).map(m => ({ 
+                role: m.role, 
+                content: [{ text: m.text }] 
+            }));
+
+            const response = await askAssistant({ 
+                message: userMsg, 
+                language: currentLanguage.code, 
+                photoDataUri: userImg || undefined, 
+                history: historyForAi 
+            });
+
             setMessages(prev => [...prev, { role: 'model', text: response }]);
             if (isSpeechEnabled) speak(response);
         } catch (error) {
-            const errMsg = "Désolé, je rencontre une difficulté technique.";
-            setMessages(prev => [...prev, { role: 'model', text: errMsg }]);
-        } finally { setIsLoading(false); }
+            console.error("AI Send Error:", error);
+            setMessages(prev => [...prev, { role: 'model', text: "Désolé, je rencontre une difficulté technique. Pouvez-vous reformuler ?" }]);
+        } finally { 
+            setIsLoading(false); 
+        }
     };
 
     const toggleScanner = async () => {
@@ -205,7 +202,7 @@ export function AiAssistant() {
     const simulateQrScan = () => {
         setIsScannerOpen(false);
         toast({ title: "Code QR Détecté", description: "Analyse en cours..." });
-        handleSend("Je viens de scanner un produit RTX, donnez-moi les détails et le stock.");
+        handleSend("Je viens de scanner un produit, donnez-moi les détails et le stock.");
     };
 
     return (
@@ -240,7 +237,7 @@ export function AiAssistant() {
                         {messages.map((m, i) => (
                             <div key={i} className={cn("flex flex-col", m.role === 'user' ? "items-end" : "items-start")}>
                                 <div className={cn("max-w-[85%] p-4 rounded-2xl text-sm shadow-lg", m.role === 'user' ? "bg-primary text-white rounded-tr-none" : "bg-white/[0.03] text-white/80 border border-white/5 rounded-tl-none italic")}>
-                                    {m.image && <div className="mb-3 rounded-xl overflow-hidden"><img src={m.image} className="w-full h-auto" /></div>}
+                                    {m.image && <div className="mb-3 rounded-xl overflow-hidden"><img src={m.image} className="w-full h-auto" alt="Attached" /></div>}
                                     {m.text && <p className="whitespace-pre-wrap">{m.text}</p>}
                                 </div>
                             </div>
@@ -249,6 +246,13 @@ export function AiAssistant() {
                     </CardContent>
 
                     <CardFooter className="p-6 bg-black/40 border-t border-white/5 flex flex-col gap-4">
+                        {attachedImage && (
+                            <div className="flex items-center gap-2 p-2 bg-white/5 rounded-xl animate-in slide-in-from-bottom-2">
+                                <div className="w-10 h-10 rounded-lg overflow-hidden border border-accent/40"><img src={attachedImage} className="w-full h-full object-cover" alt="Thumb" /></div>
+                                <span className="text-[8px] font-black uppercase text-accent">Photo prête pour analyse</span>
+                                <button onClick={() => setAttachedImage(null)} className="ml-auto p-1 hover:text-red-500"><CloseIcon size={12}/></button>
+                            </div>
+                        )}
                         <form onSubmit={(e) => { e.preventDefault(); handleSend(); }} className="w-full flex gap-3">
                             <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
                             <Button type="button" variant="outline" size="icon" onClick={() => fileInputRef.current?.click()} className="h-14 w-14 rounded-2xl border-white/10 hover:bg-accent/10 transition-all shrink-0"><Camera size={20} /></Button>

@@ -16,7 +16,7 @@ const AssistantInputSchema = z.object({
   photoDataUri: z.string().optional().describe("Photo du matériel au format data URI base64"),
   history: z.array(z.object({
     role: z.enum(['user', 'model']),
-    content: z.array(z.object({ text: z.string() }))
+    content: z.array(z.object({ text: z.string().optional() }))
   })).optional(),
 });
 
@@ -74,45 +74,46 @@ const customerAssistantFlow = ai.defineFlow(
         'ln': 'Lingala'
       };
       
-      const promptParts: any[] = [
-        { text: `Tu es l'Expert Double King (DKS), l'assistant IA de l'écosystème technologique Double King Shop à Bunia, RDC.
-        Ton rôle est d'être un expert conseil en hardware, vision par ordinateur et économie numérique.
+      const systemInstruction = `Tu es l'Expert Double King (DKS), l'assistant IA de l'écosystème technologique Double King Shop à Bunia, RDC.
+      Ton rôle est d'être un expert conseil en hardware, vision par ordinateur et économie numérique.
 
-        IMPORTANT : Tu dois répondre EXCLUSIVEMENT en ${langNames[input.language] || 'Français'}.
-        Garde un ton professionnel, technologique mais chaleureux.
+      IMPORTANT : Tu dois répondre EXCLUSIVEMENT en ${langNames[input.language] || 'Français'}.
+      Garde un ton professionnel, technologique mais chaleureux.
 
-        CAPACITÉ VISUELLE :
-        Si une image est fournie, analyse-la pour identifier le composant informatique ou le problème technique.
-        Utilise cette analyse pour conseiller le client sur le stock disponible ou la réparation nécessaire.
+      CAPACITÉ VISUELLE :
+      Si une image est fournie, analyse-la pour identifier le composant informatique ou le problème technique.
+      Utilise cette analyse pour conseiller le client sur le stock disponible ou la réparation nécessaire.
 
-        CONTEXTE ET VALEURS :
-        - Localisation : Immeuble Bahati, Boulevard de la Libération, Bunia, Ituri, RDC.
-        - Spécialité : Hardware premium, Starlink, Vidéosurveillance.
-        - Économie : Paiement en Pi Network (1 Pi = $314,159 GCV) et jetons DKST.
-        
-        INSTRUCTIONS DE REPONSE :
-        - Pour les produits, utilise l'outil searchProducts.
-        - Si l'image montre un composant cassé, propose d'ouvrir un ticket SAV au Hub.
-        - Explique toujours les bénéfices des paiements en Crypto.` }
-      ];
+      CONTEXTE ET VALEURS :
+      - Localisation : Immeuble Bahati, Boulevard de la Libération, Bunia, Ituri, RDC.
+      - Spécialité : Hardware premium, Starlink, Vidéosurveillance.
+      - Économie : Paiement en Pi Network (1 Pi = $314,159 GCV) et jetons DKST.
+      
+      INSTRUCTIONS DE REPONSE :
+      - Pour les produits, utilise l'outil searchProducts.
+      - Si l'image montre un composant cassé, propose d'ouvrir un ticket SAV au Hub.
+      - Explique toujours les bénéfices des paiements en Crypto.`;
 
+      const promptParts: any[] = [];
+      
       if (input.photoDataUri) {
-        promptParts.push({ media: { url: input.photoDataUri, contentType: 'image/jpeg' } });
+        promptParts.push({ media: { url: input.photoDataUri } });
       }
-
+      
       promptParts.push({ text: input.message });
 
       const response = await ai.generate({
         model: 'googleai/gemini-1.5-flash',
-        tools: [searchProducts],
+        system: systemInstruction,
         prompt: promptParts,
+        tools: [searchProducts],
         history: input.history,
       });
 
       return response.text;
     } catch (error: any) {
       console.error("Genkit Flow Error:", error);
-      return "Désolé, je rencontre une difficulté technique pour analyser cette demande. Veuillez réessayer.";
+      return "Désolé, je rencontre une difficulté technique pour analyser cette demande. Veuillez réessayer dans quelques instants.";
     }
   }
 );
