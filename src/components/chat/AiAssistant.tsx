@@ -8,28 +8,15 @@ import {
     Send, 
     Sparkles, 
     Loader2, 
-    RotateCcw, 
     ChevronDown, 
-    Mic, 
-    MicOff, 
     Volume2, 
     VolumeX, 
-    Languages,
-    Globe as GlobeIcon,
-    Check,
-    Camera,
-    Image as ImageIcon,
-    MapPin,
-    Cpu,
     QrCode,
-    Maximize,
-    Zap,
-    ChevronRight
+    Image as ImageIcon
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { askAssistant } from '@/ai/flows/customer-assistant';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -39,7 +26,7 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 
 type Message = {
     role: 'user' | 'model';
@@ -112,35 +99,27 @@ export function AiAssistant() {
         const userMsg = messageToSend.trim();
         const userImg = attachedImage;
         
-        // 1. Ajouter le message utilisateur localement pour l'affichage
+        // On prépare l'historique AVANT d'ajouter le nouveau message
+        // Gemini exige que l'historique commence par un message 'user'
+        const conversationHistory = messages
+            .filter((m, idx) => {
+                // On ignore le message de bienvenue initial pour l'IA (mais il reste dans l'UI)
+                if (idx === 0 && m.role === 'model') return false;
+                return !!m.text;
+            })
+            .map(m => ({
+                role: m.role,
+                content: [{ text: m.text }]
+            }));
+
+        // Mise à jour de l'UI
         const userMessage: Message = { role: 'user', text: userMsg, image: userImg || undefined };
-        const newMessages: Message[] = [...messages, userMessage];
-        setMessages(newMessages);
+        setMessages(prev => [...prev, userMessage]);
         setInput("");
         setAttachedImage(null);
-        setShowTeaser(false);
         setIsLoading(true);
 
         try {
-            /**
-             * CONSTRUCTION DE L'HISTORIQUE POUR GEMINI
-             * Gemini impose :
-             * 1. Début par un message 'user'.
-             * 2. Alternance stricte user/model.
-             * 3. Le prompt actuel n'est pas dans l'historique (il est passé à part).
-             */
-            const conversationHistory = messages
-                .filter((m, index) => {
-                    // On ignore le tout premier message si c'est le message de bienvenue du modèle
-                    // car l'historique DOIT commencer par un message utilisateur.
-                    if (index === 0 && m.role === 'model') return false;
-                    return !!m.text;
-                })
-                .map(m => ({
-                    role: m.role,
-                    content: [{ text: m.text }]
-                }));
-
             const response = await askAssistant({ 
                 message: userMsg, 
                 language: currentLanguage.code, 
@@ -191,12 +170,6 @@ export function AiAssistant() {
         }
     };
 
-    const simulateQrScan = () => {
-        setIsScannerOpen(false);
-        toast({ title: "Scan matériel actif", description: "Analyse en cours..." });
-        handleSend("Détaille-moi ce produit hardware s'il te plaît.");
-    };
-
     const changeLanguage = (lang: typeof LANGUAGES[0]) => {
         setCurrentLanguage(lang);
         setMessages([{ role: 'model', text: INITIAL_MESSAGES[lang.code] }]);
@@ -204,7 +177,6 @@ export function AiAssistant() {
 
     return (
         <div className="fixed bottom-6 right-6 z-[100] flex flex-col items-end gap-4">
-            {/* MESSAGE TEASER */}
             {showTeaser && !isOpen && (
                 <div 
                     onClick={() => setIsOpen(true)} 
@@ -215,7 +187,6 @@ export function AiAssistant() {
                 </div>
             )}
 
-            {/* FENÊTRE DE CHAT */}
             {isOpen && (
                 <Card className="w-[380px] h-[620px] glossy-card border-white/10 rounded-[2.5rem] flex flex-col overflow-hidden shadow-2xl animate-in slide-in-from-bottom-8 zoom-in-95">
                     <CardHeader className="bg-primary/20 backdrop-blur-3xl p-6 border-b border-white/5 shrink-0">
@@ -324,16 +295,8 @@ export function AiAssistant() {
                 </Card>
             )}
 
-            {/* SCANNER MODAL */}
             <Dialog open={isScannerOpen} onOpenChange={setIsScannerOpen}>
                 <DialogContent className="bg-black/90 border-white/10 text-white rounded-[2.5rem] sm:max-w-lg p-0 overflow-hidden">
-                    <div className="p-8 border-b border-white/5 flex justify-between items-center bg-white/5">
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-accent/20 flex items-center justify-center text-accent"><QrCode size={20}/></div>
-                            <h3 className="font-black uppercase italic">Lecteur Optique</h3>
-                        </div>
-                        <Button variant="ghost" size="icon" onClick={toggleScanner} className="hover:bg-white/10"><CloseIcon size={20}/></Button>
-                    </div>
                     <div className="aspect-square relative bg-black flex items-center justify-center">
                         <video ref={videoRef} className="w-full h-full object-cover" autoPlay muted playsInline />
                         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
@@ -341,14 +304,10 @@ export function AiAssistant() {
                                 <div className="absolute top-0 left-0 w-full h-0.5 bg-accent shadow-[0_0_15px_rgba(56,189,248,0.8)] animate-[scan_2s_ease-in-out_infinite]" />
                             </div>
                         </div>
-                        <Button onClick={simulateQrScan} className="absolute bottom-8 bg-accent text-black font-black uppercase italic rounded-xl px-8 h-12 shadow-2xl hover:scale-105 active:scale-95 transition-all">
-                            Déclencher l'Analyse
-                        </Button>
                     </div>
                 </DialogContent>
             </Dialog>
 
-            {/* BOUTON FLOTTANT PRINCIPAL */}
             <Button 
                 onClick={() => setIsOpen(!isOpen)} 
                 className={cn(

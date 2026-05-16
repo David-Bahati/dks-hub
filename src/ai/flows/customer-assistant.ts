@@ -31,7 +31,6 @@ const searchProducts = ai.defineTool(
   },
   async (input) => {
     try {
-      // Recherche simplifiée pour la robustesse serveur
       const productsRef = collection(db, "products");
       const q = query(productsRef, where("isPublished", "==", true), limit(20));
       const snapshot = await getDocs(q);
@@ -83,9 +82,8 @@ const customerAssistantFlow = ai.defineFlow(
       - Spécialité : Hardware luxe (RTX 4090), Starlink, Formations IA.
       - Paiements : Pi Network (GCV $314,159) et DKST acceptés.`;
 
-      // Préparation du prompt multi-modal
       const promptParts: any[] = [];
-      if (input.photoDataUri) {
+      if (input.photoDataUri && input.photoDataUri.startsWith('data:')) {
         promptParts.push({ media: { url: input.photoDataUri } });
       }
       promptParts.push({ text: input.message || "Bonjour" });
@@ -101,7 +99,7 @@ const customerAssistantFlow = ai.defineFlow(
       return response.text || "Je n'ai pas pu formuler de réponse. Pouvez-vous reformuler ?";
     } catch (error: any) {
       console.error("Genkit Flow Error:", error);
-      throw new Error("Échec du traitement IA : " + (error.message || "Erreur inconnue"));
+      return "Une difficulté technique empêche temporairement la communication avec le cerveau DKS. Veuillez réessayer dans quelques instants.";
     }
   }
 );
