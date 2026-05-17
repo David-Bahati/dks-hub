@@ -6,7 +6,6 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
-import { gemini15Flash } from '@genkit-ai/google-genai';
 
 const AssistantInputSchema = z.object({
   message: z.string(),
@@ -55,9 +54,9 @@ const customerAssistantFlow = ai.defineFlow(
       
       promptParts.push({ text: input.message });
 
-      // Utilisation de la référence d'objet gemini15Flash pour éviter l'erreur 404
+      // Utilisation de l'ID de chaîne explicite pour éviter l'erreur "Must supply a model"
       const response = await ai.generate({
-        model: gemini15Flash,
+        model: 'googleai/gemini-1.5-flash',
         system: systemInstruction,
         prompt: promptParts,
         history: input.history || [],
@@ -70,7 +69,6 @@ const customerAssistantFlow = ai.defineFlow(
       return response.text || "Je n'ai pas pu générer de texte. Veuillez reformuler.";
     } catch (error: any) {
       console.error("Genkit Flow Error:", error);
-      // Retourne l'erreur technique pour diagnostic si elle persiste
       return `Une erreur technique s'est produite lors de la communication avec le cerveau DKS : ${error.message || 'Erreur inconnue'}`;
     }
   }
