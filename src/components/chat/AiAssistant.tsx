@@ -86,27 +86,26 @@ export function AiAssistant() {
         if (!userMsg && !userImg) return;
         if (isLoading) return;
 
-        // CONSTRUCTION DE L'HISTORIQUE SÉCURISÉ (Alternance User -> Model)
-        // Gemini rejette si l'historique ne commence pas par 'user' ou se termine par 'user'
+        // CONSTRUCTION DE L'HISTORIQUE ÉPURÉ (Texte uniquement pour éviter de saturer le serveur)
+        // Gemini exige l'alternance User -> Model et doit commencer par User.
         const conversationHistory = [];
         
-        // On ignore le message de bienvenue (idx 0) car c'est un 'model' message au début
-        // On ne prend que les paires terminées (User, Model)
+        // On commence après le message de bienvenue (idx 1)
         for (let i = 1; i < messages.length; i++) {
             const m = messages[i];
-            const parts = [];
-            if (m.image) parts.push({ media: { url: m.image, contentType: 'image/jpeg' } });
-            if (m.text) parts.push({ text: m.text });
-            
-            conversationHistory.push({
-                role: m.role,
-                content: parts
-            });
+            if (m.text) {
+                conversationHistory.push({
+                    role: m.role,
+                    content: [{ text: m.text }]
+                });
+            }
         }
 
-        // Si l'historique est impair ou vide, il commence forcément par User si on a sauté le message 0.
-        // On s'assure qu'il finit par 'model' pour que le prompt actuel soit le nouveau 'user'
-        const safeHistory = conversationHistory.length % 2 === 0 ? conversationHistory : conversationHistory.slice(0, -1);
+        // On s'assure que l'historique envoyé finit par un message 'model'
+        // pour que notre message actuel soit le nouveau message 'user' du prompt.
+        const safeHistory = conversationHistory.length % 2 === 0 
+            ? conversationHistory 
+            : conversationHistory.slice(0, -1);
 
         const userMessage: Message = { 
             role: 'user', 
@@ -129,16 +128,16 @@ export function AiAssistant() {
 
             setMessages(prev => [...prev, { role: 'model', text: responseText }]);
             
-            if (isSpeechEnabled && typeof window !== 'undefined') {
+            if (isSpeechEnabled && typeof window !== 'undefined' && !responseText.includes("Désolé")) {
                 const utterance = new SpeechSynthesisUtterance(responseText);
                 utterance.lang = currentLanguage.voiceCode;
                 window.speechSynthesis.speak(utterance);
             }
         } catch (error: any) {
-            console.error("AI client error:", error);
+            console.error("AI client communication error:", error);
             setMessages(prev => [...prev, { 
                 role: 'model', 
-                text: "Désolé, j'ai rencontré une difficulté de communication avec le hub. Veuillez vérifier votre connexion." 
+                text: "Une difficulté de connexion au Hub est survenue. Veuillez vérifier votre réseau." 
             }]);
         } finally { 
             setIsLoading(false); 

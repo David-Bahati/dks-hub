@@ -33,34 +33,47 @@ const customerAssistantFlow = ai.defineFlow(
       
       TON RÔLE :
       1. Répondre EXCLUSIVEMENT en ${langNames[input.language] || 'Français'}.
-      2. Si l'utilisateur envoie une photo, analyse-la pour identifier le matériel hardware.
+      2. Identifier le matériel si une photo est fournie.
       
       CONTEXTE :
       - Lieu : Immeuble Bahati, Bunia.
-      - Spécialité : Hardware luxe (NVIDIA, Starlink), Formations IA & Blockchain.
-      - Paiements : Pi Network (GCV) et DKST.`;
+      - Spécialité : Hardware luxe (NVIDIA RTX, Starlink), Formations IA & Blockchain.
+      - Paiements : Pi Network (GCV $314,159) et Jeton DKST.`;
 
-      // Préparation du prompt utilisateur
+      // Construction des parties du message actuel
       const userParts: any[] = [];
+      
+      // Si une photo est présente, on l'ajoute en premier
       if (input.photoDataUri) {
-        userParts.push({ media: { url: input.photoDataUri, contentType: 'image/jpeg' } });
+        // Extraction sécurisée du type mime
+        let mimeType = 'image/jpeg';
+        if (input.photoDataUri.startsWith('data:')) {
+            const match = input.photoDataUri.match(/^data:([^;]+);base64,/);
+            if (match) mimeType = match[1];
+        }
+        userParts.push({ media: { url: input.photoDataUri, contentType: mimeType } });
       }
+      
+      // Ajout du texte
       userParts.push({ text: input.message });
 
       // Appel au modèle Gemini
       const response = await ai.generate({
+        model: 'googleai/gemini-1.5-flash',
         system: systemInstruction,
         prompt: userParts,
         history: input.history || [],
         config: {
             temperature: 0.7,
+            maxOutputTokens: 500,
         }
       });
 
-      return response.text || "Je n'ai pas pu formuler de réponse. Veuillez reformuler votre question.";
+      return response.text || "Je n'ai pas pu générer de texte. Veuillez reformuler.";
     } catch (error: any) {
-      console.error("Genkit Flow Error:", error);
-      return "Une erreur technique s'est produite lors de la communication avec le cerveau DKS. Veuillez réessayer avec un message plus simple.";
+      console.error("Genkit Flow Error Details:", error);
+      // On renvoie l'erreur réelle pour le diagnostic
+      return `Désolé, une erreur technique est survenue au cœur du Hub : ${error.message || 'Erreur inconnue'}`;
     }
   }
 );
