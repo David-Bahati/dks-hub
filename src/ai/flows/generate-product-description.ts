@@ -5,7 +5,6 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
-import { gemini15Flash } from '@genkit-ai/google-genai';
 
 const GenerateDescriptionInputSchema = z.object({
   productName: z.string().describe('Le nom du produit informatique (ex: RTX 4090, Clavier Logitech G Pro)'),
@@ -16,7 +15,7 @@ export type GenerateDescriptionInput = z.infer<typeof GenerateDescriptionInputSc
 
 const productDescriptionPrompt = ai.definePrompt({
   name: 'productDescriptionPrompt',
-  model: gemini15Flash,
+  model: 'googleai/gemini-1.5-flash',
   input: { schema: GenerateDescriptionInputSchema },
   output: { schema: z.string() },
   prompt: `Tu es un expert en marketing hardware pour la boutique de luxe "Double King Shop" à Bunia.

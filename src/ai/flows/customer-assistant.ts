@@ -6,7 +6,6 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
-import { gemini15Flash } from '@genkit-ai/google-genai';
 
 const AssistantInputSchema = z.object({
   message: z.string(),
@@ -41,7 +40,7 @@ const customerAssistantFlow = ai.defineFlow(
       - Spécialité : Hardware luxe (NVIDIA RTX, Starlink), Formations IA & Blockchain.
       - Paiements : Pi Network (GCV $314,159) et Jeton DKST.`;
 
-      // Construction des parties du prompt
+      // Construction des parties du prompt utilisateur
       const promptParts: any[] = [];
       
       if (input.photoDataUri) {
@@ -55,22 +54,22 @@ const customerAssistantFlow = ai.defineFlow(
       
       promptParts.push({ text: input.message });
 
-      // Utilisation de la référence de modèle directe pour éviter les erreurs 404
+      // Appel à Gemini avec l'identifiant de modèle explicite pour éviter l'erreur "Must supply a model"
       const response = await ai.generate({
-        model: gemini15Flash,
+        model: 'googleai/gemini-1.5-flash',
         system: systemInstruction,
         prompt: promptParts,
         history: input.history || [],
         config: {
             temperature: 0.7,
-            maxOutputTokens: 800,
+            maxOutputTokens: 1000,
         }
       });
 
       return response.text || "Je n'ai pas pu générer de texte. Veuillez reformuler.";
     } catch (error: any) {
       console.error("Genkit Flow Error:", error);
-      // Renvoi de l'erreur brute pour diagnostic si le problème persiste
+      // Renvoi de l'erreur détaillée pour diagnostic
       return `Désolé, une erreur technique est survenue au cœur du Hub : ${error.message || 'Erreur inconnue'}`;
     }
   }
