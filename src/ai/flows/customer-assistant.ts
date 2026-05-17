@@ -40,28 +40,25 @@ const customerAssistantFlow = ai.defineFlow(
       - Spécialité : Hardware luxe (NVIDIA RTX, Starlink), Formations IA & Blockchain.
       - Paiements : Pi Network (GCV $314,159) et Jeton DKST.`;
 
-      // Construction des parties du message actuel
-      const userParts: any[] = [];
+      // Construction des parties du prompt
+      const promptParts: any[] = [];
       
-      // Si une photo est présente, on l'ajoute en premier
       if (input.photoDataUri) {
-        // Extraction sécurisée du type mime
         let mimeType = 'image/jpeg';
         if (input.photoDataUri.startsWith('data:')) {
             const match = input.photoDataUri.match(/^data:([^;]+);base64,/);
             if (match) mimeType = match[1];
         }
-        userParts.push({ media: { url: input.photoDataUri, contentType: mimeType } });
+        promptParts.push({ media: { url: input.photoDataUri, contentType: mimeType } });
       }
       
-      // Ajout du texte
-      userParts.push({ text: input.message });
+      promptParts.push({ text: input.message });
 
-      // Appel au modèle Gemini
+      // Appel au modèle avec l'identifiant exact de Genkit 1.x
       const response = await ai.generate({
         model: 'googleai/gemini-1.5-flash',
         system: systemInstruction,
-        prompt: userParts,
+        prompt: promptParts,
         history: input.history || [],
         config: {
             temperature: 0.7,
@@ -71,8 +68,8 @@ const customerAssistantFlow = ai.defineFlow(
 
       return response.text || "Je n'ai pas pu générer de texte. Veuillez reformuler.";
     } catch (error: any) {
-      console.error("Genkit Flow Error Details:", error);
-      // On renvoie l'erreur réelle pour le diagnostic
+      console.error("Genkit Flow Error:", error);
+      // Renvoi de l'erreur brute pour diagnostic si le problème persiste
       return `Désolé, une erreur technique est survenue au cœur du Hub : ${error.message || 'Erreur inconnue'}`;
     }
   }

@@ -86,32 +86,19 @@ export function AiAssistant() {
         if (!userMsg && !userImg) return;
         if (isLoading) return;
 
-        // CONSTRUCTION DE L'HISTORIQUE ÉPURÉ (Texte uniquement pour éviter de saturer le serveur)
-        // Gemini exige l'alternance User -> Model et doit commencer par User.
-        const conversationHistory = [];
-        
-        // On commence après le message de bienvenue (idx 1)
-        for (let i = 1; i < messages.length; i++) {
-            const m = messages[i];
-            if (m.text) {
-                conversationHistory.push({
-                    role: m.role,
-                    content: [{ text: m.text }]
-                });
-            }
-        }
-
-        // On s'assure que l'historique envoyé finit par un message 'model'
-        // pour que notre message actuel soit le nouveau message 'user' du prompt.
-        const safeHistory = conversationHistory.length % 2 === 0 
-            ? conversationHistory 
-            : conversationHistory.slice(0, -1);
-
         const userMessage: Message = { 
             role: 'user', 
             text: userMsg || (userImg ? "Analyse cette image." : ""), 
             image: userImg || undefined 
         };
+
+        // Construction d'un historique simple (uniquement texte pour éviter de saturer le payload)
+        const chatHistory = messages
+            .filter((m, idx) => idx > 0 && m.text) // Ignore le message de bienvenue et les vides
+            .map(m => ({
+                role: m.role,
+                content: [{ text: m.text }]
+            }));
 
         setMessages(prev => [...prev, userMessage]);
         setInput("");
@@ -123,7 +110,7 @@ export function AiAssistant() {
                 message: userMessage.text, 
                 language: currentLanguage.code, 
                 photoDataUri: userImg || undefined, 
-                history: safeHistory
+                history: chatHistory
             });
 
             setMessages(prev => [...prev, { role: 'model', text: responseText }]);
@@ -134,10 +121,10 @@ export function AiAssistant() {
                 window.speechSynthesis.speak(utterance);
             }
         } catch (error: any) {
-            console.error("AI client communication error:", error);
+            console.error("AI comm error:", error);
             setMessages(prev => [...prev, { 
                 role: 'model', 
-                text: "Une difficulté de connexion au Hub est survenue. Veuillez vérifier votre réseau." 
+                text: "Désolé, une difficulté de communication avec le cerveau DKS est survenue." 
             }]);
         } finally { 
             setIsLoading(false); 
