@@ -6,6 +6,7 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
+import { gemini15Flash } from '@genkit-ai/google-genai';
 
 const AssistantInputSchema = z.object({
   message: z.string(),
@@ -54,9 +55,9 @@ const customerAssistantFlow = ai.defineFlow(
       
       promptParts.push({ text: input.message });
 
-      // Utilisation de l'ID de chaîne explicite pour éviter l'erreur "Must supply a model"
+      // Utilisation de la référence d'objet modèle stable pour éviter l'erreur 404
       const response = await ai.generate({
-        model: 'googleai/gemini-1.5-flash',
+        model: gemini15Flash,
         system: systemInstruction,
         prompt: promptParts,
         history: input.history || [],

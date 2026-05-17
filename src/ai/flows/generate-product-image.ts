@@ -5,6 +5,7 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
+import { imagen4 } from '@genkit-ai/google-genai';
 
 const GenerateImageInputSchema = z.object({
   productName: z.string().describe('Le nom du produit'),
@@ -25,7 +26,7 @@ const generateProductImageFlow = ai.defineFlow(
 
     try {
       const { media } = await ai.generate({
-        model: 'googleai/imagen-4.0-fast-generate-001',
+        model: imagen4,
         prompt: promptText,
       });
 
