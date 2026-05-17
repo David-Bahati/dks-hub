@@ -7,6 +7,7 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
+import { gemini15Flash } from '@genkit-ai/google-genai';
 
 const AdvisorInputSchema = z.object({
   budget: z.number().describe('Budget maximum en USD'),
@@ -27,7 +28,7 @@ const hardwareAdvisorFlow = ai.defineFlow(
   async (input) => {
     try {
       const response = await ai.generate({
-        model: 'googleai/gemini-1.5-flash',
+        model: gemini15Flash,
         system: `Tu es l'Expert de Configuration de Double King Shop.
         Ton rôle est de créer la meilleure configuration PC ou de conseiller les meilleurs composants en fonction du budget et de l'usage du client.
         

@@ -6,6 +6,7 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
+import { gemini15Flash } from '@genkit-ai/google-genai';
 
 const AssistantInputSchema = z.object({
   message: z.string(),
@@ -40,7 +41,6 @@ const customerAssistantFlow = ai.defineFlow(
       - Spécialité : Hardware luxe (NVIDIA RTX, Starlink), Formations IA & Blockchain.
       - Paiements : Pi Network (GCV $314,159) et Jeton DKST.`;
 
-      // Construction des parties du prompt
       const promptParts: any[] = [];
       
       if (input.photoDataUri) {
@@ -54,9 +54,8 @@ const customerAssistantFlow = ai.defineFlow(
       
       promptParts.push({ text: input.message });
 
-      // Utilisation de l'ID de chaîne explicite pour garantir la résolution du modèle
       const response = await ai.generate({
-        model: 'googleai/gemini-1.5-flash',
+        model: gemini15Flash,
         system: systemInstruction,
         prompt: promptParts,
         history: input.history || [],
