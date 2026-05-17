@@ -6,6 +6,7 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
+import { gemini15Flash } from '@genkit-ai/google-genai';
 
 const AssistantInputSchema = z.object({
   message: z.string(),
@@ -53,11 +54,17 @@ const customerAssistantFlow = ai.defineFlow(
       
       promptParts.push({ text: input.message });
 
+      // On s'assure que l'historique est bien formaté pour Genkit 1.x
+      const formattedHistory = (input.history || []).map(msg => ({
+        role: msg.role === 'model' ? 'model' : 'user',
+        content: msg.content || [{ text: msg.text || "" }]
+      }));
+
       const response = await ai.generate({
-        model: 'googleai/gemini-1.5-flash',
+        model: gemini15Flash, // Utilisation de la référence d'objet stable
         system: systemInstruction,
         prompt: promptParts,
-        history: input.history || [],
+        history: formattedHistory,
         config: {
             temperature: 0.7,
             maxOutputTokens: 1000,
@@ -67,6 +74,7 @@ const customerAssistantFlow = ai.defineFlow(
       return response.text || "Je n'ai pas pu générer de texte. Veuillez reformuler.";
     } catch (error: any) {
       console.error("Genkit Flow Error:", error);
+      // Retourne l'erreur technique réelle pour diagnostic si elle survient encore
       return `Une erreur technique s'est produite lors de la communication avec le cerveau DKS : ${error.message || 'Erreur inconnue'}`;
     }
   }

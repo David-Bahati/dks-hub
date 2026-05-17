@@ -92,12 +92,13 @@ export function AiAssistant() {
             image: userImg || undefined 
         };
 
-        // Construction d'un historique simple (uniquement texte pour éviter de saturer le payload)
+        // Construction d'un historique valide pour Gemini (alternance user/model obligatoire)
+        // On exclut le message de bienvenue initial pour que l'historique commence par 'user'
         const chatHistory = messages
-            .filter((m, idx) => idx > 0 && m.text) // Ignore le message de bienvenue et les vides
+            .filter((m, idx) => idx > 0) 
             .map(m => ({
                 role: m.role,
-                content: [{ text: m.text }]
+                text: m.text
             }));
 
         setMessages(prev => [...prev, userMessage]);
@@ -115,16 +116,15 @@ export function AiAssistant() {
 
             setMessages(prev => [...prev, { role: 'model', text: responseText }]);
             
-            if (isSpeechEnabled && typeof window !== 'undefined' && !responseText.includes("Désolé")) {
+            if (isSpeechEnabled && typeof window !== 'undefined' && !responseText.includes("erreur")) {
                 const utterance = new SpeechSynthesisUtterance(responseText);
                 utterance.lang = currentLanguage.voiceCode;
                 window.speechSynthesis.speak(utterance);
             }
         } catch (error: any) {
-            console.error("AI comm error:", error);
             setMessages(prev => [...prev, { 
                 role: 'model', 
-                text: "Désolé, une difficulté de communication avec le cerveau DKS est survenue." 
+                text: "Une erreur technique s'est produite lors de la communication avec le cerveau DKS." 
             }]);
         } finally { 
             setIsLoading(false); 
