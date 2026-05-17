@@ -6,7 +6,6 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
-import { gemini15Flash } from '@genkit-ai/google-genai';
 
 const AssistantInputSchema = z.object({
   message: z.string(),
@@ -61,7 +60,7 @@ const customerAssistantFlow = ai.defineFlow(
       }));
 
       const response = await ai.generate({
-        model: gemini15Flash, // Utilisation de la référence d'objet stable
+        model: 'gemini-1.5-flash', // Utilisation de la référence d'objet stable
         system: systemInstruction,
         prompt: promptParts,
         history: formattedHistory,
